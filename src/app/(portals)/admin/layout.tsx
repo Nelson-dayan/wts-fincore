@@ -2,6 +2,7 @@ import Link from "next/link";
 import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import { authOptions } from "@/lib/auth/options";
+import { PortalHeader } from "@/components/layout/portal-header";
 import { SignOutButton } from "@/components/portals/sign-out-button";
 
 export default async function AdminPortalLayout({
@@ -14,23 +15,27 @@ export default async function AdminPortalLayout({
   if (session.user.role !== "admin") redirect("/employee");
 
   return (
-    <div className="flex min-h-screen flex-col">
-      <header className="border-b border-border bg-card/50 px-6 py-3 backdrop-blur">
-        <div className="mx-auto flex max-w-6xl items-center justify-between">
+    <div className="flex min-h-dvh flex-col">
+      <PortalHeader
+        brand={
           <span className="text-sm font-semibold tracking-tight text-primary">
             Admin portal
           </span>
-          <nav className="flex items-center gap-4 text-sm text-muted-foreground">
-            <Link href="/admin" className="hover:text-foreground">
-              Overview
-            </Link>
-            <Link href="/employee" className="hover:text-foreground">
-              Employee area
-            </Link>
-            <SignOutButton />
-          </nav>
-        </div>
-      </header>
+        }
+      >
+        <nav className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
+          <Link href="/admin" className="hover:text-foreground">
+            Overview
+          </Link>
+          <Link href="/admin/users" className="hover:text-foreground">
+            Users
+          </Link>
+          <Link href="/employee" className="hover:text-foreground">
+            Employee area
+          </Link>
+          <SignOutButton />
+        </nav>
+      </PortalHeader>
       <main className="flex-1">{children}</main>
     </div>
   );

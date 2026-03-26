@@ -1,6 +1,6 @@
 export default function EmployeePortalHome() {
   return (
-    <div className="mx-auto max-w-6xl px-6 py-10">
+    <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
       <h1 className="text-2xl font-semibold tracking-tight">Your workspace</h1>
       <p className="mt-2 max-w-xl text-sm text-muted-foreground">
         Structure only. Add tasks, documents, or team views here.
