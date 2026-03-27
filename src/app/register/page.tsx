@@ -9,6 +9,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { RegisterForm } from "@/components/register/register-form";
+import { ArrowLeft } from "lucide-react";
 
 export const metadata: Metadata = {
   title: "Create account",
@@ -18,27 +19,22 @@ export const metadata: Metadata = {
 export default function RegisterPage() {
   return (
     <AuthPageShell>
-      <Card className="border-border/60 bg-card/85 shadow-lg backdrop-blur-sm">
-        <CardHeader className="space-y-1 pb-4 text-center sm:text-left">
-          <CardTitle className="text-2xl font-semibold tracking-tight">
-            Create an account
-          </CardTitle>
+      <Card className="glass-card border-white/25 dark:border-white/10 !shadow-[var(--shadow-premium-lg)]">
+        <CardHeader className="text-center sm:text-left">
+          <CardTitle>Create an account</CardTitle>
           <CardDescription>
-            Employees can self-register. Admins are created with a server
-            secret.
+            Join with your email — you&apos;ll use it to sign in.
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-6">
+        <CardContent className="space-y-4">
           <RegisterForm />
-          <p className="text-center text-sm text-muted-foreground">
-            Already have an account?{" "}
-            <Link
-              href="/login"
-              className="font-medium text-primary underline-offset-4 hover:underline"
-            >
-              Sign in
-            </Link>
-          </p>
+          <Link
+            href="/login"
+            className="group flex w-full items-center justify-center gap-1.5 rounded-lg py-2 text-[13px] font-medium text-muted-foreground transition-colors hover:text-foreground"
+          >
+            <ArrowLeft className="size-3.5 transition-transform duration-200 group-hover:-translate-x-0.5" />
+            Back to sign in
+          </Link>
         </CardContent>
       </Card>
     </AuthPageShell>

@@ -1,18 +1,26 @@
+import { DashboardPageHeader } from "@/components/dashboard/page-header";
+import { StatPlaceholder } from "@/components/dashboard/stat-placeholder";
+import { Bell, FileText } from "lucide-react";
+
 export default function EmployeePortalHome() {
   return (
-    <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
-      <h1 className="text-2xl font-semibold tracking-tight">Your workspace</h1>
-      <p className="mt-2 max-w-xl text-sm text-muted-foreground">
-        Structure only. Add tasks, documents, or team views here.
-      </p>
-      <ul className="mt-8 grid gap-3 text-sm text-muted-foreground sm:grid-cols-2">
-        <li className="rounded-lg border border-dashed border-border p-4">
-          My assignments
-        </li>
-        <li className="rounded-lg border border-dashed border-border p-4">
-          Profile &amp; notifications
-        </li>
-      </ul>
+    <div className="animate-[fade-in_0.4s_ease-out_both]">
+      <DashboardPageHeader
+        title="Your workspace"
+        description="A calm home for daily work — assignments, files, and updates in one streamlined view."
+      />
+      <div className="grid gap-4 sm:grid-cols-2">
+        <StatPlaceholder
+          icon={FileText}
+          title="My assignments"
+          description="Track tasks and deadlines. Connect your task backend to populate this area."
+        />
+        <StatPlaceholder
+          icon={Bell}
+          title="Profile & notifications"
+          description="Tune alerts and profile details so you stay in the loop without noise."
+        />
+      </div>
     </div>
   );
 }

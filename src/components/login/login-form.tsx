@@ -3,11 +3,12 @@
 import { Suspense, useState } from "react";
 import { useRouter } from "next/navigation";
 import { signIn } from "next-auth/react";
-import { Loader2 } from "lucide-react";
+import { Loader2, Lock, Mail } from "lucide-react";
 import { RegistrationNotice } from "@/components/login/registration-notice";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { cn } from "@/lib/utils/cn";
 
 export function LoginForm() {
   const router = useRouter();
@@ -49,40 +50,60 @@ export function LoginForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-3.5">
       <Suspense fallback={null}>
         <RegistrationNotice />
       </Suspense>
-      <div className="space-y-2">
+      <div className="space-y-1.5">
         <Label htmlFor="login-email">Email</Label>
-        <Input
-          id="login-email"
-          type="email"
-          autoComplete="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          placeholder="you@company.com"
-        />
+        <div className="relative">
+          <Mail
+            className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground/70"
+            aria-hidden
+          />
+          <Input
+            id="login-email"
+            type="email"
+            autoComplete="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="you@company.com"
+            className="h-9 pl-9 text-[13px]"
+          />
+        </div>
       </div>
-      <div className="space-y-2">
+      <div className="space-y-1.5">
         <Label htmlFor="login-password">Password</Label>
-        <Input
-          id="login-password"
-          type="password"
-          autoComplete="current-password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-        />
+        <div className="relative">
+          <Lock
+            className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground/70"
+            aria-hidden
+          />
+          <Input
+            id="login-password"
+            type="password"
+            autoComplete="current-password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="••••••••"
+            className="h-9 pl-9 text-[13px]"
+          />
+        </div>
       </div>
       {error ? (
-        <p className="text-sm text-destructive" role="alert">
+        <p
+          className={cn(
+            "rounded-lg border border-destructive/25 bg-destructive/8 px-3 py-2 text-[13px] text-destructive dark:bg-destructive/12"
+          )}
+          role="alert"
+        >
           {error}
         </p>
       ) : null}
-      <Button type="submit" className="w-full" disabled={pending}>
+      <Button type="submit" className="h-9 w-full text-[13px]" disabled={pending}>
         {pending ? (
           <>
-            <Loader2 className="animate-spin" aria-hidden />
+            <Loader2 className="size-3.5 animate-spin" aria-hidden />
             Signing in…
           </>
         ) : (
