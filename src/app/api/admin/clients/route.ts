@@ -24,7 +24,7 @@ export async function GET(req: Request) {
       : {};
     const [items, total] = await Promise.all([
       ClientModel.find(filter)
-      .select("name company email phone createdAt")
+      .select("name company email phone website address clientLogoText clientSignatureText createdAt")
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit)
@@ -44,22 +44,38 @@ export async function POST(req: Request) {
     const body = (await req.json()) as {
       name?: string;
       company?: string;
+      website?: string;
       address?: string;
       email?: string;
       phone?: string;
+      clientLogoText?: string;
+      clientSignatureText?: string;
     };
     const name = String(body.name ?? "").trim();
-    if (!name) {
-      return NextResponse.json({ message: "Client name is required" }, { status: 400 });
+    const company = String(body.company ?? "").trim();
+    const email = String(body.email ?? "").trim().toLowerCase();
+    const phone = String(body.phone ?? "").trim();
+    const address = String(body.address ?? "").trim();
+    if (!name || !company || !email || !phone || !address) {
+      return NextResponse.json(
+        {
+          message:
+            "Name, Client Company, Email, Phone, and Address are required.",
+        },
+        { status: 400 }
+      );
     }
 
     const created = await ClientModel.create({
       name,
-      company: String(body.company ?? ""),
-      address: String(body.address ?? ""),
-      email: String(body.email ?? "").toLowerCase(),
-      phone: String(body.phone ?? ""),
-      clientLogoUrl: "",
+      company,
+      website: String(body.website ?? ""),
+      address,
+      email,
+      phone,
+      clientLogoUrl: String(body.clientLogoText ?? ""),
+      clientLogoText: String(body.clientLogoText ?? ""),
+      clientSignatureText: String(body.clientSignatureText ?? ""),
       createdBy: session.user.id,
     });
 

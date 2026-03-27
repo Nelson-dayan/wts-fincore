@@ -3,7 +3,7 @@ import { connectDB } from "@/lib/db/connect";
 import {
   ActivityLogModel,
   ClientModel,
-  CompanySettingsModel,
+  CompanyModel,
   ExpenseModel,
   InvoiceModel,
   PaymentModel,
@@ -37,7 +37,7 @@ export async function initializeSystem(input: InitializeSystemInput) {
 
   const models = [
     UserModel,
-    CompanySettingsModel,
+    CompanyModel,
     ClientModel,
     ProjectModel,
     QuotationModel,
@@ -65,18 +65,20 @@ export async function initializeSystem(input: InitializeSystemInput) {
     });
   }
 
-  const company = await CompanySettingsModel.findOne().lean();
-  if (!company) {
-    await CompanySettingsModel.create({
+  let primaryCompany = await CompanyModel.findOne({ isPrimary: true }).lean();
+  if (!primaryCompany) {
+    const createdPrimary = await CompanyModel.create({
       name: "Sec DocuTrade",
       address: "",
       contactName: input.adminName.trim(),
       email: input.adminEmail.trim().toLowerCase(),
       website: "",
-      logoUrl: "",
-      signatureUrl: "",
+      logoText: "",
+      signatureText: "",
       defaultTax: { taxRate: 0, taxEnabled: false },
+      isPrimary: true,
     });
+    primaryCompany = createdPrimary.toObject();
   }
 
   if (input.createSampleData) {
@@ -90,7 +92,9 @@ export async function initializeSystem(input: InitializeSystemInput) {
           address: "Demo Address",
           email: "client@example.com",
           phone: "",
-          clientLogoUrl: "",
+          clientLogoText: "",
+          clientSignatureText: "",
+          companyId: primaryCompany?._id,
           createdBy: admin._id,
         });
         await ProjectModel.create({

@@ -1,5 +1,5 @@
 export { UserModel } from "./user.model";
-export { CompanySettingsModel } from "./company-settings.model";
+export { CompanyModel } from "./company.model";
 export { ClientModel } from "./client.model";
 export { ProjectModel } from "./project.model";
 export { QuotationModel } from "./quotation.model";
