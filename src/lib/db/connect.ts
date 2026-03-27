@@ -20,7 +20,14 @@ export async function connectDB(): Promise<typeof mongoose> {
   const cache = getCache();
   if (cache.conn) return cache.conn;
   if (!cache.promise) {
-    cache.promise = mongoose.connect(uri);
+    mongoose.set("strictQuery", true);
+    cache.promise = mongoose.connect(uri, {
+      maxPoolSize: 20,
+      minPoolSize: 2,
+      serverSelectionTimeoutMS: 5000,
+      socketTimeoutMS: 45000,
+      autoIndex: process.env.NODE_ENV !== "production",
+    });
   }
   cache.conn = await cache.promise;
   return cache.conn;

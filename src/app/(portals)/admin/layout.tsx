@@ -21,22 +21,59 @@ export default async function AdminPortalLayout({
     <div className="flex min-h-dvh flex-col bg-background">
       <PortalHeader brand={<PortalBrand variant="admin" />}>
         <nav
-          className="flex w-full flex-wrap items-center gap-1 sm:w-auto sm:justify-end sm:gap-1.5"
+          className="flex w-full flex-col gap-1 sm:w-auto sm:items-end"
           aria-label="Admin"
         >
-          <PortalNavLink href="/admin" match="exact">
-            Overview
-          </PortalNavLink>
-          <PortalNavLink href="/admin/users" match="prefix">
-            Users
-          </PortalNavLink>
-          <Link
-            href="/employee"
-            className="rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent/80 hover:text-foreground"
-          >
-            Workspace
-          </Link>
-          <SignOutButton />
+          <div className="flex w-full flex-wrap items-center gap-1 sm:justify-end">
+            <span className="px-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/80">
+              Core
+            </span>
+            <PortalNavLink href="/admin" match="exact">
+              Overview
+            </PortalNavLink>
+            <PortalNavLink href="/admin/users" match="prefix">
+              Users
+            </PortalNavLink>
+            <PortalNavLink href="/admin/clients" match="prefix">
+              Clients
+            </PortalNavLink>
+            <PortalNavLink href="/admin/projects" match="prefix">
+              Projects
+            </PortalNavLink>
+            <PortalNavLink href="/admin/company" match="prefix">
+              Company
+            </PortalNavLink>
+          </div>
+          <div className="flex w-full flex-wrap items-center gap-1 sm:justify-end">
+            <span className="px-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/80">
+              Finance
+            </span>
+            <PortalNavLink href="/admin/quotations" match="prefix">
+              Quotations
+            </PortalNavLink>
+            <PortalNavLink href="/admin/purchase-orders" match="prefix">
+              POs
+            </PortalNavLink>
+            <PortalNavLink href="/admin/invoices" match="prefix">
+              Invoices
+            </PortalNavLink>
+            <PortalNavLink href="/admin/payments" match="prefix">
+              Payments
+            </PortalNavLink>
+            <PortalNavLink href="/admin/expenses" match="prefix">
+              Expenses
+            </PortalNavLink>
+            <PortalNavLink href="/admin/activity" match="prefix">
+              Activity
+            </PortalNavLink>
+            <Link
+              href="/employee"
+              className="rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent/80 hover:text-foreground"
+            >
+              Workspace
+            </Link>
+            <SignOutButton />
+          </div>
         </nav>
       </PortalHeader>
       <PortalShell>

@@ -7,7 +7,10 @@ export interface IUser {
   email: string;
   password: string;
   role: UserRole;
-  phoneNumber: string;
+  phone: string;
+  phoneNumber?: string;
   isActive: boolean;
+  signatureUrl?: string;
   createdAt: Date;
+  updatedAt: Date;
 }
