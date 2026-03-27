@@ -23,15 +23,24 @@ export async function GET(req: Request) {
           ],
         }
       : {};
-    const [users, total] = await Promise.all([
+    const [usersRaw, total] = await Promise.all([
       UserModel.find(filter)
-      .select("name email role isActive phone signatureUrl createdAt updatedAt")
+      .select("name email role isActive phone phoneNumber signatureUrl createdAt updatedAt")
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit)
       .lean(),
       UserModel.countDocuments(filter),
     ]);
+    const users = usersRaw.map((user) => ({
+      ...user,
+      phone:
+        String(
+          (user as { phone?: string }).phone ??
+            (user as { phoneNumber?: string }).phoneNumber ??
+            ""
+        ) || "",
+    }));
     return NextResponse.json({
       users,
       items: users,

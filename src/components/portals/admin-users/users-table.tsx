@@ -3,6 +3,7 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 import type { AdminUser } from "./types";
 
 export function UsersTable({
@@ -98,36 +99,36 @@ export function UsersTable({
                     <td className="py-2 pr-3">{user.email}</td>
                     <td className="py-2 pr-3 uppercase">
                       {editingId === user._id ? (
-                        <select
-                          className="h-9 rounded-lg border border-border bg-background px-2 text-sm"
+                        <Select
                           value={drafts[user._id]?.role ?? user.role}
                           onChange={(e) =>
                             onDraftChange(user._id, {
                               role: e.target.value as "admin" | "employee",
                             })
                           }
-                        >
-                          <option value="admin">admin</option>
-                          <option value="employee">employee</option>
-                        </select>
+                          options={[
+                            { value: "admin", label: "admin" },
+                            { value: "employee", label: "employee" },
+                          ]}
+                        />
                       ) : (
                         user.role
                       )}
                     </td>
                     <td className="py-2 pr-3">
                       {editingId === user._id ? (
-                        <select
-                          className="h-9 rounded-lg border border-border bg-background px-2 text-sm"
+                        <Select
                           value={String(drafts[user._id]?.isActive ?? user.isActive)}
                           onChange={(e) =>
                             onDraftChange(user._id, {
                               isActive: e.target.value === "true",
                             })
                           }
-                        >
-                          <option value="true">active</option>
-                          <option value="false">inactive</option>
-                        </select>
+                          options={[
+                            { value: "true", label: "active" },
+                            { value: "false", label: "inactive" },
+                          ]}
+                        />
                       ) : user.isActive ? (
                         "active"
                       ) : (

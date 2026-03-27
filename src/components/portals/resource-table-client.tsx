@@ -34,6 +34,14 @@ function formatCell(value: unknown): string {
     }
     return value;
   }
+  if (typeof value === "object" && value !== null) {
+    const decimalLike = value as { $numberDecimal?: string; toString?: () => string };
+    if (decimalLike.$numberDecimal) return decimalLike.$numberDecimal;
+    if (typeof decimalLike.toString === "function") {
+      const parsed = decimalLike.toString();
+      if (parsed !== "[object Object]") return parsed;
+    }
+  }
   return String(value);
 }
 
@@ -61,7 +69,8 @@ export function ResourceTableClient({
           limit: String(limit),
           q: query,
         });
-        const response = await fetch(`${endpoint}?${qs.toString()}`, {
+        const separator = endpoint.includes("?") ? "&" : "?";
+        const response = await fetch(`${endpoint}${separator}${qs.toString()}`, {
           cache: "no-store",
         });
         const payload = (await response.json()) as ApiPayload;

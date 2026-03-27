@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { DashboardPageHeader } from "@/components/dashboard/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,6 +18,7 @@ type ClientRow = {
   address: string;
   clientLogoText?: string;
   clientSignatureText?: string;
+  projectsCount?: number;
   createdAt: string;
 };
 
@@ -146,23 +148,6 @@ export function AdminClientsClient() {
       await loadClients(page, query);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to update client");
-    } finally {
-      setSavingId("");
-    }
-  }
-
-  async function deleteClient(clientId: string) {
-    setSavingId(clientId);
-    setError("");
-    try {
-      const response = await fetch(`/api/admin/clients/${clientId}`, {
-        method: "DELETE",
-      });
-      const payload = (await response.json()) as { message?: string };
-      if (!response.ok) throw new Error(payload.message ?? "Failed to delete client");
-      await loadClients(page, query);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to delete client");
     } finally {
       setSavingId("");
     }
@@ -304,7 +289,7 @@ export function AdminClientsClient() {
                     <th className="py-2 pr-3">Phone</th>
                     <th className="py-2 pr-3">Website</th>
                     <th className="py-2 pr-3">Address</th>
-                    <th className="py-2 pr-3">Created</th>
+                    <th className="py-2 pr-3">Projects</th>
                     <th className="py-2 pr-3">Actions</th>
                   </tr>
                 </thead>
@@ -419,9 +404,7 @@ export function AdminClientsClient() {
                             client.address || "-"
                           )}
                         </td>
-                        <td className="py-2 pr-3">
-                          {new Date(client.createdAt).toLocaleDateString()}
-                        </td>
+                        <td className="py-2 pr-3">{client.projectsCount ?? 0}</td>
                         <td className="py-2 pr-3">
                           <div className="flex gap-2">
                             {editingId === client._id ? (
@@ -443,27 +426,11 @@ export function AdminClientsClient() {
                               </>
                             ) : (
                               <>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => {
-                                    setEditingId(client._id);
-                                    setDrafts((prev) => ({
-                                      ...prev,
-                                      [client._id]: { ...client },
-                                    }));
-                                  }}
-                                >
-                                  Edit
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="destructive"
-                                  onClick={() => deleteClient(client._id)}
-                                  disabled={savingId === client._id}
-                                >
-                                  Delete
-                                </Button>
+                                <Link href={`/admin/clients/${client._id}`}>
+                                  <Button size="sm" variant="outline">
+                                    View
+                                  </Button>
+                                </Link>
                               </>
                             )}
                           </div>

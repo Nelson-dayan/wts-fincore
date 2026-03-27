@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireRole } from "@/lib/auth/require-role";
 import { connectDB } from "@/lib/db/connect";
-import { ClientModel } from "@/lib/db/models";
+import { ClientModel, ProjectModel } from "@/lib/db/models";
 import { authErrorResponse } from "@/lib/api/route-auth";
 import { logActivity } from "@/lib/services/activity/log-activity.service";
 
@@ -74,6 +74,16 @@ export async function DELETE(_req: Request, ctx: RouteCtx) {
     const session = await requireRole(["admin"]);
     await connectDB();
     const { clientId } = await ctx.params;
+    const linkedProjectCount = await ProjectModel.countDocuments({ clientId });
+    if (linkedProjectCount > 0) {
+      return NextResponse.json(
+        {
+          message:
+            "Client cannot be deleted because it has linked projects. Remove projects first.",
+        },
+        { status: 400 }
+      );
+    }
     const deleted = await ClientModel.findByIdAndDelete(clientId).lean();
     if (!deleted) {
       return NextResponse.json({ message: "Client not found" }, { status: 404 });

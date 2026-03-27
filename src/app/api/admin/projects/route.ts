@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireRole } from "@/lib/auth/require-role";
 import { connectDB } from "@/lib/db/connect";
-import { ClientModel, ProjectModel } from "@/lib/db/models";
+import { ClientModel, ProjectModel, UserModel } from "@/lib/db/models";
 import { authErrorResponse } from "@/lib/api/route-auth";
 import { parsePagination, parseSearch } from "@/lib/api/pagination";
 import { logActivity } from "@/lib/services/activity/log-activity.service";
@@ -13,8 +13,11 @@ export async function GET(req: Request) {
     const url = new URL(req.url);
     const { page, limit, skip } = parsePagination(url.searchParams);
     const q = parseSearch(url.searchParams);
-    const filter = q ? { name: { $regex: q, $options: "i" } } : {};
-    const [items, total] = await Promise.all([
+    const clientId = String(url.searchParams.get("clientId") ?? "").trim();
+    const filter: Record<string, unknown> = {};
+    if (q) filter.name = { $regex: q, $options: "i" };
+    if (clientId) filter.clientId = clientId;
+    const [itemsRaw, total] = await Promise.all([
       ProjectModel.find(filter)
       .select("name status priority budget createdAt clientId")
       .sort({ createdAt: -1 })
@@ -23,6 +26,13 @@ export async function GET(req: Request) {
       .lean(),
       ProjectModel.countDocuments(filter),
     ]);
+    const items = itemsRaw.map((item) => ({
+      ...item,
+      budget:
+        typeof item.budget === "object" && item.budget !== null
+          ? Number.parseFloat(String(item.budget))
+          : item.budget,
+    }));
     return NextResponse.json({ items, page, limit, total, hasMore: skip + items.length < total });
   } catch (error) {
     return authErrorResponse(error, "Failed to load projects");
@@ -54,6 +64,15 @@ export async function POST(req: Request) {
     const clientExists = await ClientModel.exists({ _id: clientId });
     if (!clientExists) {
       return NextResponse.json({ message: "Client not found" }, { status: 404 });
+    }
+    if (Array.isArray(body.assignedTo) && body.assignedTo.length > 0) {
+      const userCount = await UserModel.countDocuments({ _id: { $in: body.assignedTo } });
+      if (userCount !== body.assignedTo.length) {
+        return NextResponse.json(
+          { message: "One or more assigned users are invalid" },
+          { status: 400 }
+        );
+      }
     }
 
     const created = await ProjectModel.create({

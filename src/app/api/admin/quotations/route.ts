@@ -12,9 +12,10 @@ export async function GET(req: Request) {
     const url = new URL(req.url);
     const { page, limit, skip } = parsePagination(url.searchParams);
     const q = parseSearch(url.searchParams);
-    const filter = q
-      ? { quotationNumber: { $regex: q, $options: "i" } }
-      : {};
+    const projectId = String(url.searchParams.get("projectId") ?? "").trim();
+    const filter: Record<string, unknown> = {};
+    if (q) filter.quotationNumber = { $regex: q, $options: "i" };
+    if (projectId) filter.projectId = projectId;
     const [items, total] = await Promise.all([
       QuotationModel.find(filter)
       .select("quotationNumber status projectId createdAt")

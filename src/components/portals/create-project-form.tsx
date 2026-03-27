@@ -5,11 +5,17 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Select } from "@/components/ui/select";
 
 interface ClientOption {
   _id: string;
   name: string;
   company?: string;
+}
+interface UserOption {
+  _id: string;
+  name: string;
+  email: string;
 }
 
 export function CreateProjectForm() {
@@ -20,6 +26,12 @@ export function CreateProjectForm() {
   const [clientId, setClientId] = useState("");
   const [clientLabel, setClientLabel] = useState("");
   const [clientOptions, setClientOptions] = useState<ClientOption[]>([]);
+  const [userOptions, setUserOptions] = useState<UserOption[]>([]);
+  const [status, setStatus] = useState<
+    "lead" | "in_progress" | "completed" | "on_hold"
+  >("lead");
+  const [priority, setPriority] = useState<"low" | "medium" | "high">("medium");
+  const [assignedToUserId, setAssignedToUserId] = useState("");
   const [message, setMessage] = useState("");
   const [pending, setPending] = useState(false);
 
@@ -39,6 +51,27 @@ export function CreateProjectForm() {
     };
   }, [clientQuery]);
 
+  useEffect(() => {
+    let alive = true;
+    async function loadUsers() {
+      const response = await fetch("/api/admin/users?page=1&limit=50", {
+        cache: "no-store",
+      });
+      const payload = (await response.json()) as { users?: UserOption[] };
+      if (alive) {
+        const rows = payload.users ?? [];
+        setUserOptions(rows);
+        if (!assignedToUserId && rows[0]?._id) {
+          setAssignedToUserId(rows[0]._id);
+        }
+      }
+    }
+    loadUsers();
+    return () => {
+      alive = false;
+    };
+  }, [assignedToUserId]);
+
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setPending(true);
@@ -52,6 +85,9 @@ export function CreateProjectForm() {
           description,
           budget: Number(budget || 0),
           clientId,
+          status,
+          priority,
+          assignedTo: assignedToUserId ? [assignedToUserId] : [],
         }),
       });
       const result = (await response.json()) as { message?: string };
@@ -88,6 +124,55 @@ export function CreateProjectForm() {
               type="number"
               value={budget}
               onChange={(e) => setBudget(e.target.value)}
+            />
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="project-status">Status</Label>
+            <Select
+              id="project-status"
+              value={status}
+              onChange={(e) =>
+                setStatus(
+                  e.target.value as "lead" | "in_progress" | "completed" | "on_hold"
+                )
+              }
+              options={[
+                { value: "lead", label: "lead" },
+                { value: "in_progress", label: "in_progress" },
+                { value: "completed", label: "completed" },
+                { value: "on_hold", label: "on_hold" },
+              ]}
+            />
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="project-priority">Priority</Label>
+            <Select
+              id="project-priority"
+              value={priority}
+              onChange={(e) =>
+                setPriority(e.target.value as "low" | "medium" | "high")
+              }
+              options={[
+                { value: "low", label: "low" },
+                { value: "medium", label: "medium" },
+                { value: "high", label: "high" },
+              ]}
+            />
+          </div>
+          <div className="space-y-1 sm:col-span-2">
+            <Label htmlFor="project-assigned">Assigned To</Label>
+            <Select
+              id="project-assigned"
+              value={assignedToUserId}
+              onChange={(e) => setAssignedToUserId(e.target.value)}
+              options={
+                userOptions.length
+                  ? userOptions.map((user) => ({
+                      value: user._id,
+                      label: `${user.name} (${user.email})`,
+                    }))
+                  : [{ value: "", label: "No users found" }]
+              }
             />
           </div>
           <div className="space-y-1 sm:col-span-2">

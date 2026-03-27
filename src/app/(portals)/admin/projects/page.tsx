@@ -1,22 +1,18 @@
 import { CreateProjectForm } from "@/components/portals/create-project-form";
-import { ResourceTableClient } from "@/components/portals/resource-table-client";
+import { AdminProjectsClient } from "@/components/portals/admin-projects-client";
 
-export default function AdminProjectsPage() {
+interface PageProps {
+  searchParams?: Promise<{ clientId?: string }>;
+}
+
+export default async function AdminProjectsPage({ searchParams }: PageProps) {
+  const params = (await searchParams) ?? {};
+  const clientId = params.clientId ? String(params.clientId) : "";
+
   return (
     <>
       <CreateProjectForm />
-      <ResourceTableClient
-        title="Projects"
-        description="Central project tracking across all clients."
-        endpoint="/api/admin/projects"
-        columns={[
-          { key: "name", label: "Name" },
-          { key: "status", label: "Status" },
-          { key: "priority", label: "Priority" },
-          { key: "budget", label: "Budget" },
-          { key: "createdAt", label: "Created At" },
-        ]}
-      />
+      <AdminProjectsClient initialClientId={clientId} />
     </>
   );
 }

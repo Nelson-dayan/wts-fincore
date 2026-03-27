@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select } from "@/components/ui/select";
 import type { NewUserForm } from "./types";
 
 export function AddUserForm({
@@ -63,17 +64,17 @@ export function AddUserForm({
           </div>
           <div className="space-y-1">
             <Label htmlFor="new-role">Role</Label>
-            <select
+            <Select
               id="new-role"
-              className="h-9 w-full rounded-lg border border-border bg-background px-3 text-sm"
               value={form.role}
               onChange={(e) =>
                 onFormChange({ ...form, role: e.target.value as "admin" | "employee" })
               }
-            >
-              <option value="employee">employee</option>
-              <option value="admin">admin</option>
-            </select>
+              options={[
+                { value: "employee", label: "employee" },
+                { value: "admin", label: "admin" },
+              ]}
+            />
           </div>
           <div className="sm:col-span-2">
             <Button type="submit" disabled={saving}>

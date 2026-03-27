@@ -12,7 +12,10 @@ export async function GET(req: Request) {
     const url = new URL(req.url);
     const { page, limit, skip } = parsePagination(url.searchParams);
     const q = parseSearch(url.searchParams);
-    const filter = q ? { poNumber: { $regex: q, $options: "i" } } : {};
+    const projectId = String(url.searchParams.get("projectId") ?? "").trim();
+    const filter: Record<string, unknown> = {};
+    if (q) filter.poNumber = { $regex: q, $options: "i" };
+    if (projectId) filter.projectId = projectId;
     const [items, total] = await Promise.all([
       PurchaseOrderModel.find(filter)
       .select("poNumber type status fileUrl quotationId createdAt")

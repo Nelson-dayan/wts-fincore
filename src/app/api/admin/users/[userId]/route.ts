@@ -25,7 +25,10 @@ export async function PATCH(req: Request, ctx: RouteCtx) {
     const updates: Record<string, unknown> = {};
     if (body.name !== undefined) updates.name = String(body.name).trim();
     if (body.role !== undefined) updates.role = body.role;
-    if (body.phone !== undefined) updates.phone = String(body.phone);
+    if (body.phone !== undefined) {
+      updates.phone = String(body.phone);
+      updates.phoneNumber = String(body.phone);
+    }
     if (body.isActive !== undefined) updates.isActive = Boolean(body.isActive);
     if (body.signatureUrl !== undefined) {
       updates.signatureUrl = String(body.signatureUrl);

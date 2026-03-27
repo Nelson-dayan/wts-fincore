@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireRole } from "@/lib/auth/require-role";
 import { connectDB } from "@/lib/db/connect";
-import { ClientModel } from "@/lib/db/models";
+import { ClientModel, ProjectModel } from "@/lib/db/models";
 import { authErrorResponse } from "@/lib/api/route-auth";
 import { parsePagination, parseSearch } from "@/lib/api/pagination";
 import { logActivity } from "@/lib/services/activity/log-activity.service";
@@ -22,7 +22,7 @@ export async function GET(req: Request) {
           ],
         }
       : {};
-    const [items, total] = await Promise.all([
+    const [itemsRaw, total] = await Promise.all([
       ClientModel.find(filter)
       .select("name company email phone website address clientLogoText clientSignatureText createdAt")
       .sort({ createdAt: -1 })
@@ -31,6 +31,18 @@ export async function GET(req: Request) {
       .lean(),
       ClientModel.countDocuments(filter),
     ]);
+    const clientIds = itemsRaw.map((item) => item._id);
+    const projectAgg = await ProjectModel.aggregate<{ _id: unknown; count: number }>([
+      { $match: { clientId: { $in: clientIds } } },
+      { $group: { _id: "$clientId", count: { $sum: 1 } } },
+    ]);
+    const projectCountMap = new Map(
+      projectAgg.map((entry) => [String(entry._id), entry.count])
+    );
+    const items = itemsRaw.map((item) => ({
+      ...item,
+      projectsCount: projectCountMap.get(String(item._id)) ?? 0,
+    }));
     return NextResponse.json({ items, page, limit, total, hasMore: skip + items.length < total });
   } catch (error) {
     return authErrorResponse(error, "Failed to load clients");
