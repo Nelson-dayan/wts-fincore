@@ -8,30 +8,33 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { ArrowRight } from "lucide-react";
 
 export default function Login() {
   return (
     <AuthPageShell>
-      <Card className="border-border/60 bg-card/85 shadow-lg backdrop-blur-sm">
-        <CardHeader className="space-y-1 pb-4 text-center sm:text-left">
-          <CardTitle className="text-2xl font-semibold tracking-tight">
-            Welcome back
-          </CardTitle>
+      <Card className="glass-card border-white/25 dark:border-white/10 !shadow-[var(--shadow-premium-lg)]">
+        <CardHeader className="text-center sm:text-left">
+          <CardTitle>Welcome back</CardTitle>
           <CardDescription>
-            Sign in with your work email to continue
+            Sign in with your work email — secure workspace access.
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-6">
+        <CardContent className="space-y-4">
           <LoginForm />
-          <p className="text-center text-sm text-muted-foreground">
-            New here?{" "}
-            <Link
-              href="/register"
-              className="font-medium text-primary underline-offset-4 hover:underline"
-            >
-              Create an account
-            </Link>
-          </p>
+          <div className="relative py-0.5">
+            <div className="absolute inset-x-0 top-1/2 h-px -translate-y-1/2 bg-border/80" />
+            <p className="relative mx-auto w-max bg-background/90 px-2.5 text-center text-[11px] text-muted-foreground backdrop-blur-sm dark:bg-background/75">
+              New to DocuTrade?
+            </p>
+          </div>
+          <Link
+            href="/register"
+            className="group flex w-full items-center justify-center gap-1.5 rounded-lg border border-border/80 bg-background/40 py-2.5 text-[13px] font-medium text-foreground shadow-sm backdrop-blur-sm transition-colors duration-200 hover:border-primary/25 hover:bg-primary/5 hover:text-primary"
+          >
+            Create an account
+            <ArrowRight className="size-3.5 opacity-80 transition-transform duration-200 group-hover:translate-x-0.5" />
+          </Link>
         </CardContent>
       </Card>
     </AuthPageShell>

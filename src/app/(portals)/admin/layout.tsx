@@ -2,7 +2,10 @@ import Link from "next/link";
 import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import { authOptions } from "@/lib/auth/options";
+import { PortalBrand } from "@/components/layout/portal-brand";
 import { PortalHeader } from "@/components/layout/portal-header";
+import { PortalNavLink } from "@/components/layout/portal-nav-link";
+import { PortalShell } from "@/components/layout/portal-shell";
 import { SignOutButton } from "@/components/portals/sign-out-button";
 
 export default async function AdminPortalLayout({
@@ -15,28 +18,32 @@ export default async function AdminPortalLayout({
   if (session.user.role !== "admin") redirect("/employee");
 
   return (
-    <div className="flex min-h-dvh flex-col">
-      <PortalHeader
-        brand={
-          <span className="text-sm font-semibold tracking-tight text-primary">
-            Admin portal
-          </span>
-        }
-      >
-        <nav className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
-          <Link href="/admin" className="hover:text-foreground">
+    <div className="flex min-h-dvh flex-col bg-background">
+      <PortalHeader brand={<PortalBrand variant="admin" />}>
+        <nav
+          className="flex w-full flex-wrap items-center gap-1 sm:w-auto sm:justify-end sm:gap-1.5"
+          aria-label="Admin"
+        >
+          <PortalNavLink href="/admin" match="exact">
             Overview
-          </Link>
-          <Link href="/admin/users" className="hover:text-foreground">
+          </PortalNavLink>
+          <PortalNavLink href="/admin/users" match="prefix">
             Users
-          </Link>
-          <Link href="/employee" className="hover:text-foreground">
-            Employee area
+          </PortalNavLink>
+          <Link
+            href="/employee"
+            className="rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent/80 hover:text-foreground"
+          >
+            Workspace
           </Link>
           <SignOutButton />
         </nav>
       </PortalHeader>
-      <main className="flex-1">{children}</main>
+      <PortalShell>
+        <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
+          {children}
+        </div>
+      </PortalShell>
     </div>
   );
 }

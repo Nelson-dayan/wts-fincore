@@ -2,8 +2,11 @@ import Link from "next/link";
 import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import { authOptions } from "@/lib/auth/options";
+import { PortalBrand } from "@/components/layout/portal-brand";
 import { PortalHeader } from "@/components/layout/portal-header";
+import { PortalShell } from "@/components/layout/portal-shell";
 import { SignOutButton } from "@/components/portals/sign-out-button";
+import { User } from "lucide-react";
 
 export default async function EmployeePortalLayout({
   children,
@@ -14,25 +17,31 @@ export default async function EmployeePortalLayout({
   if (!session?.user) redirect("/login");
 
   return (
-    <div className="flex min-h-dvh flex-col">
-      <PortalHeader
-        brand={
-          <span className="text-sm font-semibold tracking-tight">
-            Employee portal
+    <div className="flex min-h-dvh flex-col bg-background">
+      <PortalHeader brand={<PortalBrand variant="employee" />}>
+        <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end sm:gap-3">
+          <span className="inline-flex max-w-[min(100%,14rem)] items-center gap-2 rounded-lg bg-muted/60 px-3 py-1.5 text-xs text-muted-foreground ring-1 ring-border/60 sm:max-w-xs sm:text-sm">
+            <User className="size-3.5 shrink-0 opacity-70" aria-hidden />
+            <span className="truncate" title={session.user.email ?? undefined}>
+              {session.user.email}
+            </span>
           </span>
-        }
-      >
-        <span className="hidden max-w-[40vw] truncate text-sm text-muted-foreground sm:inline md:max-w-xs">
-          {session.user.email}
-        </span>
-        {session.user.role === "admin" ? (
-          <Link href="/admin" className="text-sm text-muted-foreground hover:text-foreground">
-            Admin
-          </Link>
-        ) : null}
-        <SignOutButton />
+          {session.user.role === "admin" ? (
+            <Link
+              href="/admin"
+              className="rounded-lg px-3 py-2 text-sm font-medium text-primary transition-colors hover:bg-primary/10"
+            >
+              Admin
+            </Link>
+          ) : null}
+          <SignOutButton />
+        </div>
       </PortalHeader>
-      <main className="flex-1">{children}</main>
+      <PortalShell>
+        <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
+          {children}
+        </div>
+      </PortalShell>
     </div>
   );
 }
