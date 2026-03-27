@@ -1,0 +1,39 @@
+import { Schema, Types } from "mongoose";
+import { optionalDecimalField, schemaOptions } from "@/lib/db/schemas/shared.schema";
+
+export const purchaseOrderSchema = new Schema(
+  {
+    poNumber: { type: String, required: true, unique: true, index: true },
+    projectId: { type: Types.ObjectId, ref: "Project", required: true, index: true },
+    quotationId: { type: Types.ObjectId, ref: "Quotation", required: true, index: true },
+    type: { type: String, enum: ["client", "internal"], required: true, index: true },
+    fileUrl: { type: String, default: "" },
+    externalPoNumber: { type: String, default: "" },
+    generatedFromQuotation: { type: Boolean, default: false },
+    totalAmount: optionalDecimalField,
+    status: {
+      type: String,
+      enum: ["linked", "active", "completed"],
+      default: "linked",
+      index: true,
+    },
+    createdBy: { type: Types.ObjectId, ref: "User", required: true, index: true },
+  },
+  schemaOptions
+);
+
+purchaseOrderSchema.pre("validate", function () {
+  if (this.type === "client" && !this.fileUrl) {
+    throw new Error("fileUrl is required for client purchase orders");
+  }
+  if (this.type === "internal") {
+    this.fileUrl = "";
+    if (!this.generatedFromQuotation) {
+      throw new Error(
+        "generatedFromQuotation must be true for internal purchase orders"
+      );
+    }
+  }
+});
+
+purchaseOrderSchema.index({ projectId: 1, quotationId: 1, createdAt: -1 });

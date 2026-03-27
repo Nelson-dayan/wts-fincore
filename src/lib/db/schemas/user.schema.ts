@@ -14,9 +14,10 @@ export const userSchema = new Schema<IUser>(
     },
     password: { type: String, required: true, select: false },
     role: { type: String, enum: USER_ROLES, default: DEFAULT_ROLE },
-    phoneNumber: { type: String, default: "" },
+    // Compatibility note: store `phone`, keep `phoneNumber` alias for existing auth/register flow.
+    phone: { type: String, default: "", alias: "phoneNumber" },
     isActive: { type: Boolean, default: true },
-    createdAt: { type: Date, default: Date.now },
+    signatureUrl: { type: String, default: "" },
   },
-  { _id: true, versionKey: false }
+  { _id: true, versionKey: false, timestamps: true }
 );
