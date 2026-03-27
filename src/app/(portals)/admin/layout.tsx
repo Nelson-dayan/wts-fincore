@@ -30,6 +30,33 @@ export default async function AdminPortalLayout({
           <PortalNavLink href="/admin/users" match="prefix">
             Users
           </PortalNavLink>
+          <PortalNavLink href="/admin/clients" match="prefix">
+            Clients
+          </PortalNavLink>
+          <PortalNavLink href="/admin/projects" match="prefix">
+            Projects
+          </PortalNavLink>
+          <PortalNavLink href="/admin/quotations" match="prefix">
+            Quotations
+          </PortalNavLink>
+          <PortalNavLink href="/admin/purchase-orders" match="prefix">
+            POs
+          </PortalNavLink>
+          <PortalNavLink href="/admin/invoices" match="prefix">
+            Invoices
+          </PortalNavLink>
+          <PortalNavLink href="/admin/payments" match="prefix">
+            Payments
+          </PortalNavLink>
+          <PortalNavLink href="/admin/expenses" match="prefix">
+            Expenses
+          </PortalNavLink>
+          <PortalNavLink href="/admin/activity" match="prefix">
+            Activity
+          </PortalNavLink>
+          <PortalNavLink href="/admin/company" match="prefix">
+            Company
+          </PortalNavLink>
           <Link
             href="/employee"
             className="rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent/80 hover:text-foreground"

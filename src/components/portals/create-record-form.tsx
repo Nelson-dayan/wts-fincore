@@ -1,0 +1,93 @@
+"use client";
+
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+
+interface FieldConfig {
+  name: string;
+  label: string;
+  type?: "text" | "email" | "number";
+  required?: boolean;
+}
+
+export function CreateRecordForm({
+  title,
+  endpoint,
+  fields,
+}: {
+  title: string;
+  endpoint: string;
+  fields: FieldConfig[];
+}) {
+  const [pending, setPending] = useState(false);
+  const [message, setMessage] = useState("");
+  const [values, setValues] = useState<Record<string, string>>({});
+
+  async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setPending(true);
+    setMessage("");
+    try {
+      const payload: Record<string, unknown> = {};
+      for (const field of fields) {
+        const value = values[field.name] ?? "";
+        payload[field.name] =
+          field.type === "number" ? Number(value || 0) : value;
+      }
+
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      const result = (await response.json()) as { message?: string };
+      if (!response.ok) throw new Error(result.message ?? "Create failed");
+      setMessage("Created successfully. Refreshing...");
+      setTimeout(() => {
+        window.location.reload();
+      }, 600);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Create failed");
+    } finally {
+      setPending(false);
+    }
+  }
+
+  return (
+    <Card className="mb-4">
+      <CardHeader>
+        <CardTitle className="text-base">{title}</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <form onSubmit={onSubmit} className="grid gap-3 sm:grid-cols-2">
+          {fields.map((field) => (
+            <div key={field.name} className="space-y-1">
+              <Label htmlFor={field.name}>{field.label}</Label>
+              <Input
+                id={field.name}
+                type={field.type ?? "text"}
+                required={field.required}
+                value={values[field.name] ?? ""}
+                onChange={(e) =>
+                  setValues((prev) => ({ ...prev, [field.name]: e.target.value }))
+                }
+              />
+            </div>
+          ))}
+          <div className="sm:col-span-2 flex items-center gap-3">
+            <Button type="submit" disabled={pending}>
+              {pending ? "Saving..." : "Create"}
+            </Button>
+            {message ? (
+              <p className="text-sm text-muted-foreground">{message}</p>
+            ) : null}
+          </div>
+        </form>
+      </CardContent>
+    </Card>
+  );
+}
