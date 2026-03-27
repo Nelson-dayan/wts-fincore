@@ -20,7 +20,7 @@ export default async function EmployeePortalLayout({
   return (
     <div className="flex min-h-dvh flex-col bg-background">
       <PortalHeader brand={<PortalBrand variant="employee" />}>
-        <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end sm:gap-2">
+        <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end sm:gap-2.5">
           <PortalNavLink href="/employee" match="exact">
             Overview
           </PortalNavLink>
@@ -36,7 +36,7 @@ export default async function EmployeePortalLayout({
           <PortalNavLink href="/employee/expenses" match="prefix">
             Expenses
           </PortalNavLink>
-          <span className="inline-flex max-w-[min(100%,14rem)] items-center gap-2 rounded-lg bg-muted/60 px-3 py-1.5 text-xs text-muted-foreground ring-1 ring-border/60 sm:max-w-xs sm:text-sm">
+          <span className="inline-flex max-w-[min(100%,14rem)] items-center gap-2 rounded-xl bg-card/70 px-3 py-2 text-xs text-muted-foreground shadow-[0_1px_0_hsl(var(--border)/0.6)] ring-1 ring-border/50 backdrop-blur-sm sm:max-w-xs sm:text-sm">
             <User className="size-3.5 shrink-0 opacity-70" aria-hidden />
             <span className="truncate" title={session.user.email ?? undefined}>
               {session.user.email}
@@ -54,7 +54,7 @@ export default async function EmployeePortalLayout({
         </div>
       </PortalHeader>
       <PortalShell>
-        <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
+        <div className="mx-auto max-w-6xl px-4 py-9 sm:px-6 sm:py-11">
           {children}
         </div>
       </PortalShell>

@@ -24,8 +24,8 @@ export default async function AdminPortalLayout({
           className="flex w-full flex-col gap-1 sm:w-auto sm:items-end"
           aria-label="Admin"
         >
-          <div className="flex w-full flex-wrap items-center gap-1 sm:justify-end">
-            <span className="px-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/80">
+          <div className="flex w-full flex-wrap items-center gap-1.5 sm:justify-end">
+            <span className="mr-0.5 rounded-full bg-muted/80 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground ring-1 ring-border/60">
               Core
             </span>
             <PortalNavLink href="/admin" match="exact">
@@ -44,8 +44,8 @@ export default async function AdminPortalLayout({
               Company
             </PortalNavLink>
           </div>
-          <div className="flex w-full flex-wrap items-center gap-1 sm:justify-end">
-            <span className="px-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/80">
+          <div className="flex w-full flex-wrap items-center gap-1.5 sm:justify-end">
+            <span className="mr-0.5 rounded-full bg-muted/80 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground ring-1 ring-border/60">
               Finance
             </span>
             <PortalNavLink href="/admin/quotations" match="prefix">
@@ -68,7 +68,7 @@ export default async function AdminPortalLayout({
             </PortalNavLink>
             <Link
               href="/employee"
-              className="rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent/80 hover:text-foreground"
+              className="rounded-lg px-3 py-2 text-[0.8125rem] font-medium text-muted-foreground transition-[color,background-color,box-shadow] duration-200 hover:bg-accent/80 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/70 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
             >
               Workspace
             </Link>
@@ -77,7 +77,7 @@ export default async function AdminPortalLayout({
         </nav>
       </PortalHeader>
       <PortalShell>
-        <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
+        <div className="mx-auto max-w-6xl px-4 py-9 sm:px-6 sm:py-11">
           {children}
         </div>
       </PortalShell>

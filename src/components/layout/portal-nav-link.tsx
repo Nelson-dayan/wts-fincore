@@ -27,9 +27,10 @@ export function PortalNavLink({
     <Link
       href={href}
       className={cn(
-        "rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+        "rounded-lg px-3 py-2 text-[0.8125rem] font-medium tracking-tight transition-[color,background-color,box-shadow] duration-200",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/70 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
         active
-          ? "bg-primary/12 text-primary ring-1 ring-primary/20"
+          ? "bg-primary/12 text-primary shadow-sm ring-1 ring-primary/15"
           : "text-muted-foreground hover:bg-accent/80 hover:text-foreground",
         className
       )}

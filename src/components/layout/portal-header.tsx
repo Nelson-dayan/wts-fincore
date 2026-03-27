@@ -13,16 +13,18 @@ export function PortalHeader({
   return (
     <header
       className={cn(
-        "glass-card sticky top-0 z-30 border-b-0 !shadow-[var(--shadow-premium)] ring-1 ring-border/60",
+        "sticky top-0 z-30 border-b border-border/50 bg-background/75 shadow-sm backdrop-blur-xl backdrop-saturate-150 dark:bg-background/65",
         className
       )}
     >
-      <div className="mx-auto flex max-w-6xl flex-col gap-3 px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between sm:px-6 sm:py-4">
-        <div className="min-w-0 shrink-0">{brand}</div>
-        <div className="flex flex-wrap items-center gap-1.5 sm:justify-end md:gap-2">
-          {children}
-          <div className="ml-auto flex items-center pl-2 sm:ml-0 sm:pl-0">
-            <ThemeToggle />
+      <div className="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-3.5 sm:flex-row sm:items-start sm:justify-between sm:gap-4 sm:px-6 sm:py-4">
+        <div className="min-w-0 shrink-0 pt-0.5">{brand}</div>
+        <div className="flex min-w-0 flex-1 flex-col gap-3 sm:items-end">
+          <div className="flex w-full flex-wrap items-center gap-2 sm:justify-end md:gap-2.5">
+            {children}
+            <div className="ml-auto flex shrink-0 items-center sm:ml-0">
+              <ThemeToggle />
+            </div>
           </div>
         </div>
       </div>
