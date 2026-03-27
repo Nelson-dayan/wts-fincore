@@ -3,17 +3,34 @@ import { requireRole } from "@/lib/auth/require-role";
 import { connectDB } from "@/lib/db/connect";
 import { ExpenseModel } from "@/lib/db/models";
 import { authErrorResponse } from "@/lib/api/route-auth";
+import { parsePagination, parseSearch } from "@/lib/api/pagination";
+import { logActivity } from "@/lib/services/activity/log-activity.service";
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
     await requireRole(["admin"]);
     await connectDB();
-    const items = await ExpenseModel.find()
+    const url = new URL(req.url);
+    const { page, limit, skip } = parsePagination(url.searchParams);
+    const q = parseSearch(url.searchParams);
+    const filter = q
+      ? {
+          $or: [
+            { title: { $regex: q, $options: "i" } },
+            { category: { $regex: q, $options: "i" } },
+          ],
+        }
+      : {};
+    const [items, total] = await Promise.all([
+      ExpenseModel.find(filter)
       .select("title amount category projectId createdAt")
       .sort({ createdAt: -1 })
-      .limit(100)
-      .lean();
-    return NextResponse.json({ items });
+      .skip(skip)
+      .limit(limit)
+      .lean(),
+      ExpenseModel.countDocuments(filter),
+    ]);
+    return NextResponse.json({ items, page, limit, total, hasMore: skip + items.length < total });
   } catch (error) {
     return authErrorResponse(error, "Failed to load expenses");
   }
@@ -45,6 +62,15 @@ export async function POST(req: Request) {
       category,
       projectId: body.projectId ? String(body.projectId) : undefined,
       createdBy: session.user.id,
+    });
+
+    await logActivity({
+      userId: session.user.id,
+      action: "created_expense",
+      entityType: "expense",
+      entityId: String(created._id),
+      message: `Created expense ${created.title}`,
+      projectId: created.projectId ? String(created.projectId) : undefined,
     });
 
     return NextResponse.json({ item: created }, { status: 201 });

@@ -3,17 +3,27 @@ import { requireRole } from "@/lib/auth/require-role";
 import { connectDB } from "@/lib/db/connect";
 import { ClientModel, ProjectModel } from "@/lib/db/models";
 import { authErrorResponse } from "@/lib/api/route-auth";
+import { parsePagination, parseSearch } from "@/lib/api/pagination";
+import { logActivity } from "@/lib/services/activity/log-activity.service";
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
     await requireRole(["admin"]);
     await connectDB();
-    const items = await ProjectModel.find()
-      .select("name status priority budget createdAt")
+    const url = new URL(req.url);
+    const { page, limit, skip } = parsePagination(url.searchParams);
+    const q = parseSearch(url.searchParams);
+    const filter = q ? { name: { $regex: q, $options: "i" } } : {};
+    const [items, total] = await Promise.all([
+      ProjectModel.find(filter)
+      .select("name status priority budget createdAt clientId")
       .sort({ createdAt: -1 })
-      .limit(100)
-      .lean();
-    return NextResponse.json({ items });
+      .skip(skip)
+      .limit(limit)
+      .lean(),
+      ProjectModel.countDocuments(filter),
+    ]);
+    return NextResponse.json({ items, page, limit, total, hasMore: skip + items.length < total });
   } catch (error) {
     return authErrorResponse(error, "Failed to load projects");
   }
@@ -56,6 +66,15 @@ export async function POST(req: Request) {
       status: body.status ?? "lead",
       priority: body.priority ?? "medium",
       budget: body.budget,
+    });
+
+    await logActivity({
+      userId: session.user.id,
+      action: "created_project",
+      entityType: "project",
+      entityId: String(created._id),
+      message: `Created project ${created.name}`,
+      projectId: String(created._id),
     });
 
     return NextResponse.json({ item: created }, { status: 201 });
