@@ -2,11 +2,13 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { ChevronLeft, ChevronRight, Search, UserPlus, Users } from "lucide-react";
 import { DashboardPageHeader } from "@/components/dashboard/page-header";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { cn } from "@/lib/utils/cn";
 
 type ClientRow = {
   _id: string;
@@ -153,19 +155,39 @@ export function AdminClientsClient() {
     }
   }
 
+  const totalPages = Math.max(1, Math.ceil(total / limit));
+
   return (
     <div className="animate-[fade-in_0.4s_ease-out_both]">
       <DashboardPageHeader
         title="Clients"
         description="Create, edit, and delete clients with full business profile details."
       />
-      <Card className="mb-4">
-        <CardHeader>
-          <CardTitle className="text-base">Create Client</CardTitle>
+
+      <Card className="mb-6 border-border/70 bg-card/90 shadow-[var(--shadow-premium)] backdrop-blur-[2px] transition-[box-shadow,border-color] duration-200 hover:border-primary/15 hover:shadow-[var(--shadow-premium-lg)]">
+        <CardHeader className="space-y-1 pb-2">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div className="flex items-start gap-3">
+              <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-primary/15 to-primary/5 text-primary ring-1 ring-primary/15">
+                <UserPlus className="size-5" strokeWidth={1.75} aria-hidden />
+              </span>
+              <div>
+                <CardTitle className="text-lg font-semibold tracking-tight sm:text-xl">
+                  Create client
+                </CardTitle>
+                <CardDescription className="mt-1.5 max-w-xl text-[0.8125rem] leading-relaxed">
+                  Add a new client record. Required fields are marked on the form.
+                </CardDescription>
+              </div>
+            </div>
+            <span className="inline-flex w-fit items-center rounded-full bg-muted/90 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground ring-1 ring-border/60">
+              New record
+            </span>
+          </div>
         </CardHeader>
-        <CardContent>
-          <form onSubmit={createClient} className="grid gap-3 sm:grid-cols-2">
-            <div className="space-y-1">
+        <CardContent className="pt-2">
+          <form onSubmit={createClient} className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
               <Label>Name</Label>
               <Input
                 required
@@ -173,7 +195,7 @@ export function AdminClientsClient() {
                 onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
               />
             </div>
-            <div className="space-y-1">
+            <div className="space-y-2">
               <Label>Client Company</Label>
               <Input
                 required
@@ -181,7 +203,7 @@ export function AdminClientsClient() {
                 onChange={(e) => setForm((f) => ({ ...f, company: e.target.value }))}
               />
             </div>
-            <div className="space-y-1">
+            <div className="space-y-2">
               <Label>Email</Label>
               <Input
                 required
@@ -190,7 +212,7 @@ export function AdminClientsClient() {
                 onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
               />
             </div>
-            <div className="space-y-1">
+            <div className="space-y-2">
               <Label>Phone</Label>
               <Input
                 required
@@ -198,14 +220,14 @@ export function AdminClientsClient() {
                 onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
               />
             </div>
-            <div className="space-y-1">
+            <div className="space-y-2">
               <Label>Website</Label>
               <Input
                 value={form.website}
                 onChange={(e) => setForm((f) => ({ ...f, website: e.target.value }))}
               />
             </div>
-            <div className="space-y-1">
+            <div className="space-y-2">
               <Label>Address</Label>
               <Input
                 required
@@ -213,11 +235,12 @@ export function AdminClientsClient() {
                 onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))}
               />
             </div>
-            <div className="space-y-1">
+            <div className="space-y-2">
               <Label>Logo Upload</Label>
               <Input
                 type="file"
                 accept="image/*"
+                className="cursor-pointer file:mr-3 file:rounded-md file:border-0 file:bg-primary/10 file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-primary hover:file:bg-primary/15"
                 onChange={async (e) => {
                   const file = e.target.files?.[0];
                   if (!file) return;
@@ -229,11 +252,12 @@ export function AdminClientsClient() {
                 {form.clientLogoText ? "Logo selected" : "No file chosen"}
               </p>
             </div>
-            <div className="space-y-1">
+            <div className="space-y-2">
               <Label>Signature Upload</Label>
               <Input
                 type="file"
                 accept="image/*"
+                className="cursor-pointer file:mr-3 file:rounded-md file:border-0 file:bg-primary/10 file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-primary hover:file:bg-primary/15"
                 onChange={async (e) => {
                   const file = e.target.files?.[0];
                   if (!file) return;
@@ -246,57 +270,105 @@ export function AdminClientsClient() {
               </p>
             </div>
             <div className="sm:col-span-2">
-              <Button type="submit" disabled={savingId === "create"}>
+              <Button type="submit" disabled={savingId === "create"} className="min-w-[8.5rem]">
                 {savingId === "create" ? "Creating..." : "Create Client"}
               </Button>
             </div>
           </form>
         </CardContent>
       </Card>
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Client List ({total})</CardTitle>
+
+      <Card className="border-border/70 bg-card/90 shadow-[var(--shadow-premium)] backdrop-blur-[2px]">
+        <CardHeader className="space-y-1 pb-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-3">
+              <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-muted/80 text-foreground/80 ring-1 ring-border/50 dark:bg-muted/50">
+                <Users className="size-5" strokeWidth={1.75} aria-hidden />
+              </span>
+              <div>
+                <CardTitle className="flex flex-wrap items-center gap-2 text-lg font-semibold tracking-tight sm:text-xl">
+                  Client directory
+                  <span className="inline-flex items-center rounded-full bg-primary/12 px-2.5 py-0.5 text-xs font-semibold tabular-nums text-primary ring-1 ring-primary/20">
+                    {total}
+                  </span>
+                </CardTitle>
+                <CardDescription className="mt-1 text-[0.8125rem]">
+                  Search and open client profiles. Use horizontal scroll on smaller screens.
+                </CardDescription>
+              </div>
+            </div>
+          </div>
         </CardHeader>
-        <CardContent>
-          <div className="mb-3 flex gap-2">
+        <CardContent className="space-y-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-stretch">
             <Input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search by client name or email"
+              className="h-10 flex-1 transition-[box-shadow] duration-200 sm:min-w-[240px]"
             />
             <Button
               variant="outline"
+              className="h-10 shrink-0 gap-2 sm:w-auto"
               onClick={() => {
                 setPage(1);
                 loadClients(1, query);
               }}
             >
+              <Search className="size-4 opacity-70" aria-hidden />
               Search
             </Button>
           </div>
+
           {error ? (
-            <div className="rounded-xl border border-destructive/40 bg-destructive/5 p-4 text-sm text-destructive">
+            <div
+              className="rounded-2xl border border-destructive/35 bg-destructive/[0.06] p-4 text-[0.8125rem] leading-relaxed text-destructive shadow-sm dark:bg-destructive/[0.1]"
+              role="alert"
+            >
               {error}
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[980px] text-left text-sm">
-                <thead className="text-muted-foreground">
-                  <tr>
-                    <th className="py-2 pr-3">Name</th>
-                    <th className="py-2 pr-3">Client Company</th>
-                    <th className="py-2 pr-3">Email</th>
-                    <th className="py-2 pr-3">Phone</th>
-                    <th className="py-2 pr-3">Website</th>
-                    <th className="py-2 pr-3">Address</th>
-                    <th className="py-2 pr-3">Projects</th>
-                    <th className="py-2 pr-3">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {items.map((client) => (
-                      <tr key={client._id} className="border-t border-border/70">
-                        <td className="py-2 pr-3">
+            <div className="overflow-hidden rounded-xl border border-border/60 shadow-sm">
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[980px] text-left text-[0.8125rem]">
+                  <thead>
+                    <tr className="border-b border-border/60 bg-muted/45 dark:bg-muted/25">
+                      <th className="whitespace-nowrap px-4 py-3.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                        Name
+                      </th>
+                      <th className="whitespace-nowrap px-4 py-3.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                        Client Company
+                      </th>
+                      <th className="whitespace-nowrap px-4 py-3.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                        Email
+                      </th>
+                      <th className="whitespace-nowrap px-4 py-3.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                        Phone
+                      </th>
+                      <th className="whitespace-nowrap px-4 py-3.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                        Website
+                      </th>
+                      <th className="whitespace-nowrap px-4 py-3.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                        Address
+                      </th>
+                      <th className="whitespace-nowrap px-4 py-3.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                        Projects
+                      </th>
+                      <th className="whitespace-nowrap px-4 py-3.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border/50">
+                    {items.map((client) => (
+                      <tr
+                        key={client._id}
+                        className={cn(
+                          "bg-card/40 transition-[background-color,box-shadow] duration-150",
+                          "hover:bg-muted/35 dark:hover:bg-muted/20"
+                        )}
+                      >
+                        <td className="px-4 py-3 align-middle font-medium text-foreground">
                           {editingId === client._id ? (
                             <Input
                               value={drafts[client._id]?.name ?? client.name}
@@ -309,12 +381,13 @@ export function AdminClientsClient() {
                                   },
                                 }))
                               }
+                              className="h-9"
                             />
                           ) : (
-                            client.name
+                            <span className="line-clamp-2">{client.name}</span>
                           )}
                         </td>
-                        <td className="py-2 pr-3">
+                        <td className="px-4 py-3 align-middle text-muted-foreground">
                           {editingId === client._id ? (
                             <Input
                               value={drafts[client._id]?.company ?? client.company}
@@ -327,12 +400,13 @@ export function AdminClientsClient() {
                                   },
                                 }))
                               }
+                              className="h-9"
                             />
                           ) : (
-                            client.company || "-"
+                            <span className="line-clamp-2">{client.company || "—"}</span>
                           )}
                         </td>
-                        <td className="py-2 pr-3">
+                        <td className="max-w-[200px] px-4 py-3 align-middle text-muted-foreground">
                           {editingId === client._id ? (
                             <Input
                               value={drafts[client._id]?.email ?? client.email}
@@ -345,12 +419,13 @@ export function AdminClientsClient() {
                                   },
                                 }))
                               }
+                              className="h-9"
                             />
                           ) : (
-                            client.email || "-"
+                            <span className="line-clamp-2 break-all">{client.email || "—"}</span>
                           )}
                         </td>
-                        <td className="py-2 pr-3">
+                        <td className="px-4 py-3 align-middle tabular-nums text-muted-foreground">
                           {editingId === client._id ? (
                             <Input
                               value={drafts[client._id]?.phone ?? client.phone}
@@ -363,12 +438,13 @@ export function AdminClientsClient() {
                                   },
                                 }))
                               }
+                              className="h-9"
                             />
                           ) : (
-                            client.phone || "-"
+                            client.phone || "—"
                           )}
                         </td>
-                        <td className="py-2 pr-3">
+                        <td className="max-w-[160px] px-4 py-3 align-middle text-muted-foreground">
                           {editingId === client._id ? (
                             <Input
                               value={drafts[client._id]?.website ?? client.website}
@@ -381,12 +457,13 @@ export function AdminClientsClient() {
                                   },
                                 }))
                               }
+                              className="h-9"
                             />
                           ) : (
-                            client.website || "-"
+                            <span className="line-clamp-2 break-all">{client.website || "—"}</span>
                           )}
                         </td>
-                        <td className="py-2 pr-3">
+                        <td className="max-w-[220px] px-4 py-3 align-middle text-muted-foreground">
                           {editingId === client._id ? (
                             <Input
                               value={drafts[client._id]?.address ?? client.address}
@@ -399,14 +476,19 @@ export function AdminClientsClient() {
                                   },
                                 }))
                               }
+                              className="h-9"
                             />
                           ) : (
-                            client.address || "-"
+                            <span className="line-clamp-2">{client.address || "—"}</span>
                           )}
                         </td>
-                        <td className="py-2 pr-3">{client.projectsCount ?? 0}</td>
-                        <td className="py-2 pr-3">
-                          <div className="flex gap-2">
+                        <td className="px-4 py-3 align-middle">
+                          <span className="inline-flex min-w-[1.75rem] justify-center rounded-full bg-primary/10 px-2 py-0.5 text-xs font-semibold tabular-nums text-primary ring-1 ring-primary/15 transition-transform duration-150 hover:scale-105">
+                            {client.projectsCount ?? 0}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 align-middle">
+                          <div className="flex flex-wrap gap-2">
                             {editingId === client._id ? (
                               <>
                                 <Button
@@ -425,47 +507,56 @@ export function AdminClientsClient() {
                                 </Button>
                               </>
                             ) : (
-                              <>
-                                <Link href={`/admin/clients/${client._id}`}>
-                                  <Button size="sm" variant="outline">
-                                    View
-                                  </Button>
-                                </Link>
-                              </>
+                              <Button size="sm" variant="outline" asChild className="transition-[box-shadow,transform] duration-200 hover:border-primary/30 hover:bg-primary/5">
+                                <Link href={`/admin/clients/${client._id}`}>View</Link>
+                              </Button>
                             )}
                           </div>
                         </td>
                       </tr>
                     ))}
-                </tbody>
-              </table>
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
-          <div className="mt-4 flex items-center justify-between text-sm">
+
+          <div className="flex flex-col gap-3 rounded-xl border border-border/50 bg-muted/25 px-4 py-3 sm:flex-row sm:items-center sm:justify-between dark:bg-muted/15">
             <Button
               variant="outline"
+              size="sm"
               disabled={loading || page <= 1}
+              className="gap-1.5"
               onClick={() => {
                 const next = Math.max(1, page - 1);
                 setPage(next);
                 loadClients(next, query);
               }}
             >
+              <ChevronLeft className="size-4" aria-hidden />
               Previous
             </Button>
-            <span className="text-muted-foreground">
-              Page {page} of {Math.max(1, Math.ceil(total / limit))}
-            </span>
+            <div className="flex items-center justify-center gap-2 text-[0.8125rem] text-muted-foreground">
+              {loading ? (
+                <span className="inline-flex size-2 animate-pulse rounded-full bg-primary/60" aria-hidden />
+              ) : null}
+              <span className="tabular-nums font-medium">
+                Page {page} of {totalPages}
+              </span>
+            </div>
             <Button
               variant="outline"
-              disabled={loading || page >= Math.max(1, Math.ceil(total / limit))}
+              size="sm"
+              disabled={loading || page >= totalPages}
+              className="gap-1.5"
               onClick={() => {
-                const next = Math.min(Math.ceil(total / limit), page + 1);
+                const next = Math.min(totalPages, page + 1);
                 setPage(next);
                 loadClients(next, query);
               }}
             >
               Next
+              <ChevronRight className="size-4" aria-hidden />
             </Button>
           </div>
         </CardContent>
