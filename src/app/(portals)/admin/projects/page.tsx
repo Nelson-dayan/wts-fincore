@@ -11,8 +11,12 @@ export default async function AdminProjectsPage({ searchParams }: PageProps) {
 
   return (
     <>
-      <CreateProjectForm />
       <AdminProjectsClient initialClientId={clientId} />
+      <CreateProjectForm
+        key={clientId || "all"}
+        prefillClientId={clientId}
+        defaultCollapsed={Boolean(clientId)}
+      />
     </>
   );
 }
