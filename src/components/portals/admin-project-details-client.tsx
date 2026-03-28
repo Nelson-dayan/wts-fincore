@@ -263,6 +263,9 @@ export function AdminProjectDetailsClient({ projectId }: { projectId: string }) 
       </Card>
 
       <div className="mb-2 flex flex-wrap justify-end gap-2">
+        <Link href={`/admin/quotations?projectId=${projectId}&create=1`}>
+          <Button size="sm">Create quotation</Button>
+        </Link>
         <Link href={`/admin/quotations?projectId=${projectId}`}>
           <Button size="sm" variant="outline">View All Quotations for Project</Button>
         </Link>

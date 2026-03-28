@@ -25,6 +25,8 @@ export const optionalDecimalField = {
 
 export const documentInfoSchema = new Schema(
   {
+    quotationCode: { type: String, default: "" },
+    /** @deprecated Use quotationCode; kept for legacy Mongo documents */
     geCode: { type: String, default: "" },
     date: { type: Date, required: true },
     subject: { type: String, default: "" },
@@ -41,6 +43,8 @@ export const clientSnapshotSchema = new Schema(
     name: { type: String, required: true },
     company: { type: String, default: "" },
     address: { type: String, default: "" },
+    logoText: { type: String, default: "" },
+    signatureText: { type: String, default: "" },
   },
   { _id: false }
 );
@@ -52,6 +56,8 @@ export const companySnapshotSchema = new Schema(
     email: { type: String, default: "" },
     website: { type: String, default: "" },
     logoUrl: { type: String, default: "" },
+    logoText: { type: String, default: "" },
+    signatureText: { type: String, default: "" },
   },
   { _id: false }
 );

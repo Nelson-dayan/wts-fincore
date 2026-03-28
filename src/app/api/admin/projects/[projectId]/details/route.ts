@@ -28,7 +28,11 @@ export async function GET(_req: Request, ctx: RouteCtx) {
     }
 
     const [client, quotations, purchaseOrders, invoices] = await Promise.all([
-      ClientModel.findById(project.clientId).select("_id name company email").lean(),
+      ClientModel.findById(project.clientId)
+        .select(
+          "_id name company email address website clientLogoText clientSignatureText"
+        )
+        .lean(),
       QuotationModel.find({ projectId })
         .select("_id quotationNumber status createdAt")
         .sort({ createdAt: -1 })
