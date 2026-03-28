@@ -31,6 +31,17 @@ const quotationPageSchema = new Schema(
   { _id: false }
 );
 
+const quotationBrandingSchema = new Schema(
+  {
+    useCompanyLogo: { type: Boolean, default: true },
+    useCompanySignature: { type: Boolean, default: true },
+    showClientSignature: { type: Boolean, default: false },
+    customLogoText: { type: String, default: "" },
+    customSignatureText: { type: String, default: "" },
+  },
+  { _id: false }
+);
+
 export const quotationSchema = new Schema(
   {
     quotationNumber: { type: String, required: true, unique: true, index: true },
@@ -49,6 +60,8 @@ export const quotationSchema = new Schema(
       remainingAmount: optionalDecimalField,
       remainingText: { type: String, default: "" },
     },
+    branding: { type: quotationBrandingSchema, default: () => ({}) },
+    internalNotes: { type: String, default: "" },
     status: {
       type: String,
       enum: ["draft", "sent", "approved", "rejected"],

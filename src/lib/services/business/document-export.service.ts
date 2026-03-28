@@ -15,6 +15,7 @@ export interface RenderPayload {
   companySnapshot: unknown;
   pages: unknown[];
   totals: unknown;
+  /** Quotation visual overrides; invoices use branding on the document. */
   branding?: unknown;
 }
 
@@ -45,6 +46,7 @@ export class DocumentExportService {
       companySnapshot: quotation.companySnapshot,
       pages: quotation.pages ?? [],
       totals: quotation.totals,
+      branding: (quotation as { branding?: unknown }).branding,
     };
   }
 
