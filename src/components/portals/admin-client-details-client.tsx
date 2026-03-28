@@ -4,25 +4,11 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import type { LucideIcon } from "lucide-react";
-import {
-  ArrowLeft,
-  Building2,
-  FileSpreadsheet,
-  FileText,
-  FolderKanban,
-  Mail,
-  MapPin,
-  Phone,
-  ShoppingCart,
-  Trash2,
-} from "lucide-react";
 import { DashboardPageHeader } from "@/components/dashboard/page-header";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { cn } from "@/lib/utils/cn";
 
 type ClientDetailsPayload = {
   client?: {
@@ -70,171 +56,49 @@ type ClientDetailsPayload = {
   message?: string;
 };
 
-function StatusBadge({ value }: { value: string }) {
-  const normalized = value.toLowerCase();
-  let styles =
-    "inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide ring-1 ring-inset transition-colors duration-150";
-  if (
-    normalized.includes("complet") ||
-    normalized === "paid" ||
-    normalized === "approved" ||
-    normalized === "active" ||
-    normalized === "closed"
-  ) {
-    styles += cn(
-      " bg-emerald-500/10 text-emerald-800 ring-emerald-500/20",
-      "dark:text-emerald-400"
-    );
-  } else if (
-    normalized.includes("pend") ||
-    normalized.includes("draft") ||
-    normalized === "open" ||
-    normalized.includes("progress")
-  ) {
-    styles += cn(
-      " bg-amber-500/10 text-amber-900 ring-amber-500/25",
-      "dark:text-amber-400"
-    );
-  } else if (
-    normalized.includes("cancel") ||
-    normalized.includes("reject") ||
-    normalized.includes("void") ||
-    normalized.includes("overdue")
-  ) {
-    styles += " bg-destructive/10 text-destructive ring-destructive/20";
-  } else if (normalized.includes("high") || normalized === "urgent") {
-    styles += cn(
-      " bg-orange-500/10 text-orange-900 ring-orange-500/25",
-      "dark:text-orange-400"
-    );
-  } else if (normalized.includes("low") || normalized === "medium") {
-    styles += " bg-slate-500/10 text-slate-700 ring-slate-500/20 dark:text-slate-300";
-  } else {
-    styles += " bg-muted text-muted-foreground ring-border/60";
-  }
-  return <span className={styles}>{value}</span>;
-}
-
-function renderCell(columnKey: string, raw: unknown): React.ReactNode {
-  const val = String(raw ?? "—");
-  if (val === "—") return <span className="text-muted-foreground">—</span>;
-  if (columnKey === "status" || columnKey === "priority") {
-    return <StatusBadge value={val} />;
-  }
-  if (columnKey === "type") {
-    return (
-      <span className="inline-flex rounded-md bg-secondary/70 px-2 py-0.5 text-xs font-medium text-secondary-foreground ring-1 ring-border/55 dark:bg-secondary/40">
-        {val}
-      </span>
-    );
-  }
-  return <span className="text-foreground/95">{val}</span>;
-}
-
 function SectionTable({
   title,
   columns,
   rows,
-  icon: Icon,
-  footerAction,
 }: {
   title: string;
   columns: Array<{ key: string; label: string }>;
   rows: Array<Record<string, unknown>>;
-  icon: LucideIcon;
-  footerAction?: React.ReactNode;
 }) {
   return (
-    <Card className="group mb-5 border-border/70 bg-card/90 shadow-[var(--shadow-premium)] backdrop-blur-[2px] transition-[box-shadow,border-color] duration-200 hover:border-primary/12 hover:shadow-[var(--shadow-premium-lg)]">
-      <CardHeader className="flex flex-col gap-3 space-y-0 pb-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-start gap-3">
-          <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-muted/80 text-foreground/80 ring-1 ring-border/50 transition-transform duration-200 group-hover:scale-[1.02] dark:bg-muted/45">
-            <Icon className="size-[18px]" strokeWidth={1.75} aria-hidden />
-          </span>
-          <div>
-            <CardTitle className="flex flex-wrap items-center gap-2 text-base font-semibold tracking-tight sm:text-lg">
-              {title}
-              <span className="inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-semibold tabular-nums text-primary ring-1 ring-primary/15">
-                {rows.length}
-              </span>
-            </CardTitle>
-            <CardDescription className="mt-1 text-[0.8125rem]">
-              Linked records for this client
-            </CardDescription>
-          </div>
-        </div>
-        {footerAction ? <div className="flex w-full shrink-0 sm:ml-4 sm:w-auto">{footerAction}</div> : null}
+    <Card className="mb-4">
+      <CardHeader>
+        <CardTitle className="text-base">
+          {title} ({rows.length})
+        </CardTitle>
       </CardHeader>
-      <CardContent className="pt-0">
-        <div className="overflow-hidden rounded-xl border border-border/60 shadow-sm">
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[760px] text-left text-[0.8125rem]">
-              <thead>
-                <tr className="border-b border-border/60 bg-muted/45 dark:bg-muted/25">
+      <CardContent>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[760px] text-left text-sm">
+            <thead className="text-muted-foreground">
+              <tr>
+                {columns.map((column) => (
+                  <th key={column.key} className="py-2 pr-3">
+                    {column.label}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row, idx) => (
+                <tr key={String(row._id ?? idx)} className="border-t border-border/70">
                   {columns.map((column) => (
-                    <th
-                      key={column.key}
-                      className="whitespace-nowrap px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground"
-                    >
-                      {column.label}
-                    </th>
+                    <td key={column.key} className="py-2 pr-3">
+                      {String(row[column.key] ?? "-")}
+                    </td>
                   ))}
                 </tr>
-              </thead>
-              <tbody className="divide-y divide-border/50">
-                {rows.length === 0 ? (
-                  <tr>
-                    <td
-                      colSpan={columns.length}
-                      className="px-4 py-12 text-center text-sm text-muted-foreground"
-                    >
-                      No records in this section yet.
-                    </td>
-                  </tr>
-                ) : (
-                  rows.map((row, idx) => (
-                    <tr
-                      key={String(row._id ?? idx)}
-                      className="bg-card/40 transition-[background-color] duration-150 hover:bg-muted/35 dark:hover:bg-muted/20"
-                    >
-                      {columns.map((column) => (
-                        <td key={column.key} className="px-4 py-3 align-middle">
-                          {renderCell(column.key, row[column.key])}
-                        </td>
-                      ))}
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
+              ))}
+            </tbody>
+          </table>
         </div>
       </CardContent>
     </Card>
-  );
-}
-
-function DetailTile({
-  label,
-  children,
-  className,
-}: {
-  label: string;
-  children: React.ReactNode;
-  className?: string;
-}) {
-  return (
-    <div
-      className={cn(
-        "rounded-xl border border-border/50 bg-muted/20 p-4 transition-[border-color,box-shadow] duration-200 hover:border-primary/15 hover:shadow-sm dark:bg-muted/10",
-        className
-      )}
-    >
-      <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-        {label}
-      </p>
-      <div className="mt-2 text-sm font-medium leading-snug text-foreground">{children}</div>
-    </div>
   );
 }
 
@@ -341,87 +205,40 @@ export function AdminClientDetailsClient({ clientId }: { clientId: string }) {
     }
   }
 
-  const clientName = data.client?.name;
-
   return (
     <div className="animate-[fade-in_0.4s_ease-out_both]">
-      <Link
-        href="/admin/clients"
-        className="group mb-6 inline-flex items-center gap-2 rounded-lg text-[0.8125rem] font-medium text-muted-foreground transition-[color,background-color] duration-200 hover:bg-accent/60 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/70 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-      >
-        <ArrowLeft
-          className="size-4 transition-transform duration-200 group-hover:-translate-x-0.5"
-          aria-hidden
-        />
-        Back to clients
-      </Link>
-
       <DashboardPageHeader
-        title={clientName ? clientName : "Client details"}
+        title={data.client?.name ? `Client: ${data.client.name}` : "Client Details"}
         description="Full linked flow for this client: projects, quotations, purchase orders, and invoices."
       />
-
       {error ? (
-        <div
-          className="mb-6 rounded-2xl border border-destructive/35 bg-destructive/[0.06] p-4 text-[0.8125rem] leading-relaxed text-destructive shadow-sm dark:bg-destructive/[0.1]"
-          role="alert"
-        >
+        <div className="mb-4 rounded-xl border border-destructive/40 bg-destructive/5 p-4 text-sm text-destructive">
           {error}
         </div>
       ) : null}
 
-      <Card className="mb-6 border-border/70 bg-card/90 shadow-[var(--shadow-premium)] backdrop-blur-[2px]">
-        <CardHeader className="space-y-4 pb-4">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-            <div className="flex items-start gap-3">
-              <span className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-primary/15 to-primary/5 text-primary ring-1 ring-primary/15">
-                <Building2 className="size-6" strokeWidth={1.6} aria-hidden />
-              </span>
-              <div className="min-w-0 space-y-1">
-                <CardTitle className="text-lg font-semibold tracking-tight sm:text-xl">
-                  Client profile
-                </CardTitle>
-                <CardDescription className="text-[0.8125rem] leading-relaxed">
-                  {clientName ? (
-                    <>
-                      <span className="font-medium text-foreground/90">{data.client?.company}</span>
-                      {data.client?.createdAt ? (
-                        <span className="mt-1 block text-muted-foreground">
-                          Client since{" "}
-                          <time dateTime={data.client.createdAt}>
-                            {new Date(data.client.createdAt).toLocaleDateString(undefined, {
-                              year: "numeric",
-                              month: "short",
-                              day: "numeric",
-                            })}
-                          </time>
-                        </span>
-                      ) : null}
-                    </>
-                  ) : (
-                    "Loading profile…"
-                  )}
-                </CardDescription>
-              </div>
-            </div>
-            <div className="flex flex-wrap gap-2 sm:justify-end">
+      <Card className="mb-4">
+        <CardHeader>
+          <div className="flex items-center justify-between gap-3">
+            <CardTitle className="text-base">Client Profile</CardTitle>
+            <div className="flex gap-2">
               {editing ? (
                 <>
-                  <Button size="sm" onClick={saveClient} disabled={saving} className="min-w-[4.5rem]">
-                    {saving ? "Saving…" : "Save"}
+                  <Button size="sm" onClick={saveClient} disabled={saving}>
+                    Save
                   </Button>
-                  <Button size="sm" variant="outline" onClick={() => setEditing(false)} disabled={saving}>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setEditing(false)}
+                    disabled={saving}
+                  >
                     Cancel
                   </Button>
                 </>
               ) : (
                 <>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => setEditing(true)}
-                    className="transition-[box-shadow,border-color] duration-200 hover:border-primary/35 hover:bg-primary/5"
-                  >
+                  <Button size="sm" variant="outline" onClick={() => setEditing(true)}>
                     Edit
                   </Button>
                   <Button
@@ -429,9 +246,7 @@ export function AdminClientDetailsClient({ clientId }: { clientId: string }) {
                     variant="destructive"
                     onClick={deleteClient}
                     disabled={saving}
-                    className="gap-1.5"
                   >
-                    <Trash2 className="size-3.5" aria-hidden />
                     Delete
                   </Button>
                 </>
@@ -439,52 +254,38 @@ export function AdminClientDetailsClient({ clientId }: { clientId: string }) {
             </div>
           </div>
         </CardHeader>
-        <CardContent className="grid gap-4 text-sm sm:grid-cols-2">
+        <CardContent className="grid gap-3 text-sm sm:grid-cols-2">
           {editing ? (
             <>
-              <div className="space-y-2">
+              <div className="space-y-1">
                 <Label>Name</Label>
                 <Input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} />
               </div>
-              <div className="space-y-2">
+              <div className="space-y-1">
                 <Label>Client Company</Label>
-                <Input
-                  value={form.company}
-                  onChange={(e) => setForm((f) => ({ ...f, company: e.target.value }))}
-                />
+                <Input value={form.company} onChange={(e) => setForm((f) => ({ ...f, company: e.target.value }))} />
               </div>
-              <div className="space-y-2">
+              <div className="space-y-1">
                 <Label>Email</Label>
-                <Input
-                  type="email"
-                  value={form.email}
-                  onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
-                />
+                <Input type="email" value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} />
               </div>
-              <div className="space-y-2">
+              <div className="space-y-1">
                 <Label>Phone</Label>
                 <Input value={form.phone} onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))} />
               </div>
-              <div className="space-y-2">
+              <div className="space-y-1">
                 <Label>Website</Label>
-                <Input
-                  value={form.website}
-                  onChange={(e) => setForm((f) => ({ ...f, website: e.target.value }))}
-                />
+                <Input value={form.website} onChange={(e) => setForm((f) => ({ ...f, website: e.target.value }))} />
               </div>
-              <div className="space-y-2">
+              <div className="space-y-1">
                 <Label>Address</Label>
-                <Input
-                  value={form.address}
-                  onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))}
-                />
+                <Input value={form.address} onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))} />
               </div>
-              <div className="space-y-2">
+              <div className="space-y-1">
                 <Label>Logo Upload</Label>
                 <Input
                   type="file"
                   accept="image/*"
-                  className="cursor-pointer file:mr-3 file:rounded-md file:border-0 file:bg-primary/10 file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-primary hover:file:bg-primary/15"
                   onChange={async (e) => {
                     const file = e.target.files?.[0];
                     if (!file) return;
@@ -493,12 +294,11 @@ export function AdminClientDetailsClient({ clientId }: { clientId: string }) {
                   }}
                 />
               </div>
-              <div className="space-y-2">
+              <div className="space-y-1">
                 <Label>Signature Upload</Label>
                 <Input
                   type="file"
                   accept="image/*"
-                  className="cursor-pointer file:mr-3 file:rounded-md file:border-0 file:bg-primary/10 file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-primary hover:file:bg-primary/15"
                   onChange={async (e) => {
                     const file = e.target.files?.[0];
                     if (!file) return;
@@ -510,50 +310,15 @@ export function AdminClientDetailsClient({ clientId }: { clientId: string }) {
             </>
           ) : (
             <>
-              <DetailTile label="Name">{data.client?.name ?? "—"}</DetailTile>
-              <DetailTile label="Company">{data.client?.company ?? "—"}</DetailTile>
-              <DetailTile label="Email">
-                {data.client?.email ? (
-                  <span className="inline-flex items-center gap-2 break-all">
-                    <Mail className="size-3.5 shrink-0 text-primary/70" aria-hidden />
-                    {data.client.email}
-                  </span>
-                ) : (
-                  "—"
-                )}
-              </DetailTile>
-              <DetailTile label="Phone">
-                {data.client?.phone ? (
-                  <span className="inline-flex items-center gap-2 tabular-nums">
-                    <Phone className="size-3.5 shrink-0 text-primary/70" aria-hidden />
-                    {data.client.phone}
-                  </span>
-                ) : (
-                  "—"
-                )}
-              </DetailTile>
-              <DetailTile label="Website" className="sm:col-span-2">
-                {data.client?.website ? (
-                  <span className="break-all">{data.client.website}</span>
-                ) : (
-                  "—"
-                )}
-              </DetailTile>
-              <DetailTile label="Address" className="sm:col-span-2">
-                {data.client?.address ? (
-                  <span className="inline-flex items-start gap-2">
-                    <MapPin className="mt-0.5 size-3.5 shrink-0 text-primary/70" aria-hidden />
-                    {data.client.address}
-                  </span>
-                ) : (
-                  "—"
-                )}
-              </DetailTile>
-              <div className="sm:col-span-2 grid gap-4 sm:grid-cols-2">
-                <div className="overflow-hidden rounded-xl border border-border/50 bg-muted/15 p-4 dark:bg-muted/10">
-                  <p className="mb-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                    Logo
-                  </p>
+              <p><strong>Name:</strong> {data.client?.name ?? "-"}</p>
+              <p><strong>Client Company:</strong> {data.client?.company ?? "-"}</p>
+              <p><strong>Email:</strong> {data.client?.email ?? "-"}</p>
+              <p><strong>Phone:</strong> {data.client?.phone ?? "-"}</p>
+              <p><strong>Website:</strong> {data.client?.website ?? "-"}</p>
+              <p><strong>Address:</strong> {data.client?.address ?? "-"}</p>
+              <div className="sm:col-span-2 grid gap-3 sm:grid-cols-2">
+                <div>
+                  <p className="mb-1"><strong>Logo</strong></p>
                   {data.client?.clientLogoText ? (
                     <Image
                       src={data.client.clientLogoText}
@@ -561,16 +326,14 @@ export function AdminClientDetailsClient({ clientId }: { clientId: string }) {
                       width={180}
                       height={96}
                       unoptimized
-                      className="h-24 w-auto rounded-lg border border-border/60 bg-background/80 object-contain shadow-sm transition-transform duration-200 hover:scale-[1.02]"
+                      className="h-24 w-auto rounded-md border border-border bg-muted/20"
                     />
                   ) : (
-                    <p className="text-sm text-muted-foreground">No logo uploaded.</p>
+                    <p className="text-muted-foreground">No logo uploaded.</p>
                   )}
                 </div>
-                <div className="overflow-hidden rounded-xl border border-border/50 bg-muted/15 p-4 dark:bg-muted/10">
-                  <p className="mb-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                    Signature
-                  </p>
+                <div>
+                  <p className="mb-1"><strong>Signature</strong></p>
                   {data.client?.clientSignatureText ? (
                     <Image
                       src={data.client.clientSignatureText}
@@ -578,10 +341,10 @@ export function AdminClientDetailsClient({ clientId }: { clientId: string }) {
                       width={180}
                       height={96}
                       unoptimized
-                      className="h-24 w-auto rounded-lg border border-border/60 bg-background/80 object-contain shadow-sm transition-transform duration-200 hover:scale-[1.02]"
+                      className="h-24 w-auto rounded-md border border-border bg-muted/20"
                     />
                   ) : (
-                    <p className="text-sm text-muted-foreground">No signature uploaded.</p>
+                    <p className="text-muted-foreground">No signature uploaded.</p>
                   )}
                 </div>
               </div>
@@ -592,7 +355,6 @@ export function AdminClientDetailsClient({ clientId }: { clientId: string }) {
 
       <SectionTable
         title="Projects"
-        icon={FolderKanban}
         columns={[
           { key: "name", label: "Name" },
           { key: "status", label: "Status" },
@@ -603,16 +365,15 @@ export function AdminClientDetailsClient({ clientId }: { clientId: string }) {
           ...project,
           createdAt: new Date(project.createdAt).toLocaleString(),
         }))}
-        footerAction={
-          <Button size="sm" variant="outline" asChild className="gap-1.5 transition-[box-shadow,border-color] duration-200 hover:border-primary/35 hover:bg-primary/5">
-            <Link href={`/admin/projects?clientId=${clientId}`}>View all projects</Link>
-          </Button>
-        }
       />
+      <div className="mb-4 flex justify-end">
+        <Link href={`/admin/projects?clientId=${clientId}`}>
+          <Button size="sm" variant="outline">View All Projects</Button>
+        </Link>
+      </div>
 
       <SectionTable
         title="Quotations"
-        icon={FileText}
         columns={[
           { key: "quotationNumber", label: "Quotation #" },
           { key: "status", label: "Status" },
@@ -626,8 +387,7 @@ export function AdminClientDetailsClient({ clientId }: { clientId: string }) {
       />
 
       <SectionTable
-        title="Purchase orders"
-        icon={ShoppingCart}
+        title="Purchase Orders"
         columns={[
           { key: "poNumber", label: "PO #" },
           { key: "type", label: "Type" },
@@ -643,7 +403,6 @@ export function AdminClientDetailsClient({ clientId }: { clientId: string }) {
 
       <SectionTable
         title="Invoices"
-        icon={FileSpreadsheet}
         columns={[
           { key: "invoiceNumber", label: "Invoice #" },
           { key: "status", label: "Status" },
@@ -653,7 +412,7 @@ export function AdminClientDetailsClient({ clientId }: { clientId: string }) {
         ]}
         rows={(data.invoices ?? []).map((invoice) => ({
           ...invoice,
-          dueDate: invoice.dueDate ? new Date(invoice.dueDate).toLocaleDateString() : "—",
+          dueDate: invoice.dueDate ? new Date(invoice.dueDate).toLocaleDateString() : "-",
           createdAt: new Date(invoice.createdAt).toLocaleString(),
         }))}
       />
