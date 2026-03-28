@@ -248,9 +248,10 @@ export async function renderQuotationPdf(input: QuotationRenderDraft): Promise<B
     }
   };
 
-  const metaW = 210;
+  const panelGap = 12;
+  const metaW = 218;
   const metaX = PAGE_W - MARGIN - metaW;
-  const leftContentW = metaX - MARGIN - 20;
+  const leftContentW = metaX - MARGIN - panelGap;
 
   /* —— Top brand bar —— */
   doc.save();
@@ -258,66 +259,105 @@ export async function renderQuotationPdf(input: QuotationRenderDraft): Promise<B
   doc.restore();
   y = MARGIN + 2;
 
-  /* —— Logo + company (left) | Meta (right) —— */
+  /* —— Logo + address (single left card) | Meta (right) —— */
   const headerStartY = y;
   let leftBlockBottom = y;
 
-  const logoInnerPad = 12;
-  const logoFitW = Math.min(leftContentW - logoInnerPad * 2, 320);
-  const logoFitH = 86;
-  const logoFrameH = logoFitH + logoInnerPad * 2;
+  const logoInnerPad = 14;
+  const addrFontSize = 9.5;
+  const logoFitW = Math.min(leftContentW - logoInnerPad * 2, 200);
+  const logoFitH = 52;
+  const logoToAddrGap = 8;
 
-  drawRoundedPanel(doc, MARGIN, y, leftContentW, logoFrameH, 8, "#f8fafc", T.borderLight);
-
-  if (logoSrc) {
-    if (logoBuf) {
-      try {
-        doc.image(logoBuf, MARGIN + logoInnerPad, y + logoInnerPad, {
-          fit: [logoFitW, logoFitH],
-          align: "center",
-          valign: "center",
-        });
-        leftBlockBottom = y + logoFrameH + 8;
-      } catch {
-        doc.fillColor(T.text).font("Helvetica-Bold").fontSize(16);
-        doc.text(draft.companySnapshot.name, MARGIN + 14, y + 28, {
-          width: leftContentW - 28,
-        });
-        leftBlockBottom = y + logoFrameH + 8;
-      }
-    } else {
-      doc.fillColor(T.text).font("Helvetica-Bold").fontSize(15);
-      doc.text(draft.companySnapshot.name, MARGIN + 14, y + 32, {
-        width: leftContentW - 28,
-      });
-      leftBlockBottom = y + logoFrameH + 8;
-    }
-  } else {
-    doc.fillColor(T.text).font("Helvetica-Bold").fontSize(16);
-    doc.text(draft.companySnapshot.name, MARGIN + 14, y + 32, {
-      width: leftContentW - 28,
-    });
-    leftBlockBottom = y + logoFrameH + 8;
-  }
-
-  doc.fillColor(T.textMuted).font("Helvetica").fontSize(8.5);
   const addr = [
     draft.companySnapshot.address,
     draft.companySnapshot.email,
     draft.companySnapshot.website,
   ].filter(Boolean) as string[];
-  let addrY = leftBlockBottom;
-  for (const line of addr) {
-    doc.text(line, MARGIN, addrY, { width: leftContentW, lineGap: 1 });
-    addrY = doc.y + 2;
-  }
-  leftBlockBottom = Math.max(leftBlockBottom, addrY + 4);
 
-  /* Right: quotation meta card */
+  const addrTextW = leftContentW - logoInnerPad * 2;
+  doc.save();
+  doc.font("Helvetica").fontSize(addrFontSize);
+  let addrBlockH = 0;
+  for (let i = 0; i < addr.length; i++) {
+    const line = addr[i];
+    addrBlockH += doc.heightOfString(line, { width: addrTextW, lineGap: 1 });
+    if (i < addr.length - 1) addrBlockH += 2;
+  }
+  doc.restore();
+
+  const canDrawLogo = Boolean(logoSrc && logoBuf);
+  let innerH = 0;
+  if (canDrawLogo) innerH += logoFitH;
+  if (addr.length) {
+    if (canDrawLogo) innerH += logoToAddrGap;
+    innerH += addrBlockH;
+  }
+  if (innerH < 1) innerH = 24;
+
+  const companyPanelNaturalH = logoInnerPad + innerH + logoInnerPad;
+
+  /* Right meta: natural content height (for equal-height row) */
   const qc = quotationCodeFromDocumentInfo(draft.documentInfo);
+  const metaPad = 14;
+  const metaInnerW = metaW - 28;
+  doc.save();
+  let metaNaturalH = metaPad;
+  doc.font("Helvetica-Bold").fontSize(9).fillColor(T.accent);
+  metaNaturalH += doc.heightOfString("QUOTATION", { width: metaInnerW, align: "right" });
+  metaNaturalH += 4;
+  doc.fillColor(T.text).fontSize(13);
+  metaNaturalH += doc.heightOfString(draft.quotationNumberLabel ?? "—", {
+    width: metaInnerW,
+    align: "right",
+  });
+  metaNaturalH += 10;
+  doc.font("Helvetica").fontSize(8.5).fillColor(T.textMuted);
+  if (draft.status) {
+    metaNaturalH +=
+      doc.heightOfString(`Status · ${draft.status}`, { width: metaInnerW, align: "right" }) + 2;
+  }
+  if (qc) {
+    metaNaturalH += doc.heightOfString(`Ref · ${qc}`, { width: metaInnerW, align: "right" }) + 2;
+  }
+  metaNaturalH += doc.heightOfString(`Date · ${fmtDate(draft.documentInfo.date)}`, {
+    width: metaInnerW,
+    align: "right",
+  });
+  metaNaturalH += metaPad;
+  doc.restore();
+
+  const headerCardH = Math.max(companyPanelNaturalH, metaNaturalH);
+
+  drawRoundedPanel(doc, MARGIN, y, leftContentW, headerCardH, 8, "#f8fafc", T.borderLight);
+
+  let contentY = y + logoInnerPad;
+  if (canDrawLogo) {
+    try {
+      doc.image(logoBuf!, MARGIN + logoInnerPad, contentY, {
+        fit: [logoFitW, logoFitH],
+        align: "center",
+        valign: "center",
+      });
+    } catch {
+      /* Logo failed to decode */
+    }
+    contentY += logoFitH + (addr.length ? logoToAddrGap : 0);
+  }
+  if (addr.length) {
+    doc.fillColor(T.textMuted).font("Helvetica").fontSize(addrFontSize);
+    let addrY = contentY;
+    for (const line of addr) {
+      doc.text(line, MARGIN + logoInnerPad, addrY, { width: addrTextW, lineGap: 1 });
+      addrY = doc.y + 2;
+    }
+  }
+
+  leftBlockBottom = y + headerCardH + 8;
+
+  /* Right: quotation meta card (same height as left) */
   let ry = headerStartY;
-  const metaCardH = 118;
-  drawRoundedPanel(doc, metaX, ry, metaW, metaCardH, 8, T.accentMuted, T.border);
+  drawRoundedPanel(doc, metaX, ry, metaW, headerCardH, 8, T.accentMuted, T.border);
 
   doc.fillColor(T.accent).font("Helvetica-Bold").fontSize(9);
   doc.text("QUOTATION", metaX + 14, ry + 12, { width: metaW - 28, align: "right" });
@@ -343,7 +383,7 @@ export async function renderQuotationPdf(input: QuotationRenderDraft): Promise<B
     { width: metaW - 28, align: "right" }
   );
 
-  y = Math.max(leftBlockBottom, ry + metaCardH + 14);
+  y = Math.max(leftBlockBottom, ry + headerCardH + 14);
 
   /* —— Bill to | Subject —— */
   ensureSpace(140);

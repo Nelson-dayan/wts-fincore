@@ -90,6 +90,22 @@ async function fileToText(file: File): Promise<string> {
   });
 }
 
+/** Keeps text inputs strictly controlled (avoids defined → undefined React warning). */
+function s(v: string | undefined | null): string {
+  return v ?? "";
+}
+
+function lineNumberValue(n: unknown): number {
+  const x = typeof n === "number" ? n : Number(n);
+  if (!Number.isFinite(x)) return 1;
+  return Math.max(1, Math.floor(x));
+}
+
+function lineQtyPriceValue(n: unknown, fallback: number): number {
+  const x = typeof n === "number" ? n : Number(n);
+  return Number.isFinite(x) ? x : fallback;
+}
+
 export function CreateQuotationForm({
   prefillProjectId = "",
   defaultCollapsed = false,
@@ -604,7 +620,7 @@ export function CreateQuotationForm({
                     <div className="space-y-1 sm:col-span-2">
                       <Label>Project</Label>
                       <Input
-                        value={projectQuery}
+                        value={s(projectQuery)}
                         onChange={(e) => setProjectQuery(e.target.value)}
                         placeholder="Search project by name"
                       />
@@ -640,12 +656,12 @@ export function CreateQuotationForm({
                       <div className="grid gap-2 sm:grid-cols-2">
                         <div className="space-y-1">
                           <Label className="text-muted-foreground">Project ID</Label>
-                          <Input value={projectId || "—"} readOnly className="font-mono text-xs" />
+                          <Input value={s(projectId) || "—"} readOnly className="font-mono text-xs" />
                         </div>
                         <div className="space-y-1 sm:col-span-2">
                           <Label className="text-muted-foreground">Internal notes</Label>
                           <textarea
-                            value={internalNotes}
+                            value={s(internalNotes)}
                             onChange={(e) => setInternalNotes(e.target.value)}
                             rows={3}
                             className="flex min-h-[80px] w-full rounded-lg border border-border bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
@@ -662,18 +678,32 @@ export function CreateQuotationForm({
                       </p>
                       <div className="grid gap-2 sm:grid-cols-2">
                         <div className="space-y-1 sm:col-span-2">
-                          <Label>Company name</Label>
+                          <Label>Upload logo</Label>
                           <Input
-                            value={previewCompany.name}
-                            onChange={(e) =>
-                              setPreviewCompany((c) => ({ ...c, name: e.target.value }))
-                            }
+                            type="file"
+                            accept="image/*"
+                            onChange={async (e) => {
+                              const file = e.target.files?.[0];
+                              if (!file) return;
+                              const text = await fileToText(file);
+                              setPreviewCompany((c) => ({ ...c, logoText: text }));
+                              e.target.value = "";
+                            }}
                           />
+                          {previewCompany.logoText ? (
+                            <div className="pt-1">
+                              <img
+                                src={previewCompany.logoText}
+                                alt="Company logo preview"
+                                className="h-12 max-w-[200px] rounded-md border border-border object-contain"
+                              />
+                            </div>
+                          ) : null}
                         </div>
                         <div className="space-y-1 sm:col-span-2">
                           <Label>Address</Label>
                           <textarea
-                            value={previewCompany.address}
+                            value={s(previewCompany.address)}
                             onChange={(e) =>
                               setPreviewCompany((c) => ({ ...c, address: e.target.value }))
                             }
@@ -684,7 +714,7 @@ export function CreateQuotationForm({
                         <div className="space-y-1">
                           <Label>Email</Label>
                           <Input
-                            value={previewCompany.email}
+                            value={s(previewCompany.email)}
                             onChange={(e) =>
                               setPreviewCompany((c) => ({ ...c, email: e.target.value }))
                             }
@@ -693,7 +723,7 @@ export function CreateQuotationForm({
                         <div className="space-y-1">
                           <Label>Website</Label>
                           <Input
-                            value={previewCompany.website}
+                            value={s(previewCompany.website)}
                             onChange={(e) =>
                               setPreviewCompany((c) => ({ ...c, website: e.target.value }))
                             }
@@ -711,7 +741,7 @@ export function CreateQuotationForm({
                         <div className="space-y-1">
                           <Label>Client name</Label>
                           <Input
-                            value={previewClient.name}
+                            value={s(previewClient.name)}
                             onChange={(e) =>
                               setPreviewClient((c) => ({ ...c, name: e.target.value }))
                             }
@@ -720,7 +750,7 @@ export function CreateQuotationForm({
                         <div className="space-y-1">
                           <Label>Company</Label>
                           <Input
-                            value={previewClient.company}
+                            value={s(previewClient.company)}
                             onChange={(e) =>
                               setPreviewClient((c) => ({ ...c, company: e.target.value }))
                             }
@@ -729,7 +759,7 @@ export function CreateQuotationForm({
                         <div className="space-y-1 sm:col-span-2">
                           <Label>Address</Label>
                           <textarea
-                            value={previewClient.address}
+                            value={s(previewClient.address)}
                             onChange={(e) =>
                               setPreviewClient((c) => ({ ...c, address: e.target.value }))
                             }
@@ -738,24 +768,50 @@ export function CreateQuotationForm({
                           />
                         </div>
                         <div className="space-y-1">
-                          <Label>Client logo (text / data URL)</Label>
+                          <Label>Upload client logo</Label>
                           <Input
-                            value={previewClient.logoText}
-                            onChange={(e) =>
-                              setPreviewClient((c) => ({ ...c, logoText: e.target.value }))
-                            }
-                            placeholder="Optional"
+                            type="file"
+                            accept="image/*"
+                            onChange={async (e) => {
+                              const file = e.target.files?.[0];
+                              if (!file) return;
+                              const text = await fileToText(file);
+                              setPreviewClient((c) => ({ ...c, logoText: text }));
+                              e.target.value = "";
+                            }}
                           />
+                          {previewClient.logoText ? (
+                            <div className="pt-1">
+                              <img
+                                src={previewClient.logoText}
+                                alt="Client logo preview"
+                                className="h-12 max-w-[200px] rounded-md border border-border object-contain"
+                              />
+                            </div>
+                          ) : null}
                         </div>
                         <div className="space-y-1">
-                          <Label>Client signature (text / data URL)</Label>
+                          <Label>Upload client signature</Label>
                           <Input
-                            value={previewClient.signatureText}
-                            onChange={(e) =>
-                              setPreviewClient((c) => ({ ...c, signatureText: e.target.value }))
-                            }
-                            placeholder="Optional"
+                            type="file"
+                            accept="image/*"
+                            onChange={async (e) => {
+                              const file = e.target.files?.[0];
+                              if (!file) return;
+                              const text = await fileToText(file);
+                              setPreviewClient((c) => ({ ...c, signatureText: text }));
+                              e.target.value = "";
+                            }}
                           />
+                          {previewClient.signatureText ? (
+                            <div className="pt-1">
+                              <img
+                                src={previewClient.signatureText}
+                                alt="Client signature preview"
+                                className="h-12 max-w-[240px] rounded-md border border-border object-contain object-left"
+                              />
+                            </div>
+                          ) : null}
                         </div>
                       </div>
                     </div>
@@ -763,7 +819,7 @@ export function CreateQuotationForm({
                     <div className="space-y-1">
                       <Label>Status</Label>
                       <Select
-                        value={status}
+                        value={status ?? "draft"}
                         onChange={(e) => setStatus(e.target.value as typeof status)}
                         options={[
                           { value: "draft", label: "draft" },
@@ -777,7 +833,7 @@ export function CreateQuotationForm({
                       <Label>Document date</Label>
                       <Input
                         type="date"
-                        value={docDate}
+                        value={s(docDate)}
                         onChange={(e) => setDocDate(e.target.value)}
                         required
                       />
@@ -785,29 +841,29 @@ export function CreateQuotationForm({
                     <div className="space-y-1">
                       <Label>Quotation code</Label>
                       <Input
-                        value={quotationCode}
+                        value={s(quotationCode)}
                         onChange={(e) => setQuotationCode(e.target.value)}
                         placeholder="e.g. internal reference"
                       />
                     </div>
                     <div className="space-y-1">
                       <Label>Subject</Label>
-                      <Input value={subject} onChange={(e) => setSubject(e.target.value)} />
+                      <Input value={s(subject)} onChange={(e) => setSubject(e.target.value)} />
                     </div>
                     <div className="space-y-1 sm:col-span-2">
                       <Label>Title</Label>
-                      <Input value={title} onChange={(e) => setTitle(e.target.value)} />
+                      <Input value={s(title)} onChange={(e) => setTitle(e.target.value)} />
                     </div>
                     <div className="space-y-1 sm:col-span-2">
                       <Label>Description</Label>
-                      <Input value={description} onChange={(e) => setDescription(e.target.value)} />
+                      <Input value={s(description)} onChange={(e) => setDescription(e.target.value)} />
                     </div>
                     <div className="space-y-1">
                       <Label>Tax rate (%)</Label>
                       <Input
                         type="number"
                         min={0}
-                        value={taxRate}
+                        value={s(taxRate)}
                         onChange={(e) => setTaxRate(e.target.value)}
                       />
                     </div>
@@ -834,7 +890,7 @@ export function CreateQuotationForm({
                             setBranding((b) => ({
                               ...b,
                               useCompanyLogo: v,
-                              customLogoText: v ? "" : b.customLogoText,
+                              customLogoText: v ? "" : s(b.customLogoText),
                             }));
                           }}
                         />
@@ -864,7 +920,7 @@ export function CreateQuotationForm({
                             setBranding((b) => ({
                               ...b,
                               useCompanySignature: v,
-                              customSignatureText: v ? "" : b.customSignatureText,
+                              customSignatureText: v ? "" : s(b.customSignatureText),
                             }));
                           }}
                         />
@@ -927,15 +983,17 @@ export function CreateQuotationForm({
                                     className="h-8"
                                     type="number"
                                     min={1}
-                                    value={item.number}
+                                    value={lineNumberValue(item.number)}
                                     onChange={(e) => {
-                                      const v = Number(e.target.value);
+                                      const raw = e.target.value;
+                                      const v = raw === "" ? 1 : Number(raw);
+                                      const next = Number.isFinite(v) ? Math.max(1, Math.floor(v)) : 1;
                                       setPages((prev) => {
                                         const copy = prev.map((p) => ({
                                           ...p,
                                           items: p.items.map((row) => ({ ...row })),
                                         }));
-                                        copy[pageIdx].items[lineIdx].number = v;
+                                        copy[pageIdx].items[lineIdx].number = next;
                                         return copy;
                                       });
                                     }}
@@ -944,7 +1002,7 @@ export function CreateQuotationForm({
                                 <td className="py-1 pr-2">
                                   <Input
                                     className="h-8"
-                                    value={item.name}
+                                    value={s(item.name)}
                                     onChange={(e) => {
                                       const v = e.target.value;
                                       setPages((prev) => {
@@ -964,15 +1022,17 @@ export function CreateQuotationForm({
                                     className="h-8"
                                     type="number"
                                     min={0}
-                                    value={item.quantity}
+                                    value={lineQtyPriceValue(item.quantity, 0)}
                                     onChange={(e) => {
-                                      const v = Number(e.target.value);
+                                      const raw = e.target.value;
+                                      const v = raw === "" ? 0 : Number(raw);
+                                      const next = Number.isFinite(v) ? v : 0;
                                       setPages((prev) => {
                                         const copy = prev.map((p) => ({
                                           ...p,
                                           items: p.items.map((row) => ({ ...row })),
                                         }));
-                                        copy[pageIdx].items[lineIdx].quantity = v;
+                                        copy[pageIdx].items[lineIdx].quantity = next;
                                         return copy;
                                       });
                                     }}
@@ -984,15 +1044,17 @@ export function CreateQuotationForm({
                                     type="number"
                                     min={0}
                                     step="0.01"
-                                    value={item.price}
+                                    value={lineQtyPriceValue(item.price, 0)}
                                     onChange={(e) => {
-                                      const v = Number(e.target.value);
+                                      const raw = e.target.value;
+                                      const v = raw === "" ? 0 : Number(raw);
+                                      const next = Number.isFinite(v) ? v : 0;
                                       setPages((prev) => {
                                         const copy = prev.map((p) => ({
                                           ...p,
                                           items: p.items.map((row) => ({ ...row })),
                                         }));
-                                        copy[pageIdx].items[lineIdx].price = v;
+                                        copy[pageIdx].items[lineIdx].price = next;
                                         return copy;
                                       });
                                     }}
@@ -1023,21 +1085,21 @@ export function CreateQuotationForm({
                   <div className="grid gap-2 sm:grid-cols-2">
                     <div className="space-y-1">
                       <Label>Lead time</Label>
-                      <Input value={leadTime} onChange={(e) => setLeadTime(e.target.value)} />
+                      <Input value={s(leadTime)} onChange={(e) => setLeadTime(e.target.value)} />
                     </div>
                     <div className="space-y-1">
                       <Label>Validity</Label>
-                      <Input value={validity} onChange={(e) => setValidity(e.target.value)} />
+                      <Input value={s(validity)} onChange={(e) => setValidity(e.target.value)} />
                     </div>
                     <div className="space-y-1 sm:col-span-2">
                       <Label>Terms</Label>
-                      <Input value={terms} onChange={(e) => setTerms(e.target.value)} />
+                      <Input value={s(terms)} onChange={(e) => setTerms(e.target.value)} />
                     </div>
                     <div className="space-y-1">
                       <Label>Remaining amount</Label>
                       <Input
                         type="number"
-                        value={remainingAmount}
+                        value={s(remainingAmount)}
                         onChange={(e) => setRemainingAmount(e.target.value)}
                         placeholder="Optional"
                       />
@@ -1046,13 +1108,13 @@ export function CreateQuotationForm({
                       <Label>Confirm date</Label>
                       <Input
                         type="date"
-                        value={confirmDate}
+                        value={s(confirmDate)}
                         onChange={(e) => setConfirmDate(e.target.value)}
                       />
                     </div>
                     <div className="space-y-1 sm:col-span-2">
                       <Label>Remaining text</Label>
-                      <Input value={remainingText} onChange={(e) => setRemainingText(e.target.value)} />
+                      <Input value={s(remainingText)} onChange={(e) => setRemainingText(e.target.value)} />
                     </div>
                   </div>
 
