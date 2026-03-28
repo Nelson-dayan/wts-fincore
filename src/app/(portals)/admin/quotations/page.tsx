@@ -1,31 +1,19 @@
-import { ResourceTableClient } from "@/components/portals/resource-table-client";
+import { AdminQuotationsClient } from "@/components/portals/admin-quotations-client";
 
 interface PageProps {
-  searchParams?: Promise<{ projectId?: string }>;
+  searchParams?: Promise<{ projectId?: string; create?: string }>;
 }
 
 export default async function AdminQuotationsPage({ searchParams }: PageProps) {
   const params = (await searchParams) ?? {};
   const projectId = params.projectId ? String(params.projectId) : "";
-  const endpoint = projectId
-    ? `/api/admin/quotations?projectId=${encodeURIComponent(projectId)}`
-    : "/api/admin/quotations";
+  const defaultCreateExpanded =
+    params.create === "1" || params.create === "true" || params.create === "yes";
 
   return (
-    <ResourceTableClient
-      title="Quotations"
-      description={
-        projectId
-          ? "Quotation documents filtered by selected project."
-          : "Quotation documents used for client proposals."
-      }
-      endpoint={endpoint}
-      columns={[
-        { key: "quotationNumber", label: "Quotation #" },
-        { key: "status", label: "Status" },
-        { key: "projectId", label: "Project" },
-        { key: "createdAt", label: "Created At" },
-      ]}
+    <AdminQuotationsClient
+      initialProjectId={projectId}
+      defaultCreateExpanded={defaultCreateExpanded}
     />
   );
 }
