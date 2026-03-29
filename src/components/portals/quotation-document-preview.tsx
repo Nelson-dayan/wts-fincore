@@ -114,7 +114,7 @@ export function QuotationDocumentPreview({
                 <img
                   src={logoSrc}
                   alt="Company logo"
-                  className="mb-2 max-h-9 w-auto max-w-[176px] object-contain object-left"
+                  className="mb-2 max-h-9 w-auto max-w-44 object-contain object-left"
                 />
               ) : null}
               <div className="space-y-1 text-[13px] leading-snug text-slate-600 dark:text-zinc-400">
@@ -124,7 +124,7 @@ export function QuotationDocumentPreview({
               </div>
             </div>
           </div>
-          <div className="flex w-full shrink-0 sm:w-[min(100%,14.5rem)] sm:min-w-[12.5rem]">
+          <div className="flex w-full shrink-0 sm:w-[min(100%,14.5rem)] sm:min-w-50">
             <div className="flex h-full min-h-0 w-full flex-col rounded-lg border border-slate-200 bg-sky-50/80 p-3.5 text-right text-[12px] text-slate-600 dark:border-white/15 dark:bg-sky-950/35 dark:text-zinc-400">
               <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-zinc-500">
                 Quotation
@@ -154,6 +154,14 @@ export function QuotationDocumentPreview({
             <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-zinc-500">
               Bill to
             </p>
+            {clientSnapshot.logoText ? (
+              // eslint-disable-next-line @next/next/no-img-element -- data URLs
+              <img
+                src={clientSnapshot.logoText}
+                alt=""
+                className="mb-3 max-h-12 w-auto max-w-45 object-contain object-left"
+              />
+            ) : null}
             <p className="font-semibold text-slate-900 dark:text-zinc-50">{clientSnapshot.name}</p>
             {clientSnapshot.company ? (
               <p className="text-slate-700 dark:text-zinc-300">{clientSnapshot.company}</p>
@@ -284,7 +292,7 @@ export function QuotationDocumentPreview({
                 <img
                   src={companySig}
                   alt="Company signature"
-                  className="max-h-20 w-auto max-w-[200px] object-contain object-left"
+                  className="max-h-20 w-auto max-w-50 object-contain object-left"
                 />
               </div>
             ) : null}
@@ -297,7 +305,7 @@ export function QuotationDocumentPreview({
                 <img
                   src={clientSig}
                   alt="Client signature"
-                  className="max-h-20 w-auto max-w-[200px] object-contain object-left"
+                  className="max-h-20 w-auto max-w-50 object-contain object-left"
                 />
               </div>
             ) : null}

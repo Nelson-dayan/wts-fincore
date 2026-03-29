@@ -232,11 +232,14 @@ export async function renderQuotationPdf(input: QuotationRenderDraft): Promise<B
   const logoSrc = resolveQuotationLogoSrc(b, draft.companySnapshot);
   const companySig = resolveCompanySignatureSrc(b, draft.companySnapshot);
   const clientSig = resolveClientSignatureSrc(b, draft.clientSnapshot);
+  const clientLogoSrc =
+    String(draft.clientSnapshot.logoText ?? "").trim() || null;
 
-  const [logoBuf, companySigBuf, clientSigBuf] = await Promise.all([
+  const [logoBuf, companySigBuf, clientSigBuf, clientLogoBuf] = await Promise.all([
     logoSrc ? resolveImageBufferForPdf(logoSrc) : Promise.resolve(null),
     companySig ? resolveImageBufferForPdf(companySig) : Promise.resolve(null),
     clientSig ? resolveImageBufferForPdf(clientSig) : Promise.resolve(null),
+    clientLogoSrc ? resolveImageBufferForPdf(clientLogoSrc) : Promise.resolve(null),
   ]);
 
   let y = MARGIN;
@@ -393,12 +396,25 @@ export async function renderQuotationPdf(input: QuotationRenderDraft): Promise<B
   const leftBoxX = MARGIN;
   const rightBoxX = MARGIN + colW + colGap;
 
-  const billH = 108;
   const subjH = 108;
+  const hasClientLogo = Boolean(clientLogoBuf);
+  const billH = hasClientLogo ? 132 : 108;
   drawRoundedPanel(doc, leftBoxX, boxY, colW, billH, 6, T.white, T.border);
   drawAccentTitleBar(doc, leftBoxX, boxY, colW, "Bill to");
+  let billTextY = boxY + 28;
+  if (clientLogoBuf) {
+    try {
+      doc.image(clientLogoBuf, leftBoxX + 14, billTextY, {
+        fit: [Math.min(colW - 28, 100), 40],
+        valign: "center",
+      });
+      billTextY += 44;
+    } catch {
+      /* skip broken client logo */
+    }
+  }
   doc.fillColor(T.text).font("Helvetica-Bold").fontSize(10);
-  doc.text(draft.clientSnapshot.name, leftBoxX + 14, boxY + 30, { width: colW - 28 });
+  doc.text(draft.clientSnapshot.name, leftBoxX + 14, billTextY, { width: colW - 28 });
   doc.font("Helvetica").fontSize(9).fillColor(T.textMuted);
   if (draft.clientSnapshot.company) {
     doc.text(draft.clientSnapshot.company, leftBoxX + 14, doc.y + 2, { width: colW - 28 });

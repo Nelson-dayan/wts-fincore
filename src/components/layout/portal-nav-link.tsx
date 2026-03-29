@@ -17,11 +17,9 @@ export function PortalNavLink({
   match?: MatchMode;
   className?: string;
 }) {
-  const pathname = usePathname();
+  const pathname = usePathname() ?? "";
   const active =
-    match === "exact"
-      ? pathname === href
-      : pathname === href || pathname.startsWith(`${href}/`);
+    match === "exact" ? pathname === href : pathname === href || pathname.startsWith(`${href}/`);
 
   return (
     <Link

@@ -25,29 +25,25 @@ export async function PATCH(req: Request, ctx: RouteCtx) {
       clientSignatureText?: string;
     };
 
+    const $set: Record<string, unknown> = {};
+    if (body.name !== undefined) $set.name = String(body.name).trim();
+    if (body.company !== undefined) $set.company = String(body.company).trim();
+    if (body.website !== undefined) $set.website = String(body.website).trim();
+    if (body.address !== undefined) $set.address = String(body.address);
+    if (body.email !== undefined) $set.email = String(body.email).trim().toLowerCase();
+    if (body.phone !== undefined) $set.phone = String(body.phone);
+    if (body.clientLogoText !== undefined) {
+      const t = String(body.clientLogoText);
+      $set.clientLogoText = t;
+      $set.clientLogoUrl = t;
+    }
+    if (body.clientSignatureText !== undefined) {
+      $set.clientSignatureText = String(body.clientSignatureText);
+    }
+
     const updated = await ClientModel.findByIdAndUpdate(
       clientId,
-      {
-        $set: {
-          name: body.name !== undefined ? String(body.name).trim() : undefined,
-          company: body.company !== undefined ? String(body.company).trim() : undefined,
-          website: body.website !== undefined ? String(body.website).trim() : undefined,
-          address: body.address !== undefined ? String(body.address) : undefined,
-          email:
-            body.email !== undefined
-              ? String(body.email).trim().toLowerCase()
-              : undefined,
-          phone: body.phone !== undefined ? String(body.phone) : undefined,
-          clientLogoUrl:
-            body.clientLogoText !== undefined ? String(body.clientLogoText) : undefined,
-          clientLogoText:
-            body.clientLogoText !== undefined ? String(body.clientLogoText) : undefined,
-          clientSignatureText:
-            body.clientSignatureText !== undefined
-              ? String(body.clientSignatureText)
-              : undefined,
-        },
-      },
+      { $set },
       { new: true }
     ).lean();
 

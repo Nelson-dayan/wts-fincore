@@ -235,14 +235,14 @@ export async function PATCH(req: Request, ctx: RouteCtx) {
         ? {
             useCompanyLogo: patchB.useCompanyLogo !== false,
             useCompanySignature: patchB.useCompanySignature !== false,
-            showClientSignature: Boolean(patchB.showClientSignature),
+            showClientSignature: patchB.showClientSignature !== false,
             customLogoText: String(patchB.customLogoText ?? ""),
             customSignatureText: String(patchB.customSignatureText ?? ""),
           }
         : {
             useCompanyLogo: existingBranding.useCompanyLogo !== false,
             useCompanySignature: existingBranding.useCompanySignature !== false,
-            showClientSignature: Boolean(existingBranding.showClientSignature),
+            showClientSignature: existingBranding.showClientSignature !== false,
             customLogoText: String(existingBranding.customLogoText ?? ""),
             customSignatureText: String(existingBranding.customSignatureText ?? ""),
           };
@@ -307,6 +307,23 @@ export async function PATCH(req: Request, ctx: RouteCtx) {
 
     return NextResponse.json({ item: formatQuotation(updated as Record<string, unknown>) });
   } catch (error) {
+    if (error instanceof Error) {
+      const msg = error.message;
+      if (msg === "UNAUTHORIZED" || msg === "FORBIDDEN") {
+        return authErrorResponse(error, "Failed to update quotation");
+      }
+      if (
+        msg.startsWith("At least one page") ||
+        msg.startsWith("Each page") ||
+        msg.startsWith("Each line item") ||
+        msg.startsWith("Quotation has no pages") ||
+        msg.startsWith("Project not found") ||
+        msg.startsWith("Client not found") ||
+        msg.startsWith("Primary company")
+      ) {
+        return NextResponse.json({ message: msg }, { status: 400 });
+      }
+    }
     return authErrorResponse(error, "Failed to update quotation");
   }
 }

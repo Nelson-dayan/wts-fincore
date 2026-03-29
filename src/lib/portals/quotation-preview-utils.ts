@@ -10,7 +10,7 @@ export function defaultQuotationBranding(): QuotationBrandingState {
   return {
     useCompanyLogo: true,
     useCompanySignature: true,
-    showClientSignature: false,
+    showClientSignature: true,
     customLogoText: "",
     customSignatureText: "",
   };
@@ -43,9 +43,11 @@ export function resolveClientSignatureSrc(
   branding: QuotationBrandingState,
   clientSnapshot: { signatureText?: string }
 ): string | null {
-  if (!branding.showClientSignature) return null;
   const c = String(clientSnapshot.signatureText ?? "").trim();
-  return c || null;
+  if (!c) return null;
+  /* Explicit false hides; true/undefined (legacy drafts) shows when a signature image exists. */
+  if (branding.showClientSignature === false) return null;
+  return c;
 }
 
 type LineLike = { quantity: number; price: number };

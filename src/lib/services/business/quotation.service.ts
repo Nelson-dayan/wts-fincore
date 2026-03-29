@@ -91,15 +91,21 @@ export async function buildQuotationSnapshots(projectId: string): Promise<{
     throw new Error("Primary company is not configured. Complete company settings first.");
   }
 
+  const c = client as {
+    clientLogoText?: string;
+    clientLogoUrl?: string;
+    clientSignatureText?: string;
+  };
+  const logoText = String(c.clientLogoText ?? "").trim();
+  const logoUrl = String(c.clientLogoUrl ?? "").trim();
+
   return {
     clientSnapshot: {
       name: String(client.name ?? "").trim(),
       company: String(client.company ?? "").trim(),
       address: String(client.address ?? "").trim(),
-      logoText: String((client as { clientLogoText?: string }).clientLogoText ?? "").trim(),
-      signatureText: String(
-        (client as { clientSignatureText?: string }).clientSignatureText ?? ""
-      ).trim(),
+      logoText: logoText || logoUrl,
+      signatureText: String(c.clientSignatureText ?? "").trim(),
     },
     companySnapshot: {
       name: String(company.name ?? "").trim(),

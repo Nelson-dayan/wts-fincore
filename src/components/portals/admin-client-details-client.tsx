@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import Image from "next/image";
 import type { LucideIcon } from "lucide-react";
 import {
   ArrowLeft,
@@ -23,6 +22,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils/cn";
+import { readFileAsPdfSafeDataUrl } from "@/lib/portals/read-file-as-pdf-safe-data-url";
 
 type ClientDetailsPayload = {
   client?: {
@@ -34,6 +34,7 @@ type ClientDetailsPayload = {
     website?: string;
     address?: string;
     clientLogoText?: string;
+    clientLogoUrl?: string;
     clientSignatureText?: string;
     createdAt: string;
   };
@@ -145,11 +146,11 @@ function SectionTable({
   footerAction?: React.ReactNode;
 }) {
   return (
-    <Card className="group mb-5 border-border/70 bg-card/90 shadow-[var(--shadow-premium)] backdrop-blur-[2px] transition-[box-shadow,border-color] duration-200 hover:border-primary/12 hover:shadow-[var(--shadow-premium-lg)]">
+    <Card className="group mb-5 border-border/70 bg-card/90 shadow-(--shadow-premium) backdrop-blur-[2px] transition-[box-shadow,border-color] duration-200 hover:border-primary/12 hover:shadow-(--shadow-premium-lg)">
       <CardHeader className="flex flex-col gap-3 space-y-0 pb-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-start gap-3">
           <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-muted/80 text-foreground/80 ring-1 ring-border/50 transition-transform duration-200 group-hover:scale-[1.02] dark:bg-muted/45">
-            <Icon className="size-[18px]" strokeWidth={1.75} aria-hidden />
+            <Icon className="size-4.5" strokeWidth={1.75} aria-hidden />
           </span>
           <div>
             <CardTitle className="flex flex-wrap items-center gap-2 text-base font-semibold tracking-tight sm:text-lg">
@@ -168,7 +169,7 @@ function SectionTable({
       <CardContent className="pt-0">
         <div className="overflow-hidden rounded-xl border border-border/60 shadow-sm">
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[760px] text-left text-[0.8125rem]">
+            <table className="w-full min-w-190 text-left text-[0.8125rem]">
               <thead>
                 <tr className="border-b border-border/60 bg-muted/45 dark:bg-muted/25">
                   {columns.map((column) => (
@@ -255,15 +256,6 @@ export function AdminClientDetailsClient({ clientId }: { clientId: string }) {
     clientSignatureText: "",
   });
 
-  async function fileToText(file: File): Promise<string> {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(String(reader.result ?? ""));
-      reader.onerror = () => reject(new Error("Failed to read file"));
-      reader.readAsDataURL(file);
-    });
-  }
-
   useEffect(() => {
     let alive = true;
     async function load() {
@@ -344,7 +336,7 @@ export function AdminClientDetailsClient({ clientId }: { clientId: string }) {
   const clientName = data.client?.name;
 
   return (
-    <div className="animate-[fade-in_0.4s_ease-out_both]">
+    <div className="animate-fade-in">
       <Link
         href="/admin/clients"
         className="group mb-6 inline-flex items-center gap-2 rounded-lg text-[0.8125rem] font-medium text-muted-foreground transition-[color,background-color] duration-200 hover:bg-accent/60 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/70 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
@@ -363,18 +355,18 @@ export function AdminClientDetailsClient({ clientId }: { clientId: string }) {
 
       {error ? (
         <div
-          className="mb-6 rounded-2xl border border-destructive/35 bg-destructive/[0.06] p-4 text-[0.8125rem] leading-relaxed text-destructive shadow-sm dark:bg-destructive/[0.1]"
+          className="mb-6 rounded-2xl border border-destructive/35 bg-destructive/6 p-4 text-[0.8125rem] leading-relaxed text-destructive shadow-sm dark:bg-destructive/10"
           role="alert"
         >
           {error}
         </div>
       ) : null}
 
-      <Card className="mb-6 border-border/70 bg-card/90 shadow-[var(--shadow-premium)] backdrop-blur-[2px]">
+      <Card className="mb-6 border-border/70 bg-card/90 shadow-(--shadow-premium) backdrop-blur-[2px]">
         <CardHeader className="space-y-4 pb-4">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div className="flex items-start gap-3">
-              <span className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-primary/15 to-primary/5 text-primary ring-1 ring-primary/15">
+              <span className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-linear-to-br from-primary/15 to-primary/5 text-primary ring-1 ring-primary/15">
                 <Building2 className="size-6" strokeWidth={1.6} aria-hidden />
               </span>
               <div className="min-w-0 space-y-1">
@@ -407,7 +399,7 @@ export function AdminClientDetailsClient({ clientId }: { clientId: string }) {
             <div className="flex flex-wrap gap-2 sm:justify-end">
               {editing ? (
                 <>
-                  <Button size="sm" onClick={saveClient} disabled={saving} className="min-w-[4.5rem]">
+                  <Button size="sm" onClick={saveClient} disabled={saving} className="min-w-18">
                     {saving ? "Saving…" : "Save"}
                   </Button>
                   <Button size="sm" variant="outline" onClick={() => setEditing(false)} disabled={saving}>
@@ -442,6 +434,59 @@ export function AdminClientDetailsClient({ clientId }: { clientId: string }) {
         <CardContent className="grid gap-4 text-sm sm:grid-cols-2">
           {editing ? (
             <>
+              <div className="space-y-3 sm:col-span-2">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  Brand (quotation PDF)
+                </p>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label>Upload client logo</Label>
+                    <Input
+                      type="file"
+                      accept="image/*"
+                      className="cursor-pointer file:mr-3 file:rounded-md file:border-0 file:bg-primary/10 file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-primary hover:file:bg-primary/15"
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        const text = await readFileAsPdfSafeDataUrl(file);
+                        setForm((f) => ({ ...f, clientLogoText: text }));
+                        e.target.value = "";
+                      }}
+                    />
+                    {form.clientLogoText ? (
+                      // eslint-disable-next-line @next/next/no-img-element -- data URL
+                      <img
+                        src={form.clientLogoText}
+                        alt=""
+                        className="mt-1 h-12 max-w-50 rounded-md border border-border object-contain"
+                      />
+                    ) : null}
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Upload client signature</Label>
+                    <Input
+                      type="file"
+                      accept="image/*"
+                      className="cursor-pointer file:mr-3 file:rounded-md file:border-0 file:bg-primary/10 file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-primary hover:file:bg-primary/15"
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        const text = await readFileAsPdfSafeDataUrl(file);
+                        setForm((f) => ({ ...f, clientSignatureText: text }));
+                        e.target.value = "";
+                      }}
+                    />
+                    {form.clientSignatureText ? (
+                      // eslint-disable-next-line @next/next/no-img-element -- data URL
+                      <img
+                        src={form.clientSignatureText}
+                        alt=""
+                        className="mt-1 h-12 max-w-60 rounded-md border border-border object-contain object-left"
+                      />
+                    ) : null}
+                  </div>
+                </div>
+              </div>
               <div className="space-y-2">
                 <Label>Name</Label>
                 <Input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} />
@@ -472,44 +517,48 @@ export function AdminClientDetailsClient({ clientId }: { clientId: string }) {
                   onChange={(e) => setForm((f) => ({ ...f, website: e.target.value }))}
                 />
               </div>
-              <div className="space-y-2">
+              <div className="space-y-2 sm:col-span-2">
                 <Label>Address</Label>
                 <Input
                   value={form.address}
                   onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))}
                 />
               </div>
-              <div className="space-y-2">
-                <Label>Logo Upload</Label>
-                <Input
-                  type="file"
-                  accept="image/*"
-                  className="cursor-pointer file:mr-3 file:rounded-md file:border-0 file:bg-primary/10 file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-primary hover:file:bg-primary/15"
-                  onChange={async (e) => {
-                    const file = e.target.files?.[0];
-                    if (!file) return;
-                    const text = await fileToText(file);
-                    setForm((f) => ({ ...f, clientLogoText: text }));
-                  }}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Signature Upload</Label>
-                <Input
-                  type="file"
-                  accept="image/*"
-                  className="cursor-pointer file:mr-3 file:rounded-md file:border-0 file:bg-primary/10 file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-primary hover:file:bg-primary/15"
-                  onChange={async (e) => {
-                    const file = e.target.files?.[0];
-                    if (!file) return;
-                    const text = await fileToText(file);
-                    setForm((f) => ({ ...f, clientSignatureText: text }));
-                  }}
-                />
-              </div>
             </>
           ) : (
             <>
+              <div className="sm:col-span-2 grid gap-4 sm:grid-cols-2">
+                <div className="overflow-hidden rounded-xl border border-border/50 bg-muted/15 p-4 dark:bg-muted/10">
+                  <p className="mb-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    Client logo
+                  </p>
+                  {data.client?.clientLogoText || data.client?.clientLogoUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element -- data URLs / legacy URLs
+                    <img
+                      src={data.client.clientLogoText || data.client.clientLogoUrl}
+                      alt="Client logo"
+                      className="h-24 max-w-55 rounded-lg border border-border/60 bg-background/80 object-contain shadow-sm transition-transform duration-200 hover:scale-[1.02]"
+                    />
+                  ) : (
+                    <p className="text-sm text-muted-foreground">No logo uploaded.</p>
+                  )}
+                </div>
+                <div className="overflow-hidden rounded-xl border border-border/50 bg-muted/15 p-4 dark:bg-muted/10">
+                  <p className="mb-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    Client signature
+                  </p>
+                  {data.client?.clientSignatureText ? (
+                    // eslint-disable-next-line @next/next/no-img-element -- data URL
+                    <img
+                      src={data.client.clientSignatureText}
+                      alt="Client signature"
+                      className="h-24 max-w-65 rounded-lg border border-border/60 bg-background/80 object-contain object-left shadow-sm transition-transform duration-200 hover:scale-[1.02]"
+                    />
+                  ) : (
+                    <p className="text-sm text-muted-foreground">No signature uploaded.</p>
+                  )}
+                </div>
+              </div>
               <DetailTile label="Name">{data.client?.name ?? "—"}</DetailTile>
               <DetailTile label="Company">{data.client?.company ?? "—"}</DetailTile>
               <DetailTile label="Email">
@@ -549,42 +598,6 @@ export function AdminClientDetailsClient({ clientId }: { clientId: string }) {
                   "—"
                 )}
               </DetailTile>
-              <div className="sm:col-span-2 grid gap-4 sm:grid-cols-2">
-                <div className="overflow-hidden rounded-xl border border-border/50 bg-muted/15 p-4 dark:bg-muted/10">
-                  <p className="mb-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                    Logo
-                  </p>
-                  {data.client?.clientLogoText ? (
-                    <Image
-                      src={data.client.clientLogoText}
-                      alt="Client logo"
-                      width={180}
-                      height={96}
-                      unoptimized
-                      className="h-24 w-auto rounded-lg border border-border/60 bg-background/80 object-contain shadow-sm transition-transform duration-200 hover:scale-[1.02]"
-                    />
-                  ) : (
-                    <p className="text-sm text-muted-foreground">No logo uploaded.</p>
-                  )}
-                </div>
-                <div className="overflow-hidden rounded-xl border border-border/50 bg-muted/15 p-4 dark:bg-muted/10">
-                  <p className="mb-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                    Signature
-                  </p>
-                  {data.client?.clientSignatureText ? (
-                    <Image
-                      src={data.client.clientSignatureText}
-                      alt="Client signature"
-                      width={180}
-                      height={96}
-                      unoptimized
-                      className="h-24 w-auto rounded-lg border border-border/60 bg-background/80 object-contain shadow-sm transition-transform duration-200 hover:scale-[1.02]"
-                    />
-                  ) : (
-                    <p className="text-sm text-muted-foreground">No signature uploaded.</p>
-                  )}
-                </div>
-              </div>
             </>
           )}
         </CardContent>

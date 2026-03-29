@@ -15,6 +15,7 @@ import {
 } from "@/lib/portals/quotation-preview-utils";
 import type { QuotationRenderDraft } from "@/lib/services/business/quotation-render.types";
 import { sanitizeDraftForServerRender } from "@/lib/portals/quotation-draft-sanitize";
+import { readFileAsPdfSafeDataUrl } from "@/lib/portals/read-file-as-pdf-safe-data-url";
 
 type LineItem = {
   number: number;
@@ -81,15 +82,6 @@ function emptyCompany(): PreviewCompany {
   };
 }
 
-async function fileToText(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result ?? ""));
-    reader.onerror = () => reject(new Error("Failed to read file"));
-    reader.readAsDataURL(file);
-  });
-}
-
 /** Keeps text inputs strictly controlled (avoids defined → undefined React warning). */
 function s(v: string | undefined | null): string {
   return v ?? "";
@@ -104,6 +96,12 @@ function lineNumberValue(n: unknown): number {
 function lineQtyPriceValue(n: unknown, fallback: number): number {
   const x = typeof n === "number" ? n : Number(n);
   return Number.isFinite(x) ? x : fallback;
+}
+
+/** Avoids RangeError from `new Date("").toISOString()` when date input is cleared. */
+function toIsoDateOrNow(dateInput: string): string {
+  const d = new Date(dateInput);
+  return Number.isNaN(d.getTime()) ? new Date().toISOString() : d.toISOString();
 }
 
 export function CreateQuotationForm({
@@ -506,7 +504,7 @@ export function CreateQuotationForm({
           branding,
           documentInfo: {
             quotationCode,
-            date: new Date(docDate).toISOString(),
+            date: toIsoDateOrNow(docDate),
             subject,
             title,
             description,
@@ -541,11 +539,15 @@ export function CreateQuotationForm({
           },
         }),
       });
-      const result = (await response.json()) as {
+      const result = (await response.json().catch(() => ({}))) as {
         message?: string;
         item?: { _id?: string };
       };
-      if (!response.ok) throw new Error(result.message ?? "Create failed");
+      if (!response.ok) {
+        throw new Error(
+          result.message ?? `Could not save quotation (HTTP ${response.status}).`
+        );
+      }
       setMessage("Quotation saved.");
       const createdId = result.item?._id;
       setTimeout(() => {
@@ -664,7 +666,7 @@ export function CreateQuotationForm({
                             value={s(internalNotes)}
                             onChange={(e) => setInternalNotes(e.target.value)}
                             rows={3}
-                            className="flex min-h-[80px] w-full rounded-lg border border-border bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+                            className="flex min-h-20 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
                             placeholder="Team-only context, CRM links, follow-ups…"
                           />
                         </div>
@@ -685,7 +687,7 @@ export function CreateQuotationForm({
                             onChange={async (e) => {
                               const file = e.target.files?.[0];
                               if (!file) return;
-                              const text = await fileToText(file);
+                              const text = await readFileAsPdfSafeDataUrl(file);
                               setPreviewCompany((c) => ({ ...c, logoText: text }));
                               e.target.value = "";
                             }}
@@ -695,7 +697,7 @@ export function CreateQuotationForm({
                               <img
                                 src={previewCompany.logoText}
                                 alt="Company logo preview"
-                                className="h-12 max-w-[200px] rounded-md border border-border object-contain"
+                                className="h-12 max-w-50 rounded-md border border-border object-contain"
                               />
                             </div>
                           ) : null}
@@ -708,7 +710,7 @@ export function CreateQuotationForm({
                               setPreviewCompany((c) => ({ ...c, address: e.target.value }))
                             }
                             rows={3}
-                            className="flex min-h-[72px] w-full rounded-lg border border-border bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+                            className="flex min-h-18 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
                           />
                         </div>
                         <div className="space-y-1">
@@ -738,6 +740,59 @@ export function CreateQuotationForm({
                         Selecting a project fills these fields; you can edit them anytime.
                       </p>
                       <div className="grid gap-2 sm:grid-cols-2">
+                        <div className="space-y-1 sm:col-span-2">
+                          <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                            Brand on quotation
+                          </p>
+                          <div className="grid gap-3 sm:grid-cols-2">
+                            <div className="space-y-1">
+                              <Label>Upload client logo</Label>
+                              <Input
+                                type="file"
+                                accept="image/*"
+                                onChange={async (e) => {
+                                  const file = e.target.files?.[0];
+                                  if (!file) return;
+                                  const text = await readFileAsPdfSafeDataUrl(file);
+                                  setPreviewClient((c) => ({ ...c, logoText: text }));
+                                  e.target.value = "";
+                                }}
+                              />
+                              {previewClient.logoText ? (
+                                <div className="pt-1">
+                                  <img
+                                    src={previewClient.logoText}
+                                    alt="Client logo preview"
+                                    className="h-12 max-w-50 rounded-md border border-border object-contain"
+                                  />
+                                </div>
+                              ) : null}
+                            </div>
+                            <div className="space-y-1">
+                              <Label>Upload client signature</Label>
+                              <Input
+                                type="file"
+                                accept="image/*"
+                                onChange={async (e) => {
+                                  const file = e.target.files?.[0];
+                                  if (!file) return;
+                                  const text = await readFileAsPdfSafeDataUrl(file);
+                                  setPreviewClient((c) => ({ ...c, signatureText: text }));
+                                  e.target.value = "";
+                                }}
+                              />
+                              {previewClient.signatureText ? (
+                                <div className="pt-1">
+                                  <img
+                                    src={previewClient.signatureText}
+                                    alt="Client signature preview"
+                                    className="h-12 max-w-60 rounded-md border border-border object-contain object-left"
+                                  />
+                                </div>
+                              ) : null}
+                            </div>
+                          </div>
+                        </div>
                         <div className="space-y-1">
                           <Label>Client name</Label>
                           <Input
@@ -764,54 +819,8 @@ export function CreateQuotationForm({
                               setPreviewClient((c) => ({ ...c, address: e.target.value }))
                             }
                             rows={3}
-                            className="flex min-h-[72px] w-full rounded-lg border border-border bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+                            className="flex min-h-18 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
                           />
-                        </div>
-                        <div className="space-y-1">
-                          <Label>Upload client logo</Label>
-                          <Input
-                            type="file"
-                            accept="image/*"
-                            onChange={async (e) => {
-                              const file = e.target.files?.[0];
-                              if (!file) return;
-                              const text = await fileToText(file);
-                              setPreviewClient((c) => ({ ...c, logoText: text }));
-                              e.target.value = "";
-                            }}
-                          />
-                          {previewClient.logoText ? (
-                            <div className="pt-1">
-                              <img
-                                src={previewClient.logoText}
-                                alt="Client logo preview"
-                                className="h-12 max-w-[200px] rounded-md border border-border object-contain"
-                              />
-                            </div>
-                          ) : null}
-                        </div>
-                        <div className="space-y-1">
-                          <Label>Upload client signature</Label>
-                          <Input
-                            type="file"
-                            accept="image/*"
-                            onChange={async (e) => {
-                              const file = e.target.files?.[0];
-                              if (!file) return;
-                              const text = await fileToText(file);
-                              setPreviewClient((c) => ({ ...c, signatureText: text }));
-                              e.target.value = "";
-                            }}
-                          />
-                          {previewClient.signatureText ? (
-                            <div className="pt-1">
-                              <img
-                                src={previewClient.signatureText}
-                                alt="Client signature preview"
-                                className="h-12 max-w-[240px] rounded-md border border-border object-contain object-left"
-                              />
-                            </div>
-                          ) : null}
                         </div>
                       </div>
                     </div>
@@ -905,7 +914,7 @@ export function CreateQuotationForm({
                             onChange={async (e) => {
                               const file = e.target.files?.[0];
                               if (!file) return;
-                              const text = await fileToText(file);
+                              const text = await readFileAsPdfSafeDataUrl(file);
                               setBranding((b) => ({ ...b, customLogoText: text }));
                             }}
                           />
@@ -935,7 +944,7 @@ export function CreateQuotationForm({
                             onChange={async (e) => {
                               const file = e.target.files?.[0];
                               if (!file) return;
-                              const text = await fileToText(file);
+                              const text = await readFileAsPdfSafeDataUrl(file);
                               setBranding((b) => ({ ...b, customSignatureText: text }));
                             }}
                           />
@@ -1119,7 +1128,22 @@ export function CreateQuotationForm({
                   </div>
 
                   {message ? (
-                    <p className="text-sm text-muted-foreground">{message}</p>
+                    <p
+                      className={cn(
+                        "text-sm",
+                        message === "Quotation saved."
+                          ? "text-muted-foreground"
+                          : "font-medium text-destructive"
+                      )}
+                      role={message === "Quotation saved." ? undefined : "alert"}
+                    >
+                      {message}
+                    </p>
+                  ) : null}
+                  {!projectId ? (
+                    <p className="text-sm text-amber-700 dark:text-amber-400">
+                      Choose a project from the search list — saving is disabled until a project is selected.
+                    </p>
                   ) : null}
 
                   <div className="flex flex-wrap gap-2">

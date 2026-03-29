@@ -1,11 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Building2, Landmark, Loader2, Percent, Save } from "lucide-react";
 import { DashboardPageHeader } from "@/components/dashboard/page-header";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select } from "@/components/ui/select";
+import { readFileAsPdfSafeDataUrl } from "@/lib/portals/read-file-as-pdf-safe-data-url";
 
 type CompanyData = {
   _id?: string;
@@ -20,6 +23,10 @@ type CompanyData = {
   defaultTax?: { taxRate?: number; taxEnabled?: boolean };
 };
 
+function s(v: string | undefined | null): string {
+  return v ?? "";
+}
+
 export function AdminCompanyClient() {
   const [primaryForm, setPrimaryForm] = useState<CompanyData>({
     name: "",
@@ -32,21 +39,33 @@ export function AdminCompanyClient() {
     defaultTax: { taxRate: 0, taxEnabled: false },
   });
   const [message, setMessage] = useState("");
+  const [messageOk, setMessageOk] = useState(true);
   const [pending, setPending] = useState(false);
+  const [loadingInitial, setLoadingInitial] = useState(true);
+  const [bootError, setBootError] = useState("");
 
-  async function fileToText(file: File): Promise<string> {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(String(reader.result ?? ""));
-      reader.onerror = () => reject(new Error("Failed to read file"));
-      reader.readAsDataURL(file);
-    });
-  }
-
-  async function loadPrimary() {
-    const primaryRes = await fetch("/api/admin/company", { cache: "no-store" });
-    const primaryPayload = (await primaryRes.json()) as { item?: CompanyData };
-    if (primaryPayload.item) setPrimaryForm(primaryPayload.item);
+  async function loadPrimary(opts?: { quiet?: boolean }) {
+    if (!opts?.quiet) {
+      setLoadingInitial(true);
+      setBootError("");
+    }
+    try {
+      const primaryRes = await fetch("/api/admin/company", { cache: "no-store" });
+      const primaryPayload = (await primaryRes.json()) as { item?: CompanyData; message?: string };
+      if (!primaryRes.ok) throw new Error(primaryPayload.message ?? "Failed to load company");
+      if (primaryPayload.item) setPrimaryForm(primaryPayload.item);
+      if (!opts?.quiet) setBootError("");
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Failed to load company";
+      if (opts?.quiet) {
+        setMessageOk(false);
+        setMessage(msg);
+      } else {
+        setBootError(msg);
+      }
+    } finally {
+      if (!opts?.quiet) setLoadingInitial(false);
+    }
   }
 
   useEffect(() => {
@@ -65,9 +84,11 @@ export function AdminCompanyClient() {
       });
       const payload = (await response.json()) as { message?: string };
       if (!response.ok) throw new Error(payload.message ?? "Failed to update");
-      setMessage("Primary company settings saved.");
-      await loadPrimary();
+      setMessageOk(true);
+      setMessage("Saved. Quotations and PDFs will use these details.");
+      await loadPrimary({ quiet: true });
     } catch (e) {
+      setMessageOk(false);
       setMessage(e instanceof Error ? e.message : "Failed to update");
     } finally {
       setPending(false);
@@ -75,133 +96,244 @@ export function AdminCompanyClient() {
   }
 
   return (
-    <div className="animate-[fade-in_0.4s_ease-out_both]">
+    <div className="animate-fade-in">
       <DashboardPageHeader
-        title="Company Settings"
-        description="Manage company profile used across clients and documents."
+        title="Company"
+        description="Your canonical business profile—what clients see on quotations, exports, and team defaults like tax."
       />
-      <Card className="mb-4">
-        <CardHeader>
-          <CardTitle className="text-base">Edit Company Settings</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={onSubmit} className="grid gap-3 sm:grid-cols-2">
-            <div className="space-y-1">
-              <Label>Name</Label>
-              <Input
-                value={primaryForm.name ?? ""}
-                onChange={(e) =>
-                  setPrimaryForm((f) => ({ ...f, name: e.target.value }))
-                }
-              />
+
+      {loadingInitial ? (
+        <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-border/80 bg-card/50 py-24 text-muted-foreground">
+          <Loader2 className="size-8 animate-spin text-primary" aria-hidden />
+          <p className="text-sm font-medium">Loading company profile…</p>
+        </div>
+      ) : bootError ? (
+        <Card className="border-destructive/30 bg-destructive/5 p-8">
+          <p className="text-sm font-medium text-destructive">{bootError}</p>
+          <Button className="mt-4" variant="outline" onClick={() => loadPrimary()}>
+            Retry
+          </Button>
+        </Card>
+      ) : (
+        <Card className="overflow-hidden border-border/80 shadow-[0_24px_48px_-24px_rgba(0,0,0,0.18)] dark:shadow-[0_24px_56px_-24px_rgba(0,0,0,0.5)]">
+          <div className="h-1 bg-linear-to-r from-primary/80 via-primary to-primary/40" />
+          <CardHeader className="border-b border-border/50 bg-muted/10 pb-5 dark:bg-muted/5">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+              <div className="flex items-start gap-3">
+                <span className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-primary/12 text-primary ring-1 ring-primary/20">
+                  <Building2 className="size-5" aria-hidden />
+                </span>
+                <div>
+                  <CardTitle className="text-[1.15rem] sm:text-xl">Primary company</CardTitle>
+                  <CardDescription className="mt-1.5 max-w-2xl">
+                    Legal and contact info, brand marks for documents, and optional default tax for new quotations.
+                  </CardDescription>
+                </div>
+              </div>
             </div>
-            <div className="space-y-1">
-              <Label>Contact Name</Label>
-              <Input
-                value={primaryForm.contactName ?? ""}
-                onChange={(e) =>
-                  setPrimaryForm((f) => ({ ...f, contactName: e.target.value }))
-                }
-              />
-            </div>
-            <div className="space-y-1">
-              <Label>Email</Label>
-              <Input
-                type="email"
-                value={primaryForm.email ?? ""}
-                onChange={(e) =>
-                  setPrimaryForm((f) => ({ ...f, email: e.target.value }))
-                }
-              />
-            </div>
-            <div className="space-y-1">
-              <Label>Website</Label>
-              <Input
-                value={primaryForm.website ?? ""}
-                onChange={(e) =>
-                  setPrimaryForm((f) => ({ ...f, website: e.target.value }))
-                }
-              />
-            </div>
-            <div className="space-y-1 sm:col-span-2">
-              <Label>Address</Label>
-              <Input
-                value={primaryForm.address ?? ""}
-                onChange={(e) =>
-                  setPrimaryForm((f) => ({ ...f, address: e.target.value }))
-                }
-              />
-            </div>
-            <div className="space-y-1">
-              <Label>Logo Upload (stored as text)</Label>
-              <Input
-                type="file"
-                accept="image/*"
-                onChange={async (e) => {
-                  const file = e.target.files?.[0];
-                  if (!file) return;
-                  const text = await fileToText(file);
-                  setPrimaryForm((f) => ({ ...f, logoText: text }));
-                }}
-              />
-            </div>
-            <div className="space-y-1">
-              <Label>Signature Upload (stored as text)</Label>
-              <Input
-                type="file"
-                accept="image/*"
-                onChange={async (e) => {
-                  const file = e.target.files?.[0];
-                  if (!file) return;
-                  const text = await fileToText(file);
-                  setPrimaryForm((f) => ({ ...f, signatureText: text }));
-                }}
-              />
-            </div>
-            <div className="space-y-1">
-              <Label>Default Tax Rate</Label>
-              <Input
-                type="number"
-                value={primaryForm.defaultTax?.taxRate ?? 0}
-                onChange={(e) =>
-                  setPrimaryForm((f) => ({
-                    ...f,
-                    defaultTax: {
-                      taxRate: Number(e.target.value || 0),
-                      taxEnabled: f.defaultTax?.taxEnabled ?? false,
-                    },
-                  }))
-                }
-              />
-            </div>
-            <div className="space-y-1">
-              <Label>Tax Enabled</Label>
-              <select
-                className="h-10 w-full rounded-lg border border-border bg-background px-3 text-sm shadow-sm"
-                value={String(primaryForm.defaultTax?.taxEnabled ?? false)}
-                onChange={(e) =>
-                  setPrimaryForm((f) => ({
-                    ...f,
-                    defaultTax: {
-                      taxRate: f.defaultTax?.taxRate ?? 0,
-                      taxEnabled: e.target.value === "true",
-                    },
-                  }))
-                }
-              >
-                <option value="true">Enabled</option>
-                <option value="false">Disabled</option>
-              </select>
-            </div>
-            <div className="sm:col-span-2 flex items-center gap-3">
-              <Button type="submit" disabled={pending}>
-                {pending ? "Saving..." : "Save Settings"}
-              </Button>
-              {message ? <p className="text-sm text-muted-foreground">{message}</p> : null}
-            </div>
-          </form>
-        </CardContent>
-      </Card>
+          </CardHeader>
+          <CardContent className="pt-6">
+            <form onSubmit={onSubmit} className="space-y-10">
+              <div>
+                <h3 className="mb-4 flex items-center gap-2 text-sm font-semibold text-foreground">
+                  <Landmark className="size-4 text-primary" aria-hidden />
+                  Identity & contact
+                </h3>
+                <div className="grid gap-5 sm:grid-cols-2">
+                  <div className="space-y-1.5">
+                    <Label className="text-foreground/90">Company name</Label>
+                    <Input
+                      className="h-11 border-border/80 bg-background/60"
+                      placeholder="Seclance Ltd."
+                      value={s(primaryForm.name)}
+                      onChange={(e) => setPrimaryForm((f) => ({ ...f, name: e.target.value }))}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-foreground/90">Contact name</Label>
+                    <Input
+                      className="h-11 border-border/80 bg-background/60"
+                      placeholder="Operations lead"
+                      value={s(primaryForm.contactName)}
+                      onChange={(e) => setPrimaryForm((f) => ({ ...f, contactName: e.target.value }))}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-foreground/90">Email</Label>
+                    <Input
+                      type="email"
+                      autoComplete="email"
+                      className="h-11 border-border/80 bg-background/60"
+                      placeholder="hello@company.com"
+                      value={s(primaryForm.email)}
+                      onChange={(e) => setPrimaryForm((f) => ({ ...f, email: e.target.value }))}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-foreground/90">Website</Label>
+                    <Input
+                      type="url"
+                      className="h-11 border-border/80 bg-background/60"
+                      placeholder="https://"
+                      value={s(primaryForm.website)}
+                      onChange={(e) => setPrimaryForm((f) => ({ ...f, website: e.target.value }))}
+                    />
+                  </div>
+                  <div className="space-y-1.5 sm:col-span-2">
+                    <Label className="text-foreground/90">Address</Label>
+                    <Input
+                      className="h-11 border-border/80 bg-background/60"
+                      placeholder="Street, city, postal code"
+                      value={s(primaryForm.address)}
+                      onChange={(e) => setPrimaryForm((f) => ({ ...f, address: e.target.value }))}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <h3 className="mb-4 text-sm font-semibold text-foreground">Brand on PDFs</h3>
+                <div className="grid gap-5 sm:grid-cols-2">
+                  <div className="space-y-1.5">
+                    <Label className="text-foreground/90">Logo</Label>
+                    <Input
+                      type="file"
+                      accept="image/*"
+                      className="h-11 cursor-pointer border-border/80 bg-background/60 file:mr-3 file:rounded-lg file:border-0 file:bg-primary/12 file:px-3 file:py-2 file:text-xs file:font-semibold file:text-primary hover:file:bg-primary/18"
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        const text = await readFileAsPdfSafeDataUrl(file);
+                        setPrimaryForm((f) => ({ ...f, logoText: text }));
+                        e.target.value = "";
+                      }}
+                    />
+                    {primaryForm.logoText ? (
+                      <div className="pt-2">
+                        {/* eslint-disable-next-line @next/next/no-img-element -- data URL */}
+                        <img
+                          src={primaryForm.logoText}
+                          alt="Logo preview"
+                          className="h-14 max-w-50 rounded-lg border border-border object-contain"
+                        />
+                      </div>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">No logo on file</p>
+                    )}
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-foreground/90">Signature image</Label>
+                    <Input
+                      type="file"
+                      accept="image/*"
+                      className="h-11 cursor-pointer border-border/80 bg-background/60 file:mr-3 file:rounded-lg file:border-0 file:bg-primary/12 file:px-3 file:py-2 file:text-xs file:font-semibold file:text-primary hover:file:bg-primary/18"
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        const text = await readFileAsPdfSafeDataUrl(file);
+                        setPrimaryForm((f) => ({ ...f, signatureText: text }));
+                        e.target.value = "";
+                      }}
+                    />
+                    {primaryForm.signatureText ? (
+                      <div className="pt-2">
+                        {/* eslint-disable-next-line @next/next/no-img-element -- data URL */}
+                        <img
+                          src={primaryForm.signatureText}
+                          alt="Signature preview"
+                          className="h-14 max-w-55 rounded-lg border border-border object-contain object-left"
+                        />
+                      </div>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">No signature on file</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <h3 className="mb-4 flex items-center gap-2 text-sm font-semibold text-foreground">
+                  <Percent className="size-4 text-primary" aria-hidden />
+                  Quotation defaults
+                </h3>
+                <div className="grid gap-5 sm:grid-cols-2">
+                  <div className="space-y-1.5">
+                    <Label className="text-foreground/90">Default tax rate (%)</Label>
+                    <Input
+                      type="number"
+                      min={0}
+                      className="h-11 border-border/80 bg-background/60"
+                      value={String(primaryForm.defaultTax?.taxRate ?? 0)}
+                      onChange={(e) => {
+                        const n = e.target.value === "" ? 0 : Number(e.target.value);
+                        setPrimaryForm((f) => ({
+                          ...f,
+                          defaultTax: {
+                            taxRate: Number.isFinite(n) ? n : 0,
+                            taxEnabled: f.defaultTax?.taxEnabled ?? false,
+                          },
+                        }));
+                      }}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-foreground/90">Tax on by default</Label>
+                    <Select
+                      className="h-11"
+                      value={String(primaryForm.defaultTax?.taxEnabled ?? false)}
+                      onChange={(e) =>
+                        setPrimaryForm((f) => ({
+                          ...f,
+                          defaultTax: {
+                            taxRate: f.defaultTax?.taxRate ?? 0,
+                            taxEnabled: e.target.value === "true",
+                          },
+                        }))
+                      }
+                      options={[
+                        { value: "false", label: "Off — manual per quote" },
+                        { value: "true", label: "On — apply rate above" },
+                      ]}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-3 border-t border-border/60 pt-6 sm:flex-row sm:items-center">
+                <Button
+                  type="submit"
+                  disabled={pending}
+                  size="lg"
+                  className="h-11 rounded-xl font-semibold shadow-md shadow-primary/15"
+                >
+                  {pending ? (
+                    <>
+                      <Loader2 className="mr-2 size-4 animate-spin" aria-hidden />
+                      Saving…
+                    </>
+                  ) : (
+                    <>
+                      <Save className="mr-2 size-4" aria-hidden />
+                      Save settings
+                    </>
+                  )}
+                </Button>
+                {message ? (
+                  <p
+                    className={
+                      messageOk
+                        ? "text-sm text-emerald-600 dark:text-emerald-400"
+                        : "text-sm text-destructive"
+                    }
+                  >
+                    {message}
+                  </p>
+                ) : null}
+              </div>
+            </form>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
