@@ -1,7 +1,7 @@
 "use client";
 
 import { Moon, Sun } from "lucide-react";
-import { useTheme } from "next-themes";
+import { useTheme } from "@/components/theme/theme-provider";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils/cn";
@@ -45,9 +45,9 @@ export function ThemeToggle({ className }: { className?: string }) {
       aria-label={dark ? "Switch to light theme" : "Switch to dark theme"}
     >
       {dark ? (
-        <Sun className="size-[17px] text-amber-400 transition-transform duration-200 group-hover:rotate-12" />
+        <Sun className="size-4.25 text-amber-400 transition-transform duration-200 group-hover:rotate-12" />
       ) : (
-        <Moon className="size-[17px] text-primary transition-transform duration-200" />
+        <Moon className="size-4.25 text-primary transition-transform duration-200" />
       )}
     </Button>
   );

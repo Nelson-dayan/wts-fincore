@@ -65,7 +65,7 @@ function SectionTable({
       </CardHeader>
       <CardContent>
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[680px] text-left text-sm">
+          <table className="w-full min-w-170 text-left text-sm">
             <thead className="text-muted-foreground">
               <tr>
                 {columns.map((column) => (
@@ -175,7 +175,7 @@ export function AdminProjectDetailsClient({ projectId }: { projectId: string }) 
   }
 
   return (
-    <div className="animate-[fade-in_0.4s_ease-out_both]">
+    <div className="animate-fade-in">
       <DashboardPageHeader
         title={data.project?.name ? `Project: ${data.project.name}` : "Project Details"}
         description="Project profile with linked quotations, purchase orders, and invoices."
@@ -263,7 +263,7 @@ export function AdminProjectDetailsClient({ projectId }: { projectId: string }) 
       </Card>
 
       <div className="mb-2 flex flex-wrap justify-end gap-2">
-        <Link href={`/admin/quotations?projectId=${projectId}&create=1`}>
+        <Link href={`/admin/quotations?projectId=${projectId}#quotation-builder`}>
           <Button size="sm">Create quotation</Button>
         </Link>
         <Link href={`/admin/quotations?projectId=${projectId}`}>

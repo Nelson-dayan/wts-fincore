@@ -178,7 +178,7 @@ export function UsersTable({
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[920px] text-left text-sm">
+            <table className="w-full min-w-230 text-left text-sm">
               <thead>
                 <tr className="border-b border-border/80 bg-muted/30 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground dark:bg-muted/15">
                   <th className="px-5 py-3.5 pr-3">Member</th>
@@ -201,7 +201,7 @@ export function UsersTable({
                     >
                       <td className="px-5 py-3.5 pr-3">
                         <div className="flex items-center gap-3">
-                          <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-primary/20 to-primary/5 text-xs font-bold text-primary ring-1 ring-primary/15">
+                          <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-linear-to-br from-primary/20 to-primary/5 text-xs font-bold text-primary ring-1 ring-primary/15">
                             {initials(draft?.name ?? user.name)}
                           </span>
                           <div className="min-w-0">
@@ -209,7 +209,7 @@ export function UsersTable({
                               <Input
                                 value={draft?.name ?? user.name ?? ""}
                                 onChange={(e) => onDraftChange(user._id, { name: e.target.value })}
-                                className="h-9 max-w-[200px] text-sm font-medium"
+                                className="h-9 max-w-50 text-sm font-medium"
                               />
                             ) : (
                               <p className="truncate font-semibold text-foreground">{user.name}</p>
@@ -218,14 +218,14 @@ export function UsersTable({
                           </div>
                         </div>
                       </td>
-                      <td className="max-w-[200px] truncate px-0 py-3.5 pr-3 text-muted-foreground">
+                      <td className="max-w-50 truncate px-0 py-3.5 pr-3 text-muted-foreground">
                         {user.email}
                       </td>
                       <td className="px-0 py-3.5 pr-3 align-middle">
                         {isEditing ? (
                           <Select
                             value={draft?.role ?? user.role}
-                            className="h-9 max-w-[160px] text-sm"
+                            className="h-9 max-w-40 text-sm"
                             onChange={(e) =>
                               onDraftChange(user._id, {
                                 role: e.target.value as "admin" | "employee",
@@ -244,7 +244,7 @@ export function UsersTable({
                         {isEditing ? (
                           <Select
                             value={String(draft?.isActive ?? user.isActive)}
-                            className="h-9 max-w-[140px] text-sm"
+                            className="h-9 max-w-35 text-sm"
                             onChange={(e) =>
                               onDraftChange(user._id, {
                                 isActive: e.target.value === "true",
@@ -264,7 +264,7 @@ export function UsersTable({
                           <Input
                             value={draft?.phone ?? user.phone ?? ""}
                             onChange={(e) => onDraftChange(user._id, { phone: e.target.value })}
-                            className="h-9 max-w-[140px] text-sm"
+                            className="h-9 max-w-35 text-sm"
                           />
                         ) : (
                           <span className="tabular-nums">{user.phone || "—"}</span>

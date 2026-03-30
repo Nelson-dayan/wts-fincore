@@ -131,7 +131,7 @@ export function AdminUsersClient() {
   }
 
   return (
-    <div className="animate-[fade-in_0.4s_ease-out_both]">
+    <div className="animate-fade-in">
       <DashboardPageHeader
         title="Users"
         description="Invite teammates, assign roles, and keep your workspace access clean—from one calm control surface."

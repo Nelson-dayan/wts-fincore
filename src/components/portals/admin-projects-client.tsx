@@ -117,7 +117,7 @@ export function AdminProjectsClient({ initialClientId = "" }: { initialClientId?
   const start = total === 0 ? 0 : (page - 1) * limit + 1;
 
   return (
-    <div className="animate-[fade-in_0.4s_ease-out_both]">
+    <div className="animate-fade-in">
       {initialClientId ? (
         <Link
           href={`/admin/clients/${initialClientId}`}
@@ -141,7 +141,7 @@ export function AdminProjectsClient({ initialClientId = "" }: { initialClientId?
       />
 
       <Card className="overflow-hidden border-border/80">
-        <div className="h-1 bg-gradient-to-r from-primary/70 via-primary to-primary/35" />
+        <div className="h-1 bg-linear-to-r from-primary/70 via-primary to-primary/35" />
         <CardHeader className="border-b border-border/60 bg-muted/20 pb-5 dark:bg-muted/10">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div className="flex items-start gap-3">
@@ -228,7 +228,7 @@ export function AdminProjectsClient({ initialClientId = "" }: { initialClientId?
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[720px] text-left text-sm">
+              <table className="w-full min-w-180 text-left text-sm">
                 <thead>
                   <tr className="border-b border-border/80 bg-muted/30 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground dark:bg-muted/15">
                     <th className="px-5 py-3.5 pr-3">Project</th>
@@ -247,7 +247,7 @@ export function AdminProjectsClient({ initialClientId = "" }: { initialClientId?
                     >
                       <td className="px-5 py-3.5 pr-3">
                         <div className="flex items-center gap-3">
-                          <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-primary/20 to-primary/5 text-xs font-bold text-primary ring-1 ring-primary/15">
+                          <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-linear-to-br from-primary/20 to-primary/5 text-xs font-bold text-primary ring-1 ring-primary/15">
                             {initials(project.name)}
                           </span>
                           <div className="min-w-0">

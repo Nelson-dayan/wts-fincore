@@ -52,7 +52,7 @@ export function EmployeeOverviewClient() {
   }, []);
 
   return (
-    <div className="animate-[fade-in_0.4s_ease-out_both]">
+    <div className="animate-fade-in">
       <DashboardPageHeader
         title="Your workspace"
         description="Assignments and documents created by you across active projects."

@@ -1,9 +1,11 @@
+import type { ReactNode } from "react";
+
 export function DashboardPageHeader({
   title,
   description,
 }: {
   title: string;
-  description: string;
+  description?: ReactNode;
 }) {
   return (
     <header className="mb-8 border-b border-border/40 pb-6 md:mb-10 md:pb-8">
@@ -11,9 +13,11 @@ export function DashboardPageHeader({
       <h1 className="text-2xl font-semibold tracking-tight text-foreground md:text-[1.75rem] md:leading-tight">
         {title}
       </h1>
-      <p className="mt-2 max-w-2xl text-[0.9375rem] leading-relaxed text-muted-foreground">
-        {description}
-      </p>
+      {description != null && description !== "" ? (
+        <div className="mt-2 max-w-2xl text-[0.9375rem] leading-relaxed text-muted-foreground">
+          {description}
+        </div>
+      ) : null}
     </header>
   );
 }

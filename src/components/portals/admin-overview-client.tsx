@@ -53,7 +53,7 @@ export function AdminOverviewClient() {
   }, []);
 
   return (
-    <div className="animate-[fade-in_0.4s_ease-out_both]">
+    <div className="animate-fade-in">
       <DashboardPageHeader
         title="Dashboard"
         description="Live admin overview for users, projects, documents, and financial operations."
