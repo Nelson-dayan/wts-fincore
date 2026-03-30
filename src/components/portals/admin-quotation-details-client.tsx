@@ -104,6 +104,11 @@ function emptyLine(n: number): LineItem {
   };
 }
 
+function toIsoDateOrNow(dateInput: string): string {
+  const d = new Date(dateInput);
+  return Number.isNaN(d.getTime()) ? new Date().toISOString() : d.toISOString();
+}
+
 function mapPagesFromApi(pages: QuotationPayload["pages"]): PageBlock[] {
   return pages.map((p) => ({
     pageNumber: p.pageNumber,
@@ -269,8 +274,10 @@ export function AdminQuotationDetailsClient({ quotationId }: { quotationId: stri
           internalNotes,
         }),
       });
-      const result = (await response.json()) as { message?: string };
-      if (!response.ok) throw new Error(result.message ?? "Failed to save");
+      const result = (await response.json().catch(() => ({}))) as { message?: string };
+      if (!response.ok) {
+        throw new Error(result.message ?? `Failed to save (HTTP ${response.status}).`);
+      }
       setEditing(false);
       setRefreshSnapshots(false);
       await load();
@@ -304,7 +311,7 @@ export function AdminQuotationDetailsClient({ quotationId }: { quotationId: stri
   }
 
   return (
-    <div className="animate-[fade-in_0.4s_ease-out_both]">
+    <div className="animate-fade-in">
       <DashboardPageHeader
         title={item ? `Quotation ${item.quotationNumber}` : "Quotation"}
         description="Edit document data, line items, and status. Totals are recalculated on save."
@@ -413,7 +420,7 @@ export function AdminQuotationDetailsClient({ quotationId }: { quotationId: stri
                     value={internalNotes}
                     onChange={(e) => setInternalNotes(e.target.value)}
                     rows={4}
-                    className="flex min-h-[100px] w-full rounded-lg border border-border bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+                    className="flex min-h-25 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
                   />
                 </div>
               ) : (

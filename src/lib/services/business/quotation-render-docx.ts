@@ -48,12 +48,7 @@ export async function renderQuotationDocx(input: QuotationRenderDraft): Promise<
 
   const qc = quotationCodeFromDocumentInfo(draft.documentInfo);
 
-  const headerChildren: Paragraph[] = [
-    new Paragraph({
-      text: draft.companySnapshot.name,
-      heading: HeadingLevel.TITLE,
-    }),
-  ];
+  const headerChildren: Paragraph[] = [];
   if (logoNote) {
     headerChildren.push(
       new Paragraph({

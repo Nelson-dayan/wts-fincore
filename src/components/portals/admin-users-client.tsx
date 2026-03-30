@@ -134,8 +134,10 @@ export function AdminUsersClient() {
     <div className="animate-[fade-in_0.4s_ease-out_both]">
       <DashboardPageHeader
         title="Users"
-        description="Create users, update roles/status, and remove users with full admin control."
+        description="Invite teammates, assign roles, and keep your workspace access clean—from one calm control surface."
       />
+
+      <div className="space-y-8">
       <AddUserForm
         form={form}
         saving={savingId === "create"}
@@ -154,9 +156,10 @@ export function AdminUsersClient() {
         savingId={savingId}
         drafts={drafts}
         onQueryChange={setQuery}
-        onSearch={() => {
+        onSearch={(override) => {
+          const nextQuery = override !== undefined ? override : query;
           setPage(1);
-          loadUsers(1, query);
+          loadUsers(1, nextQuery);
         }}
         onPrev={() => {
           const next = Math.max(1, page - 1);
@@ -182,6 +185,7 @@ export function AdminUsersClient() {
         onSave={saveUser}
         onDelete={deleteUser}
       />
+      </div>
     </div>
   );
 }

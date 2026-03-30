@@ -2,13 +2,26 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ChevronLeft, ChevronRight, Search, UserPlus, Users } from "lucide-react";
+import {
+  Building2,
+  ChevronLeft,
+  ChevronRight,
+  ExternalLink,
+  FolderKanban,
+  Loader2,
+  Pencil,
+  Search,
+  UserPlus,
+  Users,
+  X,
+} from "lucide-react";
 import { DashboardPageHeader } from "@/components/dashboard/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils/cn";
+import { readFileAsPdfSafeDataUrl } from "@/lib/portals/read-file-as-pdf-safe-data-url";
 
 type ClientRow = {
   _id: string;
@@ -23,6 +36,17 @@ type ClientRow = {
   projectsCount?: number;
   createdAt: string;
 };
+
+function initials(name: string) {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "?";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
+function s(v: string | undefined | null): string {
+  return v ?? "";
+}
 
 export function AdminClientsClient() {
   const [items, setItems] = useState<ClientRow[]>([]);
@@ -46,15 +70,6 @@ export function AdminClientsClient() {
     clientSignatureText: "",
   });
   const [drafts, setDrafts] = useState<Record<string, Partial<ClientRow>>>({});
-
-  async function fileToText(file: File): Promise<string> {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(String(reader.result ?? ""));
-      reader.onerror = () => reject(new Error("Failed to read file"));
-      reader.readAsDataURL(file);
-    });
-  }
 
   async function loadClients(nextPage = page, nextQuery = query) {
     setLoading(true);
@@ -87,6 +102,12 @@ export function AdminClientsClient() {
     loadClients(1, "");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  function searchClients(override?: string) {
+    const nextQuery = override !== undefined ? override : query;
+    setPage(1);
+    loadClients(1, nextQuery);
+  }
 
   async function createClient(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -156,411 +177,519 @@ export function AdminClientsClient() {
   }
 
   const totalPages = Math.max(1, Math.ceil(total / limit));
+  const end = Math.min(page * limit, total);
+  const start = total === 0 ? 0 : (page - 1) * limit + 1;
 
   return (
-    <div className="animate-[fade-in_0.4s_ease-out_both]">
+    <div className="animate-fade-in">
       <DashboardPageHeader
         title="Clients"
-        description="Create, edit, and delete clients with full business profile details."
+        description="Keep every relationship in one place—profiles, contacts, and project counts ready for quotations and delivery."
       />
 
-      <Card className="mb-6 border-border/70 bg-card/90 shadow-[var(--shadow-premium)] backdrop-blur-[2px] transition-[box-shadow,border-color] duration-200 hover:border-primary/15 hover:shadow-[var(--shadow-premium-lg)]">
-        <CardHeader className="space-y-1 pb-2">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-            <div className="flex items-start gap-3">
-              <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-primary/15 to-primary/5 text-primary ring-1 ring-primary/15">
-                <UserPlus className="size-5" strokeWidth={1.75} aria-hidden />
+      <div className="space-y-8">
+        <Card className="overflow-hidden border-border/80 shadow-[0_24px_48px_-24px_rgba(0,0,0,0.18)] dark:shadow-[0_24px_56px_-24px_rgba(0,0,0,0.5)]">
+          <div className="h-1 bg-linear-to-r from-primary/80 via-primary to-primary/40" />
+          <CardHeader className="border-b border-border/50 bg-muted/10 pb-5 dark:bg-muted/5">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+              <div className="flex items-start gap-3">
+                <span className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-primary/12 text-primary ring-1 ring-primary/20">
+                  <UserPlus className="size-5" aria-hidden />
+                </span>
+                <div>
+                  <CardTitle className="text-[1.15rem] sm:text-xl">Add a client</CardTitle>
+                  <CardDescription className="mt-1.5 max-w-xl">
+                    Capture the basics now; open the profile anytime for documents, uploads, and history.
+                  </CardDescription>
+                </div>
+              </div>
+              <span className="inline-flex w-fit items-center rounded-full border border-border/80 bg-background/90 px-3 py-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                New record
               </span>
-              <div>
-                <CardTitle className="text-lg font-semibold tracking-tight sm:text-xl">
-                  Create client
-                </CardTitle>
-                <CardDescription className="mt-1.5 max-w-xl text-[0.8125rem] leading-relaxed">
-                  Add a new client record. Required fields are marked on the form.
-                </CardDescription>
+            </div>
+          </CardHeader>
+          <CardContent className="pt-6">
+            <form onSubmit={createClient} className="grid gap-5 sm:grid-cols-2">
+              <div className="space-y-3 sm:col-span-2">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  Upload client logo &amp; signature (optional)
+                </p>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-1.5">
+                    <Label className="text-foreground/90">Upload client logo</Label>
+                    <Input
+                      type="file"
+                      accept="image/*"
+                      className="h-11 cursor-pointer border-border/80 bg-background/60 file:mr-3 file:rounded-lg file:border-0 file:bg-primary/12 file:px-3 file:py-2 file:text-xs file:font-semibold file:text-primary hover:file:bg-primary/18"
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        const text = await readFileAsPdfSafeDataUrl(file);
+                        setForm((f) => ({ ...f, clientLogoText: text }));
+                        e.target.value = "";
+                      }}
+                    />
+                    {form.clientLogoText ? (
+                      <div className="pt-1">
+                        {/* eslint-disable-next-line @next/next/no-img-element -- data URL preview */}
+                        <img
+                          src={form.clientLogoText}
+                          alt=""
+                          className="h-10 max-w-40 rounded-md border border-border object-contain"
+                        />
+                      </div>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">No image yet</p>
+                    )}
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-foreground/90">Upload client signature</Label>
+                    <Input
+                      type="file"
+                      accept="image/*"
+                      className="h-11 cursor-pointer border-border/80 bg-background/60 file:mr-3 file:rounded-lg file:border-0 file:bg-primary/12 file:px-3 file:py-2 file:text-xs file:font-semibold file:text-primary hover:file:bg-primary/18"
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        const text = await readFileAsPdfSafeDataUrl(file);
+                        setForm((f) => ({ ...f, clientSignatureText: text }));
+                        e.target.value = "";
+                      }}
+                    />
+                    {form.clientSignatureText ? (
+                      <div className="pt-1">
+                        {/* eslint-disable-next-line @next/next/no-img-element -- data URL preview */}
+                        <img
+                          src={form.clientSignatureText}
+                          alt=""
+                          className="h-10 max-w-50 rounded-md border border-border object-contain object-left"
+                        />
+                      </div>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">No image yet</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-foreground/90">Contact name</Label>
+                <Input
+                  required
+                  autoComplete="name"
+                  placeholder="Jordan Lee"
+                  className="h-11 border-border/80 bg-background/60"
+                  value={s(form.name)}
+                  onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-foreground/90">Company</Label>
+                <Input
+                  required
+                  autoComplete="organization"
+                  placeholder="Acme Industries"
+                  className="h-11 border-border/80 bg-background/60"
+                  value={s(form.company)}
+                  onChange={(e) => setForm((f) => ({ ...f, company: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-foreground/90">Email</Label>
+                <Input
+                  required
+                  type="email"
+                  autoComplete="email"
+                  placeholder="hello@company.com"
+                  className="h-11 border-border/80 bg-background/60"
+                  value={s(form.email)}
+                  onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-foreground/90">Phone</Label>
+                <Input
+                  required
+                  type="tel"
+                  autoComplete="tel"
+                  placeholder="+1 …"
+                  className="h-11 border-border/80 bg-background/60"
+                  value={s(form.phone)}
+                  onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-foreground/90">
+                  Website <span className="font-normal text-muted-foreground">(optional)</span>
+                </Label>
+                <Input
+                  type="url"
+                  autoComplete="url"
+                  placeholder="https://"
+                  className="h-11 border-border/80 bg-background/60"
+                  value={s(form.website)}
+                  onChange={(e) => setForm((f) => ({ ...f, website: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-1.5 sm:col-span-2">
+                <Label className="text-foreground/90">Address</Label>
+                <Input
+                  required
+                  autoComplete="street-address"
+                  placeholder="Street, city, region"
+                  className="h-11 border-border/80 bg-background/60"
+                  value={s(form.address)}
+                  onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))}
+                />
+              </div>
+              <div className="flex items-end sm:col-span-2">
+                <Button
+                  type="submit"
+                  disabled={savingId === "create"}
+                  size="lg"
+                  className="h-11 rounded-xl font-semibold shadow-md shadow-primary/15"
+                >
+                  {savingId === "create" ? (
+                    <>
+                      <Loader2 className="mr-2 size-4 animate-spin" aria-hidden />
+                      Creating…
+                    </>
+                  ) : (
+                    "Create client"
+                  )}
+                </Button>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
+
+        <Card className="overflow-hidden border-border/80">
+          <CardHeader className="border-b border-border/60 bg-muted/20 pb-5 dark:bg-muted/10">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+              <div className="flex items-start gap-3">
+                <span className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-muted/80 text-foreground ring-1 ring-border/60 dark:bg-muted/40">
+                  <Users className="size-5" aria-hidden />
+                </span>
+                <div>
+                  <CardTitle className="text-[1.15rem] sm:text-xl">Directory</CardTitle>
+                  <CardDescription className="mt-1.5 max-w-lg">
+                    Search by name or email. Edit in place or open the full profile for deep work.
+                  </CardDescription>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 rounded-full border border-border/80 bg-background/80 px-3 py-1.5 text-xs font-medium text-muted-foreground shadow-sm">
+                <Building2 className="size-3.5 opacity-70" aria-hidden />
+                <span className="tabular-nums text-foreground">{total}</span>
+                <span>clients</span>
               </div>
             </div>
-            <span className="inline-flex w-fit items-center rounded-full bg-muted/90 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground ring-1 ring-border/60">
-              New record
-            </span>
-          </div>
-        </CardHeader>
-        <CardContent className="pt-2">
-          <form onSubmit={createClient} className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label>Name</Label>
-              <Input
-                required
-                value={form.name}
-                onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Client Company</Label>
-              <Input
-                required
-                value={form.company}
-                onChange={(e) => setForm((f) => ({ ...f, company: e.target.value }))}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Email</Label>
-              <Input
-                required
-                type="email"
-                value={form.email}
-                onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Phone</Label>
-              <Input
-                required
-                value={form.phone}
-                onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Website</Label>
-              <Input
-                value={form.website}
-                onChange={(e) => setForm((f) => ({ ...f, website: e.target.value }))}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Address</Label>
-              <Input
-                required
-                value={form.address}
-                onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Logo Upload</Label>
-              <Input
-                type="file"
-                accept="image/*"
-                className="cursor-pointer file:mr-3 file:rounded-md file:border-0 file:bg-primary/10 file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-primary hover:file:bg-primary/15"
-                onChange={async (e) => {
-                  const file = e.target.files?.[0];
-                  if (!file) return;
-                  const text = await fileToText(file);
-                  setForm((f) => ({ ...f, clientLogoText: text }));
-                }}
-              />
-              <p className="text-xs text-muted-foreground">
-                {form.clientLogoText ? "Logo selected" : "No file chosen"}
-              </p>
-            </div>
-            <div className="space-y-2">
-              <Label>Signature Upload</Label>
-              <Input
-                type="file"
-                accept="image/*"
-                className="cursor-pointer file:mr-3 file:rounded-md file:border-0 file:bg-primary/10 file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-primary hover:file:bg-primary/15"
-                onChange={async (e) => {
-                  const file = e.target.files?.[0];
-                  if (!file) return;
-                  const text = await fileToText(file);
-                  setForm((f) => ({ ...f, clientSignatureText: text }));
-                }}
-              />
-              <p className="text-xs text-muted-foreground">
-                {form.clientSignatureText ? "Signature selected" : "No file chosen"}
-              </p>
-            </div>
-            <div className="sm:col-span-2">
-              <Button type="submit" disabled={savingId === "create"} className="min-w-[8.5rem]">
-                {savingId === "create" ? "Creating..." : "Create Client"}
-              </Button>
-            </div>
-          </form>
-        </CardContent>
-      </Card>
 
-      <Card className="border-border/70 bg-card/90 shadow-[var(--shadow-premium)] backdrop-blur-[2px]">
-        <CardHeader className="space-y-1 pb-4">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-center gap-3">
-              <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-muted/80 text-foreground/80 ring-1 ring-border/50 dark:bg-muted/50">
-                <Users className="size-5" strokeWidth={1.75} aria-hidden />
-              </span>
-              <div>
-                <CardTitle className="flex flex-wrap items-center gap-2 text-lg font-semibold tracking-tight sm:text-xl">
-                  Client directory
-                  <span className="inline-flex items-center rounded-full bg-primary/12 px-2.5 py-0.5 text-xs font-semibold tabular-nums text-primary ring-1 ring-primary/20">
-                    {total}
-                  </span>
-                </CardTitle>
-                <CardDescription className="mt-1 text-[0.8125rem]">
-                  Search and open client profiles. Use horizontal scroll on smaller screens.
-                </CardDescription>
+            <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:items-center">
+              <div className="relative flex-1">
+                <Search
+                  className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+                  aria-hidden
+                />
+                <Input
+                  value={s(query)}
+                  onChange={(e) => setQuery(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && searchClients(undefined)}
+                  placeholder="Search by name or email…"
+                  className="h-11 border-border/80 bg-background/80 pl-10 pr-4"
+                />
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  className="h-11 shrink-0 rounded-xl px-5"
+                  onClick={() => searchClients(undefined)}
+                >
+                  Search
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-11 shrink-0 rounded-xl"
+                  disabled={!query.trim()}
+                  onClick={() => {
+                    setQuery("");
+                    searchClients("");
+                  }}
+                >
+                  Clear
+                </Button>
               </div>
             </div>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-stretch">
-            <Input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search by client name or email"
-              className="h-10 flex-1 transition-[box-shadow] duration-200 sm:min-w-[240px]"
-            />
-            <Button
-              variant="outline"
-              className="h-10 shrink-0 gap-2 sm:w-auto"
-              onClick={() => {
-                setPage(1);
-                loadClients(1, query);
-              }}
-            >
-              <Search className="size-4 opacity-70" aria-hidden />
-              Search
-            </Button>
-          </div>
+          </CardHeader>
 
-          {error ? (
-            <div
-              className="rounded-2xl border border-destructive/35 bg-destructive/[0.06] p-4 text-[0.8125rem] leading-relaxed text-destructive shadow-sm dark:bg-destructive/[0.1]"
-              role="alert"
-            >
-              {error}
-            </div>
-          ) : (
-            <div className="overflow-hidden rounded-xl border border-border/60 shadow-sm">
+          <CardContent className="p-0">
+            {error ? (
+              <div className="m-5 rounded-xl border border-destructive/40 bg-destructive/5 p-4 text-sm text-destructive" role="alert">
+                {error}
+              </div>
+            ) : loading && items.length === 0 ? (
+              <div className="flex flex-col items-center justify-center gap-3 py-20 text-muted-foreground">
+                <Loader2 className="size-8 animate-spin text-primary" aria-hidden />
+                <p className="text-sm font-medium">Loading clients…</p>
+              </div>
+            ) : !loading && items.length === 0 ? (
+              <div className="flex flex-col items-center justify-center gap-3 px-6 py-20 text-center">
+                <span className="flex size-14 items-center justify-center rounded-2xl bg-muted/70 text-muted-foreground">
+                  <FolderKanban className="size-7" aria-hidden />
+                </span>
+                <p className="text-base font-semibold text-foreground">No clients found</p>
+                <p className="max-w-sm text-sm text-muted-foreground">
+                  Try another search, or add your first client with the form above.
+                </p>
+              </div>
+            ) : (
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[980px] text-left text-[0.8125rem]">
+                <table className="w-full min-w-250 text-left text-sm">
                   <thead>
-                    <tr className="border-b border-border/60 bg-muted/45 dark:bg-muted/25">
-                      <th className="whitespace-nowrap px-4 py-3.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                        Name
-                      </th>
-                      <th className="whitespace-nowrap px-4 py-3.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                        Client Company
-                      </th>
-                      <th className="whitespace-nowrap px-4 py-3.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                        Email
-                      </th>
-                      <th className="whitespace-nowrap px-4 py-3.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                        Phone
-                      </th>
-                      <th className="whitespace-nowrap px-4 py-3.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                        Website
-                      </th>
-                      <th className="whitespace-nowrap px-4 py-3.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                        Address
-                      </th>
-                      <th className="whitespace-nowrap px-4 py-3.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                        Projects
-                      </th>
-                      <th className="whitespace-nowrap px-4 py-3.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                        Actions
-                      </th>
+                    <tr className="border-b border-border/80 bg-muted/30 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground dark:bg-muted/15">
+                      <th className="px-5 py-3.5 pr-3">Client</th>
+                      <th className="px-0 py-3.5 pr-3">Company</th>
+                      <th className="px-0 py-3.5 pr-3">Email</th>
+                      <th className="px-0 py-3.5 pr-3">Phone</th>
+                      <th className="px-0 py-3.5 pr-3">Website</th>
+                      <th className="px-0 py-3.5 pr-3">Address</th>
+                      <th className="px-0 py-3.5 pr-3">Projects</th>
+                      <th className="px-0 py-3.5 pr-5 text-right">Actions</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-border/50">
-                    {items.map((client) => (
-                      <tr
-                        key={client._id}
-                        className={cn(
-                          "bg-card/40 transition-[background-color,box-shadow] duration-150",
-                          "hover:bg-muted/35 dark:hover:bg-muted/20"
-                        )}
-                      >
-                        <td className="px-4 py-3 align-middle font-medium text-foreground">
-                          {editingId === client._id ? (
-                            <Input
-                              value={drafts[client._id]?.name ?? client.name}
-                              onChange={(e) =>
-                                setDrafts((prev) => ({
-                                  ...prev,
-                                  [client._id]: {
-                                    ...(prev[client._id] ?? client),
-                                    name: e.target.value,
-                                  },
-                                }))
-                              }
-                              className="h-9"
-                            />
-                          ) : (
-                            <span className="line-clamp-2">{client.name}</span>
+                  <tbody className="divide-y divide-border/60">
+                    {items.map((client) => {
+                      const isEditing = editingId === client._id;
+                      const draft = drafts[client._id];
+                      return (
+                        <tr
+                          key={client._id}
+                          className={cn(
+                            "bg-card transition-colors hover:bg-muted/35 dark:hover:bg-muted/20",
+                            isEditing && "bg-primary/5 dark:bg-primary/10"
                           )}
-                        </td>
-                        <td className="px-4 py-3 align-middle text-muted-foreground">
-                          {editingId === client._id ? (
-                            <Input
-                              value={drafts[client._id]?.company ?? client.company}
-                              onChange={(e) =>
-                                setDrafts((prev) => ({
-                                  ...prev,
-                                  [client._id]: {
-                                    ...(prev[client._id] ?? client),
-                                    company: e.target.value,
-                                  },
-                                }))
-                              }
-                              className="h-9"
-                            />
-                          ) : (
-                            <span className="line-clamp-2">{client.company || "—"}</span>
-                          )}
-                        </td>
-                        <td className="max-w-[200px] px-4 py-3 align-middle text-muted-foreground">
-                          {editingId === client._id ? (
-                            <Input
-                              value={drafts[client._id]?.email ?? client.email}
-                              onChange={(e) =>
-                                setDrafts((prev) => ({
-                                  ...prev,
-                                  [client._id]: {
-                                    ...(prev[client._id] ?? client),
-                                    email: e.target.value,
-                                  },
-                                }))
-                              }
-                              className="h-9"
-                            />
-                          ) : (
-                            <span className="line-clamp-2 break-all">{client.email || "—"}</span>
-                          )}
-                        </td>
-                        <td className="px-4 py-3 align-middle tabular-nums text-muted-foreground">
-                          {editingId === client._id ? (
-                            <Input
-                              value={drafts[client._id]?.phone ?? client.phone}
-                              onChange={(e) =>
-                                setDrafts((prev) => ({
-                                  ...prev,
-                                  [client._id]: {
-                                    ...(prev[client._id] ?? client),
-                                    phone: e.target.value,
-                                  },
-                                }))
-                              }
-                              className="h-9"
-                            />
-                          ) : (
-                            client.phone || "—"
-                          )}
-                        </td>
-                        <td className="max-w-[160px] px-4 py-3 align-middle text-muted-foreground">
-                          {editingId === client._id ? (
-                            <Input
-                              value={drafts[client._id]?.website ?? client.website}
-                              onChange={(e) =>
-                                setDrafts((prev) => ({
-                                  ...prev,
-                                  [client._id]: {
-                                    ...(prev[client._id] ?? client),
-                                    website: e.target.value,
-                                  },
-                                }))
-                              }
-                              className="h-9"
-                            />
-                          ) : (
-                            <span className="line-clamp-2 break-all">{client.website || "—"}</span>
-                          )}
-                        </td>
-                        <td className="max-w-[220px] px-4 py-3 align-middle text-muted-foreground">
-                          {editingId === client._id ? (
-                            <Input
-                              value={drafts[client._id]?.address ?? client.address}
-                              onChange={(e) =>
-                                setDrafts((prev) => ({
-                                  ...prev,
-                                  [client._id]: {
-                                    ...(prev[client._id] ?? client),
-                                    address: e.target.value,
-                                  },
-                                }))
-                              }
-                              className="h-9"
-                            />
-                          ) : (
-                            <span className="line-clamp-2">{client.address || "—"}</span>
-                          )}
-                        </td>
-                        <td className="px-4 py-3 align-middle">
-                          <span className="inline-flex min-w-[1.75rem] justify-center rounded-full bg-primary/10 px-2 py-0.5 text-xs font-semibold tabular-nums text-primary ring-1 ring-primary/15 transition-transform duration-150 hover:scale-105">
-                            {client.projectsCount ?? 0}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 align-middle">
-                          <div className="flex flex-wrap gap-2">
-                            {editingId === client._id ? (
-                              <>
-                                <Button
-                                  size="sm"
-                                  onClick={() => saveClient(client._id)}
-                                  disabled={savingId === client._id}
-                                >
-                                  Save
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => setEditingId(null)}
-                                >
-                                  Cancel
-                                </Button>
-                              </>
+                        >
+                          <td className="px-5 py-3.5 pr-3">
+                            <div className="flex items-center gap-3">
+                              <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-linear-to-br from-primary/20 to-primary/5 text-xs font-bold text-primary ring-1 ring-primary/15">
+                                {initials(draft?.name ?? client.name)}
+                              </span>
+                              <div className="min-w-0">
+                                {isEditing ? (
+                                  <Input
+                                    value={s(draft?.name ?? client.name)}
+                                    onChange={(e) =>
+                                      setDrafts((prev) => ({
+                                        ...prev,
+                                        [client._id]: { ...(prev[client._id] ?? client), name: e.target.value },
+                                      }))
+                                    }
+                                    className="h-9 max-w-50 text-sm font-medium"
+                                  />
+                                ) : (
+                                  <p className="truncate font-semibold text-foreground">{client.name}</p>
+                                )}
+                                <p className="truncate text-xs text-muted-foreground">
+                                  …{client._id.slice(-8)}
+                                </p>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="max-w-40 px-0 py-3.5 pr-3 text-muted-foreground">
+                            {isEditing ? (
+                              <Input
+                                value={s(draft?.company ?? client.company)}
+                                onChange={(e) =>
+                                  setDrafts((prev) => ({
+                                    ...prev,
+                                    [client._id]: { ...(prev[client._id] ?? client), company: e.target.value },
+                                  }))
+                                }
+                                className="h-9 text-sm"
+                              />
                             ) : (
-                              <Button size="sm" variant="outline" asChild className="transition-[box-shadow,transform] duration-200 hover:border-primary/30 hover:bg-primary/5">
-                                <Link href={`/admin/clients/${client._id}`}>View</Link>
-                              </Button>
+                              <span className="line-clamp-2">{client.company || "—"}</span>
                             )}
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
+                          </td>
+                          <td className="max-w-50 px-0 py-3.5 pr-3 text-muted-foreground">
+                            {isEditing ? (
+                              <Input
+                                type="email"
+                                value={s(draft?.email ?? client.email)}
+                                onChange={(e) =>
+                                  setDrafts((prev) => ({
+                                    ...prev,
+                                    [client._id]: { ...(prev[client._id] ?? client), email: e.target.value },
+                                  }))
+                                }
+                                className="h-9 text-sm"
+                              />
+                            ) : (
+                              <span className="line-clamp-2 break-all">{client.email || "—"}</span>
+                            )}
+                          </td>
+                          <td className="whitespace-nowrap px-0 py-3.5 pr-3 tabular-nums text-muted-foreground">
+                            {isEditing ? (
+                              <Input
+                                value={s(draft?.phone ?? client.phone)}
+                                onChange={(e) =>
+                                  setDrafts((prev) => ({
+                                    ...prev,
+                                    [client._id]: { ...(prev[client._id] ?? client), phone: e.target.value },
+                                  }))
+                                }
+                                className="h-9 max-w-35 text-sm"
+                              />
+                            ) : (
+                              client.phone || "—"
+                            )}
+                          </td>
+                          <td className="max-w-40 px-0 py-3.5 pr-3 text-muted-foreground">
+                            {isEditing ? (
+                              <Input
+                                value={s(draft?.website ?? client.website)}
+                                onChange={(e) =>
+                                  setDrafts((prev) => ({
+                                    ...prev,
+                                    [client._id]: { ...(prev[client._id] ?? client), website: e.target.value },
+                                  }))
+                                }
+                                className="h-9 text-sm"
+                              />
+                            ) : (
+                              <span className="line-clamp-2 break-all">{client.website || "—"}</span>
+                            )}
+                          </td>
+                          <td className="max-w-50 px-0 py-3.5 pr-3 text-muted-foreground">
+                            {isEditing ? (
+                              <Input
+                                value={s(draft?.address ?? client.address)}
+                                onChange={(e) =>
+                                  setDrafts((prev) => ({
+                                    ...prev,
+                                    [client._id]: { ...(prev[client._id] ?? client), address: e.target.value },
+                                  }))
+                                }
+                                className="h-9 text-sm"
+                              />
+                            ) : (
+                              <span className="line-clamp-2">{client.address || "—"}</span>
+                            )}
+                          </td>
+                          <td className="px-0 py-3.5 pr-3">
+                            <span className="inline-flex min-w-8 justify-center rounded-full border border-primary/20 bg-primary/10 px-2 py-0.5 text-xs font-semibold tabular-nums text-primary">
+                              {client.projectsCount ?? 0}
+                            </span>
+                          </td>
+                          <td className="px-0 py-3.5 pr-5 text-right">
+                            <div className="flex justify-end gap-1.5">
+                              {isEditing ? (
+                                <>
+                                  <Button
+                                    size="sm"
+                                    className="h-8 rounded-lg px-3"
+                                    onClick={() => saveClient(client._id)}
+                                    disabled={savingId === client._id}
+                                  >
+                                    {savingId === client._id ? (
+                                      <>
+                                        <Loader2 className="mr-1.5 size-3.5 animate-spin" aria-hidden />
+                                        Save
+                                      </>
+                                    ) : (
+                                      "Save"
+                                    )}
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-8 rounded-lg px-2"
+                                    onClick={() => setEditingId(null)}
+                                  >
+                                    <X className="size-4" aria-label="Cancel" />
+                                  </Button>
+                                </>
+                              ) : (
+                                <>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-8 rounded-lg px-2.5"
+                                    onClick={() => {
+                                      setEditingId(client._id);
+                                      setDrafts((prev) => ({
+                                        ...prev,
+                                        [client._id]: { ...client },
+                                      }));
+                                    }}
+                                  >
+                                    <Pencil className="size-3.5" aria-hidden />
+                                    <span className="sr-only sm:not-sr-only sm:ml-1.5 sm:text-xs">Edit</span>
+                                  </Button>
+                                  <Button size="sm" variant="secondary" className="h-8 rounded-lg px-2.5" asChild>
+                                    <Link href={`/admin/clients/${client._id}`}>
+                                      <ExternalLink className="size-3.5" aria-hidden />
+                                      <span className="sr-only sm:not-sr-only sm:ml-1.5 sm:text-xs">Profile</span>
+                                    </Link>
+                                  </Button>
+                                </>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
-            </div>
-          )}
+            )}
 
-          <div className="flex flex-col gap-3 rounded-xl border border-border/50 bg-muted/25 px-4 py-3 sm:flex-row sm:items-center sm:justify-between dark:bg-muted/15">
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={loading || page <= 1}
-              className="gap-1.5"
-              onClick={() => {
-                const next = Math.max(1, page - 1);
-                setPage(next);
-                loadClients(next, query);
-              }}
-            >
-              <ChevronLeft className="size-4" aria-hidden />
-              Previous
-            </Button>
-            <div className="flex items-center justify-center gap-2 text-[0.8125rem] text-muted-foreground">
-              {loading ? (
-                <span className="inline-flex size-2 animate-pulse rounded-full bg-primary/60" aria-hidden />
-              ) : null}
-              <span className="tabular-nums font-medium">
-                Page {page} of {totalPages}
-              </span>
-            </div>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={loading || page >= totalPages}
-              className="gap-1.5"
-              onClick={() => {
-                const next = Math.min(totalPages, page + 1);
-                setPage(next);
-                loadClients(next, query);
-              }}
-            >
-              Next
-              <ChevronRight className="size-4" aria-hidden />
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+            {items.length > 0 ? (
+              <div className="flex flex-col gap-3 border-t border-border/60 bg-muted/10 px-5 py-4 sm:flex-row sm:items-center sm:justify-between dark:bg-muted/5">
+                <p className="text-xs text-muted-foreground">
+                  Showing{" "}
+                  <span className="font-medium text-foreground">
+                    {start}–{end}
+                  </span>{" "}
+                  of <span className="font-medium text-foreground">{total}</span>
+                </p>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-9 rounded-lg"
+                    disabled={loading || page <= 1}
+                    onClick={() => {
+                      const next = Math.max(1, page - 1);
+                      setPage(next);
+                      loadClients(next, query);
+                    }}
+                  >
+                    <ChevronLeft className="mr-1 size-4" aria-hidden />
+                    Previous
+                  </Button>
+                  <span className="rounded-lg border border-border/80 bg-background px-3 py-1.5 text-xs font-medium tabular-nums text-muted-foreground">
+                    {page} / {totalPages}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-9 rounded-lg"
+                    disabled={loading || page >= totalPages}
+                    onClick={() => {
+                      const next = Math.min(totalPages, page + 1);
+                      setPage(next);
+                      loadClients(next, query);
+                    }}
+                  >
+                    Next
+                    <ChevronRight className="ml-1 size-4" aria-hidden />
+                  </Button>
+                </div>
+              </div>
+            ) : null}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }
