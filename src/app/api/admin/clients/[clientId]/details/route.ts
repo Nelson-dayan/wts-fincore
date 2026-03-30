@@ -22,7 +22,7 @@ export async function GET(_req: Request, ctx: RouteCtx) {
 
     const client = await ClientModel.findById(clientId)
       .select(
-        "name company email phone website address clientLogoText clientSignatureText createdAt updatedAt"
+        "name company email phone website address clientLogoText clientLogoUrl clientSignatureText createdAt updatedAt"
       )
       .lean();
     if (!client) {

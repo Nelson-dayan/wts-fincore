@@ -106,46 +106,46 @@ export function QuotationDocumentPreview({
       }
     >
       <div className="flex flex-col gap-6">
-        <header className="flex flex-col gap-4 border-b border-slate-200 pb-4 dark:border-white/10 sm:flex-row sm:items-start sm:justify-between">
-          <div className="min-w-0 flex-1">
-            {logoSrc ? (
-              // eslint-disable-next-line @next/next/no-img-element -- data URLs / arbitrary preview
-              <img
-                src={logoSrc}
-                alt="Company logo"
-                className="mb-3 max-h-16 w-auto max-w-[220px] object-contain object-left"
-              />
-            ) : (
-              <div className="mb-3 text-lg font-semibold tracking-tight text-slate-800 dark:text-zinc-100">
-                {companySnapshot.name}
+        <header className="flex flex-col gap-4 border-b border-slate-200 pb-4 dark:border-white/10 sm:flex-row sm:items-stretch sm:justify-between">
+          <div className="flex min-h-0 min-w-0 flex-1 sm:mr-2">
+            <div className="flex h-full min-h-0 w-full flex-col rounded-lg border border-slate-200 bg-slate-50/90 p-3.5 dark:border-white/15 dark:bg-zinc-900/50">
+              {logoSrc ? (
+                // eslint-disable-next-line @next/next/no-img-element -- data URLs / arbitrary preview
+                <img
+                  src={logoSrc}
+                  alt="Company logo"
+                  className="mb-2 max-h-9 w-auto max-w-44 object-contain object-left"
+                />
+              ) : null}
+              <div className="space-y-1 text-[13px] leading-snug text-slate-600 dark:text-zinc-400">
+                {companySnapshot.address ? <p>{companySnapshot.address}</p> : null}
+                {companySnapshot.email ? <p>{companySnapshot.email}</p> : null}
+                {companySnapshot.website ? <p>{companySnapshot.website}</p> : null}
               </div>
-            )}
-            <div className="space-y-0.5 text-[12px] text-slate-600 dark:text-zinc-400">
-              {companySnapshot.address ? <p>{companySnapshot.address}</p> : null}
-              {companySnapshot.email ? <p>{companySnapshot.email}</p> : null}
-              {companySnapshot.website ? <p>{companySnapshot.website}</p> : null}
             </div>
           </div>
-          <div className="text-right text-[12px] text-slate-600 dark:text-zinc-400">
-            <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-zinc-500">
-              Quotation
-            </p>
-            <p className="text-base font-semibold text-slate-900 dark:text-zinc-50">
-              {quotationNumberLabel}
-            </p>
-            {statusLabel ? (
-              <p className="mt-1 inline-block rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-700 dark:bg-white/10 dark:text-zinc-300">
-                {statusLabel}
+          <div className="flex w-full shrink-0 sm:w-[min(100%,14.5rem)] sm:min-w-50">
+            <div className="flex h-full min-h-0 w-full flex-col rounded-lg border border-slate-200 bg-sky-50/80 p-3.5 text-right text-[12px] text-slate-600 dark:border-white/15 dark:bg-sky-950/35 dark:text-zinc-400">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-zinc-500">
+                Quotation
               </p>
-            ) : null}
-            {(documentInfo.quotationCode || documentInfo.geCode) ? (
-              <p className="mt-2">
-                Ref: {String(documentInfo.quotationCode ?? documentInfo.geCode ?? "").trim()}
+              <p className="text-base font-semibold text-slate-900 dark:text-zinc-50">
+                {quotationNumberLabel}
               </p>
-            ) : null}
-            <p className="mt-1 font-medium text-slate-800 dark:text-zinc-200">
-              Date: {fmtDate(documentInfo.date)}
-            </p>
+              {statusLabel ? (
+                <p className="mt-1 inline-block rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-700 dark:bg-white/10 dark:text-zinc-300">
+                  {statusLabel}
+                </p>
+              ) : null}
+              {(documentInfo.quotationCode || documentInfo.geCode) ? (
+                <p className="mt-2">
+                  Ref: {String(documentInfo.quotationCode ?? documentInfo.geCode ?? "").trim()}
+                </p>
+              ) : null}
+              <p className="mt-1 font-medium text-slate-800 dark:text-zinc-200">
+                Date: {fmtDate(documentInfo.date)}
+              </p>
+            </div>
           </div>
         </header>
 
@@ -154,6 +154,14 @@ export function QuotationDocumentPreview({
             <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-zinc-500">
               Bill to
             </p>
+            {clientSnapshot.logoText ? (
+              // eslint-disable-next-line @next/next/no-img-element -- data URLs
+              <img
+                src={clientSnapshot.logoText}
+                alt=""
+                className="mb-3 max-h-12 w-auto max-w-45 object-contain object-left"
+              />
+            ) : null}
             <p className="font-semibold text-slate-900 dark:text-zinc-50">{clientSnapshot.name}</p>
             {clientSnapshot.company ? (
               <p className="text-slate-700 dark:text-zinc-300">{clientSnapshot.company}</p>
@@ -284,7 +292,7 @@ export function QuotationDocumentPreview({
                 <img
                   src={companySig}
                   alt="Company signature"
-                  className="max-h-20 w-auto max-w-[200px] object-contain object-left"
+                  className="max-h-20 w-auto max-w-50 object-contain object-left"
                 />
               </div>
             ) : null}
@@ -297,7 +305,7 @@ export function QuotationDocumentPreview({
                 <img
                   src={clientSig}
                   alt="Client signature"
-                  className="max-h-20 w-auto max-w-[200px] object-contain object-left"
+                  className="max-h-20 w-auto max-w-50 object-contain object-left"
                 />
               </div>
             ) : null}

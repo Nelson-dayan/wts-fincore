@@ -15,6 +15,7 @@ import {
 } from "@/lib/portals/quotation-preview-utils";
 import type { QuotationRenderDraft } from "@/lib/services/business/quotation-render.types";
 import { sanitizeDraftForServerRender } from "@/lib/portals/quotation-draft-sanitize";
+import { readFileAsPdfSafeDataUrl } from "@/lib/portals/read-file-as-pdf-safe-data-url";
 
 type LineItem = {
   number: number;
@@ -81,13 +82,26 @@ function emptyCompany(): PreviewCompany {
   };
 }
 
-async function fileToText(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result ?? ""));
-    reader.onerror = () => reject(new Error("Failed to read file"));
-    reader.readAsDataURL(file);
-  });
+/** Keeps text inputs strictly controlled (avoids defined → undefined React warning). */
+function s(v: string | undefined | null): string {
+  return v ?? "";
+}
+
+function lineNumberValue(n: unknown): number {
+  const x = typeof n === "number" ? n : Number(n);
+  if (!Number.isFinite(x)) return 1;
+  return Math.max(1, Math.floor(x));
+}
+
+function lineQtyPriceValue(n: unknown, fallback: number): number {
+  const x = typeof n === "number" ? n : Number(n);
+  return Number.isFinite(x) ? x : fallback;
+}
+
+/** Avoids RangeError from `new Date("").toISOString()` when date input is cleared. */
+function toIsoDateOrNow(dateInput: string): string {
+  const d = new Date(dateInput);
+  return Number.isNaN(d.getTime()) ? new Date().toISOString() : d.toISOString();
 }
 
 export function CreateQuotationForm({
@@ -490,7 +504,7 @@ export function CreateQuotationForm({
           branding,
           documentInfo: {
             quotationCode,
-            date: new Date(docDate).toISOString(),
+            date: toIsoDateOrNow(docDate),
             subject,
             title,
             description,
@@ -525,11 +539,15 @@ export function CreateQuotationForm({
           },
         }),
       });
-      const result = (await response.json()) as {
+      const result = (await response.json().catch(() => ({}))) as {
         message?: string;
         item?: { _id?: string };
       };
-      if (!response.ok) throw new Error(result.message ?? "Create failed");
+      if (!response.ok) {
+        throw new Error(
+          result.message ?? `Could not save quotation (HTTP ${response.status}).`
+        );
+      }
       setMessage("Quotation saved.");
       const createdId = result.item?._id;
       setTimeout(() => {
@@ -604,7 +622,7 @@ export function CreateQuotationForm({
                     <div className="space-y-1 sm:col-span-2">
                       <Label>Project</Label>
                       <Input
-                        value={projectQuery}
+                        value={s(projectQuery)}
                         onChange={(e) => setProjectQuery(e.target.value)}
                         placeholder="Search project by name"
                       />
@@ -640,15 +658,15 @@ export function CreateQuotationForm({
                       <div className="grid gap-2 sm:grid-cols-2">
                         <div className="space-y-1">
                           <Label className="text-muted-foreground">Project ID</Label>
-                          <Input value={projectId || "—"} readOnly className="font-mono text-xs" />
+                          <Input value={s(projectId) || "—"} readOnly className="font-mono text-xs" />
                         </div>
                         <div className="space-y-1 sm:col-span-2">
                           <Label className="text-muted-foreground">Internal notes</Label>
                           <textarea
-                            value={internalNotes}
+                            value={s(internalNotes)}
                             onChange={(e) => setInternalNotes(e.target.value)}
                             rows={3}
-                            className="flex min-h-[80px] w-full rounded-lg border border-border bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+                            className="flex min-h-20 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
                             placeholder="Team-only context, CRM links, follow-ups…"
                           />
                         </div>
@@ -662,29 +680,43 @@ export function CreateQuotationForm({
                       </p>
                       <div className="grid gap-2 sm:grid-cols-2">
                         <div className="space-y-1 sm:col-span-2">
-                          <Label>Company name</Label>
+                          <Label>Upload logo</Label>
                           <Input
-                            value={previewCompany.name}
-                            onChange={(e) =>
-                              setPreviewCompany((c) => ({ ...c, name: e.target.value }))
-                            }
+                            type="file"
+                            accept="image/*"
+                            onChange={async (e) => {
+                              const file = e.target.files?.[0];
+                              if (!file) return;
+                              const text = await readFileAsPdfSafeDataUrl(file);
+                              setPreviewCompany((c) => ({ ...c, logoText: text }));
+                              e.target.value = "";
+                            }}
                           />
+                          {previewCompany.logoText ? (
+                            <div className="pt-1">
+                              <img
+                                src={previewCompany.logoText}
+                                alt="Company logo preview"
+                                className="h-12 max-w-50 rounded-md border border-border object-contain"
+                              />
+                            </div>
+                          ) : null}
                         </div>
                         <div className="space-y-1 sm:col-span-2">
                           <Label>Address</Label>
                           <textarea
-                            value={previewCompany.address}
+                            value={s(previewCompany.address)}
                             onChange={(e) =>
                               setPreviewCompany((c) => ({ ...c, address: e.target.value }))
                             }
                             rows={3}
-                            className="flex min-h-[72px] w-full rounded-lg border border-border bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+                            className="flex min-h-18 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
                           />
                         </div>
                         <div className="space-y-1">
                           <Label>Email</Label>
                           <Input
-                            value={previewCompany.email}
+                            value={s(previewCompany.email)}
                             onChange={(e) =>
                               setPreviewCompany((c) => ({ ...c, email: e.target.value }))
                             }
@@ -693,7 +725,7 @@ export function CreateQuotationForm({
                         <div className="space-y-1">
                           <Label>Website</Label>
                           <Input
-                            value={previewCompany.website}
+                            value={s(previewCompany.website)}
                             onChange={(e) =>
                               setPreviewCompany((c) => ({ ...c, website: e.target.value }))
                             }
@@ -708,10 +740,63 @@ export function CreateQuotationForm({
                         Selecting a project fills these fields; you can edit them anytime.
                       </p>
                       <div className="grid gap-2 sm:grid-cols-2">
+                        <div className="space-y-1 sm:col-span-2">
+                          <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                            Brand on quotation
+                          </p>
+                          <div className="grid gap-3 sm:grid-cols-2">
+                            <div className="space-y-1">
+                              <Label>Upload client logo</Label>
+                              <Input
+                                type="file"
+                                accept="image/*"
+                                onChange={async (e) => {
+                                  const file = e.target.files?.[0];
+                                  if (!file) return;
+                                  const text = await readFileAsPdfSafeDataUrl(file);
+                                  setPreviewClient((c) => ({ ...c, logoText: text }));
+                                  e.target.value = "";
+                                }}
+                              />
+                              {previewClient.logoText ? (
+                                <div className="pt-1">
+                                  <img
+                                    src={previewClient.logoText}
+                                    alt="Client logo preview"
+                                    className="h-12 max-w-50 rounded-md border border-border object-contain"
+                                  />
+                                </div>
+                              ) : null}
+                            </div>
+                            <div className="space-y-1">
+                              <Label>Upload client signature</Label>
+                              <Input
+                                type="file"
+                                accept="image/*"
+                                onChange={async (e) => {
+                                  const file = e.target.files?.[0];
+                                  if (!file) return;
+                                  const text = await readFileAsPdfSafeDataUrl(file);
+                                  setPreviewClient((c) => ({ ...c, signatureText: text }));
+                                  e.target.value = "";
+                                }}
+                              />
+                              {previewClient.signatureText ? (
+                                <div className="pt-1">
+                                  <img
+                                    src={previewClient.signatureText}
+                                    alt="Client signature preview"
+                                    className="h-12 max-w-60 rounded-md border border-border object-contain object-left"
+                                  />
+                                </div>
+                              ) : null}
+                            </div>
+                          </div>
+                        </div>
                         <div className="space-y-1">
                           <Label>Client name</Label>
                           <Input
-                            value={previewClient.name}
+                            value={s(previewClient.name)}
                             onChange={(e) =>
                               setPreviewClient((c) => ({ ...c, name: e.target.value }))
                             }
@@ -720,7 +805,7 @@ export function CreateQuotationForm({
                         <div className="space-y-1">
                           <Label>Company</Label>
                           <Input
-                            value={previewClient.company}
+                            value={s(previewClient.company)}
                             onChange={(e) =>
                               setPreviewClient((c) => ({ ...c, company: e.target.value }))
                             }
@@ -729,32 +814,12 @@ export function CreateQuotationForm({
                         <div className="space-y-1 sm:col-span-2">
                           <Label>Address</Label>
                           <textarea
-                            value={previewClient.address}
+                            value={s(previewClient.address)}
                             onChange={(e) =>
                               setPreviewClient((c) => ({ ...c, address: e.target.value }))
                             }
                             rows={3}
-                            className="flex min-h-[72px] w-full rounded-lg border border-border bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
-                          />
-                        </div>
-                        <div className="space-y-1">
-                          <Label>Client logo (text / data URL)</Label>
-                          <Input
-                            value={previewClient.logoText}
-                            onChange={(e) =>
-                              setPreviewClient((c) => ({ ...c, logoText: e.target.value }))
-                            }
-                            placeholder="Optional"
-                          />
-                        </div>
-                        <div className="space-y-1">
-                          <Label>Client signature (text / data URL)</Label>
-                          <Input
-                            value={previewClient.signatureText}
-                            onChange={(e) =>
-                              setPreviewClient((c) => ({ ...c, signatureText: e.target.value }))
-                            }
-                            placeholder="Optional"
+                            className="flex min-h-18 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
                           />
                         </div>
                       </div>
@@ -763,7 +828,7 @@ export function CreateQuotationForm({
                     <div className="space-y-1">
                       <Label>Status</Label>
                       <Select
-                        value={status}
+                        value={status ?? "draft"}
                         onChange={(e) => setStatus(e.target.value as typeof status)}
                         options={[
                           { value: "draft", label: "draft" },
@@ -777,7 +842,7 @@ export function CreateQuotationForm({
                       <Label>Document date</Label>
                       <Input
                         type="date"
-                        value={docDate}
+                        value={s(docDate)}
                         onChange={(e) => setDocDate(e.target.value)}
                         required
                       />
@@ -785,29 +850,29 @@ export function CreateQuotationForm({
                     <div className="space-y-1">
                       <Label>Quotation code</Label>
                       <Input
-                        value={quotationCode}
+                        value={s(quotationCode)}
                         onChange={(e) => setQuotationCode(e.target.value)}
                         placeholder="e.g. internal reference"
                       />
                     </div>
                     <div className="space-y-1">
                       <Label>Subject</Label>
-                      <Input value={subject} onChange={(e) => setSubject(e.target.value)} />
+                      <Input value={s(subject)} onChange={(e) => setSubject(e.target.value)} />
                     </div>
                     <div className="space-y-1 sm:col-span-2">
                       <Label>Title</Label>
-                      <Input value={title} onChange={(e) => setTitle(e.target.value)} />
+                      <Input value={s(title)} onChange={(e) => setTitle(e.target.value)} />
                     </div>
                     <div className="space-y-1 sm:col-span-2">
                       <Label>Description</Label>
-                      <Input value={description} onChange={(e) => setDescription(e.target.value)} />
+                      <Input value={s(description)} onChange={(e) => setDescription(e.target.value)} />
                     </div>
                     <div className="space-y-1">
                       <Label>Tax rate (%)</Label>
                       <Input
                         type="number"
                         min={0}
-                        value={taxRate}
+                        value={s(taxRate)}
                         onChange={(e) => setTaxRate(e.target.value)}
                       />
                     </div>
@@ -834,7 +899,7 @@ export function CreateQuotationForm({
                             setBranding((b) => ({
                               ...b,
                               useCompanyLogo: v,
-                              customLogoText: v ? "" : b.customLogoText,
+                              customLogoText: v ? "" : s(b.customLogoText),
                             }));
                           }}
                         />
@@ -849,7 +914,7 @@ export function CreateQuotationForm({
                             onChange={async (e) => {
                               const file = e.target.files?.[0];
                               if (!file) return;
-                              const text = await fileToText(file);
+                              const text = await readFileAsPdfSafeDataUrl(file);
                               setBranding((b) => ({ ...b, customLogoText: text }));
                             }}
                           />
@@ -864,7 +929,7 @@ export function CreateQuotationForm({
                             setBranding((b) => ({
                               ...b,
                               useCompanySignature: v,
-                              customSignatureText: v ? "" : b.customSignatureText,
+                              customSignatureText: v ? "" : s(b.customSignatureText),
                             }));
                           }}
                         />
@@ -879,7 +944,7 @@ export function CreateQuotationForm({
                             onChange={async (e) => {
                               const file = e.target.files?.[0];
                               if (!file) return;
-                              const text = await fileToText(file);
+                              const text = await readFileAsPdfSafeDataUrl(file);
                               setBranding((b) => ({ ...b, customSignatureText: text }));
                             }}
                           />
@@ -927,15 +992,17 @@ export function CreateQuotationForm({
                                     className="h-8"
                                     type="number"
                                     min={1}
-                                    value={item.number}
+                                    value={lineNumberValue(item.number)}
                                     onChange={(e) => {
-                                      const v = Number(e.target.value);
+                                      const raw = e.target.value;
+                                      const v = raw === "" ? 1 : Number(raw);
+                                      const next = Number.isFinite(v) ? Math.max(1, Math.floor(v)) : 1;
                                       setPages((prev) => {
                                         const copy = prev.map((p) => ({
                                           ...p,
                                           items: p.items.map((row) => ({ ...row })),
                                         }));
-                                        copy[pageIdx].items[lineIdx].number = v;
+                                        copy[pageIdx].items[lineIdx].number = next;
                                         return copy;
                                       });
                                     }}
@@ -944,7 +1011,7 @@ export function CreateQuotationForm({
                                 <td className="py-1 pr-2">
                                   <Input
                                     className="h-8"
-                                    value={item.name}
+                                    value={s(item.name)}
                                     onChange={(e) => {
                                       const v = e.target.value;
                                       setPages((prev) => {
@@ -964,15 +1031,17 @@ export function CreateQuotationForm({
                                     className="h-8"
                                     type="number"
                                     min={0}
-                                    value={item.quantity}
+                                    value={lineQtyPriceValue(item.quantity, 0)}
                                     onChange={(e) => {
-                                      const v = Number(e.target.value);
+                                      const raw = e.target.value;
+                                      const v = raw === "" ? 0 : Number(raw);
+                                      const next = Number.isFinite(v) ? v : 0;
                                       setPages((prev) => {
                                         const copy = prev.map((p) => ({
                                           ...p,
                                           items: p.items.map((row) => ({ ...row })),
                                         }));
-                                        copy[pageIdx].items[lineIdx].quantity = v;
+                                        copy[pageIdx].items[lineIdx].quantity = next;
                                         return copy;
                                       });
                                     }}
@@ -984,15 +1053,17 @@ export function CreateQuotationForm({
                                     type="number"
                                     min={0}
                                     step="0.01"
-                                    value={item.price}
+                                    value={lineQtyPriceValue(item.price, 0)}
                                     onChange={(e) => {
-                                      const v = Number(e.target.value);
+                                      const raw = e.target.value;
+                                      const v = raw === "" ? 0 : Number(raw);
+                                      const next = Number.isFinite(v) ? v : 0;
                                       setPages((prev) => {
                                         const copy = prev.map((p) => ({
                                           ...p,
                                           items: p.items.map((row) => ({ ...row })),
                                         }));
-                                        copy[pageIdx].items[lineIdx].price = v;
+                                        copy[pageIdx].items[lineIdx].price = next;
                                         return copy;
                                       });
                                     }}
@@ -1023,21 +1094,21 @@ export function CreateQuotationForm({
                   <div className="grid gap-2 sm:grid-cols-2">
                     <div className="space-y-1">
                       <Label>Lead time</Label>
-                      <Input value={leadTime} onChange={(e) => setLeadTime(e.target.value)} />
+                      <Input value={s(leadTime)} onChange={(e) => setLeadTime(e.target.value)} />
                     </div>
                     <div className="space-y-1">
                       <Label>Validity</Label>
-                      <Input value={validity} onChange={(e) => setValidity(e.target.value)} />
+                      <Input value={s(validity)} onChange={(e) => setValidity(e.target.value)} />
                     </div>
                     <div className="space-y-1 sm:col-span-2">
                       <Label>Terms</Label>
-                      <Input value={terms} onChange={(e) => setTerms(e.target.value)} />
+                      <Input value={s(terms)} onChange={(e) => setTerms(e.target.value)} />
                     </div>
                     <div className="space-y-1">
                       <Label>Remaining amount</Label>
                       <Input
                         type="number"
-                        value={remainingAmount}
+                        value={s(remainingAmount)}
                         onChange={(e) => setRemainingAmount(e.target.value)}
                         placeholder="Optional"
                       />
@@ -1046,18 +1117,33 @@ export function CreateQuotationForm({
                       <Label>Confirm date</Label>
                       <Input
                         type="date"
-                        value={confirmDate}
+                        value={s(confirmDate)}
                         onChange={(e) => setConfirmDate(e.target.value)}
                       />
                     </div>
                     <div className="space-y-1 sm:col-span-2">
                       <Label>Remaining text</Label>
-                      <Input value={remainingText} onChange={(e) => setRemainingText(e.target.value)} />
+                      <Input value={s(remainingText)} onChange={(e) => setRemainingText(e.target.value)} />
                     </div>
                   </div>
 
                   {message ? (
-                    <p className="text-sm text-muted-foreground">{message}</p>
+                    <p
+                      className={cn(
+                        "text-sm",
+                        message === "Quotation saved."
+                          ? "text-muted-foreground"
+                          : "font-medium text-destructive"
+                      )}
+                      role={message === "Quotation saved." ? undefined : "alert"}
+                    >
+                      {message}
+                    </p>
+                  ) : null}
+                  {!projectId ? (
+                    <p className="text-sm text-amber-700 dark:text-amber-400">
+                      Choose a project from the search list — saving is disabled until a project is selected.
+                    </p>
                   ) : null}
 
                   <div className="flex flex-wrap gap-2">

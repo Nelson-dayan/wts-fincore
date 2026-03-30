@@ -209,7 +209,7 @@ export async function POST(req: Request) {
       branding: {
         useCompanyLogo: branding.useCompanyLogo !== false,
         useCompanySignature: branding.useCompanySignature !== false,
-        showClientSignature: Boolean(branding.showClientSignature),
+        showClientSignature: branding.showClientSignature !== false,
         customLogoText: String(branding.customLogoText ?? ""),
         customSignatureText: String(branding.customSignatureText ?? ""),
       },
@@ -228,6 +228,25 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ item: created }, { status: 201 });
   } catch (error) {
+    if (error instanceof Error) {
+      const msg = error.message;
+      if (msg === "UNAUTHORIZED" || msg === "FORBIDDEN") {
+        return authErrorResponse(error, "Failed to create quotation");
+      }
+      const clientMsg =
+        msg.startsWith("At least one page") ||
+        msg.startsWith("Each page") ||
+        msg.startsWith("Each line item") ||
+        msg.startsWith("Project not found") ||
+        msg.startsWith("Client not found") ||
+        msg.startsWith("Primary company") ||
+        msg.includes("validation")
+          ? msg
+          : undefined;
+      if (clientMsg) {
+        return NextResponse.json({ message: clientMsg }, { status: 400 });
+      }
+    }
     return authErrorResponse(error, "Failed to create quotation");
   }
 }
