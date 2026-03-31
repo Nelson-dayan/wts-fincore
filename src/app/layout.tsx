@@ -66,7 +66,7 @@ export default function RootLayout({
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
       </head>
-      <body className="min-h-dvh flex flex-col bg-background text-foreground antialiased [font-feature-settings:'cv02','cv03','cv04','cv11']">
+      <body className="min-h-dvh flex flex-col bg-background text-foreground antialiased">
         <ThemeProvider
           attribute="class"
           defaultTheme="system"

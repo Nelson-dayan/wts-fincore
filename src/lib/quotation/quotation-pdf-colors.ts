@@ -10,7 +10,6 @@ export const QUOTATION_PDF_COLORS = {
   body: "#2b2b2c",
   borderHairline: "rgba(0,0,0,0.05)",
   shadowCard: "0 10px 36px rgba(0,0,0,0.1)",
-  shadowLogo: "0 1px 3px rgba(0,0,0,0.12)",
   /** Replaces Tailwind `shadow-sm` without modern color spaces */
   shadowSm: "0 1px 2px 0 rgba(0,0,0,0.05)",
 } as const;

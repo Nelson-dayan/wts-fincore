@@ -37,6 +37,10 @@ export type QuotationData = {
   coverTextAlign: "left" | "center" | "right";
   page2TextAlign: "left" | "center" | "right";
   contactTextAlign: "left" | "center" | "right";
+  /** Logo corner / top band: left, center, or right on each PDF page. */
+  logoAlign: "left" | "center" | "right";
+  /** Page 2 — cost table block horizontal position (max-w-4xl). */
+  tableBlockAlign: "left" | "center" | "right";
   pageFormat: "a4" | "letter";
   pageOrientation: "portrait" | "landscape";
 };
@@ -71,6 +75,8 @@ export const defaultQuotationData = (): QuotationData => ({
   coverTextAlign: "center",
   page2TextAlign: "center",
   contactTextAlign: "left",
+  logoAlign: "right",
+  tableBlockAlign: "center",
   pageFormat: "a4",
   pageOrientation: "landscape",
 });
@@ -146,6 +152,16 @@ export function normalizeQuotationData(raw: unknown): QuotationData {
       o.contactTextAlign === "center"
         ? o.contactTextAlign
         : base.contactTextAlign,
+    logoAlign:
+      o.logoAlign === "left" || o.logoAlign === "right" || o.logoAlign === "center"
+        ? o.logoAlign
+        : base.logoAlign,
+    tableBlockAlign:
+      o.tableBlockAlign === "left" ||
+      o.tableBlockAlign === "right" ||
+      o.tableBlockAlign === "center"
+        ? o.tableBlockAlign
+        : base.tableBlockAlign,
     pageFormat: o.pageFormat === "letter" ? "letter" : base.pageFormat,
     pageOrientation:
       o.pageOrientation === "portrait" || o.pageOrientation === "landscape"

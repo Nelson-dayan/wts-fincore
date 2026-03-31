@@ -106,6 +106,7 @@ body {
   background: hsl(var(--background));
   color: hsl(var(--foreground));
   font-family: var(--font-geist-sans), system-ui, sans-serif;
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -563,6 +564,56 @@ body {
 
 .dark .dashboard-list-row:hover {
   background: hsl(240 7% 14% / 0.55);
+}
+
+/*
+ * Quotation builder live preview: CSS transform scale does not shrink layout,
+ * which caused horizontal scroll for A4/Letter landscape. The viewport clips to
+ * the scaled width/height so only vertical scroll remains.
+ */
+.quotation-preview-scale-viewport {
+  --qv-scale: 0.54;
+  overflow: hidden;
+  width: calc(var(--qv-page-w) * var(--qv-scale));
+  height: calc(var(--qv-stack-h) * var(--qv-scale));
+}
+
+@media (min-width: 640px) {
+  .quotation-preview-scale-viewport {
+    --qv-scale: 0.66;
+  }
+}
+
+@media (min-width: 900px) {
+  .quotation-preview-scale-viewport {
+    --qv-scale: 0.78;
+  }
+}
+
+@media (min-width: 1200px) {
+  .quotation-preview-scale-viewport {
+    --qv-scale: 0.9;
+  }
+}
+
+@media (min-width: 1280px) {
+  .quotation-preview-scale-viewport {
+    --qv-scale: 0.97;
+  }
+}
+
+@media (min-width: 1536px) {
+  .quotation-preview-scale-viewport {
+    --qv-scale: 1;
+  }
+}
+
+.quotation-preview-scale-inner {
+  width: var(--qv-page-w);
+  height: var(--qv-stack-h);
+  transform: scale(var(--qv-scale));
+  transform-origin: top left;
+  pointer-events: none;
 }
 
 /* Grid mesh for auth / hero backgrounds */
