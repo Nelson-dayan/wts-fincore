@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { DashboardPageHeader } from "@/components/dashboard/page-header";
+import { QuotationPurchaseOrdersSection } from "@/components/portals/quotation-purchase-orders-section";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -314,7 +315,7 @@ export function AdminQuotationDetailsClient({ quotationId }: { quotationId: stri
     <div className="animate-fade-in">
       <DashboardPageHeader
         title={item ? `Quotation ${item.quotationNumber}` : "Quotation"}
-        description="Edit document data, line items, and status. Totals are recalculated on save."
+        description="When the client PO arrives, upload it in the green section below. Edit the rest of the quotation here."
       />
       {error ? (
         <div className="mb-4 rounded-xl border border-destructive/40 bg-destructive/5 p-4 text-sm text-destructive">
@@ -351,6 +352,13 @@ export function AdminQuotationDetailsClient({ quotationId }: { quotationId: stri
               </Button>
             </Link>
           </div>
+
+          <QuotationPurchaseOrdersSection
+            quotationId={item._id}
+            projectId={item.projectId}
+            quotationStatus={item.status}
+            quotationNumber={item.quotationNumber}
+          />
 
           <Card className="mb-4">
             <CardHeader>

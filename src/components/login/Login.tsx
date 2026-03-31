@@ -1,3 +1,4 @@
+
 import Link from "next/link";
 import { AuthPageShell } from "@/components/auth/auth-page-shell";
 import { LoginForm } from "@/components/login/login-form";
@@ -9,9 +10,21 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { ArrowRight } from "lucide-react";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth/options";
+import { useSession } from "next-auth/react";
+import { redirect } from "next/navigation";
 
-export default function Login() {
-  return (
+
+
+export default async function Login() {
+  const session = await getServerSession(authOptions);
+
+  if (session) {
+    redirect("/admin");
+  }
+
+ return (
     <AuthPageShell>
       <Card className="glass-card border-white/25 dark:border-white/10 !shadow-[var(--shadow-premium-lg)]">
         <CardHeader className="text-center sm:text-left">

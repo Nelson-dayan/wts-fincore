@@ -1,3 +1,4 @@
+import { AdminInvoicesCreateHelper } from "@/components/portals/admin-invoices-create-helper";
 import { ResourceTableClient } from "@/components/portals/resource-table-client";
 
 interface PageProps {
@@ -12,21 +13,27 @@ export default async function AdminInvoicesPage({ searchParams }: PageProps) {
     : "/api/admin/invoices";
 
   return (
-    <ResourceTableClient
+    <>
+      <AdminInvoicesCreateHelper projectId={projectId} />
+      <ResourceTableClient
       title="Invoices"
       description={
         projectId
-          ? "Invoice list filtered by selected project."
-          : "Invoice list with payment statuses and due dates."
+          ? "Invoices for this project. Payment status and due dates are shown in each row."
+          : "Payment status, totals, due dates, and linked PO. Open a row to edit or print."
       }
       endpoint={endpoint}
       columns={[
         { key: "invoiceNumber", label: "Invoice #" },
+        { key: "poNumberRef", label: "PO #" },
         { key: "status", label: "Status" },
+        { key: "total", label: "Total" },
         { key: "dueDate", label: "Due Date" },
         { key: "projectId", label: "Project" },
-        { key: "createdAt", label: "Created At" },
+        { key: "createdAt", label: "Created" },
       ]}
+      rowDetailPathPrefix="/admin/invoices"
     />
+    </>
   );
 }

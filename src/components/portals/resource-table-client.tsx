@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { DashboardPageHeader } from "@/components/dashboard/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
@@ -23,10 +24,27 @@ interface ResourceTableClientProps {
   columns: Array<{ key: string; label: string }>;
   singleItem?: boolean;
   searchable?: boolean;
+  /**
+   * Base path for row detail links (serializable from Server Components).
+   * e.g. `/admin/purchase-orders` → link `/admin/purchase-orders/{_id}`.
+   */
+  rowDetailPathPrefix?: string;
+  /** Appended to row detail links, e.g. `#section` to scroll after open. */
+  rowDetailHash?: string;
+  /**
+   * Extra links per row; `{id}` is replaced with the row’s `_id` (URL-encoded).
+   * e.g. `{ label: "Invoice", hrefPattern: "/admin/invoices/new?poId={id}" }`
+   */
+  extraRowLinks?: Array<{ label: string; hrefPattern: string }>;
+  /** Shown in the table body when the API returns zero rows (not an error). */
+  emptyMessage?: string;
+  /** When false, skips the top DashboardPageHeader (use when the page supplies its own). */
+  showPageHeader?: boolean;
 }
 
 function formatCell(value: unknown): string {
   if (value == null || value === "") return "-";
+  if (typeof value === "boolean") return value ? "Yes" : "No";
   if (typeof value === "string") {
     const maybeDate = Date.parse(value);
     if (!Number.isNaN(maybeDate) && value.includes("T")) {
@@ -52,9 +70,17 @@ export function ResourceTableClient({
   columns,
   singleItem = false,
   searchable = true,
+  rowDetailPathPrefix,
+  rowDetailHash = "",
+  extraRowLinks,
+  emptyMessage =
+    "No records match yet. Adjust search or add new data — the table updates after the list loads.",
+  showPageHeader = true,
 }: ResourceTableClientProps) {
+  const detailPrefix = rowDetailPathPrefix?.replace(/\/$/, "") ?? "";
   const [rows, setRows] = useState<Row[]>([]);
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
@@ -63,6 +89,8 @@ export function ResourceTableClient({
   useEffect(() => {
     let alive = true;
     async function load() {
+      setLoading(true);
+      setError("");
       try {
         const qs = new URLSearchParams({
           page: String(page),
@@ -89,7 +117,13 @@ export function ResourceTableClient({
           setTotal(payload.total ?? loadedRows.length);
         }
       } catch (e) {
-        if (alive) setError(e instanceof Error ? e.message : "Failed to load data");
+        if (alive) {
+          setError(e instanceof Error ? e.message : "Failed to load data");
+          setRows([]);
+          setTotal(0);
+        }
+      } finally {
+        if (alive) setLoading(false);
       }
     }
 
@@ -100,8 +134,8 @@ export function ResourceTableClient({
   }, [endpoint, singleItem, page, query]);
 
   return (
-    <div className="animate-[fade-in_0.4s_ease-out_both]">
-      <DashboardPageHeader title={title} description={description} />
+    <div className="animate-fade-in">
+      {showPageHeader ? <DashboardPageHeader title={title} description={description} /> : null}
       <Card>
         <CardHeader>
           <CardTitle className="text-base">
@@ -126,9 +160,11 @@ export function ResourceTableClient({
             <div className="rounded-xl border border-destructive/40 bg-destructive/5 p-4 text-sm text-destructive">
               {error}
             </div>
+          ) : loading ? (
+            <p className="text-muted-foreground py-8 text-center text-sm">Loading…</p>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[760px] text-left text-sm">
+              <table className="w-full min-w-190 text-left text-sm">
                 <thead className="text-muted-foreground">
                   <tr>
                     {columns.map((column) => (
@@ -136,21 +172,70 @@ export function ResourceTableClient({
                         {column.label}
                       </th>
                     ))}
+                    {detailPrefix || (extraRowLinks && extraRowLinks.length > 0) ? (
+                      <th className="py-2 pr-3 text-right">
+                        <span className="sr-only">Actions</span>
+                      </th>
+                    ) : null}
                   </tr>
                 </thead>
                 <tbody>
-                  {rows.map((row, index) => (
-                    <tr
-                      key={String(row._id ?? index)}
-                      className="border-t border-border/70"
-                    >
-                      {columns.map((column) => (
-                        <td key={column.key} className="py-2 pr-3">
-                          {formatCell(row[column.key])}
-                        </td>
-                      ))}
+                  {rows.length === 0 ? (
+                    <tr className="border-t border-border/70">
+                      <td
+                        colSpan={
+                          columns.length +
+                          (detailPrefix || (extraRowLinks && extraRowLinks.length > 0) ? 1 : 0)
+                        }
+                        className="text-muted-foreground py-10 px-2 text-center text-sm leading-relaxed"
+                      >
+                        {emptyMessage}
+                      </td>
                     </tr>
-                  ))}
+                  ) : (
+                    rows.map((row, index) => (
+                      <tr
+                        key={String(row._id ?? index)}
+                        className="border-t border-border/70"
+                      >
+                        {columns.map((column) => (
+                          <td key={column.key} className="py-2 pr-3">
+                            {formatCell(row[column.key])}
+                          </td>
+                        ))}
+                        {detailPrefix || (extraRowLinks && extraRowLinks.length > 0) ? (
+                          <td className="py-2 pr-3 text-right">
+                            {row._id ? (
+                              <span className="inline-flex flex-wrap items-center justify-end gap-x-3 gap-y-1">
+                                {detailPrefix ? (
+                                  <Link
+                                    href={`${detailPrefix}/${encodeURIComponent(String(row._id))}${rowDetailHash}`}
+                                    className="text-primary text-sm font-medium underline-offset-4 hover:underline"
+                                  >
+                                    Open
+                                  </Link>
+                                ) : null}
+                                {(extraRowLinks ?? []).map((link) => (
+                                  <Link
+                                    key={link.label}
+                                    href={link.hrefPattern.replace(
+                                      "{id}",
+                                      encodeURIComponent(String(row._id))
+                                    )}
+                                    className="text-primary text-sm font-medium underline-offset-4 hover:underline"
+                                  >
+                                    {link.label}
+                                  </Link>
+                                ))}
+                              </span>
+                            ) : (
+                              "—"
+                            )}
+                          </td>
+                        ) : null}
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
