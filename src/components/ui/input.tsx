@@ -3,6 +3,10 @@ import { cn } from "@/lib/utils/cn";
 
 const Input = React.forwardRef<HTMLInputElement, React.ComponentProps<"input">>(
   ({ className, type, ...props }, ref) => {
+    const normalizedProps =
+      "value" in props && type !== "file"
+        ? { ...props, value: (props.value as string | number | readonly string[] | undefined) ?? "" }
+        : props;
     return (
       <input
         type={type}
@@ -16,7 +20,7 @@ const Input = React.forwardRef<HTMLInputElement, React.ComponentProps<"input">>(
           className
         )}
         ref={ref}
-        {...props}
+        {...normalizedProps}
       />
     );
   }

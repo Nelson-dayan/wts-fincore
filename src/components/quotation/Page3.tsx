@@ -14,6 +14,7 @@ export function Page3({ data }: Page3Props) {
     companyAddress,
     contactPhone,
     contactEmail,
+    contactTextAlign,
   } = data;
 
   const heading = page3Title.trim();
@@ -24,12 +25,18 @@ export function Page3({ data }: Page3Props) {
   const mail = contactEmail.trim();
 
   const hasBody = Boolean(name || co || addr || tel || mail);
+  const textAlignClass =
+    contactTextAlign === "center"
+      ? "text-center"
+      : contactTextAlign === "right"
+        ? "text-right"
+        : "text-left";
 
   return (
     <QuotationPageFrame data={data} page={3}>
       <div className="flex h-full min-h-0 flex-col justify-end pb-2 pl-[2%] pt-4">
         <div
-          className="max-w-xl space-y-4 text-left text-[14px] leading-relaxed md:text-[15px]"
+          className={`max-w-xl space-y-4 text-[14px] leading-relaxed md:text-[15px] ${textAlignClass}`}
           style={{ color: QUOTATION_PDF_COLORS.slate800 }}
         >
           {heading ? (

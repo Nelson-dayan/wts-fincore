@@ -34,7 +34,6 @@ export function AdminInvoiceDetailClient({
   poInvoiceCount,
 }: {
   invoiceId: string;
-  /** When opened from PO context, show sibling count hint. */
   poInvoiceCount?: number;
 }) {
   const [item, setItem] = useState<Item | null>(null);

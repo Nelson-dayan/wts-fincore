@@ -17,6 +17,10 @@ export type QuotationFormProps = {
   exporting?: boolean;
   saveNotice?: string | null;
   pdfError?: string | null;
+  /** Shown in the card header (e.g. "New quotation" vs "Edit quotation"). */
+  formTitle?: string;
+  /** Admin embedded: close builder without navigating away. */
+  onCancelEdit?: () => void;
 };
 
 export function QuotationForm({
@@ -28,6 +32,8 @@ export function QuotationForm({
   exporting = false,
   saveNotice = null,
   pdfError = null,
+  formTitle = "Quotation",
+  onCancelEdit,
 }: QuotationFormProps) {
   const patch = (partial: Partial<QuotationData>) => {
     onChange({ ...data, ...partial });
@@ -62,10 +68,23 @@ export function QuotationForm({
 
   const clearLogo = () => patch({ logo: undefined });
 
+  const onBackgroundChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !file.type.startsWith("image/")) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      patch({ backgroundImage: reader.result as string });
+    };
+    reader.readAsDataURL(file);
+    e.target.value = "";
+  };
+
+  const clearBackground = () => patch({ backgroundImage: undefined });
+
   return (
     <Card className="mx-auto w-full max-w-4xl shrink-0 border-border/80 shadow-md">
       <CardHeader className="space-y-1">
-        <CardTitle>Quotation</CardTitle>
+        <CardTitle>{formTitle}</CardTitle>
       </CardHeader>
       <CardContent className="flex flex-col gap-5 pr-1">
         <fieldset className="grid gap-3 rounded-xl border border-border/80 bg-muted/25 p-4 dark:bg-muted/15">
@@ -336,32 +355,225 @@ export function QuotationForm({
         </fieldset>
 
         <fieldset className="grid gap-3">
-          <p className="text-muted-foreground text-[0.8125rem] font-medium">Cover & page colours</p>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="grid gap-2">
-              <Label htmlFor="qg-bg">Background</Label>
-              <Input
-                id="qg-bg"
-                type="color"
-                value={data.bgColor}
-                onChange={(e) => patch({ bgColor: e.target.value })}
-                className="h-10 cursor-pointer p-1"
-              />
+          <p className="text-muted-foreground text-[0.8125rem] font-medium">Design & layout</p>
+          <details className="rounded-lg border border-border/80 bg-background/60 p-3 dark:bg-background/40">
+            <summary className="cursor-pointer text-sm font-medium text-foreground">
+              Advanced options (alignment, colors, table style)
+            </summary>
+            <div className="mt-3 grid gap-4">
+              <div className="grid gap-3 rounded-lg border border-border/70 bg-background/70 p-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Page setup
+                </p>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="grid gap-2">
+                    <Label htmlFor="qg-page-format">Paper format</Label>
+                    <select
+                      id="qg-page-format"
+                      value={data.pageFormat}
+                      onChange={(e) =>
+                        patch({ pageFormat: e.target.value as QuotationData["pageFormat"] })
+                      }
+                      className="h-10 rounded-lg border border-input/90 bg-background px-3 text-sm"
+                    >
+                      <option value="a4">A4</option>
+                      <option value="letter">Letter</option>
+                    </select>
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="qg-page-orientation">Orientation</Label>
+                    <select
+                      id="qg-page-orientation"
+                      value={data.pageOrientation}
+                      onChange={(e) =>
+                        patch({
+                          pageOrientation:
+                            e.target.value as QuotationData["pageOrientation"],
+                        })
+                      }
+                      className="h-10 rounded-lg border border-input/90 bg-background px-3 text-sm"
+                    >
+                      <option value="landscape">Landscape</option>
+                      <option value="portrait">Portrait</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid gap-3 rounded-lg border border-border/70 bg-background/70 p-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Text alignment
+                </p>
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <div className="grid gap-2">
+                    <Label htmlFor="qg-align-cover">Cover</Label>
+                    <select
+                      id="qg-align-cover"
+                      value={data.coverTextAlign}
+                      onChange={(e) =>
+                        patch({ coverTextAlign: e.target.value as QuotationData["coverTextAlign"] })
+                      }
+                      className="h-10 rounded-lg border border-input/90 bg-background px-3 text-sm"
+                    >
+                      <option value="left">Left</option>
+                      <option value="center">Center</option>
+                      <option value="right">Right</option>
+                    </select>
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="qg-align-page2">Page 2 title/intro</Label>
+                    <select
+                      id="qg-align-page2"
+                      value={data.page2TextAlign}
+                      onChange={(e) =>
+                        patch({ page2TextAlign: e.target.value as QuotationData["page2TextAlign"] })
+                      }
+                      className="h-10 rounded-lg border border-input/90 bg-background px-3 text-sm"
+                    >
+                      <option value="left">Left</option>
+                      <option value="center">Center</option>
+                      <option value="right">Right</option>
+                    </select>
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="qg-align-contact">Contact block</Label>
+                    <select
+                      id="qg-align-contact"
+                      value={data.contactTextAlign}
+                      onChange={(e) =>
+                        patch({
+                          contactTextAlign: e.target.value as QuotationData["contactTextAlign"],
+                        })
+                      }
+                      className="h-10 rounded-lg border border-input/90 bg-background px-3 text-sm"
+                    >
+                      <option value="left">Left</option>
+                      <option value="center">Center</option>
+                      <option value="right">Right</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid gap-3 rounded-lg border border-border/70 bg-background/70 p-3">
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={data.useDecorShapes}
+                    onChange={(e) => patch({ useDecorShapes: e.target.checked })}
+                    className="size-4 rounded border-input"
+                  />
+                  Show left ribbon design
+                </label>
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={data.useGradientBackground}
+                    onChange={(e) => patch({ useGradientBackground: e.target.checked })}
+                    className="size-4 rounded border-input"
+                    disabled={Boolean(data.backgroundImage)}
+                  />
+                  Use gradient background (disable for flat color)
+                </label>
+                <div className="grid gap-2">
+                  <Label htmlFor="qg-bg-image">Custom background image</Label>
+                  <Input
+                    id="qg-bg-image"
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp,image/*"
+                    onChange={onBackgroundChange}
+                    className="cursor-pointer file:mr-3 file:rounded-md file:border-0 file:bg-primary file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-primary-foreground hover:file:bg-primary/90"
+                  />
+                  {data.backgroundImage ? (
+                    <div className="flex flex-wrap items-center gap-3 pt-1">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={data.backgroundImage}
+                        alt="Background preview"
+                        className="h-16 w-auto max-w-60 rounded-lg border border-border bg-background object-cover p-1"
+                      />
+                      <Button type="button" variant="outline" size="sm" onClick={clearBackground}>
+                        Remove background
+                      </Button>
+                    </div>
+                  ) : null}
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="grid gap-2">
+                    <Label htmlFor="qg-bg">Background</Label>
+                    <Input
+                      id="qg-bg"
+                      type="color"
+                      value={data.bgColor}
+                      onChange={(e) => patch({ bgColor: e.target.value })}
+                      className="h-10 cursor-pointer p-1"
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="qg-accent">Accent</Label>
+                    <Input
+                      id="qg-accent"
+                      type="color"
+                      value={data.accentColor}
+                      onChange={(e) => patch({ accentColor: e.target.value })}
+                      className="h-10 cursor-pointer p-1"
+                    />
+                  </div>
+                </div>
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={data.tableUseAccentPreset}
+                    onChange={(e) => patch({ tableUseAccentPreset: e.target.checked })}
+                    className="size-4 rounded border-input"
+                  />
+                  Table style follows accent color preset
+                </label>
+                {!data.tableUseAccentPreset ? (
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                    <div className="grid gap-2">
+                      <Label htmlFor="qg-table-head">Table header</Label>
+                      <Input
+                        id="qg-table-head"
+                        type="color"
+                        value={data.tableHeaderBg}
+                        onChange={(e) => patch({ tableHeaderBg: e.target.value })}
+                        className="h-10 cursor-pointer p-1"
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="qg-table-body">Table body</Label>
+                      <Input
+                        id="qg-table-body"
+                        type="color"
+                        value={data.tableBodyBg}
+                        onChange={(e) => patch({ tableBodyBg: e.target.value })}
+                        className="h-10 cursor-pointer p-1"
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="qg-table-border">Table border</Label>
+                      <Input
+                        id="qg-table-border"
+                        type="color"
+                        value={data.tableBorderColor}
+                        onChange={(e) => patch({ tableBorderColor: e.target.value })}
+                        className="h-10 cursor-pointer p-1"
+                      />
+                    </div>
+                  </div>
+                ) : null}
+              </div>
             </div>
-            <div className="grid gap-2">
-              <Label htmlFor="qg-accent">Accent</Label>
-              <Input
-                id="qg-accent"
-                type="color"
-                value={data.accentColor}
-                onChange={(e) => patch({ accentColor: e.target.value })}
-                className="h-10 cursor-pointer p-1"
-              />
-            </div>
-          </div>
+          </details>
         </fieldset>
 
         <div className="sticky bottom-0 z-10 -mx-1 flex flex-wrap items-center gap-2 border-t border-border/80 bg-card/95 px-1 pb-1 pt-3 backdrop-blur supports-backdrop-filter:bg-card/80">
+          {onCancelEdit ? (
+            <Button type="button" variant="ghost" onClick={onCancelEdit}>
+              Cancel
+            </Button>
+          ) : null}
           <Button type="button" variant="outline" onClick={onReset}>
             Reset form
           </Button>

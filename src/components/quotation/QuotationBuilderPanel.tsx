@@ -18,51 +18,112 @@ import {
 } from "@/types/quotation-generator";
 import { exportQuotationPdf } from "@/utils/exportPdf";
 
+type PrimaryCompanySettings = {
+  name?: string;
+  address?: string;
+  contactName?: string;
+  email?: string;
+  logoText?: string;
+};
+
 function pdfSafeName(ref: string) {
   const base = ref.trim() || "draft";
   return base.replace(/[^\w\-]+/g, "_").slice(0, 80) || "draft";
 }
 
+function applyPrimaryCompanyDefaults(
+  current: QuotationData,
+  company: PrimaryCompanySettings | null
+): QuotationData {
+  if (!company) return current;
+  return {
+    ...current,
+    companyName: current.companyName.trim() ? current.companyName : String(company.name ?? ""),
+    companyAddress: current.companyAddress.trim()
+      ? current.companyAddress
+      : String(company.address ?? ""),
+    contactName: current.contactName.trim()
+      ? current.contactName
+      : String(company.contactName ?? ""),
+    contactEmail: current.contactEmail.trim() ? current.contactEmail : String(company.email ?? ""),
+    logo:
+      typeof current.logo === "string" && current.logo.trim()
+        ? current.logo
+        : String(company.logoText ?? "") || undefined,
+  };
+}
+
 export type QuotationBuilderPanelProps = {
   /** Full page: show header + back link. Embedded: section title only (e.g. admin quotations). */
   variant?: "standalone" | "embedded";
-  /** Pre-select project for database save (e.g. from Admin quotations ?projectId=). */
+  /** Prefer this project when saving (e.g. from Admin ?projectId=). Server falls back to first project if empty. */
   initialSaveProjectId?: string;
+  /** When set, Save updates this record (same quotation, no duplicate). */
+  editingQuotationId?: string | null;
+  /** Seed form when opening the builder (e.g. Load from admin table). Prefer remounting parent `key` when this changes. */
+  initialSnapshot?: QuotationData | null;
+  onDbSaveSuccess?: (info: {
+    quotationId: string;
+    quotationNumber: string;
+    created: boolean;
+  }) => void;
+  /** Embedded: closes the builder / clears edit mode. */
+  onCancelEdit?: () => void;
 };
-
-type ProjectOption = { _id: string; name: string };
 
 export function QuotationBuilderPanel({
   variant = "standalone",
   initialSaveProjectId = "",
+  editingQuotationId = null,
+  initialSnapshot = null,
+  onDbSaveSuccess,
+  onCancelEdit,
 }: QuotationBuilderPanelProps) {
-  const [data, setData] = useState<QuotationData>(() => defaultQuotationData());
+  const [data, setData] = useState<QuotationData>(() =>
+    initialSnapshot ? normalizeQuotationData(initialSnapshot) : defaultQuotationData()
+  );
   const [storageReady, setStorageReady] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [saveNotice, setSaveNotice] = useState<string | null>(null);
-  const [projects, setProjects] = useState<ProjectOption[]>([]);
-  const [saveProjectId, setSaveProjectId] = useState("");
-  const [dbListOk, setDbListOk] = useState<boolean | null>(null);
   const [pdfError, setPdfError] = useState<string | null>(null);
+  const [primaryDefaults, setPrimaryDefaults] = useState<PrimaryCompanySettings | null>(null);
   const saveNoticeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** After a DB save we clear localStorage; skip the next persist so the draft is not immediately re-written. */
+  const skipNextLocalPersistRef = useRef(false);
+  const lastLocalSerializedRef = useRef<string | null>(null);
   const previewRef = useRef<HTMLDivElement>(null);
   /** Full-scale capture root — must not sit under CSS `transform: scale(...)`. */
   const exportCaptureRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     try {
-      const raw = localStorage.getItem(QUOTATION_STORAGE_KEY);
-      if (raw) setData(normalizeQuotationData(JSON.parse(raw)));
+      if (initialSnapshot) {
+        setData(normalizeQuotationData(initialSnapshot));
+      } else {
+        const raw = localStorage.getItem(QUOTATION_STORAGE_KEY);
+        if (raw) setData(normalizeQuotationData(JSON.parse(raw)));
+        else setData(defaultQuotationData());
+      }
     } catch {
-      /* ignore corrupt storage */
+      setData(
+        initialSnapshot ? normalizeQuotationData(initialSnapshot) : defaultQuotationData()
+      );
     }
     setStorageReady(true);
-  }, []);
+  }, [initialSnapshot]);
 
   useEffect(() => {
     if (!storageReady) return;
+    const serialized = JSON.stringify(data);
+    if (skipNextLocalPersistRef.current) {
+      skipNextLocalPersistRef.current = false;
+      lastLocalSerializedRef.current = serialized;
+      return;
+    }
+    if (lastLocalSerializedRef.current === serialized) return;
+    lastLocalSerializedRef.current = serialized;
     try {
-      localStorage.setItem(QUOTATION_STORAGE_KEY, JSON.stringify(data));
+      localStorage.setItem(QUOTATION_STORAGE_KEY, serialized);
     } catch {
       /* quota or private mode */
     }
@@ -73,46 +134,6 @@ export function QuotationBuilderPanel({
       if (saveNoticeTimerRef.current) clearTimeout(saveNoticeTimerRef.current);
     };
   }, []);
-
-  useEffect(() => {
-    let alive = true;
-    (async () => {
-      try {
-        const res = await fetch("/api/admin/projects?page=1&limit=300&q=", {
-          credentials: "include",
-          cache: "no-store",
-        });
-        if (!alive) return;
-        if (!res.ok) {
-          setDbListOk(false);
-          setProjects([]);
-          return;
-        }
-        const payload = (await res.json()) as {
-          items?: Array<{ _id?: string; name?: string }>;
-        };
-        const list = (payload.items ?? []).map((p) => ({
-          _id: String(p._id ?? ""),
-          name: String(p.name ?? "Project"),
-        }));
-        setProjects(list.filter((p) => p._id));
-        setDbListOk(true);
-      } catch {
-        if (alive) {
-          setDbListOk(false);
-          setProjects([]);
-        }
-      }
-    })();
-    return () => {
-      alive = false;
-    };
-  }, []);
-
-  useEffect(() => {
-    const id = initialSaveProjectId.trim();
-    if (id) setSaveProjectId(id);
-  }, [initialSaveProjectId]);
 
   useEffect(() => {
     const onLoadDraft = (e: Event) => {
@@ -130,7 +151,6 @@ export function QuotationBuilderPanel({
         /* ignore */
       }
       setSaveNotice("Loaded saved quotation.");
-      if (saveNoticeTimerRef.current) clearTimeout(saveNoticeTimerRef.current);
       saveNoticeTimerRef.current = setTimeout(() => {
         setSaveNotice(null);
         saveNoticeTimerRef.current = null;
@@ -140,6 +160,30 @@ export function QuotationBuilderPanel({
     return () =>
       window.removeEventListener(QUOTATION_PDF_LOAD_DRAFT, onLoadDraft as EventListener);
   }, []);
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const res = await fetch("/api/admin/company", {
+          credentials: "include",
+          cache: "no-store",
+        });
+        if (!res.ok) return;
+        const payload = (await res.json()) as { item?: PrimaryCompanySettings };
+        const next = payload.item ?? null;
+        if (!alive || !next) return;
+        setPrimaryDefaults(next);
+        if (initialSnapshot || editingQuotationId) return;
+        setData((prev) => applyPrimaryCompanyDefaults(prev, next));
+      } catch {
+        /* optional defaults only */
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [editingQuotationId, initialSnapshot]);
 
   const handleSaveQuotation = useCallback(async () => {
     if (saveNoticeTimerRef.current) {
@@ -156,57 +200,97 @@ export function QuotationBuilderPanel({
       }, 4000);
       return;
     }
-    let localMsg = "Saved in this browser.";
-    try {
-      appendSavedPdfQuotation(data);
-      window.dispatchEvent(new Event(QUOTATION_PDF_SAVES_CHANGED));
-    } catch {
-      localMsg =
-        "Draft updated. Saved list full — remove an old entry or use a smaller logo.";
-    }
 
-    let dbPart = "";
-    if (dbListOk && saveProjectId.trim()) {
+    const isEmbedded = variant === "embedded";
+    let localMsg = "Draft kept in this browser until it is saved to the database.";
+
+    if (!isEmbedded) {
       try {
-        const res = await fetch("/api/admin/quotations/from-builder", {
-          method: "POST",
-          credentials: "include",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            projectId: saveProjectId.trim(),
-            data,
-            status: "sent",
-          }),
-        });
-        const raw = await res.text();
-        const json = raw ? (JSON.parse(raw) as { message?: string; item?: { quotationNumber?: string } }) : {};
-        if (!res.ok) throw new Error(json.message ?? "Database save failed");
-        const qn = json.item?.quotationNumber ?? "";
-        dbPart = qn ? ` Also in database: ${qn} (use on Purchase orders).` : " Also saved to database.";
-      } catch (e) {
-        dbPart = ` Database: ${e instanceof Error ? e.message : "failed"}.`;
+        appendSavedPdfQuotation(data);
+        window.dispatchEvent(new Event(QUOTATION_PDF_SAVES_CHANGED));
+        localMsg = "Draft saved in this browser.";
+      } catch {
+        localMsg =
+          "Draft updated. Saved list full — remove an old entry or use a smaller logo.";
       }
-    } else if (dbListOk && projects.length > 0) {
-      dbPart = " Choose a project above to copy this quotation into the database for POs.";
-    } else if (dbListOk === false) {
-      dbPart = " Sign in as admin to save the same quotation to the database for POs.";
     }
 
-    setSaveNotice(localMsg + dbPart);
+    try {
+      const res = await fetch("/api/admin/quotations/from-builder", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          projectId: initialSaveProjectId.trim() || undefined,
+          quotationId: editingQuotationId?.trim() || undefined,
+          data,
+          status: "sent",
+        }),
+      });
+      const rawText = await res.text();
+      const json = rawText
+        ? (JSON.parse(rawText) as {
+            message?: string;
+            item?: { _id?: string; quotationNumber?: string };
+          })
+        : {};
+      if (!res.ok) {
+        if (res.status === 401 || res.status === 403) {
+          setSaveNotice(
+            `${localMsg} Sign in as admin to save this quotation to the database.`
+          );
+        } else {
+          setSaveNotice(`${localMsg} Database: ${json.message ?? "save failed"}.`);
+        }
+        saveNoticeTimerRef.current = setTimeout(() => {
+          setSaveNotice(null);
+          saveNoticeTimerRef.current = null;
+        }, 5600);
+        return;
+      }
+
+      try {
+        localStorage.removeItem(QUOTATION_STORAGE_KEY);
+      } catch {
+        /* ignore */
+      }
+      skipNextLocalPersistRef.current = true;
+
+      const qid = String(json.item?._id ?? "");
+      const qn = String(json.item?.quotationNumber ?? "");
+      const created = res.status === 201;
+      onDbSaveSuccess?.({
+        quotationId: qid,
+        quotationNumber: qn,
+        created,
+      });
+
+      setSaveNotice(
+        qn
+          ? `Saved to database as ${qn}. Local draft cleared.`
+          : "Saved to database. Local draft cleared."
+      );
+    } catch (e) {
+      setSaveNotice(
+        `${localMsg} Database: ${e instanceof Error ? e.message : "request failed"}.`
+      );
+    }
+
     saveNoticeTimerRef.current = setTimeout(() => {
       setSaveNotice(null);
       saveNoticeTimerRef.current = null;
     }, 5200);
-  }, [data, dbListOk, projects.length, saveProjectId]);
+  }, [data, editingQuotationId, initialSaveProjectId, onDbSaveSuccess, variant]);
 
   const handleReset = useCallback(() => {
-    setData(defaultQuotationData());
+    const base = defaultQuotationData();
+    setData(applyPrimaryCompanyDefaults(base, primaryDefaults));
     try {
       localStorage.removeItem(QUOTATION_STORAGE_KEY);
     } catch {
       /* ignore */
     }
-  }, []);
+  }, [primaryDefaults]);
 
   const handleDownloadPdf = useCallback(async () => {
     const root = exportCaptureRef.current ?? previewRef.current;
@@ -217,14 +301,17 @@ export function QuotationBuilderPanel({
     setPdfError(null);
     setExporting(true);
     try {
-      await exportQuotationPdf(root, `quotation_${pdfSafeName(data.refNo)}.pdf`);
+      await exportQuotationPdf(root, `quotation_${pdfSafeName(data.refNo)}.pdf`, {
+        format: data.pageFormat,
+        orientation: data.pageOrientation,
+      });
     } catch (e) {
       console.error(e);
       setPdfError(e instanceof Error ? e.message : "Could not create PDF.");
     } finally {
       setExporting(false);
     }
-  }, [data.refNo]);
+  }, [data.pageFormat, data.pageOrientation, data.refNo]);
 
   if (!storageReady) {
     return (
@@ -235,6 +322,8 @@ export function QuotationBuilderPanel({
   }
 
   const isStandalone = variant === "standalone";
+  const isEditMode = Boolean(editingQuotationId);
+  const formTitle = isEditMode ? "Edit quotation" : "New quotation";
 
   return (
     <div className={isStandalone ? "min-h-dvh bg-muted/25" : ""}>
@@ -246,7 +335,7 @@ export function QuotationBuilderPanel({
                 Quotation generator
               </h1>
               <p className="text-muted-foreground text-sm">
-                Form above · three A4 landscape pages (1123×794 px) · one PDF
+                Form above · three pages · PDF format/orientation configurable
               </p>
             </div>
             <Link
@@ -259,7 +348,7 @@ export function QuotationBuilderPanel({
         </header>
       ) : (
         <div className="mb-6 border-b border-border/60 pb-4">
-          <h2 className="text-lg font-semibold tracking-tight">New quotation</h2>
+          <h2 className="text-lg font-semibold tracking-tight">{formTitle}</h2>
         </div>
       )}
 
@@ -273,43 +362,6 @@ export function QuotationBuilderPanel({
         <div className="flex flex-col gap-10">
           {isStandalone ? <QuotationPdfSavedListCard alwaysShow /> : null}
 
-          <div className="rounded-xl border border-border/70 bg-card/80 px-4 py-3 shadow-sm">
-            <p className="text-foreground mb-2 text-sm font-medium">Database (for Purchase orders)</p>
-            {dbListOk === false ? (
-              <p className="text-muted-foreground text-sm">
-                Sign in as an <strong className="text-foreground">admin</strong> to list projects. Local PDF saves
-                stay on this device only.
-              </p>
-            ) : projects.length === 0 ? (
-              <p className="text-muted-foreground text-sm">
-                No projects yet. Create one under Admin → Projects, then choose it here before Save quotation.
-              </p>
-            ) : (
-              <>
-                <label htmlFor="qg-save-project" className="sr-only">
-                  Project for database save
-                </label>
-                <select
-                  id="qg-save-project"
-                  value={saveProjectId}
-                  onChange={(e) => setSaveProjectId(e.target.value)}
-                  className="h-10 w-full max-w-md rounded-lg border border-input/90 bg-background px-3 text-sm"
-                >
-                  <option value="">Save locally only (no database)</option>
-                  {projects.map((p) => (
-                    <option key={p._id} value={p._id}>
-                      {p.name}
-                    </option>
-                  ))}
-                </select>
-                <p className="text-muted-foreground mt-2 text-xs">
-                  With a project selected, Save quotation also writes to the database (PO page quotation dropdown).
-                </p>
-              </>
-            )}
-          </div>
-
-          {/* Off-screen 1:1 pages for PDF — avoids html2canvas bugs with scaled preview */}
           <div
             ref={exportCaptureRef}
             aria-hidden
@@ -327,15 +379,17 @@ export function QuotationBuilderPanel({
             exporting={exporting}
             saveNotice={saveNotice}
             pdfError={pdfError}
+            formTitle={formTitle}
+            onCancelEdit={onCancelEdit}
           />
 
           <div className="flex w-full flex-col items-stretch rounded-xl border border-border/50 bg-muted/15 p-4 sm:p-5 dark:bg-muted/10">
             <p className="text-muted-foreground mb-3 text-center text-[11px] font-semibold uppercase tracking-wider">
-              Live preview — 3× landscape A4
+              Live preview — 3 pages ({data.pageFormat.toUpperCase()} {data.pageOrientation})
             </p>
-            <div className="min-h-[min(88vh,900px)] w-full overflow-auto overscroll-contain [-webkit-overflow-scrolling:touch]">
+            <div className="min-h-[min(88vh,900px)] w-full overflow-auto [-webkit-overflow-scrolling:touch]">
               <div className="mx-auto flex w-max max-w-full flex-col items-center pb-10 pt-2">
-                <div className="origin-top scale-[0.45] min-[640px]:scale-[0.58] min-[900px]:scale-[0.72] min-[1200px]:scale-[0.88] xl:scale-[0.95] 2xl:scale-100">
+                <div className="pointer-events-none origin-top scale-[0.54] min-[640px]:scale-[0.66] min-[900px]:scale-[0.78] min-[1200px]:scale-[0.9] xl:scale-[0.97] 2xl:scale-100">
                   <QuotationPreview ref={previewRef} data={data} />
                 </div>
               </div>

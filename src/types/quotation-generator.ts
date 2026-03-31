@@ -25,8 +25,20 @@ export type QuotationData = {
   contactPhone: string;
   contactEmail: string;
   logo?: string;
+  backgroundImage?: string;
   bgColor: string;
   accentColor: string;
+  useDecorShapes: boolean;
+  useGradientBackground: boolean;
+  tableUseAccentPreset: boolean;
+  tableHeaderBg: string;
+  tableBodyBg: string;
+  tableBorderColor: string;
+  coverTextAlign: "left" | "center" | "right";
+  page2TextAlign: "left" | "center" | "right";
+  contactTextAlign: "left" | "center" | "right";
+  pageFormat: "a4" | "letter";
+  pageOrientation: "portrait" | "landscape";
 };
 
 export const defaultQuotationData = (): QuotationData => ({
@@ -47,8 +59,20 @@ export const defaultQuotationData = (): QuotationData => ({
   contactPhone: "",
   contactEmail: "",
   logo: undefined,
+  backgroundImage: undefined,
   bgColor: "#E6E7E8",
   accentColor: "#00AEEF",
+  useDecorShapes: false,
+  useGradientBackground: false,
+  tableUseAccentPreset: true,
+  tableHeaderBg: "#E6F2FF",
+  tableBodyBg: "#f4f9fd",
+  tableBorderColor: "#cfe8fc",
+  coverTextAlign: "center",
+  page2TextAlign: "center",
+  contactTextAlign: "left",
+  pageFormat: "a4",
+  pageOrientation: "landscape",
 });
 
 export const QUOTATION_STORAGE_KEY = "quotation-generator-draft";
@@ -92,8 +116,41 @@ export function normalizeQuotationData(raw: unknown): QuotationData {
     contactPhone: String(o.contactPhone ?? base.contactPhone),
     contactEmail: String(o.contactEmail ?? base.contactEmail),
     logo: typeof o.logo === "string" ? o.logo : base.logo,
+    backgroundImage: typeof o.backgroundImage === "string" ? o.backgroundImage : base.backgroundImage,
     bgColor: String(o.bgColor ?? base.bgColor),
     accentColor: String(o.accentColor ?? base.accentColor),
+    useDecorShapes:
+      typeof o.useDecorShapes === "boolean" ? o.useDecorShapes : base.useDecorShapes,
+    useGradientBackground:
+      typeof o.useGradientBackground === "boolean"
+        ? o.useGradientBackground
+        : base.useGradientBackground,
+    tableUseAccentPreset:
+      typeof o.tableUseAccentPreset === "boolean"
+        ? o.tableUseAccentPreset
+        : base.tableUseAccentPreset,
+    tableHeaderBg: defaultIfBlank(o.tableHeaderBg, base.tableHeaderBg),
+    tableBodyBg: defaultIfBlank(o.tableBodyBg, base.tableBodyBg),
+    tableBorderColor: defaultIfBlank(o.tableBorderColor, base.tableBorderColor),
+    coverTextAlign:
+      o.coverTextAlign === "left" || o.coverTextAlign === "right" || o.coverTextAlign === "center"
+        ? o.coverTextAlign
+        : base.coverTextAlign,
+    page2TextAlign:
+      o.page2TextAlign === "left" || o.page2TextAlign === "right" || o.page2TextAlign === "center"
+        ? o.page2TextAlign
+        : base.page2TextAlign,
+    contactTextAlign:
+      o.contactTextAlign === "left" ||
+      o.contactTextAlign === "right" ||
+      o.contactTextAlign === "center"
+        ? o.contactTextAlign
+        : base.contactTextAlign,
+    pageFormat: o.pageFormat === "letter" ? "letter" : base.pageFormat,
+    pageOrientation:
+      o.pageOrientation === "portrait" || o.pageOrientation === "landscape"
+        ? o.pageOrientation
+        : base.pageOrientation,
     items,
   };
 }

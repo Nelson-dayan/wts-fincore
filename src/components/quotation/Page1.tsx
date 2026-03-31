@@ -16,6 +16,7 @@ export function Page1({ data }: Page1Props) {
     companyAddress,
     date,
     accentColor,
+    coverTextAlign,
   } = data;
   const title = page1Title.trim();
   const client = clientName.trim();
@@ -28,13 +29,20 @@ export function Page1({ data }: Page1Props) {
   const showBody = Boolean(ref || name || addr);
   const showDate = Boolean(dateStr);
 
+  const textAlignClass =
+    coverTextAlign === "left"
+      ? "text-left"
+      : coverTextAlign === "right"
+        ? "text-right"
+        : "text-center";
+
   return (
     <QuotationPageFrame data={data} page={1}>
       <div className="flex h-full min-h-0 flex-col">
         <div className="flex min-h-0 flex-1 flex-col justify-center gap-6">
           {showHero ? (
             <h1
-              className="px-2 text-center text-[19px] font-normal leading-snug tracking-tight md:text-[21px]"
+              className={`px-2 text-[19px] font-normal leading-snug tracking-tight md:text-[21px] ${textAlignClass}`}
               style={{ color: QUOTATION_PDF_COLORS.slate900 }}
             >
               {title ? (
@@ -60,7 +68,7 @@ export function Page1({ data }: Page1Props) {
 
           {showBody ? (
             <div
-              className="mx-auto w-full max-w-2xl space-y-3 pl-[4%] text-left text-[14px] leading-relaxed md:text-[15px]"
+              className={`mx-auto w-full max-w-2xl space-y-3 pl-[4%] text-[14px] leading-relaxed md:text-[15px] ${textAlignClass}`}
               style={{ color: QUOTATION_PDF_COLORS.slate800 }}
             >
               {ref ? (
