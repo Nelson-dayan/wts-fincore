@@ -34,12 +34,32 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const themeInitScript = `(() => {
+  try {
+    const key = "theme";
+    const saved = localStorage.getItem(key);
+    const systemDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+    const resolved = saved === "light" || saved === "dark"
+      ? saved
+      : (saved === "system" || saved === null)
+        ? (systemDark ? "dark" : "light")
+        : "light";
+    const root = document.documentElement;
+    root.classList.remove("light", "dark");
+    root.classList.add(resolved);
+    root.style.colorScheme = resolved;
+  } catch {}
+})();`;
+
   return (
     <html
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
       suppressHydrationWarning
     >
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
+      </head>
       <body className="min-h-dvh flex flex-col bg-background text-foreground antialiased [font-feature-settings:'cv02','cv03','cv04','cv11']">
         <ThemeProvider
           attribute="class"
