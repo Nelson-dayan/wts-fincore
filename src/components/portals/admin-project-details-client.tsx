@@ -108,10 +108,20 @@ export function AdminProjectDetailsClient({ projectId }: { projectId: string }) 
   });
 
   async function load() {
-    const response = await fetch(`/api/admin/projects/${projectId}/details`, {
+    const response = await fetch(`/api/admin/projects/${encodeURIComponent(projectId)}`, {
       cache: "no-store",
     });
-    const payload = (await response.json()) as ProjectDetailsPayload;
+    const raw = await response.text();
+    let payload: ProjectDetailsPayload;
+    try {
+      payload = JSON.parse(raw) as ProjectDetailsPayload;
+    } catch {
+      throw new Error(
+        response.ok
+          ? "Invalid response from server"
+          : `Failed to load details (HTTP ${response.status})`
+      );
+    }
     if (!response.ok) throw new Error(payload.message ?? "Failed to load details");
     setData(payload);
     if (payload.project) {
