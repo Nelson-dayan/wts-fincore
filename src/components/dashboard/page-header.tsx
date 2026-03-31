@@ -8,9 +8,8 @@ export function DashboardPageHeader({
   description?: ReactNode;
 }) {
   return (
-    <header className="mb-8 border-b border-border/40 pb-6 md:mb-10 md:pb-8">
-      <div className="mb-3 h-px w-12 rounded-full bg-gradient-to-r from-primary to-primary/30" />
-      <h1 className="text-2xl font-semibold tracking-tight text-foreground md:text-[1.75rem] md:leading-tight">
+    <header className="mb-8 md:mb-10">
+      <h1 className="text-2xl font-semibold tracking-tight text-foreground md:text-3xl">
         {title}
       </h1>
       {description != null && description !== "" ? (

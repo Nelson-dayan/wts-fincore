@@ -4,19 +4,20 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils/cn";
 
 const buttonVariants = cva(
-  "inline-flex cursor-pointer items-center justify-center gap-2 whitespace-nowrap rounded-lg text-sm font-medium tracking-tight transition-[color,box-shadow,transform,background-color,border-color] duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/80 focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-50 active:scale-[0.98] [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-lg text-sm font-medium transition-all duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-50 active:scale-[0.98] [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
   {
     variants: {
       variant: {
         default:
-          "bg-primary text-primary-foreground shadow-[0_1px_1px_hsl(0_0%_0%/0.06),var(--shadow-premium)] hover:bg-primary/92 hover:shadow-md",
+          "bg-primary text-primary-foreground shadow-md hover:bg-primary/92 hover:shadow-lg hover:shadow-primary/25",
         destructive:
-          "bg-destructive text-destructive-foreground shadow-sm hover:bg-destructive/[0.92]",
+          "bg-destructive text-destructive-foreground shadow-sm hover:bg-destructive/90",
         outline:
-          "border border-input/90 bg-background/90 shadow-sm hover:border-border hover:bg-accent/60 hover:text-accent-foreground",
+          "border border-input bg-background/80 shadow-sm backdrop-blur-sm hover:bg-accent hover:text-accent-foreground hover:border-border",
         secondary:
-          "bg-secondary text-secondary-foreground shadow-sm hover:bg-secondary/88",
-        ghost: "text-foreground/90 hover:bg-accent/70 hover:text-accent-foreground",
+          "bg-secondary text-secondary-foreground shadow-sm hover:bg-secondary/85",
+        ghost:
+          "hover:bg-accent/80 hover:text-accent-foreground text-foreground/90",
         link: "text-primary underline-offset-4 hover:underline active:scale-100",
       },
       size: {

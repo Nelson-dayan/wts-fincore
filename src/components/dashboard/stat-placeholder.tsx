@@ -24,7 +24,7 @@ export function StatPlaceholder({
       </div>
       <div>
         <h3 className="font-semibold tracking-tight text-foreground">{title}</h3>
-        <p className="mt-1.5 text-[0.8125rem] leading-relaxed text-muted-foreground">
+        <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
           {description}
         </p>
       </div>
