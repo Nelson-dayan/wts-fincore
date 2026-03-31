@@ -17,7 +17,11 @@ async function capturePage(el: HTMLElement, opts: Html2CanvasOpts) {
  */
 export async function exportQuotationPdf(
   root: HTMLElement,
-  fileName = "quotation.pdf"
+  fileName = "quotation.pdf",
+  pageSetup?: {
+    format?: "a4" | "letter";
+    orientation?: "portrait" | "landscape";
+  }
 ): Promise<void> {
   const nodes = Array.from(
     root.querySelectorAll<HTMLElement>("[data-quotation-page]")
@@ -27,9 +31,9 @@ export async function exportQuotationPdf(
   }
 
   const pdf = new jsPDF({
-    orientation: "landscape",
+    orientation: pageSetup?.orientation ?? "landscape",
     unit: "mm",
-    format: "a4",
+    format: pageSetup?.format ?? "a4",
     compress: true,
   });
 

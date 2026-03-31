@@ -2,9 +2,15 @@ import { QUOTATION_PDF_COLORS } from "@/lib/quotation/quotation-pdf-colors";
 import type { QuotationData } from "@/types/quotation-generator";
 import { QuotationPageFrame } from "./QuotationPageFrame";
 
-const TABLE_HEAD_BG = "#E6F2FF";
-const TABLE_BODY_BG = "#f4f9fd";
-const TABLE_BORDER = "#cfe8fc";
+function withAlpha(hex: string, alpha: number) {
+  const v = hex.trim();
+  if (!/^#([0-9a-fA-F]{6})$/.test(v)) return v;
+  const n = v.slice(1);
+  const r = parseInt(n.slice(0, 2), 16);
+  const g = parseInt(n.slice(2, 4), 16);
+  const b = parseInt(n.slice(4, 6), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
 
 type Page2Props = {
   data: QuotationData;
@@ -19,6 +25,12 @@ export function Page2({ data }: Page2Props) {
     paymentMilestone,
     tableHeaderDetail,
     tableHeaderCost,
+    accentColor,
+    tableUseAccentPreset,
+    tableHeaderBg,
+    tableBodyBg,
+    tableBorderColor,
+    page2TextAlign,
   } = data;
   const rows = items.length > 0 ? items : [{ detail: "", cost: "" }];
   const hDetail = tableHeaderDetail.trim();
@@ -35,19 +47,29 @@ export function Page2({ data }: Page2Props) {
     .map((l) => l.trim())
     .filter(Boolean);
 
+  const headerBg = tableUseAccentPreset ? withAlpha(accentColor, 0.16) : tableHeaderBg;
+  const bodyBg = tableUseAccentPreset ? withAlpha(accentColor, 0.06) : tableBodyBg;
+  const borderColor = tableUseAccentPreset ? withAlpha(accentColor, 0.32) : tableBorderColor;
+  const headingAlignClass =
+    page2TextAlign === "left"
+      ? "text-left"
+      : page2TextAlign === "right"
+        ? "text-right"
+        : "text-center";
+
   return (
     <QuotationPageFrame data={data} page={2}>
       <div className="flex h-full min-h-0 flex-col justify-center gap-5 pt-1">
         {customTitle ? (
           <h2
-            className="text-center text-[17px] font-normal leading-snug md:text-[19px]"
+            className={`text-[17px] font-normal leading-snug md:text-[19px] ${headingAlignClass}`}
             style={{ color: QUOTATION_PDF_COLORS.slate900 }}
           >
             {customTitle}
           </h2>
         ) : showComposedTitle ? (
           <h2
-            className="text-center text-[17px] font-normal leading-snug md:text-[19px]"
+            className={`text-[17px] font-normal leading-snug md:text-[19px] ${headingAlignClass}`}
             style={{ color: QUOTATION_PDF_COLORS.slate900 }}
           >
             {p1}
@@ -58,7 +80,7 @@ export function Page2({ data }: Page2Props) {
 
         {description.trim() ? (
           <p
-            className="px-2 text-center text-[14px] leading-relaxed md:text-[15px]"
+            className={`px-2 text-[14px] leading-relaxed md:text-[15px] ${headingAlignClass}`}
             style={{ color: QUOTATION_PDF_COLORS.slate800 }}
           >
             {description.trim()}
@@ -69,24 +91,24 @@ export function Page2({ data }: Page2Props) {
           <div
             className="overflow-hidden rounded-lg border"
             style={{
-              borderColor: TABLE_BORDER,
-              backgroundColor: TABLE_BODY_BG,
+              borderColor,
+              backgroundColor: bodyBg,
               boxShadow: QUOTATION_PDF_COLORS.shadowSm,
             }}
           >
             <table className="w-full border-collapse text-center text-[13px] md:text-[14px]">
               {showThead ? (
                 <thead>
-                  <tr style={{ backgroundColor: TABLE_HEAD_BG }}>
+                  <tr style={{ backgroundColor: headerBg }}>
                     <th
                       className="border px-3 py-2.5 font-bold"
-                      style={{ borderColor: TABLE_BORDER, color: QUOTATION_PDF_COLORS.slate900 }}
+                      style={{ borderColor, color: QUOTATION_PDF_COLORS.slate900 }}
                     >
                       {hDetail}
                     </th>
                     <th
                       className="border px-3 py-2.5 font-bold"
-                      style={{ borderColor: TABLE_BORDER, color: QUOTATION_PDF_COLORS.slate900 }}
+                      style={{ borderColor, color: QUOTATION_PDF_COLORS.slate900 }}
                     >
                       {hCost}
                     </th>
@@ -95,16 +117,16 @@ export function Page2({ data }: Page2Props) {
               ) : null}
               <tbody>
                 {rows.map((row, i) => (
-                  <tr key={i} style={{ backgroundColor: TABLE_BODY_BG }}>
+                  <tr key={i} style={{ backgroundColor: bodyBg }}>
                     <td
                       className="border px-3 py-2.5 align-top"
-                      style={{ borderColor: TABLE_BORDER, color: QUOTATION_PDF_COLORS.slate800 }}
+                      style={{ borderColor, color: QUOTATION_PDF_COLORS.slate800 }}
                     >
                       {row.detail.trim()}
                     </td>
                     <td
                       className="border px-3 py-2.5 align-top tabular-nums"
-                      style={{ borderColor: TABLE_BORDER, color: QUOTATION_PDF_COLORS.slate900 }}
+                      style={{ borderColor, color: QUOTATION_PDF_COLORS.slate900 }}
                     >
                       {row.cost.trim() ? <em>{row.cost.trim()}</em> : null}
                     </td>

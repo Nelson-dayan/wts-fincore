@@ -1,9 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { FolderOpen, Trash2 } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Download, FolderOpen, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { QuotationPreview } from "@/components/quotation/QuotationPreview";
 import {
   QUOTATION_PDF_LOAD_DRAFT,
   QUOTATION_PDF_SAVES_CHANGED,
@@ -13,6 +14,7 @@ import {
   type SavedPdfQuotationEntry,
 } from "@/lib/quotation/pdf-saved-list";
 import type { QuotationData } from "@/types/quotation-generator";
+import { exportQuotationPdf } from "@/utils/exportPdf";
 
 export type QuotationPdfSavedListCardProps = {
   /** When false, hide entirely if there are no saves (standalone page). */
@@ -21,6 +23,9 @@ export type QuotationPdfSavedListCardProps = {
 
 export function QuotationPdfSavedListCard({ alwaysShow = false }: QuotationPdfSavedListCardProps) {
   const [items, setItems] = useState<SavedPdfQuotationEntry[]>([]);
+  const [downloadingId, setDownloadingId] = useState<string>("");
+  const [downloadData, setDownloadData] = useState<QuotationData | null>(null);
+  const exportRef = useRef<HTMLDivElement>(null);
 
   const refresh = useCallback(() => {
     setItems(readSavedPdfQuotationList());
@@ -58,6 +63,23 @@ export function QuotationPdfSavedListCard({ alwaysShow = false }: QuotationPdfSa
     removeSavedPdfQuotation(id);
     refresh();
     window.dispatchEvent(new Event(QUOTATION_PDF_SAVES_CHANGED));
+  };
+
+  const downloadOne = async (entry: SavedPdfQuotationEntry) => {
+    setDownloadingId(entry.id);
+    setDownloadData(entry.data);
+    await new Promise((resolve) => requestAnimationFrame(() => resolve(undefined)));
+    const root = exportRef.current;
+    if (!root) {
+      setDownloadingId("");
+      return;
+    }
+    const safe = entry.label.trim().replace(/[^\w\-]+/g, "_").slice(0, 60) || "quotation";
+    try {
+      await exportQuotationPdf(root, `${safe}.pdf`);
+    } finally {
+      setDownloadingId("");
+    }
   };
 
   if (!alwaysShow && items.length === 0) return null;
@@ -109,7 +131,17 @@ export function QuotationPdfSavedListCard({ alwaysShow = false }: QuotationPdfSa
                       <td className="px-3 py-2.5 text-right">
                         <div className="flex flex-wrap justify-end gap-2">
                           <Button type="button" size="sm" variant="secondary" onClick={() => loadOne(row)}>
-                            Open
+                            Load
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            onClick={() => void downloadOne(row)}
+                            disabled={downloadingId === row.id}
+                          >
+                            <Download className="size-4" aria-hidden />
+                            {downloadingId === row.id ? "Building…" : "Download"}
                           </Button>
                           <Button
                             type="button"
@@ -130,6 +162,15 @@ export function QuotationPdfSavedListCard({ alwaysShow = false }: QuotationPdfSa
             </div>
           </div>
         </CardContent>
+      ) : null}
+      {downloadData ? (
+        <div
+          ref={exportRef}
+          aria-hidden
+          className="pointer-events-none fixed -left-2499.75 top-0 flex flex-col gap-10 opacity-[0.01]"
+        >
+          <QuotationPreview data={downloadData} />
+        </div>
       ) : null}
     </Card>
   );

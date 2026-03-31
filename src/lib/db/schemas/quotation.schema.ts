@@ -68,6 +68,8 @@ export const quotationSchema = new Schema(
       default: "draft",
       index: true,
     },
+    /** Full PDF-builder payload for exact Load / round-trip (optional). */
+    pdfBuilderData: { type: Schema.Types.Mixed, default: undefined },
   },
   schemaOptions
 );

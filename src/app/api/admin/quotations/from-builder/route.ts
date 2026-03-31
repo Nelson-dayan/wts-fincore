@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import mongoose from "mongoose";
 import { requireRole } from "@/lib/auth/require-role";
 import { connectDB } from "@/lib/db/connect";
-import { QuotationModel } from "@/lib/db/models";
+import { ProjectModel, QuotationModel } from "@/lib/db/models";
 import { authErrorResponse } from "@/lib/api/route-auth";
 import { logActivity } from "@/lib/services/activity/log-activity.service";
 import {
@@ -12,10 +12,36 @@ import {
   toDecimal128,
 } from "@/lib/services/business/quotation.service";
 import { pagesFromGeneratorData } from "@/lib/quotation/map-builder-to-quotation";
-import { normalizeQuotationData } from "@/types/quotation-generator";
+import { normalizeQuotationData, type QuotationData } from "@/types/quotation-generator";
+
+function pdfBuilderPayload(data: QuotationData) {
+  return JSON.parse(JSON.stringify(normalizeQuotationData(data))) as Record<string, unknown>;
+}
+
+async function resolveProjectId(params: {
+  bodyProjectId?: string;
+  quotationId?: string;
+}): Promise<{ projectId: string } | { error: string; status: number }> {
+  const trimmed = String(params.bodyProjectId ?? "").trim();
+  if (trimmed && mongoose.Types.ObjectId.isValid(trimmed)) {
+    return { projectId: trimmed };
+  }
+  const qid = String(params.quotationId ?? "").trim();
+  if (qid && mongoose.Types.ObjectId.isValid(qid)) {
+    const ex = await QuotationModel.findById(qid).select("projectId").lean();
+    if (!ex) return { error: "Quotation not found", status: 404 };
+    return { projectId: String(ex.projectId) };
+  }
+  const first = await ProjectModel.findOne().sort({ createdAt: 1 }).select("_id").lean();
+  if (!first?._id) {
+    return { error: "No project found. Create a project under Admin first.", status: 400 };
+  }
+  return { projectId: String(first._id) };
+}
 
 /**
  * Persist PDF builder (local) quotation into MongoDB so PO / invoices can link to it.
+ * Optional `quotationId` updates the same document (edit mode).
  */
 export async function POST(req: Request) {
   try {
@@ -23,23 +49,32 @@ export async function POST(req: Request) {
     await connectDB();
     const body = (await req.json()) as {
       projectId?: string;
+      quotationId?: string;
       data?: unknown;
       status?: "draft" | "sent" | "approved" | "rejected";
       taxRate?: number;
       taxEnabled?: boolean;
     };
 
-    const projectId = String(body.projectId ?? "").trim();
-    if (!projectId || !mongoose.Types.ObjectId.isValid(projectId)) {
-      return NextResponse.json({ message: "projectId is required" }, { status: 400 });
+    const quotationIdRaw = String(body.quotationId ?? "").trim();
+    const quotationOid =
+      quotationIdRaw && mongoose.Types.ObjectId.isValid(quotationIdRaw)
+        ? quotationIdRaw
+        : undefined;
+
+    const resolved = await resolveProjectId({
+      bodyProjectId: body.projectId,
+      quotationId: quotationOid,
+    });
+    if ("error" in resolved) {
+      return NextResponse.json({ message: resolved.error }, { status: resolved.status });
     }
+    const projectId = resolved.projectId;
 
     const data = normalizeQuotationData(body.data);
     const pages = pagesFromGeneratorData(data);
     const taxRate =
-      typeof body.taxRate === "number" && Number.isFinite(body.taxRate)
-        ? body.taxRate
-        : 5;
+      typeof body.taxRate === "number" && Number.isFinite(body.taxRate) ? body.taxRate : 5;
     const taxEnabled = body.taxEnabled !== false;
     const { subtotal, tax, total } = computeQuotationTotals(pages, taxRate, taxEnabled);
 
@@ -53,12 +88,8 @@ export async function POST(req: Request) {
     };
     const companySnapshot = {
       ...built.companySnapshot,
-      ...(data.companyName.trim()
-        ? { name: data.companyName.trim() }
-        : {}),
-      ...(data.companyAddress.trim()
-        ? { address: data.companyAddress.trim() }
-        : {}),
+      ...(data.companyName.trim() ? { name: data.companyName.trim() } : {}),
+      ...(data.companyAddress.trim() ? { address: data.companyAddress.trim() } : {}),
     };
 
     let docDate = new Date();
@@ -67,7 +98,6 @@ export async function POST(req: Request) {
       if (!Number.isNaN(parsed.getTime())) docDate = parsed;
     }
 
-    const quotationNumber = await generateQuotationNumber();
     const pagesForDb = pages.map((p) => ({
       pageNumber: p.pageNumber,
       items: p.items.map((item) => ({
@@ -82,10 +112,9 @@ export async function POST(req: Request) {
       })),
     }));
 
-    const created = await QuotationModel.create({
-      quotationNumber,
-      projectId: new mongoose.Types.ObjectId(projectId),
-      createdBy: new mongoose.Types.ObjectId(session.user.id),
+    const pdfBuilderData = pdfBuilderPayload(data);
+
+    const commonSet = {
       documentInfo: {
         quotationCode: data.refNo.trim(),
         geCode: "",
@@ -117,8 +146,58 @@ export async function POST(req: Request) {
         customLogoText: "",
         customSignatureText: "",
       },
-      internalNotes: "",
+      pdfBuilderData,
       status: body.status ?? "sent",
+    };
+
+    if (quotationOid) {
+      const existing = await QuotationModel.findById(quotationOid).lean();
+      if (!existing) {
+        return NextResponse.json({ message: "Quotation not found" }, { status: 404 });
+      }
+      const updated = await QuotationModel.findByIdAndUpdate(
+        quotationOid,
+        {
+          $set: {
+            ...commonSet,
+            projectId: existing.projectId,
+          },
+        },
+        { new: true }
+      ).lean();
+
+      if (!updated) {
+        return NextResponse.json({ message: "Quotation not found" }, { status: 404 });
+      }
+
+      await logActivity({
+        userId: session.user.id,
+        action: "updated_quotation",
+        entityType: "quotation",
+        entityId: String(updated._id),
+        message: `Updated quotation ${updated.quotationNumber} (from PDF builder)`,
+        projectId: String(updated.projectId),
+      });
+
+      return NextResponse.json(
+        {
+          item: {
+            _id: String(updated._id),
+            quotationNumber: updated.quotationNumber,
+            projectId: String(updated.projectId),
+          },
+        },
+        { status: 200 }
+      );
+    }
+
+    const quotationNumber = await generateQuotationNumber();
+    const created = await QuotationModel.create({
+      quotationNumber,
+      projectId: new mongoose.Types.ObjectId(projectId),
+      createdBy: new mongoose.Types.ObjectId(session.user.id),
+      ...commonSet,
+      internalNotes: "",
     });
 
     await logActivity({
@@ -154,6 +233,6 @@ export async function POST(req: Request) {
         return NextResponse.json({ message: msg }, { status: 400 });
       }
     }
-    return authErrorResponse(error, "Failed to create quotation");
+    return authErrorResponse(error, "Failed to save quotation");
   }
 }

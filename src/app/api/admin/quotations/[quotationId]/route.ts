@@ -334,7 +334,9 @@ export async function DELETE(_req: Request, ctx: RouteCtx) {
     await connectDB();
     const { quotationId } = await ctx.params;
 
-    const poCount = await PurchaseOrderModel.countDocuments({ quotationId });
+    const poCount = await PurchaseOrderModel.countDocuments({
+      quotationId: new mongoose.Types.ObjectId(quotationId),
+    });
     if (poCount > 0) {
       return NextResponse.json(
         {

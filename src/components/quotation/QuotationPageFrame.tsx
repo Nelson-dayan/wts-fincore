@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
-import { QUOTATION_PAGE_PX } from "@/constants/quotation-a4";
 import { QUOTATION_PDF_COLORS } from "@/lib/quotation/quotation-pdf-colors";
+import { getQuotationPagePx } from "@/lib/quotation/page-layout";
 import type { QuotationData } from "@/types/quotation-generator";
 
 /** Ribbon geometry was authored for portrait 794×1123; scaled to current page size. */
@@ -21,11 +21,19 @@ type QuotationPageFrameProps = {
 };
 
 export function QuotationPageFrame({ data, page, children }: QuotationPageFrameProps) {
-  const { bgColor, accentColor, logo } = data;
+  const {
+    bgColor,
+    accentColor,
+    logo,
+    backgroundImage,
+    useDecorShapes,
+    useGradientBackground,
+  } = data;
   const cyan = accentColor;
 
-  const W = QUOTATION_PAGE_PX.width;
-  const H = QUOTATION_PAGE_PX.height;
+  const pagePx = getQuotationPagePx(data);
+  const W = pagePx.width;
+  const H = pagePx.height;
   const mx = W / LEGACY_PORTRAIT.w;
   const my = H / LEGACY_PORTRAIT.h;
 
@@ -52,29 +60,35 @@ export function QuotationPageFrame({ data, page, children }: QuotationPageFrameP
         borderStyle: "solid",
         borderColor: QUOTATION_PDF_COLORS.borderHairline,
         boxShadow: QUOTATION_PDF_COLORS.shadowCard,
-        background: `radial-gradient(ellipse 118% 120% at 78% 40%, #ffffff 0%, #f7f7f8 45%, ${bgColor} 100%)`,
+        background: backgroundImage
+          ? `linear-gradient(rgba(255,255,255,0.66), rgba(255,255,255,0.66)), url("${backgroundImage}") center/cover no-repeat`
+          : useGradientBackground
+            ? `radial-gradient(ellipse 118% 120% at 78% 40%, #ffffff 0%, #f7f7f8 45%, ${bgColor} 100%)`
+            : bgColor,
       }}
     >
-      <svg
-        className="pointer-events-none absolute left-0 top-0 h-full w-full text-[0]"
-        width={W}
-        height={H}
-        viewBox={`0 0 ${W} ${H}`}
-        preserveAspectRatio="none"
-        aria-hidden
-      >
-        <path fill={CHARCOAL} d={pathCharcoal} />
-        <path fill={cyan} d={pathCyan} />
-        <path fill={THIN_CYAN} d={pathThin} />
-      </svg>
+      {useDecorShapes ? (
+        <svg
+          className="pointer-events-none absolute left-0 top-0 h-full w-full text-[0]"
+          width={W}
+          height={H}
+          viewBox={`0 0 ${W} ${H}`}
+          preserveAspectRatio="none"
+          aria-hidden
+        >
+          <path fill={CHARCOAL} d={pathCharcoal} />
+          <path fill={cyan} d={pathCyan} />
+          <path fill={THIN_CYAN} d={pathThin} />
+        </svg>
+      ) : null}
 
       {logo ? (
-        <img
-          src={logo}
-          alt=""
-          className="absolute right-8 top-7 z-1 h-12 w-auto max-w-55 object-contain"
+        <div
+          className="absolute right-6 top-5 z-1 flex h-18 w-56 items-center justify-center overflow-hidden rounded-lg bg-white/80 p-2"
           style={{ boxShadow: QUOTATION_PDF_COLORS.shadowLogo }}
-        />
+        >
+          <img src={logo} alt="" className="h-full w-full object-contain" />
+        </div>
       ) : null}
 
       <div
