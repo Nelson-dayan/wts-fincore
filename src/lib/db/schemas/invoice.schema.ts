@@ -8,6 +8,40 @@ import {
   totalsSchema,
 } from "@/lib/db/schemas/shared.schema";
 
+const bankDetailSchema = new Schema(
+  {
+    accountName: { type: String, default: "" },
+    accountNo: { type: String, default: "" },
+    iban: { type: String, default: "" },
+    bankName: { type: String, default: "" },
+    swift: { type: String, default: "" },
+  },
+  { _id: false }
+);
+
+const invoiceExtrasSchema = new Schema(
+  {
+    paymentTerms: { type: String, default: "30 DAYS" },
+    companyTrn: { type: String, default: "" },
+    clientTrn: { type: String, default: "" },
+    shipToCompany: { type: String, default: "" },
+    shipToAddress: { type: String, default: "" },
+    shipToTrn: { type: String, default: "" },
+    poNumberRef: { type: String, default: "" },
+    bankAed: { type: bankDetailSchema, default: () => ({}) },
+    bankUsd: { type: bankDetailSchema, default: () => ({}) },
+    footerTerms: { type: String, default: "" },
+    footerCurrencyLine: { type: String, default: "CURRENCY IN AED" },
+    disclaimer: {
+      type: String,
+      default:
+        "This is an electronically generated invoice, hence does not require signature.",
+    },
+    amountInWords: { type: String, default: "" },
+  },
+  { _id: false }
+);
+
 const invoiceItemSchema = new Schema(
   {
     number: { type: Number, required: true, min: 1 },
@@ -49,8 +83,10 @@ export const invoiceSchema = new Schema(
       index: true,
     },
     dueDate: { type: Date, required: true, index: true },
+    extras: { type: invoiceExtrasSchema, default: () => ({}) },
   },
   schemaOptions
 );
 
 invoiceSchema.index({ projectId: 1, status: 1, dueDate: 1 });
+invoiceSchema.index({ poId: 1, createdAt: -1 });

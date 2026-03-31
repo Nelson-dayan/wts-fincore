@@ -23,9 +23,7 @@ export const purchaseOrderSchema = new Schema(
 );
 
 purchaseOrderSchema.pre("validate", function () {
-  if (this.type === "client" && !this.fileUrl) {
-    throw new Error("fileUrl is required for client purchase orders");
-  }
+  /** Client PO may be created as a quotation link first; signed file can be added later via PATCH. */
   if (this.type === "internal") {
     this.fileUrl = "";
     if (!this.generatedFromQuotation) {
