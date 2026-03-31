@@ -11,8 +11,8 @@ export default async function AdminProjectsPage({ searchParams }: PageProps) {
 
   return (
     <>
-      <CreateProjectForm />
       <AdminProjectsClient initialClientId={clientId} />
+      <CreateProjectForm />
     </>
   );
 }

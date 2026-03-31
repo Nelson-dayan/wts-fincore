@@ -102,9 +102,9 @@ export function CreateProjectForm() {
   }
 
   return (
-    <Card className="mb-4">
+    <Card className="mb-4 mt-10 border-border/80 md:mt-12">
       <CardHeader>
-        <CardTitle className="text-base">Create Project</CardTitle>
+        <CardTitle className="text-base">Create project</CardTitle>
       </CardHeader>
       <CardContent>
         <form onSubmit={onSubmit} className="grid gap-3 sm:grid-cols-2">

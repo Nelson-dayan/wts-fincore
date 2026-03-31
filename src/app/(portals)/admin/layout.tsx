@@ -19,60 +19,66 @@ export default async function AdminPortalLayout({
 
   return (
     <div className="flex min-h-dvh flex-col bg-background">
-      <PortalHeader brand={<PortalBrand variant="admin" />}>
-        <nav
-          className="flex w-full flex-col gap-1 sm:w-auto sm:items-end"
-          aria-label="Admin"
-        >
-          <div className="flex w-full flex-wrap items-center gap-1 sm:justify-end">
-            <span className="px-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/80">
-              Core
-            </span>
-            <PortalNavLink href="/admin" match="exact">
-              Overview
-            </PortalNavLink>
-            <PortalNavLink href="/admin/users" match="prefix">
-              Users
-            </PortalNavLink>
-            <PortalNavLink href="/admin/clients" match="prefix">
-              Clients
-            </PortalNavLink>
-            <PortalNavLink href="/admin/projects" match="prefix">
-              Projects
-            </PortalNavLink>
-            <PortalNavLink href="/admin/company" match="prefix">
-              Company
-            </PortalNavLink>
-          </div>
-          <div className="flex w-full flex-wrap items-center gap-1 sm:justify-end">
-            <span className="px-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/80">
-              Finance
-            </span>
-            <PortalNavLink href="/admin/quotations" match="prefix">
-              Quotations
-            </PortalNavLink>
-            <PortalNavLink href="/admin/purchase-orders" match="prefix">
-              POs
-            </PortalNavLink>
-            <PortalNavLink href="/admin/invoices" match="prefix">
-              Invoices
-            </PortalNavLink>
-            <PortalNavLink href="/admin/payments" match="prefix">
-              Payments
-            </PortalNavLink>
-            <PortalNavLink href="/admin/expenses" match="prefix">
-              Expenses
-            </PortalNavLink>
-            <PortalNavLink href="/admin/activity" match="prefix">
-              Activity
-            </PortalNavLink>
+      <PortalHeader
+        brand={<PortalBrand variant="admin" />}
+        endActions={
+          <>
             <Link
               href="/employee"
-              className="rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent/80 hover:text-foreground"
+              className="shrink-0 rounded-xl px-3 py-2 text-sm font-medium tracking-tight text-muted-foreground outline-none transition-[transform,background-color,color] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:-translate-y-px hover:bg-accent/75 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background active:translate-y-0 motion-reduce:hover:translate-y-0"
             >
               Workspace
             </Link>
-            <SignOutButton />
+            <SignOutButton className="border-0 bg-transparent hover:bg-destructive/12" />
+          </>
+        }
+      >
+        <nav className="portal-admin-nav-unified w-full max-w-full" aria-label="Admin">
+          <div className="portal-admin-nav-rows">
+            <div className="portal-admin-nav-row">
+              <div className="flex min-w-0 flex-nowrap items-center justify-center gap-1 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                <span className="portal-admin-nav-inline-label">Core</span>
+                <PortalNavLink href="/admin" match="exact">
+                  Overview
+                </PortalNavLink>
+                <PortalNavLink href="/admin/users" match="prefix">
+                  Users
+                </PortalNavLink>
+                <PortalNavLink href="/admin/clients" match="prefix">
+                  Clients
+                </PortalNavLink>
+                <PortalNavLink href="/admin/projects" match="prefix">
+                  Projects
+                </PortalNavLink>
+                <PortalNavLink href="/admin/company" match="prefix">
+                  Company
+                </PortalNavLink>
+              </div>
+            </div>
+            <div className="portal-admin-nav-divider" aria-hidden />
+            <div className="portal-admin-nav-row">
+              <div className="flex min-w-0 flex-nowrap items-center justify-center gap-1 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                <span className="portal-admin-nav-inline-label">Finance</span>
+                <PortalNavLink href="/admin/quotations" match="prefix">
+                  Quotations
+                </PortalNavLink>
+                <PortalNavLink href="/admin/purchase-orders" match="prefix">
+                  POs
+                </PortalNavLink>
+                <PortalNavLink href="/admin/invoices" match="prefix">
+                  Invoices
+                </PortalNavLink>
+                <PortalNavLink href="/admin/payments" match="prefix">
+                  Payments
+                </PortalNavLink>
+                <PortalNavLink href="/admin/expenses" match="prefix">
+                  Expenses
+                </PortalNavLink>
+                <PortalNavLink href="/admin/activity" match="prefix">
+                  Activity
+                </PortalNavLink>
+              </div>
+            </div>
           </div>
         </nav>
       </PortalHeader>
