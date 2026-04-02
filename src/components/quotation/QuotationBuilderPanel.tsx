@@ -21,6 +21,7 @@ import {
   getQuotationPagePx,
   getQuotationPreviewStackHeightPx,
 } from "@/lib/quotation/page-layout";
+import { generateQuotationRefNo } from "@/lib/quotation/generate-ref-no";
 import { exportQuotationPdf } from "@/utils/exportPdf";
 import { readResponseJson } from "@/lib/http/read-response-json";
 
@@ -62,8 +63,11 @@ function applyPrimaryCompanyDefaults(
 export type QuotationBuilderPanelProps = {
   /** Full page: show header + back link. Embedded: section title only (e.g. admin quotations). */
   variant?: "standalone" | "embedded";
-  /** Prefer this project when saving (e.g. from Admin ?projectId=). Server falls back to first project if empty. */
+  /** When opening the builder from a project URL (`?projectId=`) — used as initial link + save target. */
   initialSaveProjectId?: string;
+  /** When loading an existing quotation for edit — the record's linked project (required for save). */
+  linkedQuotationProjectId?: string;
+  linkedQuotationProjectName?: string;
   /** When set, Save updates this record (same quotation, no duplicate). */
   editingQuotationId?: string | null;
   /** Seed form when opening the builder (e.g. Load from admin table). Prefer remounting parent `key` when this changes. */
@@ -80,6 +84,8 @@ export type QuotationBuilderPanelProps = {
 export function QuotationBuilderPanel({
   variant = "standalone",
   initialSaveProjectId = "",
+  linkedQuotationProjectId = "",
+  linkedQuotationProjectName = "",
   editingQuotationId = null,
   initialSnapshot = null,
   onDbSaveSuccess,
@@ -89,9 +95,11 @@ export function QuotationBuilderPanel({
     initialSnapshot ? normalizeQuotationData(initialSnapshot) : defaultQuotationData()
   );
   const [connectedProjectId, setConnectedProjectId] = useState<string>(
-    initialSaveProjectId.trim()
+    () => initialSaveProjectId.trim() || linkedQuotationProjectId.trim()
   );
-  const [connectedProjectName, setConnectedProjectName] = useState<string>("");
+  const [connectedProjectName, setConnectedProjectName] = useState<string>(
+    () => linkedQuotationProjectName.trim()
+  );
   const [projectDefaultsLoading, setProjectDefaultsLoading] = useState(false);
   const [projectDefaultsError, setProjectDefaultsError] = useState<string | null>(null);
   const [storageReady, setStorageReady] = useState(false);
@@ -182,6 +190,15 @@ export function QuotationBuilderPanel({
 
   useEffect(() => {
     if (!storageReady) return;
+    if (editingQuotationId || initialSnapshot) return;
+    setData((prev) => {
+      if (prev.refNo.trim()) return prev;
+      return { ...prev, refNo: generateQuotationRefNo() };
+    });
+  }, [storageReady, editingQuotationId, initialSnapshot]);
+
+  useEffect(() => {
+    if (!storageReady) return;
     const serialized = JSON.stringify(data);
     if (skipNextLocalPersistRef.current) {
       skipNextLocalPersistRef.current = false;
@@ -211,7 +228,8 @@ export function QuotationBuilderPanel({
         clearTimeout(saveNoticeTimerRef.current);
         saveNoticeTimerRef.current = null;
       }
-      const next = normalizeQuotationData(ce.detail.data);
+      let next = normalizeQuotationData(ce.detail.data);
+      if (!next.refNo.trim()) next = { ...next, refNo: generateQuotationRefNo() };
       setData(next);
       try {
         localStorage.setItem(QUOTATION_STORAGE_KEY, JSON.stringify(next));
@@ -303,6 +321,17 @@ export function QuotationBuilderPanel({
       }
     }
 
+    if (!connectedProjectId.trim()) {
+      setSaveNotice(
+        `${localMsg} Connect a project before saving to the database.`
+      );
+      saveNoticeTimerRef.current = setTimeout(() => {
+        setSaveNotice(null);
+        saveNoticeTimerRef.current = null;
+      }, 5600);
+      return;
+    }
+
     try {
       const res = await fetch("/api/admin/quotations/from-builder", {
         method: "POST",
@@ -369,7 +398,11 @@ export function QuotationBuilderPanel({
 
   const handleReset = useCallback(() => {
     const base = defaultQuotationData();
-    setData(applyPrimaryCompanyDefaults(base, primaryDefaults));
+    let next = applyPrimaryCompanyDefaults(base, primaryDefaults);
+    if (!editingQuotationId && !initialSnapshot) {
+      next = { ...next, refNo: generateQuotationRefNo() };
+    }
+    setData(next);
     try {
       localStorage.removeItem(QUOTATION_STORAGE_KEY);
     } catch {
@@ -378,7 +411,13 @@ export function QuotationBuilderPanel({
     if (connectedProjectId.trim()) {
       void loadProjectDefaults(connectedProjectId, { force: false });
     }
-  }, [connectedProjectId, primaryDefaults, loadProjectDefaults]);
+  }, [
+    connectedProjectId,
+    editingQuotationId,
+    initialSnapshot,
+    primaryDefaults,
+    loadProjectDefaults,
+  ]);
 
   const handleDownloadPdf = useCallback(async () => {
     const root = exportCaptureRef.current ?? previewRef.current;

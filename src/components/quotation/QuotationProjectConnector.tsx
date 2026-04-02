@@ -79,7 +79,8 @@ export function QuotationProjectConnector({
         <div>
           <p className="text-sm font-semibold">Connect a project</p>
           <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
-            Search and connect to auto-fill client name and product/framework title.
+            Search and connect to auto-fill client name and product/framework title. A project must
+            be connected to save the quotation to the database.
           </p>
         </div>
         {connectedProjectId ? (
