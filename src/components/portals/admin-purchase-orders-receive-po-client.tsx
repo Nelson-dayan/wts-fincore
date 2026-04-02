@@ -18,7 +18,14 @@ type QRow = {
 
 const MAX_PO_UPLOAD_BYTES = 9 * 1024 * 1024;
 
-export function AdminPurchaseOrdersReceivePoClient({ projectId }: { projectId: string }) {
+export function AdminPurchaseOrdersReceivePoClient({
+  projectId,
+  onPoSaved,
+}: {
+  projectId: string;
+  /** Called after a PO is saved so sibling lists (e.g. PO table) can refetch immediately. */
+  onPoSaved?: () => void;
+}) {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [fileKey, setFileKey] = useState(0);
@@ -100,6 +107,7 @@ export function AdminPurchaseOrdersReceivePoClient({ projectId }: { projectId: s
       setMsg(`Saved: ${data.poNumber ?? ""}`);
       setFile(null);
       setFileKey((k) => k + 1);
+      onPoSaved?.();
       router.refresh();
       loadQuotations().catch(() => {});
     } catch (e) {

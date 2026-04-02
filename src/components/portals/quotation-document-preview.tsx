@@ -139,7 +139,7 @@ export function QuotationDocumentPreview({
               ) : null}
               {(documentInfo.quotationCode || documentInfo.geCode) ? (
                 <p className="mt-2">
-                  Ref: {String(documentInfo.quotationCode ?? documentInfo.geCode ?? "").trim()}
+                  Quotation no: {String(documentInfo.quotationCode ?? documentInfo.geCode ?? "").trim()}
                 </p>
               ) : null}
               <p className="mt-1 font-medium text-slate-800 dark:text-zinc-200">

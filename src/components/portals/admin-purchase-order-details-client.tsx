@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { Trash2 } from "lucide-react";
 import { DashboardPageHeader } from "@/components/dashboard/page-header";
 import { PurchaseOrderInvoicesSection } from "@/components/portals/purchase-order-invoices-section";
 import { PurchaseOrderFilePreview } from "@/components/portals/purchase-order-file-preview";
@@ -28,10 +30,12 @@ type PoPayload = {
 const MAX_PO_UPLOAD_BYTES = 9 * 1024 * 1024;
 
 export function AdminPurchaseOrderDetailsClient({ purchaseOrderId }: { purchaseOrderId: string }) {
+  const router = useRouter();
   const [item, setItem] = useState<PoPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [status, setStatus] = useState<string>("linked");
   const [externalPoNumber, setExternalPoNumber] = useState("");
   const [totalAmountStr, setTotalAmountStr] = useState("");
@@ -39,6 +43,7 @@ export function AdminPurchaseOrderDetailsClient({ purchaseOrderId }: { purchaseO
   const [fileKey, setFileKey] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [saveMsg, setSaveMsg] = useState("");
+  const [deleteError, setDeleteError] = useState("");
 
   async function load() {
     setLoading(true);
@@ -122,6 +127,30 @@ export function AdminPurchaseOrderDetailsClient({ purchaseOrderId }: { purchaseO
     }
   }
 
+  async function deletePo() {
+    if (!item) return;
+    const ok = window.confirm(
+      `Delete purchase order ${item.poNumber}? This cannot be undone.`
+    );
+    if (!ok) return;
+    setDeleting(true);
+    setDeleteError("");
+    try {
+      const res = await fetch(`/api/admin/purchase-orders/${purchaseOrderId}`, {
+        method: "DELETE",
+      });
+      const data = await readResponseJson<{ message?: string }>(res);
+      if (!res.ok) throw new Error(data.message ?? "Could not delete purchase order");
+      const back = item.projectId.trim()
+        ? `/admin/purchase-orders?projectId=${encodeURIComponent(item.projectId)}`
+        : "/admin/purchase-orders";
+      router.push(back);
+    } catch (e) {
+      setDeleteError(e instanceof Error ? e.message : "Could not delete purchase order");
+      setDeleting(false);
+    }
+  }
+
   if (loading && !error) {
     return <p className="text-sm text-muted-foreground">Loading…</p>;
   }
@@ -186,7 +215,23 @@ export function AdminPurchaseOrderDetailsClient({ purchaseOrderId }: { purchaseO
                 All purchase orders
               </Button>
             </Link>
+            <Button
+              type="button"
+              size="sm"
+              variant="destructive"
+              className="gap-1.5"
+              disabled={deleting}
+              onClick={() => void deletePo()}
+            >
+              <Trash2 className="size-3.5" aria-hidden />
+              {deleting ? "Deleting…" : "Delete PO"}
+            </Button>
           </div>
+          {deleteError ? (
+            <p className="text-destructive mb-4 text-sm" role="alert">
+              {deleteError}
+            </p>
+          ) : null}
 
           <Card className="mb-4">
             <CardHeader>
