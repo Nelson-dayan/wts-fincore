@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { readFileAsPdfSafeDataUrl } from "@/lib/portals/read-file-as-pdf-safe-data-url";
+import { readResponseJson } from "@/lib/http/read-response-json";
 
 type CompanyData = {
   _id?: string;
@@ -51,7 +52,9 @@ export function AdminCompanyClient() {
     }
     try {
       const primaryRes = await fetch("/api/admin/company", { cache: "no-store" });
-      const primaryPayload = (await primaryRes.json()) as { item?: CompanyData; message?: string };
+      const primaryPayload = await readResponseJson<{ item?: CompanyData; message?: string }>(
+        primaryRes
+      );
       if (!primaryRes.ok) throw new Error(primaryPayload.message ?? "Failed to load company");
       if (primaryPayload.item) setPrimaryForm(primaryPayload.item);
       if (!opts?.quiet) setBootError("");
@@ -82,7 +85,7 @@ export function AdminCompanyClient() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(primaryForm),
       });
-      const payload = (await response.json()) as { message?: string };
+      const payload = await readResponseJson<{ message?: string }>(response);
       if (!response.ok) throw new Error(payload.message ?? "Failed to update");
       setMessageOk(true);
       setMessage("Saved. Quotations and PDFs will use these details.");

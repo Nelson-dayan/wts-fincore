@@ -6,6 +6,7 @@ import { FileSpreadsheet, FileText, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
+import { readResponseJson } from "@/lib/http/read-response-json";
 
 type PoRow = {
   _id: string;
@@ -51,10 +52,10 @@ export function QuotationPurchaseOrdersSection({
         q: "",
       });
       const res = await fetch(`/api/admin/purchase-orders?${qs}`, { cache: "no-store" });
-      const data = (await res.json()) as {
+      const data = await readResponseJson<{
         items?: Array<PoRow & { hasFile?: boolean }>;
         message?: string;
-      };
+      }>(res);
       if (!res.ok) throw new Error(data.message ?? "Failed to load POs");
       setRows(
         (data.items ?? []).map((r) => ({
@@ -101,7 +102,7 @@ export function QuotationPurchaseOrdersSection({
           return fd;
         })(),
       });
-      const data = (await res.json()) as { message?: string; poNumber?: string };
+      const data = await readResponseJson<{ message?: string; poNumber?: string }>(res);
       if (!res.ok) throw new Error(data.message ?? "Could not create PO");
       setFormOk(`PO ${data.poNumber ?? ""} saved.`);
       setFile(null);
@@ -141,7 +142,7 @@ export function QuotationPurchaseOrdersSection({
               </li>
               <li>
                 From the linked PO row, open <strong className="text-foreground">Invoice</strong> — a new invoice
-                is created from this PO and quotation client/company snapshot (max 4 per PO).
+                is created from this PO and quotation client/company snapshot (as many as you need per PO).
               </li>
             </ol>
           </div>

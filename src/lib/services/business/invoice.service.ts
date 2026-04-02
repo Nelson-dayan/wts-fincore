@@ -1,7 +1,12 @@
 import { randomBytes } from "node:crypto";
 import mongoose from "mongoose";
 import { connectDB } from "@/lib/db/connect";
-import { InvoiceModel, PurchaseOrderModel, QuotationModel } from "@/lib/db/models";
+import {
+  CompanyModel,
+  InvoiceModel,
+  PurchaseOrderModel,
+  QuotationModel,
+} from "@/lib/db/models";
 import { aedAmountInWords } from "@/lib/invoice/aed-amount-words";
 import { MAX_INVOICES_PER_PURCHASE_ORDER } from "@/lib/invoice/invoice-limits";
 import * as invoiceTotals from "@/lib/invoice/invoice-totals";
@@ -36,6 +41,68 @@ export async function countInvoicesForPurchaseOrder(poId: string): Promise<numbe
   });
 }
 
+type CompanyDocLean = {
+  name?: string;
+  address?: string;
+  email?: string;
+  website?: string;
+  logoText?: string;
+  signatureText?: string;
+  defaultTax?: { taxRate?: number; taxEnabled?: boolean };
+};
+
+/** Primary company row for invoice defaults (logo lives in `logoText` as data URL). */
+async function getPrimaryCompanyForInvoice(): Promise<CompanyDocLean | null> {
+  const row = await CompanyModel.findOne({ isPrimary: true })
+    .sort({ updatedAt: -1 })
+    .lean();
+  if (!row) return null;
+  return {
+    name: row.name,
+    address: row.address,
+    email: row.email,
+    website: row.website,
+    logoText: row.logoText,
+    signatureText: row.signatureText,
+    defaultTax: row.defaultTax,
+  };
+}
+
+function mergeInvoiceCompanySnapshot(
+  quotationSnap: unknown,
+  primary: CompanyDocLean | null
+): Record<string, string> {
+  const q =
+    quotationSnap && typeof quotationSnap === "object"
+      ? (quotationSnap as Record<string, unknown>)
+      : {};
+  const s = (v: unknown) => String(v ?? "").trim();
+
+  if (!primary) {
+    return {
+      name: s(q.name) || "Company",
+      address: s(q.address),
+      email: s(q.email),
+      website: s(q.website),
+      logoUrl: s(q.logoUrl),
+      logoText: s(q.logoText),
+      signatureText: s(q.signatureText),
+    };
+  }
+
+  const logoFromCompany = s(primary.logoText);
+  const logoFromQuote = s(q.logoUrl);
+  return {
+    name: s(primary.name) || s(q.name) || "Company",
+    address: s(primary.address) || s(q.address),
+    email: s(primary.email) || s(q.email),
+    website: s(primary.website) || s(q.website),
+    logoUrl: logoFromCompany || logoFromQuote,
+    logoText: s(q.logoText),
+    signatureText: s(primary.signatureText) || s(q.signatureText),
+  };
+}
+
 export interface CreateInvoiceForPoInput {
   poId: string;
   createdBy: string;
@@ -46,13 +113,30 @@ export async function createInvoiceForPurchaseOrder(
   input: CreateInvoiceForPoInput
 ): Promise<{ id: string; invoiceNumber: string; projectId: string }> {
   await connectDB();
-  const n = await countInvoicesForPurchaseOrder(input.poId);
-  if (n >= MAX_INVOICES_PER_PURCHASE_ORDER) {
-    throw new Error(`Maximum ${MAX_INVOICES_PER_PURCHASE_ORDER} invoices per purchase order`);
-  }
-
   if (!mongoose.Types.ObjectId.isValid(input.poId)) {
     throw new Error("Invalid purchase order id");
+  }
+
+  // In React strict-mode/dev remounts, the create call can happen twice.
+  // Reuse an existing unsaved draft-like invoice for this PO instead of duplicating.
+  const existingHidden = await InvoiceModel.findOne({
+    poId: new mongoose.Types.ObjectId(input.poId),
+    "extras._hiddenUntilSaved": true,
+  })
+    .sort({ createdAt: -1 })
+    .lean();
+  if (existingHidden) {
+    return {
+      id: String(existingHidden._id),
+      invoiceNumber: String(existingHidden.invoiceNumber ?? ""),
+      projectId: String(existingHidden.projectId ?? ""),
+    };
+  }
+
+  const n = await countInvoicesForPurchaseOrder(input.poId);
+  const cap = MAX_INVOICES_PER_PURCHASE_ORDER;
+  if (cap !== null && Number.isFinite(cap) && n >= cap) {
+    throw new Error(`Maximum ${cap} invoices per purchase order`);
   }
 
   const po = await PurchaseOrderModel.findById(input.poId).lean();
@@ -61,16 +145,25 @@ export async function createInvoiceForPurchaseOrder(
   const quotation = await QuotationModel.findById(po.quotationId).lean();
   if (!quotation) throw new Error("Quotation not found for this purchase order");
 
+  const primaryCompany = await getPrimaryCompanyForInvoice();
+  const companySnapshot = mergeInvoiceCompanySnapshot(
+    quotation.companySnapshot,
+    primaryCompany
+  );
+
   const invoiceNumber = await generateUniqueInvoiceNumber();
   const invDate = new Date();
   const due = new Date(invDate);
   due.setUTCDate(due.getUTCDate() + 30);
 
   const docInfo = quotation.documentInfo as Record<string, unknown> | undefined;
-  const taxRate =
+  let taxRate =
     docInfo && typeof docInfo.taxRate === "number" ? docInfo.taxRate : 5;
-  const taxEnabled =
+  let taxEnabled =
     docInfo && typeof docInfo.taxEnabled === "boolean" ? docInfo.taxEnabled : true;
+  const pt = primaryCompany?.defaultTax;
+  if (pt && typeof pt.taxRate === "number") taxRate = pt.taxRate;
+  if (pt && typeof pt.taxEnabled === "boolean") taxEnabled = pt.taxEnabled;
 
   const pages: invoiceTotals.InvoiceTotalsPage[] = [
     {
@@ -109,7 +202,7 @@ export async function createInvoiceForPurchaseOrder(
       taxEnabled,
     },
     clientSnapshot: quotation.clientSnapshot,
-    companySnapshot: quotation.companySnapshot,
+    companySnapshot,
     pages: pages.map((p) => ({
       pageNumber: p.pageNumber,
       items: p.items.map((row) => ({
@@ -147,6 +240,7 @@ export async function createInvoiceForPurchaseOrder(
       disclaimer:
         "This is an electronically generated invoice, hence does not require signature.",
       amountInWords: aedAmountInWords(total),
+      _hiddenUntilSaved: true,
     },
   });
 

@@ -5,6 +5,7 @@ import { DashboardPageHeader } from "@/components/dashboard/page-header";
 import { AddUserForm } from "@/components/portals/admin-users/add-user-form";
 import { UsersTable } from "@/components/portals/admin-users/users-table";
 import type { AdminUser, NewUserForm } from "@/components/portals/admin-users/types";
+import { readResponseJson } from "@/lib/http/read-response-json";
 
 export function AdminUsersClient() {
   const [users, setUsers] = useState<AdminUser[]>([]);
@@ -37,11 +38,11 @@ export function AdminUsersClient() {
       const response = await fetch(`/api/admin/users?${qs.toString()}`, {
         cache: "no-store",
       });
-      const payload = (await response.json()) as {
+      const payload = await readResponseJson<{
         users?: AdminUser[];
         total?: number;
         message?: string;
-      };
+      }>(response);
       if (!response.ok) {
         throw new Error(payload.message ?? "Request failed");
       }
@@ -69,7 +70,7 @@ export function AdminUsersClient() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form),
       });
-      const payload = (await response.json()) as { message?: string };
+      const payload = await readResponseJson<{ message?: string }>(response);
       if (!response.ok) throw new Error(payload.message ?? "Failed to create user");
       setForm({ name: "", email: "", password: "", phoneNumber: "", role: "employee" });
       await loadUsers(1, query);
@@ -97,7 +98,7 @@ export function AdminUsersClient() {
           isActive: draft.isActive,
         }),
       });
-      const payload = (await response.json()) as { message?: string };
+      const payload = await readResponseJson<{ message?: string }>(response);
       if (!response.ok) throw new Error(payload.message ?? "Failed to update user");
       setEditingId(null);
       setDrafts((prev) => {
@@ -120,7 +121,7 @@ export function AdminUsersClient() {
       const response = await fetch(`/api/admin/users/${userId}`, {
         method: "DELETE",
       });
-      const payload = (await response.json()) as { message?: string };
+      const payload = await readResponseJson<{ message?: string }>(response);
       if (!response.ok) throw new Error(payload.message ?? "Failed to delete user");
       await loadUsers(page, query);
     } catch (e) {

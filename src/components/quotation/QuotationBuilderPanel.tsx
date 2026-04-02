@@ -21,6 +21,7 @@ import {
   getQuotationPreviewStackHeightPx,
 } from "@/lib/quotation/page-layout";
 import { exportQuotationPdf } from "@/utils/exportPdf";
+import { readResponseJson } from "@/lib/http/read-response-json";
 
 type PrimaryCompanySettings = {
   name?: string;
@@ -174,7 +175,7 @@ export function QuotationBuilderPanel({
           cache: "no-store",
         });
         if (!res.ok) return;
-        const payload = (await res.json()) as { item?: PrimaryCompanySettings };
+        const payload = await readResponseJson<{ item?: PrimaryCompanySettings }>(res);
         const next = payload.item ?? null;
         if (!alive || !next) return;
         setPrimaryDefaults(next);
@@ -231,13 +232,10 @@ export function QuotationBuilderPanel({
           status: "sent",
         }),
       });
-      const rawText = await res.text();
-      const json = rawText
-        ? (JSON.parse(rawText) as {
-            message?: string;
-            item?: { _id?: string; quotationNumber?: string };
-          })
-        : {};
+      const json = await readResponseJson<{
+        message?: string;
+        item?: { _id?: string; quotationNumber?: string };
+      }>(res);
       if (!res.ok) {
         if (res.status === 401 || res.status === 403) {
           setSaveNotice(

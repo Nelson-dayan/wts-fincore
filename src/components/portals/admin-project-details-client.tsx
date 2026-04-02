@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
+import { readResponseJson } from "@/lib/http/read-response-json";
 
 type ProjectDetailsPayload = {
   project?: {
@@ -155,7 +156,7 @@ export function AdminProjectDetailsClient({ projectId }: { projectId: string }) 
           budget: Number(form.budget || 0),
         }),
       });
-      const payload = (await response.json()) as { message?: string };
+      const payload = await readResponseJson<{ message?: string }>(response);
       if (!response.ok) throw new Error(payload.message ?? "Failed to update project");
       setEditing(false);
       await load();
@@ -173,7 +174,7 @@ export function AdminProjectDetailsClient({ projectId }: { projectId: string }) 
       const response = await fetch(`/api/admin/projects/${projectId}`, {
         method: "DELETE",
       });
-      const payload = (await response.json()) as { message?: string };
+      const payload = await readResponseJson<{ message?: string }>(response);
       if (!response.ok) throw new Error(payload.message ?? "Failed to delete project");
       router.push("/admin/projects");
       router.refresh();

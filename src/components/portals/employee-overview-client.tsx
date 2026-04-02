@@ -6,6 +6,7 @@ import { ArrowUpRight } from "lucide-react";
 import { DashboardPageHeader } from "@/components/dashboard/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { readResponseJson } from "@/lib/http/read-response-json";
 
 type EmployeeOverview = {
   myProjects: Array<{
@@ -39,7 +40,9 @@ export function EmployeeOverviewClient() {
     async function load() {
       try {
         const response = await fetch("/api/employee/overview", { cache: "no-store" });
-        const payload = (await response.json()) as EmployeeOverview | { message?: string };
+        const payload = await readResponseJson<EmployeeOverview | { message?: string }>(
+          response
+        );
         if (!response.ok) {
           throw new Error(
             "message" in payload ? (payload.message ?? "Request failed") : "Request failed"

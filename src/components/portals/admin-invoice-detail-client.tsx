@@ -1,16 +1,17 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { EditorPanel } from "@/components/portals/admin-invoice-detail/editor-panel";
 import { InvoicePrintStyle } from "@/components/portals/admin-invoice-detail/print-style";
 import type { Bank, Item } from "@/components/portals/admin-invoice-detail/types";
-import { previewWords, readImageFileAsDataUrl } from "@/components/portals/admin-invoice-detail/utils";
+import { readImageFileAsDataUrl } from "@/components/portals/admin-invoice-detail/utils";
 import { DashboardPageHeader } from "@/components/dashboard/page-header";
 import { InvoiceSecDocument, type InvoiceDocData } from "@/components/invoices/invoice-sec-document";
 import { aedAmountInWords } from "@/lib/invoice/aed-amount-words";
 import { computeInvoiceTotals } from "@/lib/invoice/invoice-totals";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { exportInvoicePdf } from "@/utils/exportPdf";
+import { readResponseJson } from "@/lib/http/read-response-json";
 
 
 function toDocData(item: Item): InvoiceDocData {
@@ -31,16 +32,20 @@ function toDocData(item: Item): InvoiceDocData {
 
 export function AdminInvoiceDetailClient({
   invoiceId,
+  poId,
   poInvoiceCount,
 }: {
-  invoiceId: string;
+  invoiceId?: string;
+  poId?: string;
   poInvoiceCount?: number;
 }) {
+  const router = useRouter();
   const [item, setItem] = useState<Item | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState("");
+  const [pdfExporting, setPdfExporting] = useState(false);
   const [logoErr, setLogoErr] = useState("");
   const logoInputRef = useRef<HTMLInputElement>(null);
 
@@ -48,8 +53,11 @@ export function AdminInvoiceDetailClient({
     setLoading(true);
     setError("");
     try {
-      const res = await fetch(`/api/admin/invoices/${invoiceId}`, { cache: "no-store" });
-      const data = (await res.json()) as { item?: Item; message?: string };
+      const endpoint = invoiceId
+        ? `/api/admin/invoices/${invoiceId}`
+        : `/api/admin/invoices/template?poId=${encodeURIComponent(String(poId ?? ""))}`;
+      const res = await fetch(endpoint, { cache: "no-store" });
+      const data = await readResponseJson<{ item?: Item; message?: string }>(res);
       if (!res.ok) throw new Error(data.message ?? "Failed to load");
       if (!data.item) throw new Error("Missing invoice");
       setItem(data.item as Item);
@@ -59,7 +67,7 @@ export function AdminInvoiceDetailClient({
     } finally {
       setLoading(false);
     }
-  }, [invoiceId]);
+  }, [invoiceId, poId]);
 
   useEffect(() => {
     load().catch(() => {});
@@ -88,26 +96,69 @@ export function AdminInvoiceDetailClient({
     };
   }, [item, liveTotals]);
 
+  async function downloadPdf() {
+    const el = document.getElementById("invoice-print-root");
+    if (!el) {
+      setMsg("Invoice layout not ready — refresh and try again.");
+      return;
+    }
+    setPdfExporting(true);
+    setMsg("");
+    try {
+      const raw = (item?.invoiceNumber ?? "invoice").replace(/[\\/:*?"<>|]+/g, "-").trim() || "invoice";
+      const fileName = raw.toLowerCase().endsWith(".pdf") ? raw : `${raw}.pdf`;
+      await exportInvoicePdf(el as HTMLElement, fileName);
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : "PDF download failed");
+    } finally {
+      setPdfExporting(false);
+    }
+  }
+
   async function save() {
     if (!item) return;
     setSaving(true);
     setMsg("");
     try {
+      const payload = {
+        invoiceNumber: item.invoiceNumber,
+        status: item.status,
+        dueDate: item.dueDate,
+        documentInfo: item.documentInfo,
+        clientSnapshot: item.clientSnapshot,
+        companySnapshot: item.companySnapshot,
+        pages: item.pages,
+        extras: { ...item.extras, _hiddenUntilSaved: false },
+        branding: item.branding,
+      };
+      if (!invoiceId) {
+        const createRes = await fetch("/api/admin/invoices", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ poId: item.poId }),
+        });
+        const createJson = await readResponseJson<{ id?: string; message?: string }>(createRes);
+        if (!createRes.ok) throw new Error(createJson.message ?? "Create failed");
+        const createdId = String(createJson.id ?? "").trim();
+        if (!createdId) throw new Error("Missing invoice id");
+        const patchRes = await fetch(`/api/admin/invoices/${createdId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        const patchJson = await readResponseJson<{ message?: string }>(patchRes);
+        if (!patchRes.ok) throw new Error(patchJson.message ?? "Save failed");
+        setMsg("Saved.");
+        router.replace(`/admin/invoices/${createdId}`);
+        return;
+      }
+
       const res = await fetch(`/api/admin/invoices/${invoiceId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          invoiceNumber: item.invoiceNumber,
-          status: item.status,
-          dueDate: item.dueDate,
-          documentInfo: item.documentInfo,
-          clientSnapshot: item.clientSnapshot,
-          companySnapshot: item.companySnapshot,
-          pages: item.pages,
-          extras: item.extras,
-        }),
+        body: JSON.stringify(payload),
       });
-      const data = (await res.json()) as { message?: string };
+      const data = await readResponseJson<{ message?: string }>(res);
       if (!res.ok) throw new Error(data.message ?? "Save failed");
       setMsg("Saved.");
       await load();
@@ -243,14 +294,9 @@ export function AdminInvoiceDetailClient({
   const taxRatePreview = item?.documentInfo.taxRate ?? 5;
   const taxEnabledPreview = item?.documentInfo.taxEnabled !== false;
   const taxLabelPreview = taxEnabledPreview ? `Tax (${taxRatePreview}%)` : "Tax";
-  const wordsPreview = previewWords(extras, liveTotals.total);
-
   return (
     <div className="animate-fade-in">
-      <DashboardPageHeader
-        title={item ? item.invoiceNumber : "Invoice"}
-        description="SecLance-style invoice. Form follows print order; preview updates as you type. Saving syncs totals and amount in words to the database."
-      />
+      <DashboardPageHeader title={item ? item.invoiceNumber : "Invoice"} />
       {poInvoiceCount != null ? (
         <p className="text-muted-foreground mt-1 text-xs">
           Invoices on this PO: {poInvoiceCount}
@@ -263,7 +309,7 @@ export function AdminInvoiceDetailClient({
       ) : null}
 
       {item && previewDocData ? (
-        <div className="mt-6 grid gap-8 lg:grid-cols-2">
+        <div className="mt-6 grid gap-8 lg:grid-cols-2 print:grid-cols-1">
           <EditorPanel
             item={item}
             extras={extras}
@@ -273,8 +319,8 @@ export function AdminInvoiceDetailClient({
             logoInputRef={logoInputRef}
             taxLabelPreview={taxLabelPreview}
             liveTotals={liveTotals}
-            wordsPreview={wordsPreview}
             saving={saving}
+            pdfExporting={pdfExporting}
             msg={msg}
             onItemChange={setItem}
             onPatchExtra={patchExtra}
@@ -285,6 +331,7 @@ export function AdminInvoiceDetailClient({
             onCopyBillToShip={copyBillToShip}
             onPickLogo={onLogoPicked}
             onSave={() => void save()}
+            onDownloadPdf={() => void downloadPdf()}
           />
 
           <div className="print:col-span-full">

@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DashboardPageHeader } from "@/components/dashboard/page-header";
+import { readResponseJson } from "@/lib/http/read-response-json";
 
 type AdminOverview = {
   users: number;
@@ -73,7 +74,7 @@ export function AdminOverviewClient() {
     async function load() {
       try {
         const response = await fetch("/api/admin/overview", { cache: "no-store" });
-        const payload = (await response.json()) as AdminOverview | { message?: string };
+        const payload = await readResponseJson<AdminOverview | { message?: string }>(response);
         if (!response.ok) {
           throw new Error(
             "message" in payload ? (payload.message ?? "Request failed") : "Request failed"

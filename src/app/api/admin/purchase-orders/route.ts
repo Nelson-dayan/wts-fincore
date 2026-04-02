@@ -114,7 +114,10 @@ export async function POST(req: Request) {
       typeRaw = String(form.get("type") ?? "").trim() || undefined;
       externalPoNumber = String(form.get("externalPoNumber") ?? "").trim() || undefined;
       const ta = String(form.get("totalAmount") ?? "").trim();
-      if (ta) totalAmount = Number(ta);
+      if (ta) {
+        const n = Number.parseFloat(ta.replace(/,/g, ""));
+        if (Number.isFinite(n)) totalAmount = n;
+      }
       const filePart = formFileEntryToBlob(form.get("file"));
       if (filePart) {
         const built = await blobToPoDataUrl(filePart.blob, filePart.filename);
@@ -130,7 +133,7 @@ export async function POST(req: Request) {
         externalPoNumber?: string;
         fileUrl?: string;
         fileDataUrl?: string;
-        totalAmount?: number;
+        totalAmount?: number | string | null;
       };
       try {
         body = (await req.json()) as typeof body;
@@ -140,7 +143,14 @@ export async function POST(req: Request) {
       quotationId = String(body.quotationId ?? "").trim();
       typeRaw = body.type;
       externalPoNumber = body.externalPoNumber;
-      totalAmount = body.totalAmount;
+      if (body.totalAmount !== undefined && body.totalAmount !== null && body.totalAmount !== "") {
+        const n = Number(
+          typeof body.totalAmount === "number"
+            ? body.totalAmount
+            : String(body.totalAmount).replace(/,/g, "")
+        );
+        if (Number.isFinite(n)) totalAmount = n;
+      }
       fileUrl = String(body.fileUrl ?? "").trim();
       fileDataUrlRaw = String(body.fileDataUrl ?? "").trim();
     }
@@ -183,7 +193,7 @@ export async function POST(req: Request) {
       quotationId,
       type,
       fileUrl: type === "client" ? fileUrl : "",
-      externalPoNumber: type === "internal" ? externalPoNorm || undefined : undefined,
+      externalPoNumber: externalPoNorm || undefined,
       totalAmount,
       createdBy: session.user.id,
     });

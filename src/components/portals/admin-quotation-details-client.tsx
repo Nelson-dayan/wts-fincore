@@ -16,6 +16,7 @@ import { DashboardPageHeader } from "@/components/dashboard/page-header";
 import { QuotationPurchaseOrdersSection } from "@/components/portals/quotation-purchase-orders-section";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { readResponseJson } from "@/lib/http/read-response-json";
 
 export function AdminQuotationDetailsClient({ quotationId }: { quotationId: string }) {
   const router = useRouter();
@@ -50,7 +51,9 @@ export function AdminQuotationDetailsClient({ quotationId }: { quotationId: stri
     const response = await fetch(`/api/admin/quotations/${quotationId}`, {
       cache: "no-store",
     });
-    const payload = (await response.json()) as { item?: QuotationPayload; message?: string };
+    const payload = await readResponseJson<{ item?: QuotationPayload; message?: string }>(
+      response
+    );
     if (!response.ok) throw new Error(payload.message ?? "Failed to load quotation");
     const q = payload.item;
     if (!q) throw new Error("Missing quotation");
@@ -192,7 +195,7 @@ export function AdminQuotationDetailsClient({ quotationId }: { quotationId: stri
           internalNotes,
         }),
       });
-      const result = (await response.json().catch(() => ({}))) as { message?: string };
+      const result = await readResponseJson<{ message?: string }>(response);
       if (!response.ok) {
         throw new Error(result.message ?? `Failed to save (HTTP ${response.status}).`);
       }
@@ -213,7 +216,7 @@ export function AdminQuotationDetailsClient({ quotationId }: { quotationId: stri
       const response = await fetch(`/api/admin/quotations/${quotationId}`, {
         method: "DELETE",
       });
-      const result = (await response.json()) as { message?: string };
+      const result = await readResponseJson<{ message?: string }>(response);
       if (!response.ok) throw new Error(result.message ?? "Failed to delete");
       router.push("/admin/quotations");
       router.refresh();
