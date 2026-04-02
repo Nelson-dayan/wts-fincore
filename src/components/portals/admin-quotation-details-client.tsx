@@ -7,6 +7,7 @@ import { DocumentCard } from "@/components/portals/admin-quotation-details/docum
 import { InternalNotesCard } from "@/components/portals/admin-quotation-details/internal-notes-card";
 import { LineItemsCard } from "@/components/portals/admin-quotation-details/line-items-card";
 import { QuotationHeaderActions } from "@/components/portals/admin-quotation-details/quotation-header-actions";
+import { QuotationStatusCard } from "@/components/portals/admin-quotation-details/quotation-status-card";
 import { QuotationInfoCard } from "@/components/portals/admin-quotation-details/quotation-info-card";
 import { SnapshotsCard } from "@/components/portals/admin-quotation-details/snapshots-card";
 import { SummaryCard } from "@/components/portals/admin-quotation-details/summary-card";
@@ -218,7 +219,12 @@ export function AdminQuotationDetailsClient({ quotationId }: { quotationId: stri
       });
       const result = await readResponseJson<{ message?: string }>(response);
       if (!response.ok) throw new Error(result.message ?? "Failed to delete");
-      router.push("/admin/quotations");
+      const pid = item.projectId?.trim();
+      router.replace(
+        pid
+          ? `/admin/quotations?projectId=${encodeURIComponent(pid)}`
+          : "/admin/quotations"
+      );
       router.refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to delete");
@@ -246,6 +252,12 @@ export function AdminQuotationDetailsClient({ quotationId }: { quotationId: stri
       {item ? (
         <>
           <QuotationHeaderActions quotationId={quotationId} projectId={item.projectId} />
+
+          <QuotationStatusCard
+            quotationId={quotationId}
+            currentStatus={item.status}
+            onUpdated={() => load()}
+          />
 
           <QuotationPurchaseOrdersSection
             quotationId={item._id}

@@ -39,6 +39,8 @@ export function AdminQuotationsClient({
   const [builderKey, setBuilderKey] = useState(0);
   const [editingQuotationId, setEditingQuotationId] = useState<string | null>(null);
   const [initialSnapshot, setInitialSnapshot] = useState<QuotationData | null>(null);
+  const [builderLinkedProjectId, setBuilderLinkedProjectId] = useState("");
+  const [builderLinkedProjectName, setBuilderLinkedProjectName] = useState("");
   const [rowBusyId, setRowBusyId] = useState("");
 
   const fetchList = useCallback(async () => {
@@ -82,6 +84,8 @@ export function AdminQuotationsClient({
   const openNew = useCallback(() => {
     setEditingQuotationId(null);
     setInitialSnapshot(null);
+    setBuilderLinkedProjectId("");
+    setBuilderLinkedProjectName("");
     setBuilderKey((k) => k + 1);
     setBuilderOpen(true);
     window.requestAnimationFrame(() => {
@@ -104,9 +108,13 @@ export function AdminQuotationsClient({
       );
       if (!res.ok) throw new Error(payload.message ?? "Failed to load quotation");
       if (!payload.item) throw new Error("Missing quotation");
-      const data = quotationItemToGeneratorData(
-        payload.item as Parameters<typeof quotationItemToGeneratorData>[0]
-      );
+      const item = payload.item as {
+        projectId?: string;
+        projectName?: string;
+      } & Parameters<typeof quotationItemToGeneratorData>[0];
+      const data = quotationItemToGeneratorData(item);
+      setBuilderLinkedProjectId(String(item.projectId ?? "").trim());
+      setBuilderLinkedProjectName(String(item.projectName ?? "").trim());
       setEditingQuotationId(id);
       setInitialSnapshot(data);
       setBuilderKey((k) => k + 1);
@@ -156,6 +164,8 @@ export function AdminQuotationsClient({
     setBuilderOpen(false);
     setEditingQuotationId(null);
     setInitialSnapshot(null);
+    setBuilderLinkedProjectId("");
+    setBuilderLinkedProjectName("");
   }, []);
 
   const onDbSaveSuccess = useCallback(
@@ -334,6 +344,8 @@ export function AdminQuotationsClient({
             key={builderKey}
             variant="embedded"
             initialSaveProjectId={initialProjectId}
+            linkedQuotationProjectId={builderLinkedProjectId}
+            linkedQuotationProjectName={builderLinkedProjectName}
             editingQuotationId={editingQuotationId}
             initialSnapshot={initialSnapshot}
             onDbSaveSuccess={onDbSaveSuccess}

@@ -104,7 +104,7 @@ export function AdminClientDetailsClient({ clientId }: { clientId: string }) {
       });
       const payload = await readResponseJson<{ message?: string }>(response);
       if (!response.ok) throw new Error(payload.message ?? "Failed to delete client");
-      router.push("/admin/clients");
+      router.replace("/admin/clients");
       router.refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to delete client");
