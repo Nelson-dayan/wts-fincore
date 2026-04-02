@@ -18,6 +18,8 @@ export type ClientDetailsPayload = {
     status: string;
     priority: string;
     createdAt: string;
+    /** Sum of expense amounts for this project (AED). */
+    expenseTotal?: number;
   }>;
   quotations?: Array<{
     _id: string;
@@ -42,6 +44,17 @@ export type ClientDetailsPayload = {
     projectId: string;
     createdAt: string;
   }>;
+  expenses?: Array<{
+    _id: string;
+    title: string;
+    amount: number;
+    category: string;
+    projectId: string;
+    projectName: string;
+    createdAt: string;
+  }>;
+  /** Sum of all expense amounts across this client’s projects (AED). */
+  expenseTotalAll?: number;
   message?: string;
 };
 

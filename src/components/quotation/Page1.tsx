@@ -81,7 +81,7 @@ export function Page1({ data }: Page1Props) {
               {ref ? (
                 <p>
                   <span className="font-semibold" style={{ color: QUOTATION_PDF_COLORS.slate900 }}>
-                    Ref No:{" "}
+                    Quotation no:{" "}
                   </span>
                   {ref}
                 </p>

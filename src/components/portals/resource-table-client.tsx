@@ -41,6 +41,8 @@ interface ResourceTableClientProps {
   emptyMessage?: string;
   /** When false, skips the top DashboardPageHeader (use when the page supplies its own). */
   showPageHeader?: boolean;
+  /** Increment to refetch the list with the same endpoint (e.g. after creating a row elsewhere on the page). */
+  refreshKey?: number;
 }
 
 function formatCell(value: unknown): string {
@@ -77,6 +79,7 @@ export function ResourceTableClient({
   emptyMessage =
     "No records match yet. Adjust search or add new data — the table updates after the list loads.",
   showPageHeader = true,
+  refreshKey = 0,
 }: ResourceTableClientProps) {
   const detailPrefix = rowDetailPathPrefix?.replace(/\/$/, "") ?? "";
   const [rows, setRows] = useState<Row[]>([]);
@@ -132,7 +135,7 @@ export function ResourceTableClient({
     return () => {
       alive = false;
     };
-  }, [endpoint, singleItem, page, query]);
+  }, [endpoint, singleItem, page, query, refreshKey]);
 
   return (
     <div className="animate-fade-in">

@@ -18,25 +18,70 @@ function pdfBuilderPayload(data: QuotationData) {
   return JSON.parse(JSON.stringify(normalizeQuotationData(data))) as Record<string, unknown>;
 }
 
-async function resolveProjectId(params: {
-  bodyProjectId?: string;
-  quotationId?: string;
-}): Promise<{ projectId: string } | { error: string; status: number }> {
-  const trimmed = String(params.bodyProjectId ?? "").trim();
-  if (trimmed && mongoose.Types.ObjectId.isValid(trimmed)) {
-    return { projectId: trimmed };
-  }
-  const qid = String(params.quotationId ?? "").trim();
-  if (qid && mongoose.Types.ObjectId.isValid(qid)) {
-    const ex = await QuotationModel.findById(qid).select("projectId").lean();
-    if (!ex) return { error: "Quotation not found", status: 404 };
-    return { projectId: String(ex.projectId) };
-  }
-  const first = await ProjectModel.findOne().sort({ createdAt: 1 }).select("_id").lean();
-  if (!first?._id) {
-    return { error: "No project found. Create a project under Admin first.", status: 400 };
-  }
-  return { projectId: String(first._id) };
+type ClientSnap = {
+  name: string;
+  company: string;
+  address: string;
+  logoText: string;
+  signatureText: string;
+};
+
+type CompanySnap = {
+  name: string;
+  address: string;
+  email: string;
+  website: string;
+  logoUrl: string;
+  logoText: string;
+  signatureText: string;
+};
+
+function snapshotsFromExistingDoc(existing: Record<string, unknown>): {
+  clientSnapshot: ClientSnap;
+  companySnapshot: CompanySnap;
+} | null {
+  const c = existing.clientSnapshot;
+  const co = existing.companySnapshot;
+  if (!c || typeof c !== "object" || !co || typeof co !== "object") return null;
+  const cs = c as Record<string, unknown>;
+  const cos = co as Record<string, unknown>;
+  return {
+    clientSnapshot: {
+      name: String(cs.name ?? ""),
+      company: String(cs.company ?? ""),
+      address: String(cs.address ?? ""),
+      logoText: String(cs.logoText ?? ""),
+      signatureText: String(cs.signatureText ?? ""),
+    },
+    companySnapshot: {
+      name: String(cos.name ?? ""),
+      address: String(cos.address ?? ""),
+      email: String(cos.email ?? ""),
+      website: String(cos.website ?? ""),
+      logoUrl: String(cos.logoUrl ?? ""),
+      logoText: String(cos.logoText ?? ""),
+      signatureText: String(cos.signatureText ?? ""),
+    },
+  };
+}
+
+function mergeSnapshotsWithForm(
+  built: { clientSnapshot: ClientSnap; companySnapshot: CompanySnap },
+  data: QuotationData
+) {
+  const clientName = data.clientName.trim();
+  const contactName = data.contactName.trim();
+  const clientSnapshot = {
+    ...built.clientSnapshot,
+    company: clientName || built.clientSnapshot.company,
+    name: contactName || clientName || built.clientSnapshot.name,
+  };
+  const companySnapshot = {
+    ...built.companySnapshot,
+    ...(data.companyName.trim() ? { name: data.companyName.trim() } : {}),
+    ...(data.companyAddress.trim() ? { address: data.companyAddress.trim() } : {}),
+  };
+  return { clientSnapshot, companySnapshot };
 }
 
 /**
@@ -62,15 +107,6 @@ export async function POST(req: Request) {
         ? quotationIdRaw
         : undefined;
 
-    const resolved = await resolveProjectId({
-      bodyProjectId: body.projectId,
-      quotationId: quotationOid,
-    });
-    if ("error" in resolved) {
-      return NextResponse.json({ message: resolved.error }, { status: resolved.status });
-    }
-    const projectId = resolved.projectId;
-
     const data = normalizeQuotationData(body.data);
     const pages = pagesFromGeneratorData(data);
     const taxRate =
@@ -78,19 +114,50 @@ export async function POST(req: Request) {
     const taxEnabled = body.taxEnabled !== false;
     const { subtotal, tax, total } = computeQuotationTotals(pages, taxRate, taxEnabled);
 
-    const built = await buildQuotationSnapshots(projectId);
-    const clientName = data.clientName.trim();
-    const contactName = data.contactName.trim();
-    const clientSnapshot = {
-      ...built.clientSnapshot,
-      company: clientName || built.clientSnapshot.company,
-      name: contactName || clientName || built.clientSnapshot.name,
-    };
-    const companySnapshot = {
-      ...built.companySnapshot,
-      ...(data.companyName.trim() ? { name: data.companyName.trim() } : {}),
-      ...(data.companyAddress.trim() ? { address: data.companyAddress.trim() } : {}),
-    };
+    let projectId: string;
+    let snapshotBase: { clientSnapshot: ClientSnap; companySnapshot: CompanySnap };
+    let existingForUpdate: Record<string, unknown> | null = null;
+
+    if (quotationOid) {
+      const existing = await QuotationModel.findById(quotationOid).lean();
+      if (!existing) {
+        return NextResponse.json({ message: "Quotation not found" }, { status: 404 });
+      }
+      existingForUpdate = existing as Record<string, unknown>;
+      projectId = String(existing.projectId);
+
+      const bodyPid = String(body.projectId ?? "").trim();
+      if (
+        bodyPid &&
+        mongoose.Types.ObjectId.isValid(bodyPid) &&
+        bodyPid !== projectId
+      ) {
+        return NextResponse.json(
+          { message: "Project connection does not match this quotation." },
+          { status: 400 }
+        );
+      }
+
+      const fromDoc = snapshotsFromExistingDoc(existingForUpdate);
+      snapshotBase =
+        fromDoc ?? (await buildQuotationSnapshots(projectId));
+    } else {
+      const bodyPid = String(body.projectId ?? "").trim();
+      if (!bodyPid || !mongoose.Types.ObjectId.isValid(bodyPid)) {
+        return NextResponse.json(
+          { message: "Connect a project before saving (projectId required)." },
+          { status: 400 }
+        );
+      }
+      const projExists = await ProjectModel.exists({ _id: bodyPid });
+      if (!projExists) {
+        return NextResponse.json({ message: "Project not found" }, { status: 404 });
+      }
+      projectId = bodyPid;
+      snapshotBase = await buildQuotationSnapshots(projectId);
+    }
+
+    const { clientSnapshot, companySnapshot } = mergeSnapshotsWithForm(snapshotBase, data);
 
     let docDate = new Date();
     if (data.date.trim()) {
@@ -150,17 +217,14 @@ export async function POST(req: Request) {
       status: body.status ?? "sent",
     };
 
-    if (quotationOid) {
-      const existing = await QuotationModel.findById(quotationOid).lean();
-      if (!existing) {
-        return NextResponse.json({ message: "Quotation not found" }, { status: 404 });
-      }
+    if (quotationOid && existingForUpdate) {
+      const existingProjectId = existingForUpdate.projectId as mongoose.Types.ObjectId;
       const updated = await QuotationModel.findByIdAndUpdate(
         quotationOid,
         {
           $set: {
             ...commonSet,
-            projectId: existing.projectId,
+            projectId: existingProjectId,
           },
         },
         { new: true }

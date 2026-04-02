@@ -16,12 +16,15 @@ import {
   QUOTATION_STORAGE_KEY,
   type QuotationData,
 } from "@/types/quotation-generator";
+import { QuotationProjectConnector } from "@/components/quotation/QuotationProjectConnector";
 import {
   getQuotationPagePx,
   getQuotationPreviewStackHeightPx,
 } from "@/lib/quotation/page-layout";
+import { generateQuotationRefNo } from "@/lib/quotation/generate-ref-no";
 import { exportQuotationPdf } from "@/utils/exportPdf";
 import { readResponseJson } from "@/lib/http/read-response-json";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 type PrimaryCompanySettings = {
   name?: string;
@@ -61,8 +64,11 @@ function applyPrimaryCompanyDefaults(
 export type QuotationBuilderPanelProps = {
   /** Full page: show header + back link. Embedded: section title only (e.g. admin quotations). */
   variant?: "standalone" | "embedded";
-  /** Prefer this project when saving (e.g. from Admin ?projectId=). Server falls back to first project if empty. */
+  /** When opening the builder from a project URL (`?projectId=`) — used as initial link + save target. */
   initialSaveProjectId?: string;
+  /** When loading an existing quotation for edit — the record's linked project (required for save). */
+  linkedQuotationProjectId?: string;
+  linkedQuotationProjectName?: string;
   /** When set, Save updates this record (same quotation, no duplicate). */
   editingQuotationId?: string | null;
   /** Seed form when opening the builder (e.g. Load from admin table). Prefer remounting parent `key` when this changes. */
@@ -79,6 +85,8 @@ export type QuotationBuilderPanelProps = {
 export function QuotationBuilderPanel({
   variant = "standalone",
   initialSaveProjectId = "",
+  linkedQuotationProjectId = "",
+  linkedQuotationProjectName = "",
   editingQuotationId = null,
   initialSnapshot = null,
   onDbSaveSuccess,
@@ -87,6 +95,14 @@ export function QuotationBuilderPanel({
   const [data, setData] = useState<QuotationData>(() =>
     initialSnapshot ? normalizeQuotationData(initialSnapshot) : defaultQuotationData()
   );
+  const [connectedProjectId, setConnectedProjectId] = useState<string>(
+    () => initialSaveProjectId.trim() || linkedQuotationProjectId.trim()
+  );
+  const [connectedProjectName, setConnectedProjectName] = useState<string>(
+    () => linkedQuotationProjectName.trim()
+  );
+  const [projectDefaultsLoading, setProjectDefaultsLoading] = useState(false);
+  const [projectDefaultsError, setProjectDefaultsError] = useState<string | null>(null);
   const [storageReady, setStorageReady] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [saveNotice, setSaveNotice] = useState<string | null>(null);
@@ -99,6 +115,65 @@ export function QuotationBuilderPanel({
   const previewRef = useRef<HTMLDivElement>(null);
   /** Full-scale capture root — must not sit under CSS `transform: scale(...)`. */
   const exportCaptureRef = useRef<HTMLDivElement>(null);
+  const [dbConfirmOpen, setDbConfirmOpen] = useState(false);
+  const [dbSaving, setDbSaving] = useState(false);
+  const dbLocalMsgRef = useRef("");
+
+  const loadProjectDefaults = useCallback(
+    async (projectId: string, opts: { force?: boolean } = {}) => {
+      const pid = projectId.trim();
+      if (!pid) return;
+
+      const force = Boolean(opts.force);
+      setProjectDefaultsLoading(true);
+      setProjectDefaultsError(null);
+      try {
+        const res = await fetch(`/api/admin/projects/${encodeURIComponent(pid)}`, {
+          credentials: "include",
+          cache: "no-store",
+        });
+        const payload = await readResponseJson<{
+          project?: { name?: string };
+          client?: { name?: string; company?: string };
+          message?: string;
+        }>(res);
+
+        if (!res.ok) {
+          throw new Error(payload.message ?? "Failed to load project defaults");
+        }
+
+        const projectName = String(payload.project?.name ?? "").trim();
+        const clientName = String(payload.client?.name ?? "").trim();
+        const clientCompany = String(payload.client?.company ?? "").trim();
+
+        setConnectedProjectName(projectName || pid);
+
+        if (force) {
+          setData((prev) => ({
+            ...prev,
+            page1Title: projectName,
+            clientName: clientCompany || clientName,
+            contactName: clientName,
+          }));
+        } else {
+          setData((prev) => {
+            const next = { ...prev };
+            if (!next.page1Title.trim() && projectName) next.page1Title = projectName;
+            if (!next.clientName.trim() && (clientCompany || clientName)) {
+              next.clientName = clientCompany || clientName;
+            }
+            if (!next.contactName.trim() && clientName) next.contactName = clientName;
+            return next;
+          });
+        }
+      } catch (e) {
+        setProjectDefaultsError(e instanceof Error ? e.message : "Failed to load project defaults");
+      } finally {
+        setProjectDefaultsLoading(false);
+      }
+    },
+    []
+  );
 
   useEffect(() => {
     try {
@@ -116,6 +191,15 @@ export function QuotationBuilderPanel({
     }
     setStorageReady(true);
   }, [initialSnapshot]);
+
+  useEffect(() => {
+    if (!storageReady) return;
+    if (editingQuotationId || initialSnapshot) return;
+    setData((prev) => {
+      if (prev.refNo.trim()) return prev;
+      return { ...prev, refNo: generateQuotationRefNo() };
+    });
+  }, [storageReady, editingQuotationId, initialSnapshot]);
 
   useEffect(() => {
     if (!storageReady) return;
@@ -148,7 +232,8 @@ export function QuotationBuilderPanel({
         clearTimeout(saveNoticeTimerRef.current);
         saveNoticeTimerRef.current = null;
       }
-      const next = normalizeQuotationData(ce.detail.data);
+      let next = normalizeQuotationData(ce.detail.data);
+      if (!next.refNo.trim()) next = { ...next, refNo: generateQuotationRefNo() };
       setData(next);
       try {
         localStorage.setItem(QUOTATION_STORAGE_KEY, JSON.stringify(next));
@@ -190,6 +275,26 @@ export function QuotationBuilderPanel({
     };
   }, [editingQuotationId, initialSnapshot]);
 
+  const didAutoLoadDefaultsRef = useRef(false);
+  useEffect(() => {
+    // When opened from `?projectId=...`, auto-load defaults once (only fill empty fields).
+    if (didAutoLoadDefaultsRef.current) return;
+    if (editingQuotationId || initialSnapshot) return;
+
+    const pid = initialSaveProjectId.trim();
+    if (!pid) return;
+    if (!connectedProjectId.trim()) return;
+
+    didAutoLoadDefaultsRef.current = true;
+    void loadProjectDefaults(pid, { force: true });
+  }, [
+    connectedProjectId,
+    editingQuotationId,
+    initialSaveProjectId,
+    initialSnapshot,
+    loadProjectDefaults,
+  ]);
+
   const handleSaveQuotation = useCallback(async () => {
     if (saveNoticeTimerRef.current) {
       clearTimeout(saveNoticeTimerRef.current);
@@ -220,13 +325,31 @@ export function QuotationBuilderPanel({
       }
     }
 
+    if (!connectedProjectId.trim()) {
+      setSaveNotice(
+        `${localMsg} Connect a project before saving to the database.`
+      );
+      saveNoticeTimerRef.current = setTimeout(() => {
+        setSaveNotice(null);
+        saveNoticeTimerRef.current = null;
+      }, 5600);
+      return;
+    }
+
+    dbLocalMsgRef.current = localMsg;
+    setDbConfirmOpen(true);
+  }, [data, connectedProjectId, variant]);
+
+  const runPostToDatabase = useCallback(async () => {
+    const localMsg = dbLocalMsgRef.current;
+    setDbSaving(true);
     try {
       const res = await fetch("/api/admin/quotations/from-builder", {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          projectId: initialSaveProjectId.trim() || undefined,
+          projectId: connectedProjectId.trim() || undefined,
           quotationId: editingQuotationId?.trim() || undefined,
           data,
           status: "sent",
@@ -272,27 +395,43 @@ export function QuotationBuilderPanel({
           ? `Saved to database as ${qn}. Local draft cleared.`
           : "Saved to database. Local draft cleared."
       );
+      setDbConfirmOpen(false);
     } catch (e) {
       setSaveNotice(
         `${localMsg} Database: ${e instanceof Error ? e.message : "request failed"}.`
       );
+    } finally {
+      setDbSaving(false);
     }
 
     saveNoticeTimerRef.current = setTimeout(() => {
       setSaveNotice(null);
       saveNoticeTimerRef.current = null;
     }, 5200);
-  }, [data, editingQuotationId, initialSaveProjectId, onDbSaveSuccess, variant]);
+  }, [data, connectedProjectId, editingQuotationId, onDbSaveSuccess]);
 
   const handleReset = useCallback(() => {
     const base = defaultQuotationData();
-    setData(applyPrimaryCompanyDefaults(base, primaryDefaults));
+    let next = applyPrimaryCompanyDefaults(base, primaryDefaults);
+    if (!editingQuotationId && !initialSnapshot) {
+      next = { ...next, refNo: generateQuotationRefNo() };
+    }
+    setData(next);
     try {
       localStorage.removeItem(QUOTATION_STORAGE_KEY);
     } catch {
       /* ignore */
     }
-  }, [primaryDefaults]);
+    if (connectedProjectId.trim()) {
+      void loadProjectDefaults(connectedProjectId, { force: false });
+    }
+  }, [
+    connectedProjectId,
+    editingQuotationId,
+    initialSnapshot,
+    primaryDefaults,
+    loadProjectDefaults,
+  ]);
 
   const handleDownloadPdf = useCallback(async () => {
     const root = exportCaptureRef.current ?? previewRef.current;
@@ -378,6 +517,28 @@ export function QuotationBuilderPanel({
             <QuotationPreview data={data} />
           </div>
 
+          <div className="flex flex-col gap-4">
+            {projectDefaultsError ? (
+              <p className="text-destructive text-sm" role="alert">
+                {projectDefaultsError}
+              </p>
+            ) : null}
+            <QuotationProjectConnector
+              connectedProjectId={connectedProjectId}
+              connectedProjectName={connectedProjectName}
+              defaultsLoading={projectDefaultsLoading}
+              onConnectProject={(pid) => {
+                setConnectedProjectId(pid);
+                void loadProjectDefaults(pid, { force: true });
+              }}
+              onClearConnection={() => {
+                setConnectedProjectId("");
+                setConnectedProjectName("");
+                setProjectDefaultsError(null);
+              }}
+            />
+          </div>
+
           <QuotationForm
             data={data}
             onChange={setData}
@@ -410,6 +571,22 @@ export function QuotationBuilderPanel({
           </div>
         </div>
       </div>
+
+      <ConfirmDialog
+        open={dbConfirmOpen}
+        onOpenChange={(o) => {
+          if (!o && !dbSaving) setDbConfirmOpen(false);
+        }}
+        title="Save quotation to the database?"
+        description={
+          editingQuotationId
+            ? "Your changes will update this quotation record. The local browser draft is already saved."
+            : "A new quotation will be created in the database. The local browser draft is already saved."
+        }
+        confirmLabel="Save to database"
+        loading={dbSaving}
+        onConfirm={() => void runPostToDatabase()}
+      />
     </div>
   );
 }

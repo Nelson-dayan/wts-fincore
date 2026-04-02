@@ -15,9 +15,10 @@ import {
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DashboardPageHeader } from "@/components/dashboard/page-header";
+import { AdminOverviewCharts } from "@/components/portals/admin-overview-charts";
 import { readResponseJson } from "@/lib/http/read-response-json";
 
-type AdminOverview = {
+type AdminOverviewMetrics = {
   users: number;
   clients: number;
   projects: number;
@@ -29,10 +30,16 @@ type AdminOverview = {
   activityLogs: number;
 };
 
-const metricMeta: Record<
-  keyof AdminOverview,
-  { label: string; icon: LucideIcon }
-> = {
+type AdminOverview = AdminOverviewMetrics & {
+  expenseTotalAmount?: number;
+  expenseByMonth?: Array<{ key: string; label: string; total: number }>;
+  expenseByCategory?: Array<{ category: string; total: number }>;
+  topProjectsByExpense?: Array<{ projectId: string; name: string; total: number }>;
+};
+
+type MetricKey = keyof AdminOverviewMetrics;
+
+const metricMeta: Record<MetricKey, { label: string; icon: LucideIcon }> = {
   users: { label: "Users", icon: Users },
   clients: { label: "Clients", icon: Building2 },
   projects: { label: "Projects", icon: FolderKanban },
@@ -47,7 +54,7 @@ const metricMeta: Record<
 const sections: Array<{
   id: string;
   title: string;
-  keys: Array<keyof AdminOverview>;
+  keys: MetricKey[];
 }> = [
   {
     id: "organization",
@@ -111,7 +118,7 @@ export function AdminOverviewClient() {
               {section.keys.map((key) => {
                 const meta = metricMeta[key];
                 const Icon = meta.icon;
-                const raw = data?.[key];
+                const count = data?.[key] ?? 0;
                 return (
                   <Card key={key} className="dashboard-stat-card">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 pt-5">
@@ -127,7 +134,7 @@ export function AdminOverviewClient() {
                     </CardHeader>
                     <CardContent>
                       <p className="text-3xl font-semibold tabular-nums tracking-tight text-foreground">
-                        {data != null ? formatCount(raw ?? 0) : "—"}
+                        {data != null ? formatCount(count) : "—"}
                       </p>
                     </CardContent>
                   </Card>
@@ -137,6 +144,23 @@ export function AdminOverviewClient() {
           </section>
         ))}
       </div>
+
+      {data &&
+      data.expenseTotalAmount !== undefined &&
+      data.expenseByMonth &&
+      data.expenseByCategory &&
+      data.topProjectsByExpense ? (
+        <div className="mt-9 md:mt-11">
+          <AdminOverviewCharts
+            expenseTotalAmount={data.expenseTotalAmount}
+            expenseByMonth={data.expenseByMonth}
+            expenseByCategory={data.expenseByCategory}
+            topProjectsByExpense={data.topProjectsByExpense}
+            projects={data.projects}
+            expenses={data.expenses}
+          />
+        </div>
+      ) : null}
     </div>
   );
 }

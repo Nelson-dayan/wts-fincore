@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { requireRole } from "@/lib/auth/require-role";
 import { authErrorResponse } from "@/lib/api/route-auth";
 import { connectDB } from "@/lib/db/connect";
-import { PurchaseOrderModel } from "@/lib/db/models";
+import { InvoiceModel, PurchaseOrderModel } from "@/lib/db/models";
 import { logActivity } from "@/lib/services/activity/log-activity.service";
 import mongoose from "mongoose";
 import {
@@ -197,5 +197,53 @@ export async function PATCH(req: Request, ctx: Ctx) {
       return authErrorResponse(error, "Forbidden");
     }
     return authErrorResponse(error, "Failed to update purchase order");
+  }
+}
+
+export async function DELETE(_req: Request, ctx: Ctx) {
+  try {
+    const session = await requireRole(["admin"]);
+    await connectDB();
+    const { purchaseOrderId } = await ctx.params;
+    if (!mongoose.Types.ObjectId.isValid(purchaseOrderId)) {
+      return NextResponse.json({ message: "Invalid purchase order id" }, { status: 400 });
+    }
+
+    const invoiceCount = await InvoiceModel.countDocuments({
+      poId: new mongoose.Types.ObjectId(purchaseOrderId),
+    });
+    if (invoiceCount > 0) {
+      return NextResponse.json(
+        {
+          message:
+            "This purchase order has linked invoices. Remove or reassign those invoices before deleting.",
+        },
+        { status: 400 }
+      );
+    }
+
+    const deleted = await PurchaseOrderModel.findByIdAndDelete(purchaseOrderId).lean();
+    if (!deleted) {
+      return NextResponse.json({ message: "Purchase order not found" }, { status: 404 });
+    }
+
+    await logActivity({
+      userId: session.user.id,
+      action: "deleted_purchase_order",
+      entityType: "purchase_order",
+      entityId: purchaseOrderId,
+      message: `Deleted purchase order ${deleted.poNumber}`,
+      projectId: String(deleted.projectId),
+    });
+
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    if (error instanceof Error && error.message === "UNAUTHORIZED") {
+      return authErrorResponse(error, "Unauthorized");
+    }
+    if (error instanceof Error && error.message === "FORBIDDEN") {
+      return authErrorResponse(error, "Forbidden");
+    }
+    return authErrorResponse(error, "Failed to delete purchase order");
   }
 }
