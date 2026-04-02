@@ -20,7 +20,7 @@ export default async function EmployeePortalLayout({
   return (
     <div className="flex min-h-dvh flex-col bg-background">
       <PortalHeader brand={<PortalBrand variant="employee" />}>
-        <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end sm:gap-2">
+        <div className="flex w-full flex-wrap items-center justify-center gap-2 sm:w-auto sm:gap-2">
           <PortalNavLink href="/employee" match="exact">
             Overview
           </PortalNavLink>

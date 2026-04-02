@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { readResponseJson } from "@/lib/http/read-response-json";
 
 interface FieldConfig {
   name: string;
@@ -44,7 +45,7 @@ export function CreateRecordForm({
         body: JSON.stringify(payload),
       });
 
-      const result = (await response.json()) as { message?: string };
+      const result = await readResponseJson<{ message?: string }>(response);
       if (!response.ok) throw new Error(result.message ?? "Create failed");
       setMessage("Created successfully. Refreshing...");
       setTimeout(() => {

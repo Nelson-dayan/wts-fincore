@@ -36,6 +36,13 @@ export function Page1({ data }: Page1Props) {
         ? "text-right"
         : "text-center";
 
+  const bodyInsetClass =
+    coverTextAlign === "left"
+      ? "pl-[4%] pr-2"
+      : coverTextAlign === "right"
+        ? "pr-[4%] pl-2"
+        : "px-2";
+
   return (
     <QuotationPageFrame data={data} page={1}>
       <div className="flex h-full min-h-0 flex-col">
@@ -68,7 +75,7 @@ export function Page1({ data }: Page1Props) {
 
           {showBody ? (
             <div
-              className={`mx-auto w-full max-w-2xl space-y-3 pl-[4%] text-[14px] leading-relaxed md:text-[15px] ${textAlignClass}`}
+              className={`mx-auto w-full max-w-2xl space-y-3 text-[14px] leading-relaxed md:text-[15px] ${textAlignClass} ${bodyInsetClass}`}
               style={{ color: QUOTATION_PDF_COLORS.slate800 }}
             >
               {ref ? (

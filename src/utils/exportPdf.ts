@@ -77,3 +77,71 @@ export async function exportQuotationPdf(
 
   pdf.save(fileName);
 }
+
+/**
+ * Renders a single invoice node (`#invoice-print-root`) to a **single-page A4 portrait** PDF.
+ * The captured preview is fitted proportionally inside A4 with margins.
+ */
+export async function exportInvoicePdf(
+  invoiceRoot: HTMLElement,
+  fileName = "invoice.pdf"
+): Promise<void> {
+  const pdf = new jsPDF({
+    orientation: "portrait",
+    unit: "mm",
+    format: "a4",
+    compress: true,
+  });
+  const margin = 0;
+  const pageW = pdf.internal.pageSize.getWidth();
+  const pageH = pdf.internal.pageSize.getHeight();
+  const contentW = pageW - margin * 2;
+  const contentH = pageH - margin * 2;
+
+  const baseOpts: Html2CanvasOpts = {
+    useCORS: true,
+    allowTaint: true,
+    backgroundColor: "#ffffff",
+    logging: false,
+    imageTimeout: 20_000,
+    scale: 2,
+  };
+
+  let canvas: HTMLCanvasElement;
+  try {
+    canvas = await capturePage(invoiceRoot, {
+      ...baseOpts,
+      onclone(clonedDoc, clonedEl) {
+        stripUnsupportedColorsFromClone(clonedDoc, clonedEl, invoiceRoot);
+      },
+    });
+  } catch {
+    canvas = await capturePage(invoiceRoot, {
+      ...baseOpts,
+      scale: 1,
+      onclone(clonedDoc, clonedEl) {
+        stripUnsupportedColorsFromClone(clonedDoc, clonedEl, invoiceRoot);
+      },
+    });
+  }
+
+  let imgData: string;
+  try {
+    // PNG avoids JPEG compression artifacts (dark hairlines on thin borders/text).
+    imgData = canvas.toDataURL("image/png");
+  } catch {
+    throw new Error(
+      "Could not build PDF (browser blocked the image). Use Print → Save as PDF, or try a smaller logo."
+    );
+  }
+
+  const imgAspect = canvas.width / canvas.height;
+  const boxAspect = contentW / contentH;
+  const renderW = imgAspect > boxAspect ? contentW : contentH * imgAspect;
+  const renderH = imgAspect > boxAspect ? contentW / imgAspect : contentH;
+  const x = margin + (contentW - renderW) / 2;
+  const y = margin + (contentH - renderH) / 2;
+  pdf.addImage(imgData, "PNG", x, y, renderW, renderH);
+
+  pdf.save(fileName);
+}

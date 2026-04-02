@@ -189,7 +189,15 @@ export async function PATCH(req: Request, ctx: Ctx) {
       inv.markModified("totals");
     }
 
-    await inv.save();
+    try {
+      await inv.save();
+    } catch (err) {
+      if (err instanceof mongoose.Error.ValidationError) {
+        const first = Object.values(err.errors)[0]?.message ?? err.message;
+        return NextResponse.json({ message: first || "Validation failed" }, { status: 400 });
+      }
+      throw err;
+    }
 
     await logActivity({
       userId: session.user.id,

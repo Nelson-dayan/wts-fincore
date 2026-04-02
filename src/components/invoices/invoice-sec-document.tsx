@@ -96,14 +96,14 @@ function BankBlock({
   return (
     <div className="mb-3 break-inside-avoid">
       <p className="mb-1 text-[10px] font-bold uppercase tracking-wide text-neutral-800">{title}</p>
-      <table className="w-full border border-neutral-400 text-[10px]">
+      <table className="w-full border-separate border-spacing-0 border border-[#a9a9a9] text-[10px]">
         <tbody>
-          {rows.map(([k, v]) => (
-            <tr key={k} className="border-b border-neutral-300">
-              <td className="w-[32%] border-r border-neutral-300 bg-neutral-100 px-1.5 py-1 font-medium text-neutral-700">
+          {rows.map(([k, v], idx) => (
+            <tr key={k} className={idx < rows.length - 1 ? "border-b border-[#b7b7b7]" : ""}>
+              <td className="w-[32%] border-r border-[#b7b7b7] bg-[#f2f2f2] px-1.5 py-1 font-medium text-[#2a2a2a]">
                 {k}
               </td>
-              <td className="px-1.5 py-1 text-neutral-900">{v || "—"}</td>
+              <td className="px-1.5 py-1 text-[#111]">{v || "—"}</td>
             </tr>
           ))}
         </tbody>
@@ -120,6 +120,21 @@ export function InvoiceSecDocument({
   mode?: "screen" | "print";
 }) {
   const { documentInfo, clientSnapshot, companySnapshot, extras, totals, pages } = data;
+  const companyName = String(companySnapshot.name ?? "").trim();
+  const normalize = (v: string) => v.toLowerCase().replace(/[^a-z0-9]+/g, "");
+  const normalizedCompanyName = normalize(companyName);
+  const companyAddressRaw = String(companySnapshot.address ?? "");
+  const companyAddressLines = companyAddressRaw
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+  const companyAddress = companyAddressLines
+    .filter((line, idx) => {
+      if (idx !== 0 || !normalizedCompanyName) return true;
+      return !normalize(line).includes(normalizedCompanyName);
+    })
+    .join("\n")
+    .trim();
   const taxRate = documentInfo.taxRate ?? 5;
   const taxLabel = documentInfo.taxEnabled !== false ? `Tax (${taxRate}%)` : "Tax";
 
@@ -128,12 +143,17 @@ export function InvoiceSecDocument({
 
   const shell =
     mode === "print"
-      ? "bg-white p-8 text-neutral-900 print:p-6"
-      : "rounded-lg border border-neutral-200 bg-white p-6 text-neutral-900 shadow-sm print:border-0 print:shadow-none";
+      ? "bg-white p-8 text-neutral-900 print:p-0"
+      : "bg-white p-8 text-neutral-900 print:border-0 print:p-0 print:shadow-none";
 
+  /** Screen: max A4 width; print: full printable width (margins come from @page). */
   return (
-    <div className={`mx-auto max-w-[210mm] ${shell}`} id="invoice-print-root">
-      <header className="mb-5 flex flex-col gap-4 border-b border-neutral-200 pb-4 sm:flex-row sm:items-start sm:justify-between">
+    <div
+      className={`box-border mx-auto w-full max-w-[210mm] ${shell}`}
+      id="invoice-print-root"
+      data-invoice-a4="true"
+    >
+      <header className="mb-4 flex flex-col gap-4 pb-2 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex gap-3">
           {companySnapshot.logoUrl ? (
             /* eslint-disable-next-line @next/next/no-img-element */
@@ -149,66 +169,64 @@ export function InvoiceSecDocument({
               LANCE
             </div>
           )}
-          <div className="min-w-0 text-[11px] leading-snug">
-            <p className="text-sm font-bold text-neutral-900">{companySnapshot.name || "—"}</p>
-            <p className="whitespace-pre-wrap text-neutral-700">{companySnapshot.address || ""}</p>
+          <div className="min-w-0 text-[10px] leading-snug">
+            <p className="text-[12px] font-semibold text-neutral-900">{companySnapshot.name || "—"}</p>
+            <p className="whitespace-pre-wrap text-neutral-700">{companyAddress || companySnapshot.address || ""}</p>
             {extras.companyTrn ? (
               <p className="mt-1 font-medium text-neutral-800">TRN: {extras.companyTrn}</p>
             ) : null}
           </div>
         </div>
         <div className="text-right sm:min-w-50">
-          <p className="text-2xl font-bold tracking-tight text-neutral-900">
+          <p className="text-[38px] font-light leading-none tracking-tight text-[#1e3552]">
             {documentInfo.title || "INVOICE"}
           </p>
-          <p className="mt-1 font-mono text-sm font-semibold text-neutral-800">{data.invoiceNumber}</p>
+          <p className="mt-2 font-mono text-[11px] font-medium text-neutral-500">{data.invoiceNumber}</p>
         </div>
       </header>
 
-      <div className="mb-4 grid gap-4 sm:grid-cols-2">
-        <div>
-          <p className="text-[10px] font-bold uppercase text-neutral-600">Bill To</p>
-          <p className="mt-1 text-[11px] font-semibold text-neutral-900">{clientSnapshot.name || "—"}</p>
-          <p className="text-[11px] text-neutral-800">{clientSnapshot.company}</p>
-          <p className="whitespace-pre-wrap text-[11px] text-neutral-700">{clientSnapshot.address}</p>
+      <div className="mb-5 grid gap-4 sm:grid-cols-[1fr_1fr_1.3fr]">
+        <div className="min-w-0">
+          <p className="text-[11px] font-medium text-neutral-500">Bill To:</p>
+          <p className="mt-0.5 text-[12px] font-bold text-neutral-900">{clientSnapshot.name || "—"}</p>
+          <p className="text-[12px] font-bold text-neutral-900">{clientSnapshot.company}</p>
+          <p className="whitespace-pre-wrap text-[12px] font-semibold leading-tight text-neutral-900">{clientSnapshot.address}</p>
           {extras.clientTrn ? (
-            <p className="mt-1 text-[11px] font-medium">TRN: {extras.clientTrn}</p>
+            <p className="mt-1 text-[12px] font-semibold">TRN: {extras.clientTrn}</p>
           ) : null}
         </div>
-        <div>
-          <p className="text-[10px] font-bold uppercase text-neutral-600">Ship To</p>
-          <p className="mt-1 text-[11px] font-semibold text-neutral-900">
+        <div className="min-w-0">
+          <p className="text-[11px] font-medium text-neutral-500">Ship To:</p>
+          <p className="mt-0.5 text-[12px] font-bold text-neutral-900">
             {extras.shipToCompany || clientSnapshot.company || "—"}
           </p>
-          <p className="whitespace-pre-wrap text-[11px] text-neutral-700">
+          <p className="whitespace-pre-wrap text-[12px] font-semibold leading-tight text-neutral-900">
             {extras.shipToAddress || clientSnapshot.address || ""}
           </p>
           {extras.shipToTrn ? (
-            <p className="mt-1 text-[11px] font-medium">TRN: {extras.shipToTrn}</p>
+            <p className="mt-1 text-[12px] font-semibold">TRN: {extras.shipToTrn}</p>
           ) : null}
         </div>
-      </div>
-
-      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:justify-end">
-        <table className="ml-auto text-right text-[11px]">
+        <div className="min-w-0">
+          <table className="ml-auto w-full text-right text-[12px]">
           <tbody>
             <tr>
-              <td className="pr-4 font-medium text-neutral-600">Date</td>
-              <td className="font-semibold text-neutral-900">{formatDate(documentInfo.date)}</td>
+              <td className="pr-5 font-medium text-neutral-500">Date:</td>
+              <td className="font-medium text-neutral-900">{formatDate(documentInfo.date)}</td>
             </tr>
             <tr>
-              <td className="pr-4 font-medium text-neutral-600">Payment Terms</td>
-              <td className="font-semibold text-neutral-900">{extras.paymentTerms || "—"}</td>
+              <td className="pr-5 font-medium text-neutral-500">Payment Terms:</td>
+              <td className="font-medium text-neutral-900">{extras.paymentTerms || "—"}</td>
             </tr>
             <tr>
-              <td className="pr-4 font-medium text-neutral-600">Due Date</td>
-              <td className="font-semibold text-neutral-900">{formatDate(data.dueDate)}</td>
+              <td className="pr-5 font-medium text-neutral-500">Due Date:</td>
+              <td className="font-medium text-neutral-900">{formatDate(data.dueDate)}</td>
             </tr>
             <tr>
-              <td className="pr-4 font-medium text-neutral-600">PO Number</td>
-              <td className="font-semibold text-neutral-900">
+              <td className="pr-5 font-medium text-neutral-500">PO Number:</td>
+              <td className="font-medium text-neutral-900">
                 {data.poId ? (
-                  <Link href={`/admin/purchase-orders/${data.poId}`} className="text-[#1e3a5f] underline">
+                  <Link href={`/admin/purchase-orders/${data.poId}`} className="text-[#1e3a5f] no-underline">
                     {extras.poNumberRef || "—"}
                   </Link>
                 ) : (
@@ -218,10 +236,11 @@ export function InvoiceSecDocument({
             </tr>
           </tbody>
         </table>
+        </div>
       </div>
 
-      <div className="mb-4 rounded-sm bg-neutral-200 px-3 py-2.5">
-        <p className="text-center text-sm font-semibold text-neutral-900">
+      <div className="mb-6 ml-auto w-full max-w-77.5 rounded-sm bg-[#ececec] px-3 py-2">
+        <p className="text-center text-[18px] font-bold text-[#111]">
           Balance Due: {formatAed(balanceDue)}
         </p>
       </div>
@@ -229,7 +248,7 @@ export function InvoiceSecDocument({
       <div className="mb-4 overflow-x-auto">
         <table className="w-full border-collapse text-[11px]">
           <thead>
-            <tr className="bg-neutral-700 text-left text-white">
+            <tr className="rounded-sm bg-neutral-700 text-left text-white">
               <th className="px-2 py-2 font-semibold">Item</th>
               <th className="w-16 px-2 py-2 text-right font-semibold">Quantity</th>
               <th className="w-28 px-2 py-2 text-right font-semibold">Rate</th>
@@ -257,20 +276,20 @@ export function InvoiceSecDocument({
         </table>
       </div>
 
-      <div className="mb-5 flex justify-end">
-        <table className="w-full max-w-xs text-[11px]">
+      <div className="mb-6 flex justify-end">
+        <table className="w-full max-w-xs text-[12px]">
           <tbody>
             <tr>
-              <td className="py-1 pr-4 text-right text-neutral-600">Subtotal</td>
+              <td className="py-1 pr-4 text-right text-neutral-500">Subtotal:</td>
               <td className="py-1 text-right font-medium tabular-nums">{formatAed(totals.subtotal)}</td>
             </tr>
             <tr>
-              <td className="py-1 pr-4 text-right text-neutral-600">{taxLabel}</td>
+              <td className="py-1 pr-4 text-right text-neutral-500">{taxLabel}:</td>
               <td className="py-1 text-right font-medium tabular-nums">{formatAed(totals.tax)}</td>
             </tr>
             <tr className="border-t border-neutral-300">
-              <td className="py-2 pr-4 text-right font-bold text-neutral-900">Total</td>
-              <td className="py-2 text-right text-sm font-bold tabular-nums text-neutral-900">
+              <td className="py-2 pr-4 text-right font-bold text-neutral-900">Total:</td>
+              <td className="py-2 text-right text-[18px] font-bold tabular-nums text-neutral-900">
                 {formatAed(totals.total)}
               </td>
             </tr>
@@ -279,7 +298,7 @@ export function InvoiceSecDocument({
       </div>
 
       {extras.amountInWords ? (
-        <p className="mb-6 border-t border-neutral-200 pt-3 text-center text-[11px] italic leading-relaxed text-neutral-800">
+        <p className="mb-6 text-center text-[12px] italic leading-relaxed text-neutral-800">
           {extras.amountInWords}
         </p>
       ) : null}
@@ -289,10 +308,10 @@ export function InvoiceSecDocument({
         <BankBlock title="USD ACCOUNT DETAILS" b={extras.bankUsd} />
       </div>
 
-      <footer className="mt-6 border-t border-neutral-200 pt-3 text-[10px] text-neutral-600">
+      <footer className="mt-7 pt-2 text-[10px] text-neutral-600">
         <p className="font-medium text-neutral-800">{extras.footerTerms || "TERM:"}</p>
-        <p className="mt-1 uppercase">{extras.footerCurrencyLine || "CURRENCY IN AED"}</p>
-        <p className="mt-2 italic text-neutral-500">{extras.disclaimer}</p>
+        <p className="mt-2 uppercase">{extras.footerCurrencyLine || "CURRENCY IN AED"}</p>
+        <p className="mt-4 italic text-neutral-500">{extras.disclaimer}</p>
       </footer>
     </div>
   );

@@ -18,8 +18,8 @@ type EditorPanelProps = {
   logoInputRef: React.RefObject<HTMLInputElement | null>;
   taxLabelPreview: string;
   liveTotals: { subtotal: number; tax: number; total: number };
-  wordsPreview: string;
   saving: boolean;
+  pdfExporting: boolean;
   msg: string;
   onItemChange: (next: Item) => void;
   onPatchExtra: (key: string, value: string) => void;
@@ -30,10 +30,11 @@ type EditorPanelProps = {
   onCopyBillToShip: () => void;
   onPickLogo: (files: FileList | null) => Promise<void>;
   onSave: () => void;
+  onDownloadPdf: () => void;
 };
 
 export function EditorPanel(props: EditorPanelProps) {
-  const { item, extras, bankAed, bankUsd, logoErr, logoInputRef, taxLabelPreview, liveTotals, wordsPreview, saving, msg, onItemChange, onPatchExtra, onPatchBank, onPatchLine, onAddLine, onRemoveLine, onCopyBillToShip, onPickLogo, onSave } = props;
+  const { item, extras, bankAed, bankUsd, logoErr, logoInputRef, taxLabelPreview, liveTotals, saving, pdfExporting, msg, onItemChange, onPatchExtra, onPatchBank, onPatchLine, onAddLine, onRemoveLine, onCopyBillToShip, onPickLogo, onSave, onDownloadPdf } = props;
 
   return (
     <div className="print:hidden space-y-4">
@@ -41,13 +42,32 @@ export function EditorPanel(props: EditorPanelProps) {
         <Link href="/admin/invoices"><Button size="sm" variant="outline">All invoices</Button></Link>
         {item.poId ? <Link href={`/admin/purchase-orders/${item.poId}`}><Button size="sm" variant="outline">Open PO</Button></Link> : null}
         <Link href={`/admin/projects/${item.projectId}`}><Button size="sm" variant="outline">Open project</Button></Link>
-        <Button size="sm" variant="secondary" onClick={() => window.print()}>Print / PDF</Button>
+        <Button size="sm" variant="secondary" onClick={() => window.print()}>
+          Print (A4)
+        </Button>
+        <Button
+          size="sm"
+          variant="default"
+          disabled={pdfExporting}
+          onClick={() => onDownloadPdf()}
+        >
+          {pdfExporting ? "PDF…" : "Download PDF"}
+        </Button>
       </div>
       <HeadingCard item={item} extras={extras} onItemChange={onItemChange} onPatchExtra={onPatchExtra} />
       <CompanyCard item={item} logoErr={logoErr} logoInputRef={logoInputRef} onItemChange={onItemChange} onPatchExtra={onPatchExtra} onPickLogo={onPickLogo} />
       <BillShipCard item={item} extras={extras} onItemChange={onItemChange} onPatchExtra={onPatchExtra} onCopyBillToShip={onCopyBillToShip} />
-      <LineItemsCard item={item} taxLabelPreview={taxLabelPreview} liveTotals={liveTotals} wordsPreview={wordsPreview} onPatchLine={onPatchLine} onAddLine={onAddLine} onRemoveLine={onRemoveLine} />
-      <AccountsFooterCard bankAed={bankAed} bankUsd={bankUsd} extras={extras} onPatchBank={onPatchBank} onPatchExtra={onPatchExtra} />
+      <LineItemsCard
+        item={item}
+        extras={extras}
+        taxLabelPreview={taxLabelPreview}
+        liveTotals={liveTotals}
+        onPatchLine={onPatchLine}
+        onAddLine={onAddLine}
+        onRemoveLine={onRemoveLine}
+        onPatchExtra={onPatchExtra}
+      />
+      <AccountsFooterCard bankAed={bankAed} bankUsd={bankUsd} onPatchBank={onPatchBank} />
       <div className="flex flex-wrap gap-2">
         <Button type="button" onClick={onSave} disabled={saving}>{saving ? "Saving…" : "Save"}</Button>
         {msg ? <p className={msg === "Saved." ? "text-primary text-sm" : "text-destructive text-sm"} role="status">{msg}</p> : null}

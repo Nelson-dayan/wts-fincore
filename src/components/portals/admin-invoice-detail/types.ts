@@ -35,4 +35,5 @@ export type Item = {
   extras: Record<string, unknown>;
   dueDate: string;
   createdAt?: string;
+  branding?: Record<string, unknown>;
 };

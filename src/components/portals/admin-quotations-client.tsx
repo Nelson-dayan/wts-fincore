@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/card";
 import { cn } from "@/lib/utils/cn";
 import type { QuotationData } from "@/types/quotation-generator";
+import { readResponseJson } from "@/lib/http/read-response-json";
 
 type QuotationRow = {
   _id: string;
@@ -51,11 +52,11 @@ export function AdminQuotationsClient({
         credentials: "include",
         cache: "no-store",
       });
-      const payload = (await res.json()) as {
+      const payload = await readResponseJson<{
         items?: QuotationRow[];
         total?: number;
         message?: string;
-      };
+      }>(res);
       if (!res.ok) throw new Error(payload.message ?? "Failed to load quotations");
       const items = payload.items ?? [];
       setRows(
@@ -98,7 +99,9 @@ export function AdminQuotationsClient({
         credentials: "include",
         cache: "no-store",
       });
-      const payload = (await res.json()) as { item?: Record<string, unknown>; message?: string };
+      const payload = await readResponseJson<{ item?: Record<string, unknown>; message?: string }>(
+        res
+      );
       if (!res.ok) throw new Error(payload.message ?? "Failed to load quotation");
       if (!payload.item) throw new Error("Missing quotation");
       const data = quotationItemToGeneratorData(
@@ -130,8 +133,7 @@ export function AdminQuotationsClient({
           method: "DELETE",
           credentials: "include",
         });
-        const raw = await res.text();
-        const payload = raw ? (JSON.parse(raw) as { message?: string }) : {};
+        const payload = await readResponseJson<{ message?: string }>(res);
         if (!res.ok) {
           throw new Error(
             payload.message ??

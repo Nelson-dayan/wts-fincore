@@ -41,6 +41,16 @@ export async function GET(_req: Request, ctx: Ctx) {
     const createdAt =
       raw.createdAt instanceof Date ? raw.createdAt.toISOString() : String(raw.createdAt ?? "");
 
+    const rawTotal = raw.totalAmount as unknown;
+    let totalAmount: number | null = null;
+    if (rawTotal != null && rawTotal !== "") {
+      const n =
+        typeof rawTotal === "number"
+          ? rawTotal
+          : Number.parseFloat(String(rawTotal).replace(/[^\d.-]/g, ""));
+      if (Number.isFinite(n)) totalAmount = n;
+    }
+
     const item = {
       _id: String(raw._id),
       poNumber: raw.poNumber,
@@ -50,6 +60,8 @@ export async function GET(_req: Request, ctx: Ctx) {
       type: raw.type,
       status: raw.status,
       fileUrl: raw.fileUrl ?? "",
+      externalPoNumber: String(raw.externalPoNumber ?? "").trim(),
+      totalAmount,
       createdAt,
     };
 
@@ -73,12 +85,15 @@ export async function PATCH(req: Request, ctx: Ctx) {
     let status: "linked" | "active" | "completed" | undefined;
     let incomingDataUrl = "";
     let incomingUrl = "";
+    let totalAmountInput: string | undefined;
 
     if (ct.includes("multipart/form-data")) {
       const form = await req.formData();
       if (form.has("externalPoNumber")) {
         externalPoNumber = String(form.get("externalPoNumber") ?? "");
       }
+      const tam = String(form.get("totalAmount") ?? "").trim();
+      if (tam) totalAmountInput = tam;
       const statusRaw = String(form.get("status") ?? "").trim();
       if (statusRaw && ["linked", "active", "completed"].includes(statusRaw)) {
         status = statusRaw as "linked" | "active" | "completed";
@@ -96,6 +111,7 @@ export async function PATCH(req: Request, ctx: Ctx) {
         fileDataUrl?: string;
         fileUrl?: string;
         externalPoNumber?: string;
+        totalAmount?: number | string | null;
         status?: "linked" | "active" | "completed";
       };
       try {
@@ -112,6 +128,9 @@ export async function PATCH(req: Request, ctx: Ctx) {
       if (body.externalPoNumber !== undefined) {
         externalPoNumber = String(body.externalPoNumber ?? "");
       }
+      if (body.totalAmount !== undefined && body.totalAmount !== null && body.totalAmount !== "") {
+        totalAmountInput = String(body.totalAmount);
+      }
       if (body.status && ["linked", "active", "completed"].includes(body.status)) {
         status = body.status;
       }
@@ -125,10 +144,16 @@ export async function PATCH(req: Request, ctx: Ctx) {
     }
 
     if (externalPoNumber !== undefined) {
-      po.externalPoNumber = externalPoNumber;
+      po.externalPoNumber = externalPoNumber.trim();
     }
     if (status) {
       po.status = status;
+    }
+    if (totalAmountInput !== undefined) {
+      const n = Number.parseFloat(String(totalAmountInput).replace(/,/g, ""));
+      if (Number.isFinite(n)) {
+        po.set("totalAmount", mongoose.Types.Decimal128.fromString(n.toFixed(4)));
+      }
     }
 
     if (incomingDataUrl || incomingUrl) {

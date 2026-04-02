@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { readResponseJson } from "@/lib/http/read-response-json";
 
 export function InitializeForm() {
   const [setupSecret, setSetupSecret] = useState("");
@@ -30,7 +31,7 @@ export function InitializeForm() {
           createSampleData,
         }),
       });
-      const payload = (await response.json()) as { message?: string; dbName?: string };
+      const payload = await readResponseJson<{ message?: string; dbName?: string }>(response);
       if (!response.ok) throw new Error(payload.message ?? "Request failed");
       setMessage(`${payload.message} (database: ${payload.dbName ?? "unknown"})`);
     } catch (error) {

@@ -5,7 +5,11 @@ import Link from "next/link";
 import { FileSpreadsheet, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { MAX_INVOICES_PER_PURCHASE_ORDER } from "@/lib/invoice/invoice-limits";
+import {
+  invoiceCountAtOrOverCap,
+  MAX_INVOICES_PER_PURCHASE_ORDER,
+} from "@/lib/invoice/invoice-limits";
+import { readResponseJson } from "@/lib/http/read-response-json";
 
 type Row = {
   _id: string;
@@ -26,7 +30,7 @@ export function PurchaseOrderInvoicesSection({
   const [totalCount, setTotalCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
-  const atCap = totalCount >= MAX_INVOICES_PER_PURCHASE_ORDER;
+  const atCap = invoiceCountAtOrOverCap(totalCount);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -39,7 +43,9 @@ export function PurchaseOrderInvoicesSection({
         q: "",
       });
       const res = await fetch(`/api/admin/invoices?${qs}`, { cache: "no-store" });
-      const data = (await res.json()) as { items?: Row[]; message?: string; total?: number };
+      const data = await readResponseJson<{ items?: Row[]; message?: string; total?: number }>(
+        res
+      );
       if (!res.ok) throw new Error(data.message ?? "Failed to load invoices");
       setTotalCount(typeof data.total === "number" ? data.total : (data.items ?? []).length);
       setRows(
@@ -73,13 +79,18 @@ export function PurchaseOrderInvoicesSection({
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <CardTitle className="text-lg font-semibold inline-flex items-center gap-2 tracking-tight">
             <FileSpreadsheet className="size-5 opacity-90 text-primary" aria-hidden />
-            Invoices (max {MAX_INVOICES_PER_PURCHASE_ORDER} / PO)
+            Invoices
+            {MAX_INVOICES_PER_PURCHASE_ORDER != null
+              ? ` (max ${MAX_INVOICES_PER_PURCHASE_ORDER} / PO)`
+              : ""}
           </CardTitle>
           <p className="text-muted-foreground text-[0.8125rem]">
             <span className="font-mono font-semibold text-foreground">{poNumber}</span>
             {" · "}
             <span className="font-medium text-foreground">{totalCount}</span>
-            /{MAX_INVOICES_PER_PURCHASE_ORDER} used
+            {MAX_INVOICES_PER_PURCHASE_ORDER != null
+              ? ` / ${MAX_INVOICES_PER_PURCHASE_ORDER} used`
+              : " linked"}
           </p>
         </div>
       </CardHeader>
@@ -128,7 +139,7 @@ export function PurchaseOrderInvoicesSection({
             ))}
           </ul>
         )}
-        {atCap ? (
+        {atCap && MAX_INVOICES_PER_PURCHASE_ORDER != null ? (
           <p className="text-muted-foreground text-sm">
             This PO already has the maximum of {MAX_INVOICES_PER_PURCHASE_ORDER} invoices — link a new PO or open
             an existing invoice to edit it.
