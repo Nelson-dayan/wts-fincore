@@ -176,7 +176,12 @@ export function AdminProjectDetailsClient({ projectId }: { projectId: string }) 
       });
       const payload = await readResponseJson<{ message?: string }>(response);
       if (!response.ok) throw new Error(payload.message ?? "Failed to delete project");
-      router.push("/admin/projects");
+      const parentClientId = data.project?.clientId?.trim();
+      router.replace(
+        parentClientId
+          ? `/admin/clients/${encodeURIComponent(parentClientId)}`
+          : "/admin/projects"
+      );
       router.refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to delete project");
