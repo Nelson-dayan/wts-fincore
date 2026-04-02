@@ -16,6 +16,7 @@ import {
   QUOTATION_STORAGE_KEY,
   type QuotationData,
 } from "@/types/quotation-generator";
+import { QuotationProjectConnector } from "@/components/quotation/QuotationProjectConnector";
 import {
   getQuotationPagePx,
   getQuotationPreviewStackHeightPx,
@@ -87,6 +88,12 @@ export function QuotationBuilderPanel({
   const [data, setData] = useState<QuotationData>(() =>
     initialSnapshot ? normalizeQuotationData(initialSnapshot) : defaultQuotationData()
   );
+  const [connectedProjectId, setConnectedProjectId] = useState<string>(
+    initialSaveProjectId.trim()
+  );
+  const [connectedProjectName, setConnectedProjectName] = useState<string>("");
+  const [projectDefaultsLoading, setProjectDefaultsLoading] = useState(false);
+  const [projectDefaultsError, setProjectDefaultsError] = useState<string | null>(null);
   const [storageReady, setStorageReady] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [saveNotice, setSaveNotice] = useState<string | null>(null);
@@ -99,6 +106,62 @@ export function QuotationBuilderPanel({
   const previewRef = useRef<HTMLDivElement>(null);
   /** Full-scale capture root — must not sit under CSS `transform: scale(...)`. */
   const exportCaptureRef = useRef<HTMLDivElement>(null);
+
+  const loadProjectDefaults = useCallback(
+    async (projectId: string, opts: { force?: boolean } = {}) => {
+      const pid = projectId.trim();
+      if (!pid) return;
+
+      const force = Boolean(opts.force);
+      setProjectDefaultsLoading(true);
+      setProjectDefaultsError(null);
+      try {
+        const res = await fetch(`/api/admin/projects/${encodeURIComponent(pid)}`, {
+          credentials: "include",
+          cache: "no-store",
+        });
+        const payload = await readResponseJson<{
+          project?: { name?: string };
+          client?: { name?: string; company?: string };
+          message?: string;
+        }>(res);
+
+        if (!res.ok) {
+          throw new Error(payload.message ?? "Failed to load project defaults");
+        }
+
+        const projectName = String(payload.project?.name ?? "").trim();
+        const clientName = String(payload.client?.name ?? "").trim();
+        const clientCompany = String(payload.client?.company ?? "").trim();
+
+        setConnectedProjectName(projectName || pid);
+
+        if (force) {
+          setData((prev) => ({
+            ...prev,
+            page1Title: projectName,
+            clientName: clientCompany || clientName,
+            contactName: clientName,
+          }));
+        } else {
+          setData((prev) => {
+            const next = { ...prev };
+            if (!next.page1Title.trim() && projectName) next.page1Title = projectName;
+            if (!next.clientName.trim() && (clientCompany || clientName)) {
+              next.clientName = clientCompany || clientName;
+            }
+            if (!next.contactName.trim() && clientName) next.contactName = clientName;
+            return next;
+          });
+        }
+      } catch (e) {
+        setProjectDefaultsError(e instanceof Error ? e.message : "Failed to load project defaults");
+      } finally {
+        setProjectDefaultsLoading(false);
+      }
+    },
+    []
+  );
 
   useEffect(() => {
     try {
@@ -190,6 +253,26 @@ export function QuotationBuilderPanel({
     };
   }, [editingQuotationId, initialSnapshot]);
 
+  const didAutoLoadDefaultsRef = useRef(false);
+  useEffect(() => {
+    // When opened from `?projectId=...`, auto-load defaults once (only fill empty fields).
+    if (didAutoLoadDefaultsRef.current) return;
+    if (editingQuotationId || initialSnapshot) return;
+
+    const pid = initialSaveProjectId.trim();
+    if (!pid) return;
+    if (!connectedProjectId.trim()) return;
+
+    didAutoLoadDefaultsRef.current = true;
+    void loadProjectDefaults(pid, { force: true });
+  }, [
+    connectedProjectId,
+    editingQuotationId,
+    initialSaveProjectId,
+    initialSnapshot,
+    loadProjectDefaults,
+  ]);
+
   const handleSaveQuotation = useCallback(async () => {
     if (saveNoticeTimerRef.current) {
       clearTimeout(saveNoticeTimerRef.current);
@@ -226,7 +309,7 @@ export function QuotationBuilderPanel({
         credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          projectId: initialSaveProjectId.trim() || undefined,
+          projectId: connectedProjectId.trim() || undefined,
           quotationId: editingQuotationId?.trim() || undefined,
           data,
           status: "sent",
@@ -282,7 +365,7 @@ export function QuotationBuilderPanel({
       setSaveNotice(null);
       saveNoticeTimerRef.current = null;
     }, 5200);
-  }, [data, editingQuotationId, initialSaveProjectId, onDbSaveSuccess, variant]);
+  }, [data, connectedProjectId, editingQuotationId, onDbSaveSuccess, variant]);
 
   const handleReset = useCallback(() => {
     const base = defaultQuotationData();
@@ -292,7 +375,10 @@ export function QuotationBuilderPanel({
     } catch {
       /* ignore */
     }
-  }, [primaryDefaults]);
+    if (connectedProjectId.trim()) {
+      void loadProjectDefaults(connectedProjectId, { force: false });
+    }
+  }, [connectedProjectId, primaryDefaults, loadProjectDefaults]);
 
   const handleDownloadPdf = useCallback(async () => {
     const root = exportCaptureRef.current ?? previewRef.current;
@@ -376,6 +462,28 @@ export function QuotationBuilderPanel({
             className="pointer-events-none fixed -left-2499.75 top-0 flex flex-col gap-10 opacity-[0.01]"
           >
             <QuotationPreview data={data} />
+          </div>
+
+          <div className="flex flex-col gap-4">
+            {projectDefaultsError ? (
+              <p className="text-destructive text-sm" role="alert">
+                {projectDefaultsError}
+              </p>
+            ) : null}
+            <QuotationProjectConnector
+              connectedProjectId={connectedProjectId}
+              connectedProjectName={connectedProjectName}
+              defaultsLoading={projectDefaultsLoading}
+              onConnectProject={(pid) => {
+                setConnectedProjectId(pid);
+                void loadProjectDefaults(pid, { force: true });
+              }}
+              onClearConnection={() => {
+                setConnectedProjectId("");
+                setConnectedProjectName("");
+                setProjectDefaultsError(null);
+              }}
+            />
           </div>
 
           <QuotationForm
