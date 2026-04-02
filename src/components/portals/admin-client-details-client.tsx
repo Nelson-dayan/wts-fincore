@@ -9,13 +9,20 @@ import {
   FileText,
   FolderKanban,
   ShoppingCart,
+  Wallet,
 } from "lucide-react";
 import { DashboardPageHeader } from "@/components/dashboard/page-header";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ClientProfileCard } from "@/components/portals/admin-client-details/client-profile-card";
 import { SectionTable } from "@/components/portals/admin-client-details/section-table";
 import type { ClientDetailsPayload, ClientProfileForm } from "@/components/portals/admin-client-details/types";
 import { readResponseJson } from "@/lib/http/read-response-json";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+
+function formatAed(n: number) {
+  return n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
 
 const EMPTY_FORM: ClientProfileForm = {
   name: "",
@@ -35,6 +42,8 @@ export function AdminClientDetailsClient({ clientId }: { clientId: string }) {
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState<ClientProfileForm>(EMPTY_FORM);
+  const [saveConfirmOpen, setSaveConfirmOpen] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -70,7 +79,7 @@ export function AdminClientDetailsClient({ clientId }: { clientId: string }) {
     };
   }, [clientId]);
 
-  async function saveClient() {
+  async function saveClient(): Promise<boolean> {
     setSaving(true);
     setError("");
     try {
@@ -88,14 +97,16 @@ export function AdminClientDetailsClient({ clientId }: { clientId: string }) {
       });
       const details = await readResponseJson<ClientDetailsPayload>(refreshed);
       setData(details);
+      return true;
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to update client");
+      return false;
     } finally {
       setSaving(false);
     }
   }
 
-  async function deleteClient() {
+  async function deleteClient(): Promise<boolean> {
     setSaving(true);
     setError("");
     try {
@@ -104,10 +115,12 @@ export function AdminClientDetailsClient({ clientId }: { clientId: string }) {
       });
       const payload = await readResponseJson<{ message?: string }>(response);
       if (!response.ok) throw new Error(payload.message ?? "Failed to delete client");
-      router.push("/admin/clients");
+      router.replace("/admin/clients");
       router.refresh();
+      return true;
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to delete client");
+      return false;
     } finally {
       setSaving(false);
     }
@@ -142,17 +155,61 @@ export function AdminClientDetailsClient({ clientId }: { clientId: string }) {
         </div>
       ) : null}
 
+      <ConfirmDialog
+        open={saveConfirmOpen}
+        onOpenChange={setSaveConfirmOpen}
+        title="Save client profile?"
+        description="Your changes will be saved to this client record."
+        confirmLabel="Save"
+        loading={saving}
+        onConfirm={async () => {
+          const ok = await saveClient();
+          if (ok) setSaveConfirmOpen(false);
+        }}
+      />
+      <ConfirmDialog
+        open={deleteConfirmOpen}
+        onOpenChange={setDeleteConfirmOpen}
+        title="Delete this client?"
+        description="This cannot be undone. Deletion is blocked if the client still has linked projects."
+        confirmLabel="Delete"
+        variant="destructive"
+        loading={saving}
+        onConfirm={async () => {
+          const ok = await deleteClient();
+          if (ok) setDeleteConfirmOpen(false);
+        }}
+      />
+
       <ClientProfileCard
         data={data}
         editing={editing}
         saving={saving}
         form={form}
         onFormChange={(patch) => setForm((prev) => ({ ...prev, ...patch }))}
-        onSave={saveClient}
+        onSave={() => setSaveConfirmOpen(true)}
         onCancel={() => setEditing(false)}
         onStartEdit={() => setEditing(true)}
-        onDelete={deleteClient}
+        onDelete={() => setDeleteConfirmOpen(true)}
       />
+
+      <Card className="mb-6 border-border/70 bg-card/90 shadow-(--shadow-premium) backdrop-blur-[2px]">
+        <CardHeader className="pb-2">
+          <CardTitle className="flex items-center gap-2 text-base font-semibold">
+            <Wallet className="size-4 text-primary" />
+            Expenses (all projects)
+          </CardTitle>
+          <CardDescription>
+            Total recorded expenses linked to this client’s projects (AED).
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <p className="text-3xl font-semibold tabular-nums tracking-tight text-foreground">
+            {formatAed(data.expenseTotalAll ?? 0)}
+            <span className="ml-2 text-lg font-medium text-muted-foreground">AED</span>
+          </p>
+        </CardContent>
+      </Card>
 
       <SectionTable
         title="Projects"
@@ -161,10 +218,12 @@ export function AdminClientDetailsClient({ clientId }: { clientId: string }) {
           { key: "name", label: "Name" },
           { key: "status", label: "Status" },
           { key: "priority", label: "Priority" },
+          { key: "expenseTotal", label: "Expenses (AED)" },
           { key: "createdAt", label: "Created At" },
         ]}
         rows={(data.projects ?? []).map((project) => ({
           ...project,
+          expenseTotal: formatAed(project.expenseTotal ?? 0),
           createdAt: new Date(project.createdAt).toLocaleString(),
         }))}
         actionHref={`/admin/projects?clientId=${clientId}`}
@@ -217,6 +276,25 @@ export function AdminClientDetailsClient({ clientId }: { clientId: string }) {
           dueDate: invoice.dueDate ? new Date(invoice.dueDate).toLocaleDateString() : "—",
           createdAt: new Date(invoice.createdAt).toLocaleString(),
         }))}
+      />
+
+      <SectionTable
+        title="Expenses"
+        icon={Wallet}
+        columns={[
+          { key: "title", label: "Title" },
+          { key: "amount", label: "Amount (AED)" },
+          { key: "category", label: "Category" },
+          { key: "projectName", label: "Project" },
+          { key: "createdAt", label: "Created At" },
+        ]}
+        rows={(data.expenses ?? []).map((row) => ({
+          ...row,
+          amount: formatAed(row.amount),
+          createdAt: new Date(String(row.createdAt)).toLocaleString(),
+        }))}
+        actionHref="/admin/expenses"
+        actionLabel="View all expenses"
       />
     </div>
   );

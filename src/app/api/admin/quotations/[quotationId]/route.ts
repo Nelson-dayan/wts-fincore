@@ -286,7 +286,7 @@ export async function PATCH(req: Request, ctx: RouteCtx) {
           },
           branding: nextBranding,
           internalNotes: nextInternalNotes,
-          ...(body.status ? { status: body.status } : {}),
+          ...(body.status !== undefined ? { status: body.status } : {}),
         },
       },
       { new: true }

@@ -10,7 +10,7 @@ export default function EmployeeExpensesPage() {
         { key: "title", label: "Title" },
         { key: "amount", label: "Amount" },
         { key: "category", label: "Category" },
-        { key: "projectId", label: "Project" },
+        { key: "projectName", label: "Project" },
         { key: "createdAt", label: "Created At" },
       ]}
     />

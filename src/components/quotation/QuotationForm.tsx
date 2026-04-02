@@ -139,13 +139,13 @@ export function QuotationForm({
           </div>
           <div className="grid gap-2 sm:grid-cols-2 sm:gap-3">
             <div className="grid gap-2">
-              <Label htmlFor="qg-ref">Ref no</Label>
-              <Input
-                id="qg-ref"
-                value={data.refNo}
-                onChange={(e) => patch({ refNo: e.target.value })}
-                placeholder="Reference"
-              />
+              <Label htmlFor="qg-quotation-no">Quotation no</Label>
+            <Input
+              id="qg-quotation-no"
+              value={data.refNo}
+              onChange={(e) => patch({ refNo: e.target.value })}
+              placeholder="e.g. QT-20260402-A1B2C3D4 (auto-filled for new quotes)"
+            />
             </div>
             <div className="grid gap-2">
               <Label htmlFor="qg-date">Date</Label>

@@ -6,6 +6,7 @@ import { AddUserForm } from "@/components/portals/admin-users/add-user-form";
 import { UsersTable } from "@/components/portals/admin-users/users-table";
 import type { AdminUser, NewUserForm } from "@/components/portals/admin-users/types";
 import { readResponseJson } from "@/lib/http/read-response-json";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 export function AdminUsersClient() {
   const [users, setUsers] = useState<AdminUser[]>([]);
@@ -25,6 +26,8 @@ export function AdminUsersClient() {
     phoneNumber: "",
     role: "employee",
   });
+  const [saveTargetId, setSaveTargetId] = useState<string | null>(null);
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
 
   async function loadUsers(nextPage = page, nextQuery = query) {
     setLoading(true);
@@ -82,9 +85,9 @@ export function AdminUsersClient() {
     }
   }
 
-  async function saveUser(userId: string) {
+  async function saveUser(userId: string): Promise<boolean> {
     const draft = drafts[userId];
-    if (!draft) return;
+    if (!draft) return false;
     setSavingId(userId);
     setError("");
     try {
@@ -107,14 +110,16 @@ export function AdminUsersClient() {
         return copy;
       });
       await loadUsers(page, query);
+      return true;
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to update user");
+      return false;
     } finally {
       setSavingId("");
     }
   }
 
-  async function deleteUser(userId: string) {
+  async function deleteUser(userId: string): Promise<boolean> {
     setSavingId(userId);
     setError("");
     try {
@@ -124,8 +129,10 @@ export function AdminUsersClient() {
       const payload = await readResponseJson<{ message?: string }>(response);
       if (!response.ok) throw new Error(payload.message ?? "Failed to delete user");
       await loadUsers(page, query);
+      return true;
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to delete user");
+      return false;
     } finally {
       setSavingId("");
     }
@@ -133,6 +140,37 @@ export function AdminUsersClient() {
 
   return (
     <div className="animate-fade-in">
+      <ConfirmDialog
+        open={saveTargetId !== null}
+        onOpenChange={(o) => {
+          if (!o) setSaveTargetId(null);
+        }}
+        title="Save user changes?"
+        description="Updates name, role, phone, and active status for this account."
+        confirmLabel="Save"
+        loading={Boolean(saveTargetId && savingId === saveTargetId)}
+        onConfirm={async () => {
+          if (!saveTargetId) return;
+          const ok = await saveUser(saveTargetId);
+          if (ok) setSaveTargetId(null);
+        }}
+      />
+      <ConfirmDialog
+        open={deleteTargetId !== null}
+        onOpenChange={(o) => {
+          if (!o) setDeleteTargetId(null);
+        }}
+        title="Delete this user?"
+        description="This removes the account from the workspace. This cannot be undone."
+        confirmLabel="Delete"
+        variant="destructive"
+        loading={Boolean(deleteTargetId && savingId === deleteTargetId)}
+        onConfirm={async () => {
+          if (!deleteTargetId) return;
+          const ok = await deleteUser(deleteTargetId);
+          if (ok) setDeleteTargetId(null);
+        }}
+      />
       <DashboardPageHeader
         title="Users"
         description="Invite teammates, assign roles, and keep your workspace access clean—from one calm control surface."
@@ -183,8 +221,8 @@ export function AdminUsersClient() {
             [userId]: { ...(prev[userId] ?? {}), ...patch },
           }))
         }
-        onSave={saveUser}
-        onDelete={deleteUser}
+        onSave={(id) => setSaveTargetId(id)}
+        onDelete={(id) => setDeleteTargetId(id)}
       />
       </div>
     </div>

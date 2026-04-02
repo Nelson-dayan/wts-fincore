@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, FileText, Loader2, Plus, Trash2 } from "lucide-react";
+import { ArrowLeft, Eye, FileText, Loader2, Plus, Trash2 } from "lucide-react";
 import { DashboardPageHeader } from "@/components/dashboard/page-header";
 import { QuotationBuilderPanel } from "@/components/quotation/QuotationBuilderPanel";
 import { quotationItemToGeneratorData } from "@/lib/quotation/map-stored-to-generator";
@@ -14,9 +14,17 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { QuotationStatusEditor } from "@/components/portals/admin-quotation-details/quotation-status-card";
 import { cn } from "@/lib/utils/cn";
 import type { QuotationData } from "@/types/quotation-generator";
 import { readResponseJson } from "@/lib/http/read-response-json";
+import type { QuotationPayload } from "@/components/portals/admin-quotation-details/types";
+
+function normalizeQuotationStatus(s: string | undefined): QuotationPayload["status"] {
+  if (s === "draft" || s === "sent" || s === "approved" || s === "rejected") return s;
+  return "draft";
+}
 
 type QuotationRow = {
   _id: string;
@@ -24,7 +32,15 @@ type QuotationRow = {
   status?: string;
   projectName?: string;
   createdAt?: string;
+  purchaseOrderCount?: number;
+  purchaseOrderNumbers?: string[];
+  totalAmount?: number | null;
 };
+
+function formatMoney(n: number | null | undefined) {
+  if (n == null || Number.isNaN(n)) return "—";
+  return n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
 
 export function AdminQuotationsClient({
   initialProjectId = "",
@@ -39,7 +55,11 @@ export function AdminQuotationsClient({
   const [builderKey, setBuilderKey] = useState(0);
   const [editingQuotationId, setEditingQuotationId] = useState<string | null>(null);
   const [initialSnapshot, setInitialSnapshot] = useState<QuotationData | null>(null);
+  const [builderLinkedProjectId, setBuilderLinkedProjectId] = useState("");
+  const [builderLinkedProjectName, setBuilderLinkedProjectName] = useState("");
   const [rowBusyId, setRowBusyId] = useState("");
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   const fetchList = useCallback(async () => {
     setListLoading(true);
@@ -82,6 +102,8 @@ export function AdminQuotationsClient({
   const openNew = useCallback(() => {
     setEditingQuotationId(null);
     setInitialSnapshot(null);
+    setBuilderLinkedProjectId("");
+    setBuilderLinkedProjectName("");
     setBuilderKey((k) => k + 1);
     setBuilderOpen(true);
     window.requestAnimationFrame(() => {
@@ -104,9 +126,13 @@ export function AdminQuotationsClient({
       );
       if (!res.ok) throw new Error(payload.message ?? "Failed to load quotation");
       if (!payload.item) throw new Error("Missing quotation");
-      const data = quotationItemToGeneratorData(
-        payload.item as Parameters<typeof quotationItemToGeneratorData>[0]
-      );
+      const item = payload.item as {
+        projectId?: string;
+        projectName?: string;
+      } & Parameters<typeof quotationItemToGeneratorData>[0];
+      const data = quotationItemToGeneratorData(item);
+      setBuilderLinkedProjectId(String(item.projectId ?? "").trim());
+      setBuilderLinkedProjectName(String(item.projectName ?? "").trim());
       setEditingQuotationId(id);
       setInitialSnapshot(data);
       setBuilderKey((k) => k + 1);
@@ -124,38 +150,39 @@ export function AdminQuotationsClient({
     }
   }, []);
 
-  const deleteQuotation = useCallback(
-    async (id: string) => {
-      setRowBusyId(id);
-      setListError("");
-      try {
-        const res = await fetch(`/api/admin/quotations/${id}`, {
-          method: "DELETE",
-          credentials: "include",
-        });
-        const payload = await readResponseJson<{ message?: string }>(res);
-        if (!res.ok) {
-          throw new Error(
-            payload.message ??
-              (res.status === 400
-                ? "This quotation cannot be deleted."
-                : "Delete failed")
-          );
-        }
-        await fetchList();
-      } catch (e) {
-        setListError(e instanceof Error ? e.message : "Delete failed");
-      } finally {
-        setRowBusyId("");
+  const performDelete = useCallback(async () => {
+    if (!deleteTargetId) return;
+    setDeleteLoading(true);
+    setListError("");
+    try {
+      const res = await fetch(`/api/admin/quotations/${deleteTargetId}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      const payload = await readResponseJson<{ message?: string }>(res);
+      if (!res.ok) {
+        throw new Error(
+          payload.message ??
+            (res.status === 400
+              ? "This quotation cannot be deleted."
+              : "Delete failed")
+        );
       }
-    },
-    [fetchList]
-  );
+      setDeleteTargetId(null);
+      await fetchList();
+    } catch (e) {
+      setListError(e instanceof Error ? e.message : "Delete failed");
+    } finally {
+      setDeleteLoading(false);
+    }
+  }, [deleteTargetId, fetchList]);
 
   const closeBuilder = useCallback(() => {
     setBuilderOpen(false);
     setEditingQuotationId(null);
     setInitialSnapshot(null);
+    setBuilderLinkedProjectId("");
+    setBuilderLinkedProjectName("");
   }, []);
 
   const onDbSaveSuccess = useCallback(
@@ -168,8 +195,29 @@ export function AdminQuotationsClient({
     [fetchList]
   );
 
+  const deleteTargetRow = deleteTargetId
+    ? rows.find((r) => r._id === deleteTargetId)
+    : null;
+
   return (
     <div className="animate-fade-in">
+      <ConfirmDialog
+        open={deleteTargetId !== null}
+        onOpenChange={(o) => {
+          if (!o && !deleteLoading) setDeleteTargetId(null);
+        }}
+        title="Delete this quotation?"
+        description={
+          deleteTargetRow?.quotationNumber
+            ? `Permanently remove quotation ${deleteTargetRow.quotationNumber}? This cannot be undone. Delete is blocked if purchase orders are linked.`
+            : "Permanently remove this quotation? Delete is blocked if purchase orders are linked."
+        }
+        confirmLabel="Delete"
+        variant="destructive"
+        loading={deleteLoading}
+        onConfirm={() => void performDelete()}
+      />
+
       {initialProjectId ? (
         <Link
           href={`/admin/projects/${initialProjectId}`}
@@ -203,7 +251,9 @@ export function AdminQuotationsClient({
               <div>
                 <CardTitle className="text-[1.15rem] sm:text-xl">Saved quotations</CardTitle>
                 <CardDescription className="mt-1.5 max-w-lg">
-                  Load to edit the same record, or delete when no purchase order is linked.
+                  Totals and purchase order counts update from live data. Use{" "}
+                  <strong className="text-foreground">View</strong> for the full page with status
+                  controls and PO uploads.
                 </CardDescription>
               </div>
             </div>
@@ -243,11 +293,13 @@ export function AdminQuotationsClient({
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full min-w-160 text-left text-sm">
+              <table className="w-full min-w-[72rem] text-left text-sm">
                 <thead>
                   <tr className="border-b border-border/80 bg-muted/30 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground dark:bg-muted/15">
                     <th className="px-5 py-3.5 pr-3">Quotation #</th>
                     <th className="px-0 py-3.5 pr-3">Project</th>
+                    <th className="px-0 py-3.5 pr-3">Total</th>
+                    <th className="px-0 py-3.5 pr-3">Purchase orders</th>
                     <th className="px-0 py-3.5 pr-3">Status</th>
                     <th className="px-0 py-3.5 pr-3">Created</th>
                     <th className="px-0 py-3.5 pr-5 text-right">Actions</th>
@@ -256,6 +308,12 @@ export function AdminQuotationsClient({
                 <tbody className="divide-y divide-border/60">
                   {rows.map((row) => {
                     const busy = rowBusyId === row._id;
+                    const poCount = row.purchaseOrderCount ?? 0;
+                    const poNums = row.purchaseOrderNumbers ?? [];
+                    const poPreview =
+                      poNums.length > 0
+                        ? poNums.slice(0, 3).join(", ") + (poNums.length > 3 ? "…" : "")
+                        : null;
                     return (
                       <tr
                         key={row._id}
@@ -267,19 +325,37 @@ export function AdminQuotationsClient({
                         <td className="max-w-48 px-0 py-3.5 pr-3 text-muted-foreground">
                           <span className="line-clamp-2">{row.projectName || "—"}</span>
                         </td>
-                        <td className="px-0 py-3.5 pr-3">
-                          <span
-                            className={cn(
-                              "inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium capitalize",
-                              row.status === "approved"
-                                ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400"
-                                : row.status === "rejected"
-                                  ? "bg-destructive/15 text-destructive"
+                        <td className="whitespace-nowrap px-0 py-3.5 pr-3 tabular-nums text-foreground">
+                          {formatMoney(row.totalAmount ?? null)}
+                        </td>
+                        <td className="max-w-48 px-0 py-3.5 pr-3 align-top">
+                          <div className="flex flex-col gap-0.5">
+                            <span
+                              className={cn(
+                                "inline-flex w-fit rounded-full px-2.5 py-0.5 text-xs font-semibold tabular-nums",
+                                poCount > 0
+                                  ? "bg-primary/15 text-primary"
                                   : "bg-muted text-muted-foreground"
+                              )}
+                            >
+                              {poCount} PO{poCount === 1 ? "" : "s"}
+                            </span>
+                            {poPreview ? (
+                              <span className="text-[11px] leading-snug text-muted-foreground line-clamp-2">
+                                {poPreview}
+                              </span>
+                            ) : (
+                              <span className="text-[11px] text-muted-foreground">—</span>
                             )}
-                          >
-                            {row.status ?? "—"}
-                          </span>
+                          </div>
+                        </td>
+                        <td className="px-0 py-3.5 pr-3 align-top">
+                          <QuotationStatusEditor
+                            quotationId={row._id}
+                            currentStatus={normalizeQuotationStatus(row.status)}
+                            onUpdated={() => fetchList().catch(() => {})}
+                            variant="inline"
+                          />
                         </td>
                         <td className="whitespace-nowrap px-0 py-3.5 pr-3 text-muted-foreground tabular-nums">
                           {row.createdAt
@@ -287,10 +363,22 @@ export function AdminQuotationsClient({
                             : "—"}
                         </td>
                         <td className="px-0 py-3.5 pr-5 text-right">
-                          <div className="flex justify-end gap-2">
+                          <div className="flex flex-wrap justify-end gap-2">
                             <Button
                               type="button"
                               variant="secondary"
+                              size="sm"
+                              className="rounded-lg"
+                              asChild
+                            >
+                              <Link href={`/admin/quotations/${row._id}`}>
+                                <Eye className="size-4" aria-hidden />
+                                View
+                              </Link>
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="outline"
                               size="sm"
                               className="rounded-lg"
                               disabled={busy}
@@ -308,7 +396,7 @@ export function AdminQuotationsClient({
                               size="sm"
                               className="rounded-lg text-destructive hover:bg-destructive/10 hover:text-destructive"
                               disabled={busy}
-                              onClick={() => deleteQuotation(row._id)}
+                              onClick={() => setDeleteTargetId(row._id)}
                             >
                               <Trash2 className="size-4" aria-hidden />
                               <span className="sr-only sm:not-sr-only sm:ml-1">Delete</span>
@@ -334,6 +422,8 @@ export function AdminQuotationsClient({
             key={builderKey}
             variant="embedded"
             initialSaveProjectId={initialProjectId}
+            linkedQuotationProjectId={builderLinkedProjectId}
+            linkedQuotationProjectName={builderLinkedProjectName}
             editingQuotationId={editingQuotationId}
             initialSnapshot={initialSnapshot}
             onDbSaveSuccess={onDbSaveSuccess}

@@ -11,7 +11,7 @@ export default function AdminExpensesPage() {
           { name: "title", label: "Title", required: true },
           { name: "amount", label: "Amount", type: "number", required: true },
           { name: "category", label: "Category", required: true },
-          { name: "projectId", label: "Project ID" },
+          { name: "projectId", label: "Project", type: "projectSearch" },
         ]}
       />
       <ResourceTableClient
@@ -22,7 +22,7 @@ export default function AdminExpensesPage() {
           { key: "title", label: "Title" },
           { key: "amount", label: "Amount" },
           { key: "category", label: "Category" },
-          { key: "projectId", label: "Project" },
+          { key: "projectName", label: "Project" },
           { key: "createdAt", label: "Created At" },
         ]}
       />
