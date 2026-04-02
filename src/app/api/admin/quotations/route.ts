@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireRole } from "@/lib/auth/require-role";
 import { connectDB } from "@/lib/db/connect";
-import { QuotationModel } from "@/lib/db/models";
+import { PurchaseOrderModel, QuotationModel } from "@/lib/db/models";
 import { authErrorResponse } from "@/lib/api/route-auth";
 import { parsePagination, parseSearch } from "@/lib/api/pagination";
 import { logActivity } from "@/lib/services/activity/log-activity.service";
@@ -13,6 +13,7 @@ import {
   toDecimal128,
 } from "@/lib/services/business/quotation.service";
 import mongoose from "mongoose";
+import { decimalToNumber } from "@/lib/services/business/money";
 
 export async function GET(req: Request) {
   try {
@@ -27,7 +28,7 @@ export async function GET(req: Request) {
     if (projectId) filter.projectId = projectId;
     const [itemsRaw, total] = await Promise.all([
       QuotationModel.find(filter)
-        .select("quotationNumber status projectId createdAt")
+        .select("quotationNumber status projectId createdAt totals")
         .populate("projectId", "name")
         .sort({ createdAt: -1 })
         .skip(skip)
@@ -35,6 +36,27 @@ export async function GET(req: Request) {
         .lean(),
       QuotationModel.countDocuments(filter),
     ]);
+    const quotationIds = itemsRaw.map((r) => r._id as mongoose.Types.ObjectId);
+    type PoAgg = { _id: mongoose.Types.ObjectId; count: number; poNumbers: string[] };
+    const poAgg: PoAgg[] =
+      quotationIds.length === 0
+        ? []
+        : await PurchaseOrderModel.aggregate([
+            { $match: { quotationId: { $in: quotationIds } } },
+            {
+              $group: {
+                _id: "$quotationId",
+                count: { $sum: 1 },
+                poNumbers: { $push: "$poNumber" },
+              },
+            },
+          ]);
+    const poByQuotation = new Map<string, { count: number; poNumbers: string[] }>();
+    for (const g of poAgg) {
+      const id = String(g._id);
+      const nums = (g.poNumbers ?? []).filter(Boolean).slice(0, 8);
+      poByQuotation.set(id, { count: g.count ?? 0, poNumbers: nums });
+    }
     const items = itemsRaw.map((row) => {
       const proj = row.projectId as unknown;
       const projectIdStr =
@@ -45,10 +67,20 @@ export async function GET(req: Request) {
         proj && typeof proj === "object" && "name" in proj
           ? String((proj as { name?: string }).name ?? "")
           : "";
+      const qid = String(row._id);
+      const poInfo = poByQuotation.get(qid) ?? { count: 0, poNumbers: [] as string[] };
+      const totals = row.totals as { total?: unknown } | undefined;
+      const totalAmount =
+        totals?.total !== undefined && totals?.total !== null
+          ? decimalToNumber(totals.total)
+          : null;
       return {
         ...row,
         projectId: projectIdStr,
         projectName,
+        purchaseOrderCount: poInfo.count,
+        purchaseOrderNumbers: poInfo.poNumbers,
+        totalAmount,
       };
     });
     return NextResponse.json({ items, page, limit, total, hasMore: skip + items.length < total });
