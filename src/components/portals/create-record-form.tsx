@@ -6,13 +6,23 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { readResponseJson } from "@/lib/http/read-response-json";
+import { ProjectSearchPicker } from "@/components/portals/project-search-picker";
 
-interface FieldConfig {
-  name: string;
-  label: string;
-  type?: "text" | "email" | "number";
-  required?: boolean;
-}
+export type CreateRecordFieldConfig =
+  | {
+      name: string;
+      label: string;
+      type?: "text" | "email" | "number";
+      required?: boolean;
+    }
+  | {
+      name: string;
+      label: string;
+      type: "projectSearch";
+      required?: boolean;
+      /** Shown under the project search (optional). */
+      helperText?: string;
+    };
 
 export function CreateRecordForm({
   title,
@@ -21,7 +31,7 @@ export function CreateRecordForm({
 }: {
   title: string;
   endpoint: string;
-  fields: FieldConfig[];
+  fields: CreateRecordFieldConfig[];
 }) {
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState("");
@@ -66,17 +76,33 @@ export function CreateRecordForm({
       <CardContent>
         <form onSubmit={onSubmit} className="grid gap-3 sm:grid-cols-2">
           {fields.map((field) => (
-            <div key={field.name} className="space-y-1">
+            <div
+              key={field.name}
+              className={field.type === "projectSearch" ? "space-y-1 sm:col-span-2" : "space-y-1"}
+            >
               <Label htmlFor={field.name}>{field.label}</Label>
-              <Input
-                id={field.name}
-                type={field.type ?? "text"}
-                required={field.required}
-                value={values[field.name] ?? ""}
-                onChange={(e) =>
-                  setValues((prev) => ({ ...prev, [field.name]: e.target.value }))
-                }
-              />
+              {field.type === "projectSearch" ? (
+                <ProjectSearchPicker
+                  id={field.name}
+                  value={values[field.name] ?? ""}
+                  disabled={pending}
+                  onChange={(id) => setValues((prev) => ({ ...prev, [field.name]: id }))}
+                  helperText={
+                    field.helperText ??
+                    "Optional. Search by project name — no need to copy an ID from elsewhere."
+                  }
+                />
+              ) : (
+                <Input
+                  id={field.name}
+                  type={field.type ?? "text"}
+                  required={field.required}
+                  value={values[field.name] ?? ""}
+                  onChange={(e) =>
+                    setValues((prev) => ({ ...prev, [field.name]: e.target.value }))
+                  }
+                />
+              )}
             </div>
           ))}
           <div className="sm:col-span-2 flex items-center gap-3">

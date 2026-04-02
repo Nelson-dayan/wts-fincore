@@ -24,6 +24,7 @@ import {
 import { generateQuotationRefNo } from "@/lib/quotation/generate-ref-no";
 import { exportQuotationPdf } from "@/utils/exportPdf";
 import { readResponseJson } from "@/lib/http/read-response-json";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 type PrimaryCompanySettings = {
   name?: string;
@@ -114,6 +115,9 @@ export function QuotationBuilderPanel({
   const previewRef = useRef<HTMLDivElement>(null);
   /** Full-scale capture root — must not sit under CSS `transform: scale(...)`. */
   const exportCaptureRef = useRef<HTMLDivElement>(null);
+  const [dbConfirmOpen, setDbConfirmOpen] = useState(false);
+  const [dbSaving, setDbSaving] = useState(false);
+  const dbLocalMsgRef = useRef("");
 
   const loadProjectDefaults = useCallback(
     async (projectId: string, opts: { force?: boolean } = {}) => {
@@ -332,6 +336,13 @@ export function QuotationBuilderPanel({
       return;
     }
 
+    dbLocalMsgRef.current = localMsg;
+    setDbConfirmOpen(true);
+  }, [data, connectedProjectId, variant]);
+
+  const runPostToDatabase = useCallback(async () => {
+    const localMsg = dbLocalMsgRef.current;
+    setDbSaving(true);
     try {
       const res = await fetch("/api/admin/quotations/from-builder", {
         method: "POST",
@@ -384,17 +395,20 @@ export function QuotationBuilderPanel({
           ? `Saved to database as ${qn}. Local draft cleared.`
           : "Saved to database. Local draft cleared."
       );
+      setDbConfirmOpen(false);
     } catch (e) {
       setSaveNotice(
         `${localMsg} Database: ${e instanceof Error ? e.message : "request failed"}.`
       );
+    } finally {
+      setDbSaving(false);
     }
 
     saveNoticeTimerRef.current = setTimeout(() => {
       setSaveNotice(null);
       saveNoticeTimerRef.current = null;
     }, 5200);
-  }, [data, connectedProjectId, editingQuotationId, onDbSaveSuccess, variant]);
+  }, [data, connectedProjectId, editingQuotationId, onDbSaveSuccess]);
 
   const handleReset = useCallback(() => {
     const base = defaultQuotationData();
@@ -557,6 +571,22 @@ export function QuotationBuilderPanel({
           </div>
         </div>
       </div>
+
+      <ConfirmDialog
+        open={dbConfirmOpen}
+        onOpenChange={(o) => {
+          if (!o && !dbSaving) setDbConfirmOpen(false);
+        }}
+        title="Save quotation to the database?"
+        description={
+          editingQuotationId
+            ? "Your changes will update this quotation record. The local browser draft is already saved."
+            : "A new quotation will be created in the database. The local browser draft is already saved."
+        }
+        confirmLabel="Save to database"
+        loading={dbSaving}
+        onConfirm={() => void runPostToDatabase()}
+      />
     </div>
   );
 }

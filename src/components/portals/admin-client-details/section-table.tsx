@@ -18,6 +18,9 @@ function renderCell(columnKey: string, raw: unknown): React.ReactNode {
       </span>
     );
   }
+  if (columnKey === "expenseTotal" || columnKey === "amount") {
+    return <span className="tabular-nums text-foreground/95">{val}</span>;
+  }
   return <span className="text-foreground/95">{val}</span>;
 }
 
