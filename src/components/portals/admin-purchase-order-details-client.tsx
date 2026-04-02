@@ -12,6 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { readResponseJson } from "@/lib/http/read-response-json";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 type PoPayload = {
   _id: string;
@@ -44,6 +45,8 @@ export function AdminPurchaseOrderDetailsClient({ purchaseOrderId }: { purchaseO
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [saveMsg, setSaveMsg] = useState("");
   const [deleteError, setDeleteError] = useState("");
+  const [saveConfirmOpen, setSaveConfirmOpen] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 
   async function load() {
     setLoading(true);
@@ -76,8 +79,8 @@ export function AdminPurchaseOrderDetailsClient({ purchaseOrderId }: { purchaseO
     load().catch(() => {});
   }, [purchaseOrderId]);
 
-  async function save() {
-    if (!item) return;
+  async function save(): Promise<boolean> {
+    if (!item) return false;
     setSaving(true);
     setSaveMsg("");
     try {
@@ -120,19 +123,17 @@ export function AdminPurchaseOrderDetailsClient({ purchaseOrderId }: { purchaseO
       setSaveMsg("Saved.");
       setFile(null);
       await load();
+      return true;
     } catch (e) {
       setSaveMsg(e instanceof Error ? e.message : "Save failed");
+      return false;
     } finally {
       setSaving(false);
     }
   }
 
-  async function deletePo() {
-    if (!item) return;
-    const ok = window.confirm(
-      `Delete purchase order ${item.poNumber}? This cannot be undone.`
-    );
-    if (!ok) return;
+  async function deletePo(): Promise<boolean> {
+    if (!item) return false;
     setDeleting(true);
     setDeleteError("");
     try {
@@ -145,9 +146,11 @@ export function AdminPurchaseOrderDetailsClient({ purchaseOrderId }: { purchaseO
         ? `/admin/purchase-orders?projectId=${encodeURIComponent(item.projectId)}`
         : "/admin/purchase-orders";
       router.push(back);
+      return true;
     } catch (e) {
       setDeleteError(e instanceof Error ? e.message : "Could not delete purchase order");
       setDeleting(false);
+      return false;
     }
   }
 
@@ -157,6 +160,35 @@ export function AdminPurchaseOrderDetailsClient({ purchaseOrderId }: { purchaseO
 
   return (
     <div className="animate-fade-in">
+      <ConfirmDialog
+        open={saveConfirmOpen}
+        onOpenChange={setSaveConfirmOpen}
+        title="Save purchase order?"
+        description="Your changes will be saved to this purchase order."
+        confirmLabel="Save"
+        loading={saving}
+        onConfirm={async () => {
+          const ok = await save();
+          if (ok) setSaveConfirmOpen(false);
+        }}
+      />
+      <ConfirmDialog
+        open={deleteConfirmOpen}
+        onOpenChange={setDeleteConfirmOpen}
+        title="Delete this purchase order?"
+        description={
+          item
+            ? `Permanently remove ${item.poNumber}? This cannot be undone if the server allows deletion.`
+            : "Permanently remove this purchase order?"
+        }
+        confirmLabel="Delete"
+        variant="destructive"
+        loading={deleting}
+        onConfirm={async () => {
+          const ok = await deletePo();
+          if (ok) setDeleteConfirmOpen(false);
+        }}
+      />
       <DashboardPageHeader
         title={item ? `Purchase order ${item.poNumber}` : "Purchase order"}
         description={
@@ -221,7 +253,7 @@ export function AdminPurchaseOrderDetailsClient({ purchaseOrderId }: { purchaseO
               variant="destructive"
               className="gap-1.5"
               disabled={deleting}
-              onClick={() => void deletePo()}
+              onClick={() => setDeleteConfirmOpen(true)}
             >
               <Trash2 className="size-3.5" aria-hidden />
               {deleting ? "Deleting…" : "Delete PO"}
@@ -345,7 +377,7 @@ export function AdminPurchaseOrderDetailsClient({ purchaseOrderId }: { purchaseO
                   </div>
                 ) : null}
               </div>
-              <Button type="button" onClick={() => void save()} disabled={saving}>
+              <Button type="button" onClick={() => setSaveConfirmOpen(true)} disabled={saving}>
                 {saving ? "Saving…" : "Save changes"}
               </Button>
               {saveMsg ? (

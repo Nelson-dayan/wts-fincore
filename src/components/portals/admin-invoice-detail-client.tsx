@@ -12,6 +12,7 @@ import { aedAmountInWords } from "@/lib/invoice/aed-amount-words";
 import { computeInvoiceTotals } from "@/lib/invoice/invoice-totals";
 import { exportInvoicePdf } from "@/utils/exportPdf";
 import { readResponseJson } from "@/lib/http/read-response-json";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 
 function toDocData(item: Item): InvoiceDocData {
@@ -48,6 +49,7 @@ export function AdminInvoiceDetailClient({
   const [pdfExporting, setPdfExporting] = useState(false);
   const [logoErr, setLogoErr] = useState("");
   const logoInputRef = useRef<HTMLInputElement>(null);
+  const [saveConfirmOpen, setSaveConfirmOpen] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -115,8 +117,8 @@ export function AdminInvoiceDetailClient({
     }
   }
 
-  async function save() {
-    if (!item) return;
+  async function save(): Promise<boolean> {
+    if (!item) return false;
     setSaving(true);
     setMsg("");
     try {
@@ -150,7 +152,7 @@ export function AdminInvoiceDetailClient({
         if (!patchRes.ok) throw new Error(patchJson.message ?? "Save failed");
         setMsg("Saved.");
         router.replace(`/admin/invoices/${createdId}`);
-        return;
+        return true;
       }
 
       const res = await fetch(`/api/admin/invoices/${invoiceId}`, {
@@ -162,8 +164,10 @@ export function AdminInvoiceDetailClient({
       if (!res.ok) throw new Error(data.message ?? "Save failed");
       setMsg("Saved.");
       await load();
+      return true;
     } catch (e) {
       setMsg(e instanceof Error ? e.message : "Save failed");
+      return false;
     } finally {
       setSaving(false);
     }
@@ -296,6 +300,18 @@ export function AdminInvoiceDetailClient({
   const taxLabelPreview = taxEnabledPreview ? `Tax (${taxRatePreview}%)` : "Tax";
   return (
     <div className="animate-fade-in">
+      <ConfirmDialog
+        open={saveConfirmOpen}
+        onOpenChange={setSaveConfirmOpen}
+        title="Save invoice?"
+        description="Your invoice data will be written to the database."
+        confirmLabel="Save"
+        loading={saving}
+        onConfirm={async () => {
+          const ok = await save();
+          if (ok) setSaveConfirmOpen(false);
+        }}
+      />
       <DashboardPageHeader title={item ? item.invoiceNumber : "Invoice"} />
       {poInvoiceCount != null ? (
         <p className="text-muted-foreground mt-1 text-xs">
@@ -330,7 +346,7 @@ export function AdminInvoiceDetailClient({
             onRemoveLine={removeLine}
             onCopyBillToShip={copyBillToShip}
             onPickLogo={onLogoPicked}
-            onSave={() => void save()}
+            onSave={() => setSaveConfirmOpen(true)}
             onDownloadPdf={() => void downloadPdf()}
           />
 
