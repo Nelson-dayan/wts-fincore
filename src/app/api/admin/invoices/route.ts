@@ -18,7 +18,7 @@ export async function GET(req: Request) {
     const q = parseSearch(url.searchParams);
     const projectId = String(url.searchParams.get("projectId") ?? "").trim();
     const poId = String(url.searchParams.get("poId") ?? "").trim();
-    const filter: Record<string, unknown> = {};
+    const filter: Record<string, unknown> = { "extras._hiddenUntilSaved": { $ne: true } };
     if (q) filter.invoiceNumber = { $regex: q, $options: "i" };
     if (projectId) filter.projectId = projectId;
     if (poId) {

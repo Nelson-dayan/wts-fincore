@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { DashboardPageHeader } from "@/components/dashboard/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { readResponseJson } from "@/lib/http/read-response-json";
 
 type Row = Record<string, unknown> & { _id?: string };
 type ApiPayload = {
@@ -101,7 +102,7 @@ export function ResourceTableClient({
         const response = await fetch(`${endpoint}${separator}${qs.toString()}`, {
           cache: "no-store",
         });
-        const payload = (await response.json()) as ApiPayload;
+        const payload = await readResponseJson<ApiPayload>(response);
         if (!response.ok) {
           throw new Error(payload.message ?? "Request failed");
         }

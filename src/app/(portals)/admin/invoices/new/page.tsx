@@ -1,17 +1,15 @@
-import { Suspense } from "react";
-import { DashboardPageHeader } from "@/components/dashboard/page-header";
-import { NewInvoiceClient } from "./new-invoice-client";
+import { AdminInvoiceDetailClient } from "@/components/portals/admin-invoice-detail-client";
 
-export default function AdminNewInvoicePage() {
+interface PageProps {
+  searchParams?: Promise<{ poId?: string }>;
+}
+
+export default async function AdminNewInvoicePage({ searchParams }: PageProps) {
+  const params = (await searchParams) ?? {};
+  const poId = String(params.poId ?? "").trim();
   return (
     <div className="animate-fade-in">
-      <DashboardPageHeader
-        title="New invoice"
-        description="Linked to the selected purchase order. Creating the draft…"
-      />
-      <Suspense fallback={<p className="text-muted-foreground text-sm">Loading…</p>}>
-        <NewInvoiceClient />
-      </Suspense>
+      <AdminInvoiceDetailClient poId={poId} />
     </div>
   );
 }

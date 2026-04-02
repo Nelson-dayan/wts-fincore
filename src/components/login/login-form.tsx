@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils/cn";
+import { readResponseJson } from "@/lib/http/read-response-json";
 
 export function LoginForm() {
   const router = useRouter();
@@ -42,7 +43,7 @@ export function LoginForm() {
     }
 
     const sessionRes = await fetch("/api/auth/session");
-    const session = await sessionRes.json();
+    const session = await readResponseJson<{ user?: { role?: string } }>(sessionRes);
     const role = session?.user?.role as string | undefined;
 
     if (role === "admin") router.push("/admin");

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 import { QuotationForm } from "@/components/quotation/QuotationForm";
 import { QuotationPdfSavedListCard } from "@/components/quotation/QuotationPdfSavedListCard";
 import { QuotationPreview } from "@/components/quotation/QuotationPreview";
@@ -16,7 +16,12 @@ import {
   QUOTATION_STORAGE_KEY,
   type QuotationData,
 } from "@/types/quotation-generator";
+import {
+  getQuotationPagePx,
+  getQuotationPreviewStackHeightPx,
+} from "@/lib/quotation/page-layout";
 import { exportQuotationPdf } from "@/utils/exportPdf";
+import { readResponseJson } from "@/lib/http/read-response-json";
 
 type PrimaryCompanySettings = {
   name?: string;
@@ -170,7 +175,7 @@ export function QuotationBuilderPanel({
           cache: "no-store",
         });
         if (!res.ok) return;
-        const payload = (await res.json()) as { item?: PrimaryCompanySettings };
+        const payload = await readResponseJson<{ item?: PrimaryCompanySettings }>(res);
         const next = payload.item ?? null;
         if (!alive || !next) return;
         setPrimaryDefaults(next);
@@ -227,13 +232,10 @@ export function QuotationBuilderPanel({
           status: "sent",
         }),
       });
-      const rawText = await res.text();
-      const json = rawText
-        ? (JSON.parse(rawText) as {
-            message?: string;
-            item?: { _id?: string; quotationNumber?: string };
-          })
-        : {};
+      const json = await readResponseJson<{
+        message?: string;
+        item?: { _id?: string; quotationNumber?: string };
+      }>(res);
       if (!res.ok) {
         if (res.status === 401 || res.status === 403) {
           setSaveNotice(
@@ -324,6 +326,12 @@ export function QuotationBuilderPanel({
   const isStandalone = variant === "standalone";
   const isEditMode = Boolean(editingQuotationId);
   const formTitle = isEditMode ? "Edit quotation" : "New quotation";
+  const previewPagePx = getQuotationPagePx(data);
+  const previewStackHeightPx = getQuotationPreviewStackHeightPx(previewPagePx.height);
+  const previewViewportStyle = {
+    "--qv-page-w": `${previewPagePx.width}px`,
+    "--qv-stack-h": `${previewStackHeightPx}px`,
+  } as CSSProperties;
 
   return (
     <div className={isStandalone ? "min-h-dvh bg-muted/25" : ""}>
@@ -387,10 +395,15 @@ export function QuotationBuilderPanel({
             <p className="text-muted-foreground mb-3 text-center text-[11px] font-semibold uppercase tracking-wider">
               Live preview — 3 pages ({data.pageFormat.toUpperCase()} {data.pageOrientation})
             </p>
-            <div className="min-h-[min(88vh,900px)] w-full overflow-auto [-webkit-overflow-scrolling:touch]">
-              <div className="mx-auto flex w-max max-w-full flex-col items-center pb-10 pt-2">
-                <div className="pointer-events-none origin-top scale-[0.54] min-[640px]:scale-[0.66] min-[900px]:scale-[0.78] min-[1200px]:scale-[0.9] xl:scale-[0.97] 2xl:scale-100">
-                  <QuotationPreview ref={previewRef} data={data} />
+            <div className="min-h-[min(88vh,900px)] w-full max-w-full overflow-x-hidden overflow-y-auto [-webkit-overflow-scrolling:touch]">
+              <div className="mx-auto flex max-w-full justify-center pb-10 pt-2">
+                <div
+                  className="quotation-preview-scale-viewport shrink-0"
+                  style={previewViewportStyle}
+                >
+                  <div className="quotation-preview-scale-inner">
+                    <QuotationPreview ref={previewRef} data={data} />
+                  </div>
                 </div>
               </div>
             </div>

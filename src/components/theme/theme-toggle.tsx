@@ -19,7 +19,7 @@ export function ThemeToggle({ className }: { className?: string }) {
         variant="outline"
         size="icon"
         className={cn(
-          "size-9 shrink-0 rounded-lg border-border/80 bg-background/70 backdrop-blur-md",
+          "size-9 shrink-0 rounded-xl border-border/70 bg-background/65 backdrop-blur-md",
           className
         )}
         disabled
@@ -35,7 +35,7 @@ export function ThemeToggle({ className }: { className?: string }) {
       variant="outline"
       size="icon"
       className={cn(
-        "size-9 shrink-0 rounded-lg border-border/80 bg-background/70 shadow-sm backdrop-blur-md transition-colors duration-200 hover:border-primary/25 hover:bg-accent/50",
+        "size-9 shrink-0 rounded-xl border-border/60 bg-background/55 shadow-[0_1px_0_0_hsl(0_0%_100%/0.04)_inset,0_8px_24px_-12px_hsl(0_0%_0%/0.35)] backdrop-blur-md transition-[border-color,background-color,box-shadow,transform] duration-200 hover:-translate-y-px hover:border-primary/35 hover:bg-accent/45 hover:shadow-[0_1px_0_0_hsl(0_0%_100%/0.06)_inset,0_10px_28px_-10px_hsl(var(--primary)/0.2)] active:translate-y-0 motion-reduce:hover:translate-y-0 dark:bg-background/40 dark:shadow-[0_1px_0_0_hsl(0_0%_100%/0.05)_inset,0_12px_28px_-12px_hsl(0_0%_0%/0.5)]",
         className
       )}
       onClick={() => setTheme(dark ? "light" : "dark")}

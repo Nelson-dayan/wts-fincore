@@ -15,6 +15,7 @@ import { DashboardPageHeader } from "@/components/dashboard/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { readResponseJson } from "@/lib/http/read-response-json";
 
 type ProjectRow = {
   _id: string;
@@ -86,11 +87,11 @@ export function AdminProjectsClient({ initialClientId = "" }: { initialClientId?
       const response = await fetch(`/api/admin/projects?${qs.toString()}`, {
         cache: "no-store",
       });
-      const payload = (await response.json()) as {
+      const payload = await readResponseJson<{
         items?: ProjectRow[];
         total?: number;
         message?: string;
-      };
+      }>(response);
       if (!response.ok) throw new Error(payload.message ?? "Failed to load projects");
       setItems(payload.items ?? []);
       setTotal(payload.total ?? 0);

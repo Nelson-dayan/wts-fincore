@@ -10,9 +10,8 @@ export function SignOutButton({ className }: { className?: string }) {
     <Button
       type="button"
       variant="ghost"
-      size="sm"
       className={cn(
-        "gap-1.5 rounded-lg text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive",
+        "h-9 gap-1.5 rounded-xl px-3 text-sm font-medium text-muted-foreground transition-[transform,background-color,color] duration-200 hover:-translate-y-px hover:bg-destructive/12 hover:text-destructive active:translate-y-0 motion-reduce:hover:translate-y-0",
         className
       )}
       onClick={() => signOut({ callbackUrl: "/login" })}

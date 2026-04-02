@@ -8,7 +8,11 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { MAX_INVOICES_PER_PURCHASE_ORDER } from "@/lib/invoice/invoice-limits";
+import {
+  invoiceCountAtOrOverCap,
+  MAX_INVOICES_PER_PURCHASE_ORDER,
+} from "@/lib/invoice/invoice-limits";
+import { readResponseJson } from "@/lib/http/read-response-json";
 
 type PoRow = { _id: string; poNumber: string; quotationNumber?: string };
 
@@ -28,7 +32,7 @@ export function AdminInvoicesCreateHelper({ projectId }: { projectId: string }) 
       const qs = new URLSearchParams({ page: "1", limit: "25", q: "" });
       if (projectId) qs.set("projectId", projectId);
       const res = await fetch(`/api/admin/purchase-orders?${qs}`, { cache: "no-store" });
-      const data = (await res.json()) as { items?: PoRow[]; message?: string };
+      const data = await readResponseJson<{ items?: PoRow[]; message?: string }>(res);
       if (!res.ok) throw new Error(data.message ?? "Could not load POs");
       const list = data.items ?? [];
       setPos(list);
@@ -40,7 +44,7 @@ export function AdminInvoicesCreateHelper({ projectId }: { projectId: string }) 
             `/api/admin/invoices?poId=${encodeURIComponent(p._id)}&page=1&limit=10&q=`,
             { cache: "no-store" }
           );
-          const ij = (await ir.json()) as { total?: number };
+          const ij = await readResponseJson<{ total?: number }>(ir);
           counts[p._id] = ir.ok && typeof ij.total === "number" ? ij.total : 0;
         } catch {
           counts[p._id] = 0;
@@ -72,7 +76,7 @@ export function AdminInvoicesCreateHelper({ projectId }: { projectId: string }) 
 
   const selectedCount = selectedPoId ? (invoiceCounts[selectedPoId] ?? 0) : 0;
   const atCapSelected =
-    Boolean(selectedPoId) && selectedCount >= MAX_INVOICES_PER_PURCHASE_ORDER;
+    Boolean(selectedPoId) && invoiceCountAtOrOverCap(selectedCount);
 
   return (
     <Card className="mb-6 border-primary/25 bg-primary/4 dark:border-primary/35 dark:bg-primary/8">
@@ -126,7 +130,11 @@ export function AdminInvoicesCreateHelper({ projectId }: { projectId: string }) 
                 {pos.map((p) => {
                   const n = invoiceCounts[p._id];
                   const cap =
-                    typeof n === "number" && n >= MAX_INVOICES_PER_PURCHASE_ORDER ? " (full)" : "";
+                    typeof n === "number" &&
+                    MAX_INVOICES_PER_PURCHASE_ORDER != null &&
+                    invoiceCountAtOrOverCap(n)
+                      ? " (full)"
+                      : "";
                   return (
                     <option key={p._id} value={p._id}>
                       {p.poNumber}
@@ -138,7 +146,10 @@ export function AdminInvoicesCreateHelper({ projectId }: { projectId: string }) 
               </select>
               {selectedPoId ? (
                 <p className="text-muted-foreground text-[0.75rem]">
-                  {selectedCount} invoice(s) on this PO (max {MAX_INVOICES_PER_PURCHASE_ORDER}).
+                  {selectedCount} invoice(s) on this PO
+                  {MAX_INVOICES_PER_PURCHASE_ORDER != null
+                    ? ` (max ${MAX_INVOICES_PER_PURCHASE_ORDER}).`
+                    : "."}
                   {atCapSelected ? " Limit reached — choose another PO." : ""}
                 </p>
               ) : null}

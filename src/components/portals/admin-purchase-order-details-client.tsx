@@ -7,7 +7,9 @@ import { PurchaseOrderInvoicesSection } from "@/components/portals/purchase-orde
 import { PurchaseOrderFilePreview } from "@/components/portals/purchase-order-file-preview";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { readResponseJson } from "@/lib/http/read-response-json";
 
 type PoPayload = {
   _id: string;
@@ -18,6 +20,8 @@ type PoPayload = {
   type: string;
   status: string;
   fileUrl: string;
+  externalPoNumber?: string;
+  totalAmount?: number | null;
   createdAt: string;
 };
 
@@ -29,6 +33,8 @@ export function AdminPurchaseOrderDetailsClient({ purchaseOrderId }: { purchaseO
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState<string>("linked");
+  const [externalPoNumber, setExternalPoNumber] = useState("");
+  const [totalAmountStr, setTotalAmountStr] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [fileKey, setFileKey] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -39,12 +45,20 @@ export function AdminPurchaseOrderDetailsClient({ purchaseOrderId }: { purchaseO
     setError("");
     try {
       const res = await fetch(`/api/admin/purchase-orders/${purchaseOrderId}`, { cache: "no-store" });
-      const data = (await res.json()) as { item?: PoPayload; message?: string };
+      const data = await readResponseJson<{ item?: PoPayload; message?: string }>(res);
       if (!res.ok) throw new Error(data.message ?? "Failed to load");
       const po = data.item;
       if (!po) throw new Error("Missing purchase order");
       setItem(po);
       setStatus(po.status ?? "linked");
+      setExternalPoNumber(String(po.externalPoNumber ?? "").trim());
+      setTotalAmountStr(
+        po.totalAmount != null &&
+          typeof po.totalAmount === "number" &&
+          Number.isFinite(po.totalAmount)
+          ? String(po.totalAmount)
+          : ""
+      );
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load");
       setItem(null);
@@ -62,28 +76,40 @@ export function AdminPurchaseOrderDetailsClient({ purchaseOrderId }: { purchaseO
     setSaving(true);
     setSaveMsg("");
     try {
-      if (item.type === "client" && file) {
-        if (file.size > MAX_PO_UPLOAD_BYTES) {
+      if (item.type === "client") {
+        if (file && file.size > MAX_PO_UPLOAD_BYTES) {
           throw new Error("File bahut badi hai — ~9 MB se chhoti file chunna.");
         }
         const fd = new FormData();
         fd.set("status", status);
-        fd.set("file", file);
+        fd.set("externalPoNumber", externalPoNumber);
+        if (totalAmountStr.trim() !== "") fd.set("totalAmount", totalAmountStr.trim());
+        if (file) fd.set("file", file);
         const res = await fetch(`/api/admin/purchase-orders/${purchaseOrderId}`, {
           method: "PATCH",
           body: fd,
         });
-        const data = (await res.json()) as { message?: string };
+        const data = await readResponseJson<{ message?: string }>(res);
         if (!res.ok) throw new Error(data.message ?? "Save failed");
       } else {
+        const payload: {
+          status: string;
+          externalPoNumber: string;
+          totalAmount?: number;
+        } = {
+          status,
+          externalPoNumber,
+        };
+        if (totalAmountStr.trim() !== "") {
+          const n = Number.parseFloat(totalAmountStr.trim().replace(/,/g, ""));
+          if (Number.isFinite(n)) payload.totalAmount = n;
+        }
         const res = await fetch(`/api/admin/purchase-orders/${purchaseOrderId}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            status,
-          }),
+          body: JSON.stringify(payload),
         });
-        const data = (await res.json()) as { message?: string };
+        const data = await readResponseJson<{ message?: string }>(res);
         if (!res.ok) throw new Error(data.message ?? "Save failed");
       }
       setSaveMsg("Saved.");
@@ -179,75 +205,114 @@ export function AdminPurchaseOrderDetailsClient({ purchaseOrderId }: { purchaseO
               <p>
                 <strong>Created:</strong> {new Date(item.createdAt).toLocaleString()}
               </p>
+              {item.externalPoNumber ? (
+                <p className="sm:col-span-2">
+                  <strong>Client / external PO #:</strong> {item.externalPoNumber}
+                </p>
+              ) : null}
+              {item.totalAmount != null && Number.isFinite(Number(item.totalAmount)) ? (
+                <p className="sm:col-span-2">
+                  <strong>PO amount:</strong>{" "}
+                  <span className="tabular-nums">
+                    AED{" "}
+                    {Number(item.totalAmount).toLocaleString("en-IN", {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}
+                  </span>
+                </p>
+              ) : null}
             </CardContent>
           </Card>
 
           <Card className="mb-4">
             <CardHeader>
-              <CardTitle className="text-base">Edit & replace file</CardTitle>
+              <CardTitle className="text-base">
+                {item.type === "client" ? "Edit PO & replace file" : "Edit PO"}
+              </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               {item.type !== "client" ? (
                 <p className="text-muted-foreground text-sm">
-                  This is an internal PO generated from a quotation. Files are not stored here.
+                  Internal PO — no file attachment; status and reference fields still save to the database.
                 </p>
-              ) : (
-                <>
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <div className="space-y-1.5">
-                      <Label htmlFor="po-st">Status</Label>
-                      <select
-                        id="po-st"
-                        value={status}
-                        onChange={(e) => setStatus(e.target.value)}
-                        className="flex h-10 w-full rounded-lg border border-input/90 bg-background px-3 text-sm"
+              ) : null}
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label htmlFor="po-st">Status</Label>
+                  <select
+                    id="po-st"
+                    value={status}
+                    onChange={(e) => setStatus(e.target.value)}
+                    className="flex h-10 w-full rounded-lg border border-input/90 bg-background px-3 text-sm"
+                  >
+                    <option value="linked">linked</option>
+                    <option value="active">active</option>
+                    <option value="completed">completed</option>
+                  </select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="po-ext">Client / external PO # (optional)</Label>
+                  <Input
+                    id="po-ext"
+                    value={externalPoNumber}
+                    onChange={(e) => setExternalPoNumber(e.target.value)}
+                    placeholder="e.g. PO-CLIENT-1042"
+                    className="h-10"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="po-amt">PO total amount — AED (optional)</Label>
+                  <Input
+                    id="po-amt"
+                    inputMode="decimal"
+                    value={totalAmountStr}
+                    onChange={(e) => setTotalAmountStr(e.target.value)}
+                    placeholder="0.00"
+                    className="h-10 tabular-nums"
+                  />
+                </div>
+                {item.type === "client" ? (
+                  <div className="space-y-1.5 sm:col-span-2">
+                    <Label>Replace file (optional)</Label>
+                    <input
+                      key={fileKey}
+                      ref={fileInputRef}
+                      id="po-replace"
+                      type="file"
+                      className="sr-only"
+                      accept=".pdf,application/pdf,image/png,image/jpeg,image/jpg,image/pjpeg,image/webp,.png,.jpg,.jpeg,.webp"
+                      onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+                    />
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => fileInputRef.current?.click()}
                       >
-                        <option value="linked">linked</option>
-                        <option value="active">active</option>
-                        <option value="completed">completed</option>
-                      </select>
-                    </div>
-                    <div className="space-y-1.5 sm:col-span-2">
-                      <Label>Replace file (optional)</Label>
-                      <input
-                        key={fileKey}
-                        ref={fileInputRef}
-                        id="po-replace"
-                        type="file"
-                        className="sr-only"
-                        accept=".pdf,application/pdf,image/png,image/jpeg,image/jpg,image/pjpeg,image/webp,.png,.jpg,.jpeg,.webp"
-                        onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-                      />
-                      <div className="flex flex-wrap items-center gap-2">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => fileInputRef.current?.click()}
-                        >
-                          Choose file
-                        </Button>
-                        <span className="text-muted-foreground max-w-50 truncate text-xs">
-                          {file ? file.name : "—"}
-                        </span>
-                      </div>
+                        Choose file
+                      </Button>
+                      <span className="text-muted-foreground max-w-50 truncate text-xs">
+                        {file ? file.name : "—"}
+                      </span>
                     </div>
                   </div>
-                  <Button type="button" onClick={() => void save()} disabled={saving}>
-                    {saving ? "Saving…" : "Save changes"}
-                  </Button>
-                  {saveMsg ? (
-                    <p
-                      className={
-                        saveMsg === "Saved." ? "text-sm text-primary" : "text-sm text-destructive"
-                      }
-                      role="status"
-                    >
-                      {saveMsg}
-                    </p>
-                  ) : null}
-                </>
-              )}
+                ) : null}
+              </div>
+              <Button type="button" onClick={() => void save()} disabled={saving}>
+                {saving ? "Saving…" : "Save changes"}
+              </Button>
+              {saveMsg ? (
+                <p
+                  className={
+                    saveMsg === "Saved." ? "text-sm text-primary" : "text-sm text-destructive"
+                  }
+                  role="status"
+                >
+                  {saveMsg}
+                </p>
+              ) : null}
             </CardContent>
           </Card>
 

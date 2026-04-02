@@ -32,9 +32,18 @@ export function Page3({ data }: Page3Props) {
         ? "text-right"
         : "text-left";
 
+  const contactInsetClass =
+    contactTextAlign === "left"
+      ? "pl-[2%] pr-2"
+      : contactTextAlign === "right"
+        ? "pr-[2%] pl-2"
+        : "px-[2%]";
+
   return (
     <QuotationPageFrame data={data} page={3}>
-      <div className="flex h-full min-h-0 flex-col justify-end pb-2 pl-[2%] pt-4">
+      <div
+        className={`flex h-full min-h-0 flex-col justify-end pb-2 pt-4 ${contactInsetClass}`}
+      >
         <div
           className={`max-w-xl space-y-4 text-[14px] leading-relaxed md:text-[15px] ${textAlignClass}`}
           style={{ color: QUOTATION_PDF_COLORS.slate800 }}

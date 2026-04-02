@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { ClientProfileCard } from "@/components/portals/admin-client-details/client-profile-card";
 import { SectionTable } from "@/components/portals/admin-client-details/section-table";
 import type { ClientDetailsPayload, ClientProfileForm } from "@/components/portals/admin-client-details/types";
+import { readResponseJson } from "@/lib/http/read-response-json";
 
 const EMPTY_FORM: ClientProfileForm = {
   name: "",
@@ -42,7 +43,7 @@ export function AdminClientDetailsClient({ clientId }: { clientId: string }) {
         const response = await fetch(`/api/admin/clients/${clientId}/details`, {
           cache: "no-store",
         });
-        const payload = (await response.json()) as ClientDetailsPayload;
+        const payload = await readResponseJson<ClientDetailsPayload>(response);
         if (!response.ok) throw new Error(payload.message ?? "Failed to load details");
         if (alive) {
           setData(payload);
@@ -78,14 +79,14 @@ export function AdminClientDetailsClient({ clientId }: { clientId: string }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form),
       });
-      const payload = (await response.json()) as { message?: string };
+      const payload = await readResponseJson<{ message?: string }>(response);
       if (!response.ok) throw new Error(payload.message ?? "Failed to update client");
       setEditing(false);
       router.refresh();
       const refreshed = await fetch(`/api/admin/clients/${clientId}/details`, {
         cache: "no-store",
       });
-      const details = (await refreshed.json()) as ClientDetailsPayload;
+      const details = await readResponseJson<ClientDetailsPayload>(refreshed);
       setData(details);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to update client");
@@ -101,7 +102,7 @@ export function AdminClientDetailsClient({ clientId }: { clientId: string }) {
       const response = await fetch(`/api/admin/clients/${clientId}`, {
         method: "DELETE",
       });
-      const payload = (await response.json()) as { message?: string };
+      const payload = await readResponseJson<{ message?: string }>(response);
       if (!response.ok) throw new Error(payload.message ?? "Failed to delete client");
       router.push("/admin/clients");
       router.refresh();

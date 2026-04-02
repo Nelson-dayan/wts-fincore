@@ -1,4 +1,5 @@
 import { QUOTATION_PDF_COLORS } from "@/lib/quotation/quotation-pdf-colors";
+import { cn } from "@/lib/utils/cn";
 import type { QuotationData } from "@/types/quotation-generator";
 import { QuotationPageFrame } from "./QuotationPageFrame";
 
@@ -31,7 +32,10 @@ export function Page2({ data }: Page2Props) {
     tableBodyBg,
     tableBorderColor,
     page2TextAlign,
+    tableBlockAlign = "center",
+    pageOrientation,
   } = data;
+  const isLandscape = pageOrientation === "landscape";
   const rows = items.length > 0 ? items : [{ detail: "", cost: "" }];
   const hDetail = tableHeaderDetail.trim();
   const hCost = tableHeaderCost.trim();
@@ -57,19 +61,29 @@ export function Page2({ data }: Page2Props) {
         ? "text-right"
         : "text-center";
 
+  const milestoneRowClass =
+    page2TextAlign === "right"
+      ? "flex gap-2 justify-end"
+      : page2TextAlign === "center"
+        ? "flex gap-2 justify-center"
+        : "flex gap-2";
+
+  /** Landscape pages are wide — narrower table block (~36rem); portrait keeps max-w-4xl. */
+  const page2BlockMaxClass = isLandscape ? "max-w-xl" : "max-w-4xl";
+
   return (
     <QuotationPageFrame data={data} page={2}>
       <div className="flex h-full min-h-0 flex-col justify-center gap-5 pt-1">
         {customTitle ? (
           <h2
-            className={`text-[17px] font-normal leading-snug md:text-[19px] ${headingAlignClass}`}
+            className={`shrink-0 text-[17px] font-normal leading-snug md:text-[19px] ${headingAlignClass}`}
             style={{ color: QUOTATION_PDF_COLORS.slate900 }}
           >
             {customTitle}
           </h2>
         ) : showComposedTitle ? (
           <h2
-            className={`text-[17px] font-normal leading-snug md:text-[19px] ${headingAlignClass}`}
+            className={`shrink-0 text-[17px] font-normal leading-snug md:text-[19px] ${headingAlignClass}`}
             style={{ color: QUOTATION_PDF_COLORS.slate900 }}
           >
             {p1}
@@ -80,14 +94,22 @@ export function Page2({ data }: Page2Props) {
 
         {description.trim() ? (
           <p
-            className={`px-2 text-[14px] leading-relaxed md:text-[15px] ${headingAlignClass}`}
+            className={`shrink-0 px-2 text-[14px] leading-relaxed md:text-[15px] ${headingAlignClass}`}
             style={{ color: QUOTATION_PDF_COLORS.slate800 }}
           >
             {description.trim()}
           </p>
         ) : null}
 
-        <section className="mx-auto w-full max-w-4xl">
+        <section
+          className={cn(
+            "w-full shrink-0",
+            page2BlockMaxClass,
+            tableBlockAlign === "left" && "mr-auto",
+            tableBlockAlign === "center" && "mx-auto",
+            tableBlockAlign === "right" && "ml-auto"
+          )}
+        >
           <div
             className="overflow-hidden rounded-lg border"
             style={{
@@ -96,18 +118,22 @@ export function Page2({ data }: Page2Props) {
               boxShadow: QUOTATION_PDF_COLORS.shadowSm,
             }}
           >
-            <table className="w-full border-collapse text-center text-[13px] md:text-[14px]">
+            <table className="w-full table-fixed border-collapse text-[13px] md:text-[14px]">
+              <colgroup>
+                <col style={{ width: "72%" }} />
+                <col style={{ width: "28%" }} />
+              </colgroup>
               {showThead ? (
                 <thead>
                   <tr style={{ backgroundColor: headerBg }}>
                     <th
-                      className="border px-3 py-2.5 font-bold"
+                      className="border px-3 py-2.5 text-left font-bold wrap-break-word"
                       style={{ borderColor, color: QUOTATION_PDF_COLORS.slate900 }}
                     >
                       {hDetail}
                     </th>
                     <th
-                      className="border px-3 py-2.5 font-bold"
+                      className="border px-3 py-2.5 text-right font-bold whitespace-nowrap"
                       style={{ borderColor, color: QUOTATION_PDF_COLORS.slate900 }}
                     >
                       {hCost}
@@ -119,13 +145,13 @@ export function Page2({ data }: Page2Props) {
                 {rows.map((row, i) => (
                   <tr key={i} style={{ backgroundColor: bodyBg }}>
                     <td
-                      className="border px-3 py-2.5 align-top"
+                      className="border px-3 py-2.5 text-left align-top wrap-break-word"
                       style={{ borderColor, color: QUOTATION_PDF_COLORS.slate800 }}
                     >
                       {row.detail.trim()}
                     </td>
                     <td
-                      className="border px-3 py-2.5 align-top tabular-nums"
+                      className="border px-3 py-2.5 text-right align-top tabular-nums whitespace-nowrap"
                       style={{ borderColor, color: QUOTATION_PDF_COLORS.slate900 }}
                     >
                       {row.cost.trim() ? <em>{row.cost.trim()}</em> : null}
@@ -139,15 +165,22 @@ export function Page2({ data }: Page2Props) {
 
         {milestoneLines.length > 0 ? (
           <div
-            className="mx-auto mt-1 w-full max-w-4xl pl-1 text-left text-[14px] leading-relaxed md:text-[15px]"
+            className={cn(
+              "mt-1 w-full shrink-0 px-2 text-[14px] leading-relaxed md:text-[15px]",
+              page2BlockMaxClass,
+              tableBlockAlign === "left" && "mr-auto",
+              tableBlockAlign === "center" && "mx-auto",
+              tableBlockAlign === "right" && "ml-auto",
+              headingAlignClass
+            )}
             style={{ color: QUOTATION_PDF_COLORS.slate800 }}
           >
             <p className="font-bold" style={{ color: QUOTATION_PDF_COLORS.slate900 }}>
               Payment Milestone:
             </p>
-            <ul className="mt-2 list-none space-y-1.5 pl-0">
+            <ul className="mt-2 list-none space-y-1.5">
               {milestoneLines.map((line, idx) => (
-                <li key={idx} className="flex gap-2 pl-1">
+                <li key={idx} className={milestoneRowClass}>
                   <span className="shrink-0" style={{ color: QUOTATION_PDF_COLORS.slate700 }} aria-hidden>
                     ◆
                   </span>

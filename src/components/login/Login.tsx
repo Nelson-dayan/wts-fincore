@@ -26,7 +26,7 @@ export default async function Login() {
 
  return (
     <AuthPageShell>
-      <Card className="glass-card border-white/25 dark:border-white/10 !shadow-[var(--shadow-premium-lg)]">
+      <Card className="glass-card border-white/25 dark:border-white/10 shadow-(--shadow-premium-lg)!">
         <CardHeader className="text-center sm:text-left">
           <CardTitle>Welcome back</CardTitle>
           <CardDescription>

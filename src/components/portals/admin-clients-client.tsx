@@ -6,6 +6,7 @@ import { CreateClientCard } from "@/components/portals/admin-clients/create-clie
 import { ClientsDirectoryCard } from "@/components/portals/admin-clients/clients-directory-card";
 import { EMPTY_CLIENT_FORM } from "@/components/portals/admin-clients/helpers";
 import type { ClientForm, ClientRow } from "@/components/portals/admin-clients/types";
+import { readResponseJson } from "@/lib/http/read-response-json";
 
 export function AdminClientsClient() {
   const [items, setItems] = useState<ClientRow[]>([]);
@@ -33,11 +34,11 @@ export function AdminClientsClient() {
       const response = await fetch(`/api/admin/clients?${qs.toString()}`, {
         cache: "no-store",
       });
-      const payload = (await response.json()) as {
+      const payload = await readResponseJson<{
         items?: ClientRow[];
         total?: number;
         message?: string;
-      };
+      }>(response);
       if (!response.ok) throw new Error(payload.message ?? "Failed to load clients");
       setItems(payload.items ?? []);
       setTotal(payload.total ?? 0);
@@ -69,7 +70,7 @@ export function AdminClientsClient() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form),
       });
-      const payload = (await response.json()) as { message?: string };
+      const payload = await readResponseJson<{ message?: string }>(response);
       if (!response.ok) throw new Error(payload.message ?? "Failed to create client");
       setForm(EMPTY_CLIENT_FORM);
       await loadClients(1, query);
@@ -101,7 +102,7 @@ export function AdminClientsClient() {
           clientSignatureText: draft.clientSignatureText,
         }),
       });
-      const payload = (await response.json()) as { message?: string };
+      const payload = await readResponseJson<{ message?: string }>(response);
       if (!response.ok) throw new Error(payload.message ?? "Failed to update client");
       setEditingId(null);
       setDrafts((prev) => {

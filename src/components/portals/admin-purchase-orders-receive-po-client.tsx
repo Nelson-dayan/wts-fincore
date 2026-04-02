@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { readResponseJson } from "@/lib/http/read-response-json";
 
 type QRow = {
   _id: string;
@@ -37,7 +38,7 @@ export function AdminPurchaseOrdersReceivePoClient({ projectId }: { projectId: s
       const qs = new URLSearchParams({ page: "1", limit: "60", q: "" });
       if (projectId) qs.set("projectId", projectId);
       const res = await fetch(`/api/admin/quotations?${qs}`, { cache: "no-store" });
-      const data = (await res.json()) as { items?: QRow[]; message?: string };
+      const data = await readResponseJson<{ items?: QRow[]; message?: string }>(res);
       if (!res.ok) throw new Error(data.message ?? "Quotations load failed");
       const list = data.items ?? [];
       setQuotations(list);
@@ -85,10 +86,9 @@ export function AdminPurchaseOrdersReceivePoClient({ projectId }: { projectId: s
           return fd;
         })(),
       });
-      const rawText = await res.text();
-      let data: { message?: string; id?: string; poNumber?: string } = {};
+      let data: { message?: string; id?: string; poNumber?: string };
       try {
-        data = rawText ? (JSON.parse(rawText) as typeof data) : {};
+        data = await readResponseJson<typeof data>(res);
       } catch {
         throw new Error(
           res.status === 413

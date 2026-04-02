@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select } from "@/components/ui/select";
+import { readResponseJson } from "@/lib/http/read-response-json";
 
 interface ClientOption {
   _id: string;
@@ -42,7 +43,7 @@ export function CreateProjectForm() {
         `/api/admin/clients?page=1&limit=8&q=${encodeURIComponent(clientQuery)}`,
         { cache: "no-store" }
       );
-      const payload = (await response.json()) as { items?: ClientOption[] };
+      const payload = await readResponseJson<{ items?: ClientOption[] }>(response);
       if (alive) setClientOptions(payload.items ?? []);
     }
     loadClients();
@@ -57,7 +58,7 @@ export function CreateProjectForm() {
       const response = await fetch("/api/admin/users?page=1&limit=50", {
         cache: "no-store",
       });
-      const payload = (await response.json()) as { users?: UserOption[] };
+      const payload = await readResponseJson<{ users?: UserOption[] }>(response);
       if (alive) {
         const rows = payload.users ?? [];
         setUserOptions(rows);
@@ -90,7 +91,7 @@ export function CreateProjectForm() {
           assignedTo: assignedToUserId ? [assignedToUserId] : [],
         }),
       });
-      const result = (await response.json()) as { message?: string };
+      const result = await readResponseJson<{ message?: string }>(response);
       if (!response.ok) throw new Error(result.message ?? "Create failed");
       setMessage("Project created. Refreshing...");
       setTimeout(() => window.location.reload(), 600);
@@ -102,9 +103,9 @@ export function CreateProjectForm() {
   }
 
   return (
-    <Card className="mb-4">
+    <Card className="mb-4 mt-10 border-border/80 md:mt-12">
       <CardHeader>
-        <CardTitle className="text-base">Create Project</CardTitle>
+        <CardTitle className="text-base">Create project</CardTitle>
       </CardHeader>
       <CardContent>
         <form onSubmit={onSubmit} className="grid gap-3 sm:grid-cols-2">

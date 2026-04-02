@@ -86,16 +86,14 @@ export function QuotationForm({
       <CardHeader className="space-y-1">
         <CardTitle>{formTitle}</CardTitle>
       </CardHeader>
-      <CardContent className="flex flex-col gap-5 pr-1">
-        <fieldset className="grid gap-3 rounded-xl border border-border/80 bg-muted/25 p-4 dark:bg-muted/15">
+      <CardContent className="flex flex-col gap-6">
+        <fieldset className="grid gap-3 rounded-xl border border-border/80 bg-muted/25 p-4 text-left dark:bg-muted/15">
           <div className="flex items-start gap-2">
             <span className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg bg-background text-ring ring-1 ring-border/80">
               <ImageUp className="size-4 opacity-80" aria-hidden />
             </span>
-            <div className="min-w-0 flex-1 space-y-2">
-              <Label htmlFor="qg-logo" className="text-base">
-                Upload logo
-              </Label>
+            <div className="min-w-0 flex-1 space-y-2 text-left">
+              <Label htmlFor="qg-logo">Upload logo</Label>
               <Input
                 id="qg-logo"
                 type="file"
@@ -109,7 +107,7 @@ export function QuotationForm({
                   <img
                     src={data.logo}
                     alt="Logo preview"
-                    className="h-14 w-auto max-w-50 rounded-lg border border-border bg-background object-contain p-2"
+                    className="h-14 w-auto max-w-50 object-contain"
                   />
                   <Button type="button" variant="outline" size="sm" onClick={clearLogo}>
                     Remove logo
@@ -120,7 +118,7 @@ export function QuotationForm({
           </div>
         </fieldset>
 
-        <fieldset className="grid gap-3">
+        <fieldset className="grid gap-4 text-left">
           <div className="grid gap-2">
             <Label htmlFor="qg-p1-title">Product / framework title (cover, accent)</Label>
             <Input
@@ -188,7 +186,7 @@ export function QuotationForm({
           </div>
         </fieldset>
 
-        <fieldset className="grid gap-5">
+        <fieldset className="grid gap-5 text-left">
           <div className="grid gap-2">
             <Label htmlFor="qg-p2-title">Centre title (optional)</Label>
             <Input
@@ -279,7 +277,7 @@ export function QuotationForm({
                         value={row.cost}
                         onChange={(e) => setItem(index, { cost: e.target.value })}
                         placeholder="e.g. 5,000.00"
-                        className="tabular-nums"
+                        className="tabular-nums text-right"
                       />
                     </div>
                     <Button
@@ -308,7 +306,7 @@ export function QuotationForm({
               placeholder="Full payment after report submission."
               rows={3}
               className={cn(
-                "flex min-h-[80px] w-full rounded-lg border border-input/90 bg-background/90 px-3.5 py-2 text-base shadow-sm md:text-[0.9375rem]",
+                "flex min-h-20 w-full rounded-lg border border-input/90 bg-background/90 px-3.5 py-2 text-base shadow-sm md:text-[0.9375rem]",
                 "placeholder:text-muted-foreground/65",
                 "focus-visible:border-primary/35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45"
               )}
@@ -316,8 +314,8 @@ export function QuotationForm({
           </div>
         </fieldset>
 
-        <fieldset className="grid gap-3 sm:grid-cols-3">
-          <div className="grid gap-2 sm:col-span-3">
+        <fieldset className="grid gap-4 text-left">
+          <div className="grid gap-2">
             <Label htmlFor="qg-p3-title">Contact section heading</Label>
             <Input
               id="qg-p3-title"
@@ -326,7 +324,7 @@ export function QuotationForm({
               placeholder="Contact Details"
             />
           </div>
-          <div className="grid gap-2 sm:col-span-3">
+          <div className="grid gap-2">
             <Label htmlFor="qg-contact-name">Contact name</Label>
             <Input
               id="qg-contact-name"
@@ -334,7 +332,7 @@ export function QuotationForm({
               onChange={(e) => patch({ contactName: e.target.value })}
             />
           </div>
-          <div className="grid gap-2 sm:col-span-3">
+          <div className="grid gap-2">
             <Label htmlFor="qg-phone">Phone</Label>
             <Input
               id="qg-phone"
@@ -343,7 +341,7 @@ export function QuotationForm({
               className="tabular-nums"
             />
           </div>
-          <div className="grid gap-2 sm:col-span-3">
+          <div className="grid gap-2">
             <Label htmlFor="qg-email">Email</Label>
             <Input
               id="qg-email"
@@ -354,8 +352,8 @@ export function QuotationForm({
           </div>
         </fieldset>
 
-        <fieldset className="grid gap-3">
-          <p className="text-muted-foreground text-[0.8125rem] font-medium">Design & layout</p>
+        <fieldset className="grid gap-3 text-left">
+          <p className="text-[0.8125rem] font-medium text-muted-foreground">Design & layout</p>
           <details className="rounded-lg border border-border/80 bg-background/60 p-3 dark:bg-background/40">
             <summary className="cursor-pointer text-sm font-medium text-foreground">
               Advanced options (alignment, colors, table style)
@@ -404,6 +402,40 @@ export function QuotationForm({
                 <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                   Text alignment
                 </p>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="grid gap-2">
+                    <Label htmlFor="qg-logo-align">Logo position (all pages)</Label>
+                    <select
+                      id="qg-logo-align"
+                      value={data.logoAlign}
+                      onChange={(e) =>
+                        patch({ logoAlign: e.target.value as QuotationData["logoAlign"] })
+                      }
+                      className="h-10 rounded-lg border border-input/90 bg-background px-3 text-sm"
+                    >
+                      <option value="left">Left</option>
+                      <option value="center">Center</option>
+                      <option value="right">Right</option>
+                    </select>
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="qg-table-block-align">Page 2 — cost table block</Label>
+                    <select
+                      id="qg-table-block-align"
+                      value={data.tableBlockAlign}
+                      onChange={(e) =>
+                        patch({
+                          tableBlockAlign: e.target.value as QuotationData["tableBlockAlign"],
+                        })
+                      }
+                      className="h-10 rounded-lg border border-input/90 bg-background px-3 text-sm"
+                    >
+                      <option value="left">Left</option>
+                      <option value="center">Center</option>
+                      <option value="right">Right</option>
+                    </select>
+                  </div>
+                </div>
                 <div className="grid gap-3 sm:grid-cols-3">
                   <div className="grid gap-2">
                     <Label htmlFor="qg-align-cover">Cover</Label>
@@ -568,7 +600,7 @@ export function QuotationForm({
           </details>
         </fieldset>
 
-        <div className="sticky bottom-0 z-10 -mx-1 flex flex-wrap items-center gap-2 border-t border-border/80 bg-card/95 px-1 pb-1 pt-3 backdrop-blur supports-backdrop-filter:bg-card/80">
+        <div className="sticky bottom-0 z-10 -mx-5 flex flex-wrap items-center gap-2 border-t border-border/80 bg-card/95 px-5 pb-2 pt-3 backdrop-blur supports-backdrop-filter:bg-card/80">
           {onCancelEdit ? (
             <Button type="button" variant="ghost" onClick={onCancelEdit}>
               Cancel

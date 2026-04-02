@@ -28,7 +28,7 @@ export function CompanyCard({
   return (
     <Card>
       <CardHeader className="pb-2">
-        <CardTitle className="text-base">2 · Company (from)</CardTitle>
+        <CardTitle className="text-base">2 · Your company (issuer)</CardTitle>
       </CardHeader>
       <CardContent className="grid gap-3">
         <div className="space-y-1.5">
@@ -48,14 +48,10 @@ export function CompanyCard({
           <Label>Company TRN</Label>
           <Input value={String(extras.companyTrn ?? "")} onChange={(e) => onPatchExtra("companyTrn", e.target.value)} />
         </div>
-        <div className="space-y-1.5">
-          <Label>Logo URL (optional)</Label>
-          <Input value={String(item.companySnapshot.logoUrl ?? "")} onChange={(e) => onItemChange({ ...item, companySnapshot: { ...item.companySnapshot, logoUrl: e.target.value } })} placeholder="https://… ya data URL" />
-        </div>
         <div className="flex flex-wrap items-center gap-2">
           <input ref={logoInputRef} type="file" accept="image/png,image/jpeg,image/jpg,image/webp" className="sr-only" onChange={(e) => void onPickLogo(e.target.files)} />
           <Button type="button" size="sm" variant="outline" onClick={() => logoInputRef.current?.click()}>
-            Choose logo image
+            Replace logo image
           </Button>
           {logoErr ? <span className="text-destructive text-xs">{logoErr}</span> : null}
         </div>
