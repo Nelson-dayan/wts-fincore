@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { readResponseJson } from "@/lib/http/read-response-json";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 type ProjectDetailsPayload = {
   project?: {
@@ -30,6 +31,14 @@ type ProjectDetailsPayload = {
   quotations?: Array<{ _id: string; quotationNumber: string; status: string; createdAt: string }>;
   purchaseOrders?: Array<{ _id: string; poNumber: string; type: string; status: string; createdAt: string }>;
   invoices?: Array<{ _id: string; invoiceNumber: string; status: string; dueDate?: string; createdAt: string }>;
+  expenses?: Array<{
+    _id: string;
+    title: string;
+    amount: number;
+    category: string;
+    createdAt: string;
+  }>;
+  expenseTotal?: number;
   message?: string;
 };
 
@@ -46,6 +55,10 @@ function normalizeBudget(value: unknown): string {
     }
   }
   return "";
+}
+
+function formatAed(n: number) {
+  return n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 function SectionTable({
@@ -107,6 +120,8 @@ export function AdminProjectDetailsClient({ projectId }: { projectId: string }) 
     priority: "medium" as "low" | "medium" | "high",
     budget: "",
   });
+  const [saveConfirmOpen, setSaveConfirmOpen] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 
   async function load() {
     const response = await fetch(`/api/admin/projects/${encodeURIComponent(projectId)}`, {
@@ -141,7 +156,7 @@ export function AdminProjectDetailsClient({ projectId }: { projectId: string }) 
     load().catch((e) => setError(e instanceof Error ? e.message : "Failed to load details"));
   }, [projectId]);
 
-  async function saveProject() {
+  async function saveProject(): Promise<boolean> {
     setSaving(true);
     setError("");
     try {
@@ -160,14 +175,16 @@ export function AdminProjectDetailsClient({ projectId }: { projectId: string }) 
       if (!response.ok) throw new Error(payload.message ?? "Failed to update project");
       setEditing(false);
       await load();
+      return true;
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to update project");
+      return false;
     } finally {
       setSaving(false);
     }
   }
 
-  async function deleteProject() {
+  async function deleteProject(): Promise<boolean> {
     setSaving(true);
     setError("");
     try {
@@ -183,8 +200,10 @@ export function AdminProjectDetailsClient({ projectId }: { projectId: string }) 
           : "/admin/projects"
       );
       router.refresh();
+      return true;
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to delete project");
+      return false;
     } finally {
       setSaving(false);
     }
@@ -192,6 +211,31 @@ export function AdminProjectDetailsClient({ projectId }: { projectId: string }) 
 
   return (
     <div className="animate-fade-in">
+      <ConfirmDialog
+        open={saveConfirmOpen}
+        onOpenChange={setSaveConfirmOpen}
+        title="Save project?"
+        description="Your changes will be saved to this project."
+        confirmLabel="Save"
+        loading={saving}
+        onConfirm={async () => {
+          const ok = await saveProject();
+          if (ok) setSaveConfirmOpen(false);
+        }}
+      />
+      <ConfirmDialog
+        open={deleteConfirmOpen}
+        onOpenChange={setDeleteConfirmOpen}
+        title="Delete this project?"
+        description="This cannot be undone. Deletion is blocked if linked records prevent removal."
+        confirmLabel="Delete"
+        variant="destructive"
+        loading={saving}
+        onConfirm={async () => {
+          const ok = await deleteProject();
+          if (ok) setDeleteConfirmOpen(false);
+        }}
+      />
       <DashboardPageHeader
         title={data.project?.name ? `Project: ${data.project.name}` : "Project Details"}
         description="Project profile with linked quotations, purchase orders, and invoices."
@@ -208,7 +252,7 @@ export function AdminProjectDetailsClient({ projectId }: { projectId: string }) 
             <div className="flex gap-2">
               {editing ? (
                 <>
-                  <Button size="sm" onClick={saveProject} disabled={saving}>
+                  <Button size="sm" onClick={() => setSaveConfirmOpen(true)} disabled={saving}>
                     Save
                   </Button>
                   <Button size="sm" variant="outline" onClick={() => setEditing(false)}>
@@ -220,7 +264,7 @@ export function AdminProjectDetailsClient({ projectId }: { projectId: string }) 
                   <Button size="sm" variant="outline" onClick={() => setEditing(true)}>
                     Edit
                   </Button>
-                  <Button size="sm" variant="destructive" onClick={deleteProject} disabled={saving}>
+                  <Button size="sm" variant="destructive" onClick={() => setDeleteConfirmOpen(true)} disabled={saving}>
                     Delete
                   </Button>
                 </>
@@ -291,7 +335,27 @@ export function AdminProjectDetailsClient({ projectId }: { projectId: string }) 
         <Link href={`/admin/invoices?projectId=${projectId}`}>
           <Button size="sm" variant="outline">View All Invoices for Project</Button>
         </Link>
+        <Link href="/admin/expenses">
+          <Button size="sm" variant="outline">All expenses</Button>
+        </Link>
       </div>
+
+      <Card className="mb-4 border-primary/20 bg-primary/[0.04] dark:bg-primary/[0.07]">
+        <CardContent className="flex flex-col gap-1 py-4 sm:flex-row sm:items-baseline sm:justify-between sm:gap-4">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+              Total expenses (this project)
+            </p>
+            <p className="mt-1 text-2xl font-semibold tabular-nums text-foreground">
+              {formatAed(data.expenseTotal ?? 0)}{" "}
+              <span className="text-base font-medium text-muted-foreground">AED</span>
+            </p>
+          </div>
+          <p className="text-xs text-muted-foreground sm:max-w-xs sm:text-right">
+            Sum of expense lines linked to this project. Add new lines from Admin → Expenses.
+          </p>
+        </CardContent>
+      </Card>
       <SectionTable
         title="Quotations"
         columns={[
@@ -329,6 +393,20 @@ export function AdminProjectDetailsClient({ projectId }: { projectId: string }) 
           ...inv,
           dueDate: inv.dueDate ? new Date(String(inv.dueDate)).toLocaleDateString() : "-",
           createdAt: new Date(String(inv.createdAt)).toLocaleString(),
+        }))}
+      />
+      <SectionTable
+        title="Expenses"
+        columns={[
+          { key: "title", label: "Title" },
+          { key: "amount", label: "Amount (AED)" },
+          { key: "category", label: "Category" },
+          { key: "createdAt", label: "Created At" },
+        ]}
+        rows={(data.expenses ?? []).map((ex) => ({
+          ...ex,
+          amount: formatAed(ex.amount),
+          createdAt: new Date(String(ex.createdAt)).toLocaleString(),
         }))}
       />
     </div>

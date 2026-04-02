@@ -7,7 +7,8 @@ import { DocumentCard } from "@/components/portals/admin-quotation-details/docum
 import { InternalNotesCard } from "@/components/portals/admin-quotation-details/internal-notes-card";
 import { LineItemsCard } from "@/components/portals/admin-quotation-details/line-items-card";
 import { QuotationHeaderActions } from "@/components/portals/admin-quotation-details/quotation-header-actions";
-import { QuotationStatusCard } from "@/components/portals/admin-quotation-details/quotation-status-card";
+import { QuotationStatusEditor } from "@/components/portals/admin-quotation-details/quotation-status-card";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { QuotationInfoCard } from "@/components/portals/admin-quotation-details/quotation-info-card";
 import { SnapshotsCard } from "@/components/portals/admin-quotation-details/snapshots-card";
 import { SummaryCard } from "@/components/portals/admin-quotation-details/summary-card";
@@ -44,6 +45,8 @@ export function AdminQuotationDetailsClient({ quotationId }: { quotationId: stri
   const [remainingText, setRemainingText] = useState("");
   const [remainingAmount, setRemainingAmount] = useState("");
   const [confirmDate, setConfirmDate] = useState("");
+  const [saveConfirmOpen, setSaveConfirmOpen] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 
   async function load() {
     setLoading(true);
@@ -151,7 +154,7 @@ export function AdminQuotationDetailsClient({ quotationId }: { quotationId: stri
     });
   }
 
-  async function save() {
+  async function save(): Promise<boolean> {
     setSaving(true);
     setError("");
     try {
@@ -203,14 +206,16 @@ export function AdminQuotationDetailsClient({ quotationId }: { quotationId: stri
       setEditing(false);
       setRefreshSnapshots(false);
       await load();
+      return true;
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to save");
+      return false;
     } finally {
       setSaving(false);
     }
   }
 
-  async function remove() {
+  async function remove(): Promise<boolean> {
     setSaving(true);
     setError("");
     try {
@@ -219,6 +224,7 @@ export function AdminQuotationDetailsClient({ quotationId }: { quotationId: stri
       });
       const result = await readResponseJson<{ message?: string }>(response);
       if (!response.ok) throw new Error(result.message ?? "Failed to delete");
+      if (!item) throw new Error("Missing quotation");
       const pid = item.projectId?.trim();
       router.replace(
         pid
@@ -226,8 +232,10 @@ export function AdminQuotationDetailsClient({ quotationId }: { quotationId: stri
           : "/admin/quotations"
       );
       router.refresh();
+      return true;
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to delete");
+      return false;
     } finally {
       setSaving(false);
     }
@@ -249,14 +257,41 @@ export function AdminQuotationDetailsClient({ quotationId }: { quotationId: stri
         </div>
       ) : null}
 
+      <ConfirmDialog
+        open={saveConfirmOpen}
+        onOpenChange={setSaveConfirmOpen}
+        title="Save quotation?"
+        description="Your edits will be written to this quotation and totals will be recalculated."
+        confirmLabel="Save"
+        loading={saving}
+        onConfirm={async () => {
+          const ok = await save();
+          if (ok) setSaveConfirmOpen(false);
+        }}
+      />
+      <ConfirmDialog
+        open={deleteConfirmOpen}
+        onOpenChange={setDeleteConfirmOpen}
+        title="Delete this quotation?"
+        description="This cannot be undone. Delete is blocked if purchase orders are linked."
+        confirmLabel="Delete"
+        variant="destructive"
+        loading={saving}
+        onConfirm={async () => {
+          const ok = await remove();
+          if (ok) setDeleteConfirmOpen(false);
+        }}
+      />
+
       {item ? (
         <>
           <QuotationHeaderActions quotationId={quotationId} projectId={item.projectId} />
 
-          <QuotationStatusCard
+          <QuotationStatusEditor
             quotationId={quotationId}
             currentStatus={item.status}
             onUpdated={() => load()}
+            variant="banner"
           />
 
           <QuotationPurchaseOrdersSection
@@ -270,14 +305,14 @@ export function AdminQuotationDetailsClient({ quotationId }: { quotationId: stri
             item={item}
             editing={editing}
             saving={saving}
-            onSave={save}
+            onSave={() => setSaveConfirmOpen(true)}
             onCancel={() => {
               setEditing(false);
               setRefreshSnapshots(false);
               load().catch(() => {});
             }}
             onStartEdit={() => setEditing(true)}
-            onDelete={remove}
+            onDelete={() => setDeleteConfirmOpen(true)}
           />
 
           <InternalNotesCard
