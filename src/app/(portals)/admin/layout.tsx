@@ -75,7 +75,7 @@ export default async function AdminPortalLayout({
                   Expenses
                 </PortalNavLink>
                 <PortalNavLink href="/admin/activity" match="prefix">
-                  Activity
+                  Activity Log
                 </PortalNavLink>
               </div>
             </div>
