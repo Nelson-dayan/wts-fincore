@@ -30,7 +30,7 @@ export async function GET(req: Request) {
     const [rawItems, total] = await Promise.all([
       InvoiceModel.find(filter)
         .select(
-          "invoiceNumber status dueDate projectId poId createdAt totals extras.poNumberRef"
+          "invoiceNumber invoiceType status dueDate projectId poId createdAt totals extras.poNumberRef"
         )
         .sort({ createdAt: -1 })
         .skip(skip)
@@ -45,6 +45,7 @@ export async function GET(req: Request) {
       return {
         _id: String(row._id),
         invoiceNumber: row.invoiceNumber,
+        invoiceType: row.invoiceType === "usd" ? "usd" : "aed",
         status: row.status,
         dueDate: dd instanceof Date ? dd.toISOString() : dd,
         projectId: String(row.projectId ?? ""),
@@ -65,8 +66,9 @@ export async function POST(req: Request) {
   try {
     const session = await requireRole(["admin"]);
     await connectDB();
-    const body = (await req.json()) as { poId?: string };
+    const body = (await req.json()) as { poId?: string; invoiceType?: "aed" | "usd" };
     const poId = String(body.poId ?? "").trim();
+    const invoiceType = body.invoiceType === "usd" ? "usd" : "aed";
     if (!poId) {
       return NextResponse.json({ message: "poId is required" }, { status: 400 });
     }
@@ -74,6 +76,7 @@ export async function POST(req: Request) {
     const { id, invoiceNumber, projectId } = await createInvoiceForPurchaseOrder({
       poId,
       createdBy: session.user.id,
+      invoiceType,
     });
 
     await logActivity({

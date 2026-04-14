@@ -8,6 +8,7 @@ export function NewInvoiceClient() {
   const router = useRouter();
   const sp = useSearchParams();
   const poId = sp?.get("poId") ?? "";
+  const invoiceType = sp?.get("invoiceType") === "usd" ? "usd" : "aed";
   const [error, setError] = useState("");
   const hasStartedRef = useRef(false);
 
@@ -20,7 +21,7 @@ export function NewInvoiceClient() {
         const res = await fetch("/api/admin/invoices", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ poId }),
+          body: JSON.stringify({ poId, invoiceType }),
         });
         const data = await readResponseJson<{ id?: string; message?: string }>(res);
         if (!res.ok) throw new Error(data.message ?? "Could not create invoice");
@@ -30,7 +31,7 @@ export function NewInvoiceClient() {
         setError(e instanceof Error ? e.message : "Network error");
       }
     })();
-  }, [poId, router]);
+  }, [invoiceType, poId, router]);
 
   if (!poId) {
     return (

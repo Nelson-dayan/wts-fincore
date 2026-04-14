@@ -64,6 +64,7 @@ const invoicePageSchema = new Schema(
 export const invoiceSchema = new Schema(
   {
     invoiceNumber: { type: String, required: true, unique: true, index: true },
+    invoiceType: { type: String, enum: ["aed", "usd"], default: "aed", index: true },
     projectId: { type: Types.ObjectId, ref: "Project", required: true, index: true },
     poId: { type: Types.ObjectId, ref: "PurchaseOrder", index: true },
     createdBy: { type: Types.ObjectId, ref: "User", required: true, index: true },

@@ -8,6 +8,52 @@ async function capturePage(el: HTMLElement, opts: Html2CanvasOpts) {
   return html2canvas(el, opts);
 }
 
+async function waitForImages(root: HTMLElement): Promise<void> {
+  const imgs = Array.from(root.querySelectorAll("img"));
+  await Promise.all(
+    imgs.map(
+      (img) =>
+        new Promise<void>((resolve) => {
+          if (img.complete) {
+            resolve();
+            return;
+          }
+          img.addEventListener("load", () => resolve(), { once: true });
+          img.addEventListener("error", () => resolve(), { once: true });
+        })
+    )
+  );
+}
+
+function canvasLooksBlank(canvas: HTMLCanvasElement): boolean {
+  if (!canvas.width || !canvas.height) return true;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return true;
+  try {
+    const { width, height } = canvas;
+    const data = ctx.getImageData(0, 0, width, height).data;
+    const stepX = Math.max(1, Math.floor(width / 40));
+    const stepY = Math.max(1, Math.floor(height / 40));
+    let nonWhite = 0;
+    for (let y = 0; y < height; y += stepY) {
+      for (let x = 0; x < width; x += stepX) {
+        const i = (y * width + x) * 4;
+        const r = data[i];
+        const g = data[i + 1];
+        const b = data[i + 2];
+        const a = data[i + 3];
+        if (a > 0 && (r < 245 || g < 245 || b < 245)) {
+          nonWhite += 1;
+          if (nonWhite > 10) return false;
+        }
+      }
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Captures each `[data-quotation-page]` node inside `root` and merges into one A4 PDF.
  * Pages are landscape A4 (same pixel layout as the on-screen quotation pages).
@@ -104,25 +150,108 @@ export async function exportInvoicePdf(
     backgroundColor: "#ffffff",
     logging: false,
     imageTimeout: 20_000,
-    scale: 2,
+    scale: Math.max(2, Number(window.devicePixelRatio) || 1),
+    windowWidth: invoiceRoot.scrollWidth,
+    windowHeight: invoiceRoot.scrollHeight,
+    width: invoiceRoot.scrollWidth,
+    height: invoiceRoot.scrollHeight,
+    foreignObjectRendering: false,
   };
 
-  let canvas: HTMLCanvasElement;
+  // Capture from an isolated A4 clone so export does not depend on responsive grid width.
+  const host = document.createElement("div");
+  host.style.position = "fixed";
+  host.style.left = "-100000px";
+  host.style.top = "0";
+  host.style.width = "210mm";
+  host.style.height = "auto";
+  host.style.margin = "0";
+  host.style.padding = "0";
+  host.style.background = "#ffffff";
+  host.style.zIndex = "-1";
+  host.style.pointerEvents = "none";
+
+  const clone = invoiceRoot.cloneNode(true) as HTMLElement;
+  clone.style.width = "210mm";
+  clone.style.maxWidth = "210mm";
+  clone.style.minHeight = "297mm";
+  clone.style.margin = "0";
+  clone.style.padding = "0";
+  clone.style.boxSizing = "border-box";
+  clone.style.transform = "none";
+  clone.style.background = "#ffffff";
+  host.appendChild(clone);
+  document.body.appendChild(host);
+
+  await waitForImages(clone);
+  await waitForImages(invoiceRoot);
+
+  let canvas: HTMLCanvasElement | null = null;
+  let lastError: unknown = null;
   try {
-    canvas = await capturePage(invoiceRoot, {
-      ...baseOpts,
-      onclone(clonedDoc, clonedEl) {
-        stripUnsupportedColorsFromClone(clonedDoc, clonedEl, invoiceRoot);
-      },
-    });
-  } catch {
-    canvas = await capturePage(invoiceRoot, {
-      ...baseOpts,
-      scale: 1,
-      onclone(clonedDoc, clonedEl) {
-        stripUnsupportedColorsFromClone(clonedDoc, clonedEl, invoiceRoot);
-      },
-    });
+    const attempts: Array<{
+      target: HTMLElement;
+      scale: number;
+      foreignObjectRendering: boolean;
+      forceA4: boolean;
+    }> = [
+      // First try exact visible preview (WYSIWYG).
+      { target: invoiceRoot, scale: baseOpts.scale as number, foreignObjectRendering: false, forceA4: false },
+      { target: invoiceRoot, scale: 1, foreignObjectRendering: false, forceA4: false },
+      // Then fallback to stable A4 clone.
+      { target: clone, scale: baseOpts.scale as number, foreignObjectRendering: false, forceA4: true },
+      { target: clone, scale: 1, foreignObjectRendering: false, forceA4: true },
+    ];
+    for (const attempt of attempts) {
+      try {
+        const c = await capturePage(attempt.target, {
+          ...baseOpts,
+          scale: attempt.scale,
+          foreignObjectRendering: attempt.foreignObjectRendering,
+          windowWidth: attempt.target.scrollWidth,
+          windowHeight: attempt.target.scrollHeight,
+          width: attempt.target.scrollWidth,
+          height: attempt.target.scrollHeight,
+          onclone(clonedDoc, clonedEl) {
+            stripUnsupportedColorsFromClone(clonedDoc, clonedEl, attempt.target);
+            const cloneRoot = clonedEl as HTMLElement;
+            if (attempt.forceA4) {
+              cloneRoot.style.width = "210mm";
+              cloneRoot.style.maxWidth = "210mm";
+              cloneRoot.style.minHeight = "297mm";
+            } else {
+              cloneRoot.style.width = `${attempt.target.scrollWidth}px`;
+              cloneRoot.style.maxWidth = `${attempt.target.scrollWidth}px`;
+              cloneRoot.style.minHeight = `${attempt.target.scrollHeight}px`;
+            }
+            cloneRoot.style.margin = "0";
+            cloneRoot.style.padding = "0";
+            cloneRoot.style.boxSizing = "border-box";
+            cloneRoot.style.transform = "none";
+            cloneRoot.style.background = "#ffffff";
+            clonedDoc.body.style.margin = "0";
+            clonedDoc.body.style.padding = "0";
+            clonedDoc.body.style.background = "#ffffff";
+          },
+        });
+        if (canvasLooksBlank(c)) {
+          throw new Error("Captured canvas was blank");
+        }
+        canvas = c;
+        break;
+      } catch (err) {
+        lastError = err;
+      }
+    }
+  } finally {
+    host.remove();
+  }
+  if (!canvas) {
+    throw new Error(
+      lastError instanceof Error
+        ? `PDF render failed: ${lastError.message}`
+        : "PDF render failed. Please try again."
+    );
   }
 
   let imgData: string;
