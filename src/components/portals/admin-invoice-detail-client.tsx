@@ -131,17 +131,18 @@ export function AdminInvoiceDetailClient({
     setSaving(true);
     setMsg("");
     try {
-      const payload = {
-        invoiceNumber: item.invoiceNumber,
-        status: item.status,
-        dueDate: item.dueDate,
-        documentInfo: item.documentInfo,
-        clientSnapshot: item.clientSnapshot,
-        companySnapshot: item.companySnapshot,
-        pages: item.pages,
-        extras: { ...item.extras, _hiddenUntilSaved: false },
-        branding: item.branding,
-      };
+        const payload = {
+          invoiceNumber: item.invoiceNumber,
+          invoiceType: item.invoiceType,
+          status: item.status,
+          dueDate: item.dueDate,
+          documentInfo: item.documentInfo,
+          clientSnapshot: item.clientSnapshot,
+          companySnapshot: item.companySnapshot,
+          pages: item.pages,
+          extras: { ...item.extras, _hiddenUntilSaved: false },
+          branding: item.branding,
+        };
       if (!invoiceId) {
         const createRes = await fetch("/api/admin/invoices", {
           method: "POST",

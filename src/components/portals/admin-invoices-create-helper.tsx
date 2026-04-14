@@ -24,7 +24,6 @@ export function AdminInvoicesCreateHelper({ projectId }: { projectId: string }) 
   const [selectedPoId, setSelectedPoId] = useState("");
   const [manualPoId, setManualPoId] = useState("");
   const [invoiceCounts, setInvoiceCounts] = useState<Record<string, number>>({});
-  const [invoiceType, setInvoiceType] = useState<"aed" | "usd">("aed");
 
   const loadPos = useCallback(async () => {
     setLoadingPo(true);
@@ -73,7 +72,7 @@ export function AdminInvoicesCreateHelper({ projectId }: { projectId: string }) 
     const id = poId.trim();
     if (!id) return;
     router.push(
-      `/admin/invoices/new?poId=${encodeURIComponent(id)}&invoiceType=${encodeURIComponent(invoiceType)}`
+      `/admin/invoices/new?poId=${encodeURIComponent(id)}`
     );
   }
 
@@ -156,18 +155,6 @@ export function AdminInvoicesCreateHelper({ projectId }: { projectId: string }) 
                   {atCapSelected ? " Limit reached — choose another PO." : ""}
                 </p>
               ) : null}
-              <div className="pt-1">
-                <Label htmlFor="invoice-type">Invoice type</Label>
-                <select
-                  id="invoice-type"
-                  value={invoiceType}
-                  onChange={(e) => setInvoiceType(e.target.value === "usd" ? "usd" : "aed")}
-                  className="mt-1 flex h-10 w-full rounded-lg border border-input/90 bg-background px-3 text-sm"
-                >
-                  <option value="aed">AED Invoice</option>
-                  <option value="usd">USD Invoice</option>
-                </select>
-              </div>
             </div>
             <Button
               type="button"
