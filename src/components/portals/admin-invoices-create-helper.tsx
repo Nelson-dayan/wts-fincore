@@ -71,7 +71,9 @@ export function AdminInvoicesCreateHelper({ projectId }: { projectId: string }) 
   function goCreate(poId: string) {
     const id = poId.trim();
     if (!id) return;
-    router.push(`/admin/invoices/new?poId=${encodeURIComponent(id)}`);
+    router.push(
+      `/admin/invoices/new?poId=${encodeURIComponent(id)}`
+    );
   }
 
   const selectedCount = selectedPoId ? (invoiceCounts[selectedPoId] ?? 0) : 0;

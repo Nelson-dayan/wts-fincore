@@ -25,6 +25,33 @@ export function HeadingCard({ item, extras, onItemChange, onPatchExtra }: Headin
       <CardContent className="space-y-6">
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="space-y-1.5 sm:col-span-2">
+            <Label htmlFor="inv-type">Invoice type</Label>
+            <select
+              id="inv-type"
+              className="flex h-10 w-full rounded-lg border border-input/90 bg-background px-3 text-sm focus-visible:ring-1 focus-visible:ring-primary outline-none transition-colors"
+              value={item.invoiceType ?? "aed"}
+              onChange={(e) => {
+                const val = e.target.value === "usd" ? "usd" : "aed";
+                // When switching, we also update tax defaults and footer labels to help the user
+                const isUsd = val === "usd";
+                onItemChange({
+                  ...item,
+                  invoiceType: val,
+                  documentInfo: {
+                    ...item.documentInfo,
+                    // Typically export/USD invoices have 0% tax
+                    taxRate: isUsd ? 0 : (item.documentInfo.taxRate ?? 5),
+                    taxEnabled: isUsd ? false : (item.documentInfo.taxEnabled ?? true),
+                  },
+                });
+                onPatchExtra("footerCurrencyLine", isUsd ? "CURRENCY IN USD" : "CURRENCY IN AED");
+              }}
+            >
+              <option value="aed">AED Invoice (Local)</option>
+              <option value="usd">USD Invoice (International)</option>
+            </select>
+          </div>
+          <div className="space-y-1.5 sm:col-span-2">
             <Label htmlFor="inv-doc-title">Document title</Label>
             <Input
               id="inv-doc-title"

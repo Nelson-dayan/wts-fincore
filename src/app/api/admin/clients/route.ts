@@ -41,6 +41,7 @@ export async function GET(req: Request) {
     );
     const items = itemsRaw.map((item) => ({
       ...item,
+      _id: String(item._id),
       projectsCount: projectCountMap.get(String(item._id)) ?? 0,
     }));
     return NextResponse.json({ items, page, limit, total, hasMore: skip + items.length < total });

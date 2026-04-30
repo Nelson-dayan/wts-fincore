@@ -19,6 +19,7 @@ function toDocData(item: Item): InvoiceDocData {
   const extras = item.extras as InvoiceDocData["extras"];
   return {
     invoiceNumber: item.invoiceNumber,
+    invoiceType: item.invoiceType ?? "aed",
     documentInfo: item.documentInfo,
     clientSnapshot: item.clientSnapshot,
     companySnapshot: item.companySnapshot,
@@ -34,10 +35,12 @@ function toDocData(item: Item): InvoiceDocData {
 export function AdminInvoiceDetailClient({
   invoiceId,
   poId,
+  invoiceType = "aed",
   poInvoiceCount,
 }: {
   invoiceId?: string;
   poId?: string;
+  invoiceType?: "aed" | "usd";
   poInvoiceCount?: number;
 }) {
   const router = useRouter();
@@ -57,7 +60,9 @@ export function AdminInvoiceDetailClient({
     try {
       const endpoint = invoiceId
         ? `/api/admin/invoices/${invoiceId}`
-        : `/api/admin/invoices/template?poId=${encodeURIComponent(String(poId ?? ""))}`;
+        : `/api/admin/invoices/template?poId=${encodeURIComponent(
+            String(poId ?? "")
+          )}&invoiceType=${encodeURIComponent(invoiceType)}`;
       const res = await fetch(endpoint, { cache: "no-store" });
       const data = await readResponseJson<{ item?: Item; message?: string }>(res);
       if (!res.ok) throw new Error(data.message ?? "Failed to load");
@@ -69,7 +74,7 @@ export function AdminInvoiceDetailClient({
     } finally {
       setLoading(false);
     }
-  }, [invoiceId, poId]);
+  }, [invoiceId, poId, invoiceType]);
 
   useEffect(() => {
     load().catch(() => {});
@@ -93,7 +98,11 @@ export function AdminInvoiceDetailClient({
       totals: liveTotals,
       extras: {
         ...base.extras,
-        amountInWords: manualWords || aedAmountInWords(liveTotals.total),
+        amountInWords:
+          manualWords ||
+          (item.invoiceType === "usd"
+            ? `${liveTotals.total.toFixed(2)} US Dollars Only.`
+            : aedAmountInWords(liveTotals.total)),
       },
     };
   }, [item, liveTotals]);
@@ -122,22 +131,23 @@ export function AdminInvoiceDetailClient({
     setSaving(true);
     setMsg("");
     try {
-      const payload = {
-        invoiceNumber: item.invoiceNumber,
-        status: item.status,
-        dueDate: item.dueDate,
-        documentInfo: item.documentInfo,
-        clientSnapshot: item.clientSnapshot,
-        companySnapshot: item.companySnapshot,
-        pages: item.pages,
-        extras: { ...item.extras, _hiddenUntilSaved: false },
-        branding: item.branding,
-      };
+        const payload = {
+          invoiceNumber: item.invoiceNumber,
+          invoiceType: item.invoiceType,
+          status: item.status,
+          dueDate: item.dueDate,
+          documentInfo: item.documentInfo,
+          clientSnapshot: item.clientSnapshot,
+          companySnapshot: item.companySnapshot,
+          pages: item.pages,
+          extras: { ...item.extras, _hiddenUntilSaved: false },
+          branding: item.branding,
+        };
       if (!invoiceId) {
         const createRes = await fetch("/api/admin/invoices", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ poId: item.poId }),
+          body: JSON.stringify({ poId: item.poId, invoiceType: item.invoiceType ?? invoiceType }),
         });
         const createJson = await readResponseJson<{ id?: string; message?: string }>(createRes);
         if (!createRes.ok) throw new Error(createJson.message ?? "Create failed");
