@@ -30,6 +30,7 @@ export function ClientsDirectoryRow({
   onSave,
 }: ClientsDirectoryRowProps) {
   const isEditing = editingId === client._id;
+  const clientDetailsHref = `/admin/clients/${encodeURIComponent(String(client._id))}`;
 
   return (
     <tr
@@ -155,7 +156,7 @@ export function ClientsDirectoryRow({
                 <span className="sr-only sm:not-sr-only sm:ml-1.5 sm:text-xs">Edit</span>
               </Button> */}
               <Button size="sm" variant="secondary" className="h-8 rounded-lg px-2.5" asChild>
-                <Link href={`/admin/clients/${client._id}`}>
+                <Link href={clientDetailsHref}>
                   <ExternalLink className="size-3.5" aria-hidden />
                   <span className="sr-only sm:not-sr-only sm:ml-1.5 sm:text-xs">Profile</span>
                 </Link>

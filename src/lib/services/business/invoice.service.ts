@@ -106,6 +106,7 @@ function mergeInvoiceCompanySnapshot(
 export interface CreateInvoiceForPoInput {
   poId: string;
   createdBy: string;
+  invoiceType?: "aed" | "usd";
 }
 
 /** Creates invoice with one empty line prefilled from quotation snapshots. */
@@ -113,6 +114,7 @@ export async function createInvoiceForPurchaseOrder(
   input: CreateInvoiceForPoInput
 ): Promise<{ id: string; invoiceNumber: string; projectId: string }> {
   await connectDB();
+  const invoiceType = input.invoiceType === "usd" ? "usd" : "aed";
   if (!mongoose.Types.ObjectId.isValid(input.poId)) {
     throw new Error("Invalid purchase order id");
   }
@@ -121,6 +123,7 @@ export async function createInvoiceForPurchaseOrder(
   // Reuse an existing unsaved draft-like invoice for this PO instead of duplicating.
   const existingHidden = await InvoiceModel.findOne({
     poId: new mongoose.Types.ObjectId(input.poId),
+    invoiceType,
     "extras._hiddenUntilSaved": true,
   })
     .sort({ createdAt: -1 })
@@ -164,6 +167,10 @@ export async function createInvoiceForPurchaseOrder(
   const pt = primaryCompany?.defaultTax;
   if (pt && typeof pt.taxRate === "number") taxRate = pt.taxRate;
   if (pt && typeof pt.taxEnabled === "boolean") taxEnabled = pt.taxEnabled;
+  if (invoiceType === "usd") {
+    taxRate = 0;
+    taxEnabled = false;
+  }
 
   const pages: invoiceTotals.InvoiceTotalsPage[] = [
     {
@@ -188,6 +195,7 @@ export async function createInvoiceForPurchaseOrder(
 
   const created = await InvoiceModel.create({
     invoiceNumber,
+    invoiceType,
     projectId: po.projectId,
     poId: po._id,
     createdBy: new mongoose.Types.ObjectId(input.createdBy),
@@ -236,10 +244,11 @@ export async function createInvoiceForPurchaseOrder(
       bankAed: {},
       bankUsd: {},
       footerTerms: "TERM:",
-      footerCurrencyLine: "CURRENCY IN AED",
+      footerCurrencyLine: invoiceType === "usd" ? "CURRENCY IN USD" : "CURRENCY IN AED",
       disclaimer:
         "This is an electronically generated invoice, hence does not require signature.",
-      amountInWords: aedAmountInWords(total),
+      amountInWords:
+        invoiceType === "usd" ? `${total.toFixed(2)} US Dollars Only.` : aedAmountInWords(total),
       _hiddenUntilSaved: true,
     },
   });
@@ -267,6 +276,7 @@ export function formatInvoiceForApi(row: Record<string, unknown>): Record<string
   return {
     _id: String(row._id),
     invoiceNumber: row.invoiceNumber,
+    invoiceType: row.invoiceType === "usd" ? "usd" : "aed",
     projectId: String(row.projectId ?? ""),
     poId: row.poId ? String(row.poId) : "",
     createdBy: String(row.createdBy ?? ""),

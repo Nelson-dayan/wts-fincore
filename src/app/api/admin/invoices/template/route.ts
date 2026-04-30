@@ -14,6 +14,7 @@ export async function GET(req: Request) {
     await connectDB();
     const url = new URL(req.url);
     const poId = String(url.searchParams.get("poId") ?? "").trim();
+    const invoiceType = url.searchParams.get("invoiceType") === "usd" ? "usd" : "aed";
     if (!poId || !mongoose.Types.ObjectId.isValid(poId)) {
       return NextResponse.json({ message: "Valid poId is required" }, { status: 400 });
     }
@@ -58,6 +59,10 @@ export async function GET(req: Request) {
     const dt = primary?.defaultTax as { taxRate?: unknown; taxEnabled?: unknown } | undefined;
     if (typeof dt?.taxRate === "number") taxRate = dt.taxRate;
     if (typeof dt?.taxEnabled === "boolean") taxEnabled = dt.taxEnabled;
+    if (invoiceType === "usd") {
+      taxRate = 0;
+      taxEnabled = false;
+    }
 
     const pages = [
       {
@@ -84,6 +89,7 @@ export async function GET(req: Request) {
     return NextResponse.json({
       item: {
         invoiceNumber,
+        invoiceType,
         projectId: String(po.projectId ?? ""),
         poId: String(po._id),
         status: "unpaid",
@@ -109,10 +115,13 @@ export async function GET(req: Request) {
           bankAed: {},
           bankUsd: {},
           footerTerms: "TERM:",
-          footerCurrencyLine: "CURRENCY IN AED",
+          footerCurrencyLine: invoiceType === "usd" ? "CURRENCY IN USD" : "CURRENCY IN AED",
           disclaimer:
             "This is an electronically generated invoice, hence does not require signature.",
-          amountInWords: aedAmountInWords(totals.total),
+          amountInWords:
+            invoiceType === "usd"
+              ? `${totals.total.toFixed(2)} US Dollars Only.`
+              : aedAmountInWords(totals.total),
         },
         branding: {
           customLogoUrl: "",

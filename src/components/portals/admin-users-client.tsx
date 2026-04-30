@@ -7,6 +7,7 @@ import { UsersTable } from "@/components/portals/admin-users/users-table";
 import type { AdminUser, NewUserForm } from "@/components/portals/admin-users/types";
 import { readResponseJson } from "@/lib/http/read-response-json";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { normalizePhoneInput, parseRegisterPayload } from "@/lib/register/validate";
 
 export function AdminUsersClient() {
   const [users, setUsers] = useState<AdminUser[]>([]);
@@ -68,10 +69,21 @@ export function AdminUsersClient() {
     setSavingId("create");
     setError("");
     try {
+      const payloadForValidation = {
+        ...form,
+        name: form.name.trim(),
+        email: form.email.trim().toLowerCase(),
+        phoneNumber: normalizePhoneInput(form.phoneNumber),
+      };
+      const validation = parseRegisterPayload(payloadForValidation);
+      if (!validation.ok) {
+        throw new Error(validation.message);
+      }
+
       const response = await fetch("/api/admin/users", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify(validation.data),
       });
       const payload = await readResponseJson<{ message?: string }>(response);
       if (!response.ok) throw new Error(payload.message ?? "Failed to create user");
