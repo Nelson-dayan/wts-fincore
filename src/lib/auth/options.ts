@@ -3,9 +3,14 @@ import CredentialsProvider from "next-auth/providers/credentials";
 import { connectDB } from "@/lib/db/connect";
 import { UserModel } from "@/lib/db/models";
 import { verifyPassword } from "@/lib/auth/password";
+import GoogleProvider from "next-auth/providers/google";
 
 export const authOptions: NextAuthOptions = {
   providers: [
+    GoogleProvider({
+      clientId: process.env.GOOGLE_CLIENT_ID as string,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET as string,
+    }),
     CredentialsProvider({
       name: "credentials",
       credentials: {
@@ -39,8 +44,25 @@ export const authOptions: NextAuthOptions = {
   },
   secret: process.env.NEXTAUTH_SECRET,
   callbacks: {
-    async jwt({ token, user }) {
-      if (user && "role" in user) {
+    async signIn({ user, account }) {
+      if (account?.provider === "google") {
+        await connectDB();
+        const existingUser = await UserModel.findOne({ email: user.email?.trim().toLowerCase() });
+        if (!existingUser || !existingUser.isActive) {
+          return "/login?error=AccessDenied";
+        }
+      }
+      return true;
+    },
+    async jwt({ token, user, account }) {
+      if (account?.provider === "google") {
+        await connectDB();
+        const dbUser = await UserModel.findOne({ email: user.email?.trim().toLowerCase() });
+        if (dbUser) {
+          token.role = dbUser.role as string;
+          token.sub = dbUser._id.toString();
+        }
+      } else if (user && "role" in user) {
         token.role = user.role as string;
         token.sub = user.id;
       }
