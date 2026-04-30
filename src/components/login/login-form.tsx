@@ -163,12 +163,6 @@ export function LoginForm() {
         )}
         Continue with Google
       </Button>
-      {/* <p className="text-center text-xs text-muted-foreground">
-        First-time setup?{" "}
-        <Link href="/setup" className="text-primary underline-offset-2 hover:underline">
-          Initialize database
-        </Link>
-      </p> */}
     </form>
   );
 }
