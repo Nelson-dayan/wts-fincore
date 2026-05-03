@@ -61,6 +61,7 @@ export async function GET(_req: Request, ctx: Ctx) {
       status: raw.status,
       fileUrl: raw.fileUrl ?? "",
       externalPoNumber: String(raw.externalPoNumber ?? "").trim(),
+      currency: raw.currency ?? "AED",
       totalAmount,
       createdAt,
     };
@@ -153,6 +154,8 @@ export async function PATCH(req: Request, ctx: Ctx) {
       const n = Number.parseFloat(String(totalAmountInput).replace(/,/g, ""));
       if (Number.isFinite(n)) {
         po.set("totalAmount", mongoose.Types.Decimal128.fromString(n.toFixed(4)));
+        const exRate = po.exchangeRate != null ? Number(po.exchangeRate) : 1;
+        po.set("totalAmountBase", mongoose.Types.Decimal128.fromString((n * exRate).toFixed(4)));
       }
     }
 

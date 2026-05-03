@@ -64,20 +64,31 @@ export async function GET(req: Request) {
       taxEnabled = false;
     }
 
-    const pages = [
-      {
-        pageNumber: 1,
-        items: [
+    const pages = Array.isArray(quotation.pages) && quotation.pages.length > 0 
+      ? quotation.pages.map((p: any) => ({
+          pageNumber: p.pageNumber || 1,
+          items: Array.isArray(p.items) ? p.items.map((it: any) => ({
+            number: it.number || 1,
+            name: it.name || "Item",
+            description: it.description || "",
+            quantity: it.quantity || 1,
+            price: typeof it.price === "number" ? it.price : (it.price != null && typeof it.price === "object" ? parseFloat(it.price.toString()) : 0)
+          })) : []
+        }))
+      : [
           {
-            number: 1,
-            name: "Description of services / goods",
-            description: "",
-            quantity: 1,
-            price: 0,
+            pageNumber: 1,
+            items: [
+              {
+                number: 1,
+                name: "Description of services / goods",
+                description: "",
+                quantity: 1,
+                price: 0,
+              },
+            ],
           },
-        ],
-      },
-    ];
+        ];
     const totals = computeInvoiceTotals(pages, taxRate, taxEnabled);
     const clientSnap =
       quotation.clientSnapshot && typeof quotation.clientSnapshot === "object"
@@ -90,6 +101,7 @@ export async function GET(req: Request) {
       item: {
         invoiceNumber,
         invoiceType,
+        currency: quotation.currency ?? "AED",
         projectId: String(po.projectId ?? ""),
         poId: String(po._id),
         status: "unpaid",
