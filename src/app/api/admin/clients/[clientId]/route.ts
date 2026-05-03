@@ -23,6 +23,16 @@ export async function PATCH(req: Request, ctx: RouteCtx) {
       phone?: string;
       clientLogoText?: string;
       clientSignatureText?: string;
+      taxId?: string;
+      currency?: string;
+      paymentTerms?: string;
+      notes?: string;
+      billingAddress?: string;
+      shippingAddress?: string;
+      country?: string;
+      state?: string;
+      city?: string;
+      zipCode?: string;
     };
 
     const $set: Record<string, unknown> = {};
@@ -40,6 +50,16 @@ export async function PATCH(req: Request, ctx: RouteCtx) {
     if (body.clientSignatureText !== undefined) {
       $set.clientSignatureText = String(body.clientSignatureText);
     }
+    if (body.taxId !== undefined) $set.taxId = String(body.taxId).trim();
+    if (body.currency !== undefined) $set.currency = String(body.currency).trim().toUpperCase();
+    if (body.paymentTerms !== undefined) $set.paymentTerms = String(body.paymentTerms).trim();
+    if (body.notes !== undefined) $set.notes = String(body.notes).trim();
+    if (body.billingAddress !== undefined) $set.billingAddress = String(body.billingAddress).trim();
+    if (body.shippingAddress !== undefined) $set.shippingAddress = String(body.shippingAddress).trim();
+    if (body.country !== undefined) $set.country = String(body.country).trim();
+    if (body.state !== undefined) $set.state = String(body.state).trim();
+    if (body.city !== undefined) $set.city = String(body.city).trim();
+    if (body.zipCode !== undefined) $set.zipCode = String(body.zipCode).trim();
 
     const updated = await ClientModel.findByIdAndUpdate(
       clientId,

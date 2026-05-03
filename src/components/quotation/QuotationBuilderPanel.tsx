@@ -466,7 +466,8 @@ export function QuotationBuilderPanel({
   const isEditMode = Boolean(editingQuotationId);
   const formTitle = isEditMode ? "Edit quotation" : "New quotation";
   const previewPagePx = getQuotationPagePx(data);
-  const previewStackHeightPx = getQuotationPreviewStackHeightPx(previewPagePx.height);
+  const totalPages = data.pages.length + 2;
+  const previewStackHeightPx = getQuotationPreviewStackHeightPx(previewPagePx.height, totalPages);
   const previewViewportStyle = {
     "--qv-page-w": `${previewPagePx.width}px`,
     "--qv-stack-h": `${previewStackHeightPx}px`,
@@ -482,7 +483,7 @@ export function QuotationBuilderPanel({
                 Quotation generator
               </h1>
               <p className="text-muted-foreground text-sm">
-                Form above · three pages · PDF format/orientation configurable
+                Form above · {totalPages} pages · PDF format/orientation configurable
               </p>
             </div>
             <Link
@@ -554,7 +555,7 @@ export function QuotationBuilderPanel({
 
           <div className="flex w-full flex-col items-stretch rounded-xl border border-border/50 bg-muted/15 p-4 sm:p-5 dark:bg-muted/10">
             <p className="text-muted-foreground mb-3 text-center text-[11px] font-semibold uppercase tracking-wider">
-              Live preview — 3 pages ({data.pageFormat.toUpperCase()} {data.pageOrientation})
+              Live preview — {totalPages} pages ({data.pageFormat.toUpperCase()} {data.pageOrientation})
             </p>
             <div className="min-h-[min(88vh,900px)] w-full max-w-full overflow-x-hidden overflow-y-auto [-webkit-overflow-scrolling:touch]">
               <div className="mx-auto flex max-w-full justify-center pb-10 pt-2">

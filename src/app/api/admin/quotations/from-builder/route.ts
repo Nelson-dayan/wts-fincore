@@ -109,10 +109,10 @@ export async function POST(req: Request) {
 
     const data = normalizeQuotationData(body.data);
     const pages = pagesFromGeneratorData(data);
-    const taxRate =
-      typeof body.taxRate === "number" && Number.isFinite(body.taxRate) ? body.taxRate : 5;
+    const taxRate = data.taxRate;
+    const discount = data.discount;
     const taxEnabled = body.taxEnabled !== false;
-    const { subtotal, tax, total } = computeQuotationTotals(pages, taxRate, taxEnabled);
+    const { subtotal, tax, total } = computeQuotationTotals(pages, taxRate, taxEnabled, discount);
 
     let projectId: string;
     let snapshotBase: { clientSnapshot: ClientSnap; companySnapshot: CompanySnap };
@@ -200,6 +200,8 @@ export async function POST(req: Request) {
         tax: toDecimal128(tax),
         total: toDecimal128(total),
       },
+      currency: data.currency,
+      discount: data.discount,
       quotationInfo: {
         leadTime: "",
         terms: data.paymentMilestone.trim(),

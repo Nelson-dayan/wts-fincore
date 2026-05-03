@@ -32,7 +32,8 @@ export function toDecimal128(value: number): mongoose.Types.Decimal128 {
 export function computeQuotationTotals(
   pages: QuotationPageInput[],
   taxRate: number,
-  taxEnabled: boolean
+  taxEnabled: boolean,
+  discount: number = 0
 ): { subtotal: number; tax: number; total: number } {
   let subtotal = 0;
   for (const page of pages) {
@@ -42,9 +43,10 @@ export function computeQuotationTotals(
       subtotal += qty * price;
     }
   }
+  const taxableAmount = Math.max(0, subtotal - discount);
   const rate = Math.max(0, taxRate);
-  const tax = taxEnabled ? (subtotal * rate) / 100 : 0;
-  const total = subtotal + tax;
+  const tax = taxEnabled ? (taxableAmount * rate) / 100 : 0;
+  const total = taxableAmount + tax;
   return { subtotal, tax, total };
 }
 

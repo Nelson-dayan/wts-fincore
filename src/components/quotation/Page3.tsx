@@ -4,9 +4,10 @@ import { QuotationPageFrame } from "./QuotationPageFrame";
 
 type Page3Props = {
   data: QuotationData;
+  globalPageNum: number;
 };
 
-export function Page3({ data }: Page3Props) {
+export function Page3({ data, globalPageNum }: Page3Props) {
   const {
     page3Title,
     contactName,
@@ -40,7 +41,7 @@ export function Page3({ data }: Page3Props) {
         : "px-[2%]";
 
   return (
-    <QuotationPageFrame data={data} page={3}>
+    <QuotationPageFrame data={data} page={globalPageNum}>
       <div
         className={`flex h-full min-h-0 flex-col justify-end pb-2 pt-4 ${contactInsetClass}`}
       >

@@ -2,95 +2,147 @@ import type { ClientSession, Types } from "mongoose";
 import { connectDB } from "@/lib/db/connect";
 import { InvoiceModel, PaymentModel } from "@/lib/db/models";
 import { decimalToNumber } from "@/lib/services/business/money";
+import { getInvoiceSummary, PaymentInput, InvoiceInput } from "@/lib/invoice/finance-calculations";
 
 export interface RecordPaymentInput {
   invoiceId: Types.ObjectId | string;
-  amount: number;
-  method: "cash" | "bank" | "upi";
+  companyId: Types.ObjectId | string;
+  createdBy: Types.ObjectId | string;
+  type: "PAYMENT" | "REFUND";
+  method: "UPI" | "BANK_TRANSFER" | "PAYPAL" | "STRIPE" | "WISE" | "CASH";
+  currency: string;
+  exchangeRate: number;
+  intendedAmount: number;
+  receivedAmount: number;
+  fees: { type: string; amount: number; currency: string }[];
   transactionId?: string;
   note?: string;
+  originalPaymentId?: Types.ObjectId | string;
+  sourceDetails?: { platform: string; accountId: string };
 }
 
-type InvoiceStatus = "unpaid" | "partial" | "paid" | "overdue";
-
-function resolveInvoiceStatus(params: {
-  paidAmount: number;
-  invoiceTotal: number;
-  dueDate: Date;
-}): InvoiceStatus {
-  const { paidAmount, invoiceTotal, dueDate } = params;
-  if (paidAmount >= invoiceTotal && invoiceTotal > 0) return "paid";
-  if (paidAmount > 0 && paidAmount < invoiceTotal) return "partial";
-  if (paidAmount <= 0 && dueDate.getTime() < Date.now()) return "overdue";
-  return "unpaid";
-}
-
-async function computePaidAmount(
+export async function updateInvoiceCache(
   invoiceId: Types.ObjectId | string,
   session: ClientSession
-): Promise<number> {
-  const agg = await PaymentModel.aggregate<{ total: unknown }>([
-    { $match: { invoiceId } },
-    { $group: { _id: "$invoiceId", total: { $sum: "$amount" } } },
-  ]).session(session);
-
-  return decimalToNumber(agg[0]?.total);
-}
-
-export async function syncInvoicePaymentStatus(
-  invoiceId: Types.ObjectId | string,
-  session: ClientSession
-): Promise<{ status: InvoiceStatus; paidAmount: number }> {
+) {
   const invoice = await InvoiceModel.findById(invoiceId)
-    .select("totals.total dueDate")
+    .select("totals exchangeRate dueDate status")
     .session(session);
 
-  if (!invoice) {
-    throw new Error("Invoice not found");
-  }
+  if (!invoice) throw new Error("Invoice not found");
 
-  const paidAmount = await computePaidAmount(invoiceId, session);
-  const invoiceTotal = decimalToNumber(invoice.totals?.total);
+  const payments = await PaymentModel.find({ 
+    invoiceId, 
+    isDeleted: { $ne: true } 
+  }).session(session);
+
+  const mappedPayments: PaymentInput[] = payments.map((p) => ({
+    type: p.type as "PAYMENT" | "REFUND",
+    exchangeRate: decimalToNumber(p.exchangeRate),
+    intendedAmount: decimalToNumber(p.intendedAmount),
+    receivedAmount: decimalToNumber(p.receivedAmount),
+    fees: p.fees.map((f: any) => ({ amount: decimalToNumber(f.amount) })),
+  }));
+
+  const invoiceInput: InvoiceInput = {
+    exchangeRate: decimalToNumber(invoice.exchangeRate) || 1,
+    totalAmount: decimalToNumber(invoice.totals?.total),
+  };
+
+  const summary = getInvoiceSummary(mappedPayments, invoiceInput);
+
+  let status = invoice.status;
   const dueDate = invoice.dueDate ? new Date(invoice.dueDate) : new Date();
 
-  const status = resolveInvoiceStatus({ paidAmount, invoiceTotal, dueDate });
-  await InvoiceModel.updateOne({ _id: invoiceId }, { $set: { status } }, { session });
+  // Protect DRAFT status from being auto-updated unless paid
+  if (status !== "DRAFT" || summary.totalReceivedBase > 0) {
+    if (summary.totalReceivedBase >= summary.invoiceAmountBase && summary.invoiceAmountBase > 0) {
+      status = "PAID";
+    } else if (summary.totalReceivedBase > 0 && summary.totalReceivedBase < summary.invoiceAmountBase) {
+      status = "PARTIAL";
+    } else if (summary.totalReceivedBase <= 0) {
+      status = dueDate.getTime() < Date.now() ? "OVERDUE" : "SENT";
+    }
+  }
 
-  return { status, paidAmount };
+  await InvoiceModel.updateOne(
+    { _id: invoiceId },
+    { 
+      $set: { 
+        status,
+        "totalsCache.totalReceivedBase": summary.totalReceivedBase,
+        "totalsCache.totalFeesBase": summary.totalFeesBase,
+        "totalsCache.totalIntendedBase": summary.totalIntendedBase,
+        "totalsCache.overpaidAmountBase": summary.overpaidAmountBase,
+        "totalsCache.lastCalculatedAt": new Date()
+      },
+      $inc: { "totalsCache.version": 1 }
+    },
+    { session }
+  );
+
+  return { summary, status };
 }
 
-export async function recordPayment(input: RecordPaymentInput): Promise<{
-  paymentId: string;
-  invoiceStatus: InvoiceStatus;
-  paidAmount: number;
-}> {
+export async function recordPayment(input: RecordPaymentInput) {
   const db = await connectDB();
   const session = await db.startSession();
   try {
-    let result = { paymentId: "", invoiceStatus: "unpaid" as InvoiceStatus, paidAmount: 0 };
+    let result = { paymentId: "", invoiceStatus: "SENT" };
+
     await session.withTransaction(async () => {
-      if (input.amount <= 0) {
-        throw new Error("Payment amount must be greater than zero");
+      // 1. Validations
+      if (input.type === "REFUND" && !input.originalPaymentId) {
+        throw new Error("Refunds must link to an originalPaymentId.");
+      }
+      
+      const totalFees = input.fees.reduce((sum, f) => sum + f.amount, 0);
+      if (totalFees > input.intendedAmount) {
+        throw new Error("Fees cannot exceed the intended amount.");
       }
 
+      // 2. Strict Backend Currency Conversion
+      const baseCurrency = "INR"; // Enforced system default
+      const intendedAmountBase = input.intendedAmount * input.exchangeRate;
+      const receivedAmountBase = input.receivedAmount * input.exchangeRate;
+
+      const feesWithBase = input.fees.map(f => ({
+        ...f,
+        baseAmount: f.amount * input.exchangeRate
+      }));
+
+      // 3. Create Payment
       const payment = await PaymentModel.create(
         [
           {
             invoiceId: input.invoiceId,
-            amount: input.amount,
+            companyId: input.companyId,
+            type: input.type,
             method: input.method,
-            transactionId: input.transactionId ?? "",
-            note: input.note ?? "",
+            currency: input.currency,
+            baseCurrency,
+            exchangeRate: input.exchangeRate,
+            intendedAmount: input.intendedAmount,
+            receivedAmount: input.receivedAmount,
+            intendedAmountBase,
+            receivedAmountBase,
+            fees: feesWithBase,
+            transactionId: input.transactionId,
+            note: input.note,
+            originalPaymentId: input.originalPaymentId,
+            sourceDetails: input.sourceDetails,
+            createdBy: input.createdBy,
           },
         ],
         { session }
       );
 
-      const statusInfo = await syncInvoicePaymentStatus(input.invoiceId, session);
+      // 4. Update Invoice Cache Atomically
+      const { status } = await updateInvoiceCache(input.invoiceId, session);
+
       result = {
         paymentId: String(payment[0]?._id ?? ""),
-        invoiceStatus: statusInfo.status,
-        paidAmount: statusInfo.paidAmount,
+        invoiceStatus: status,
       };
     });
 
@@ -105,10 +157,11 @@ export async function markOverdueInvoices(): Promise<number> {
   const now = new Date();
   const result = await InvoiceModel.updateMany(
     {
-      status: { $in: ["unpaid", "partial"] },
+      status: { $in: ["SENT", "PARTIAL"] },
       dueDate: { $lt: now },
+      isDeleted: { $ne: true }
     },
-    { $set: { status: "overdue" } }
+    { $set: { status: "OVERDUE" } }
   );
 
   return result.modifiedCount;

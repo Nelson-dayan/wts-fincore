@@ -60,6 +60,8 @@ export const quotationSchema = new Schema(
       remainingAmount: optionalDecimalField,
       remainingText: { type: String, default: "" },
     },
+    currency: { type: String, default: "AED" },
+    discount: { type: Number, default: 0 },
     branding: { type: quotationBrandingSchema, default: () => ({}) },
     internalNotes: { type: String, default: "" },
     status: {

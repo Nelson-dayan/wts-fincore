@@ -14,8 +14,6 @@ type EditorPanelProps = {
   extras: Record<string, unknown>;
   bankAed: Bank;
   bankUsd: Bank;
-  logoErr: string;
-  logoInputRef: React.RefObject<HTMLInputElement | null>;
   taxLabelPreview: string;
   liveTotals: { subtotal: number; tax: number; total: number };
   saving: boolean;
@@ -28,13 +26,12 @@ type EditorPanelProps = {
   onAddLine: () => void;
   onRemoveLine: (idx: number) => void;
   onCopyBillToShip: () => void;
-  onPickLogo: (files: FileList | null) => Promise<void>;
   onSave: () => void;
   onDownloadPdf: () => void;
 };
 
 export function EditorPanel(props: EditorPanelProps) {
-  const { item, extras, bankAed, bankUsd, logoErr, logoInputRef, taxLabelPreview, liveTotals, saving, pdfExporting, msg, onItemChange, onPatchExtra, onPatchBank, onPatchLine, onAddLine, onRemoveLine, onCopyBillToShip, onPickLogo, onSave, onDownloadPdf } = props;
+  const { item, extras, bankAed, bankUsd, taxLabelPreview, liveTotals, saving, pdfExporting, msg, onItemChange, onPatchExtra, onPatchBank, onPatchLine, onAddLine, onRemoveLine, onCopyBillToShip, onSave, onDownloadPdf } = props;
 
   return (
     <div className="print:hidden space-y-4">
@@ -48,6 +45,14 @@ export function EditorPanel(props: EditorPanelProps) {
         <Button
           size="sm"
           variant="default"
+          onClick={onSave}
+          disabled={saving}
+        >
+          {saving ? "Saving…" : "Save Invoice"}
+        </Button>
+        <Button
+          size="sm"
+          variant="default"
           disabled={pdfExporting}
           onClick={() => onDownloadPdf()}
         >
@@ -55,7 +60,7 @@ export function EditorPanel(props: EditorPanelProps) {
         </Button>
       </div>
       <HeadingCard item={item} extras={extras} onItemChange={onItemChange} onPatchExtra={onPatchExtra} />
-      <CompanyCard item={item} logoErr={logoErr} logoInputRef={logoInputRef} onItemChange={onItemChange} onPatchExtra={onPatchExtra} onPickLogo={onPickLogo} />
+      <CompanyCard item={item} onItemChange={onItemChange} onPatchExtra={onPatchExtra} />
       <BillShipCard item={item} extras={extras} onItemChange={onItemChange} onPatchExtra={onPatchExtra} onCopyBillToShip={onCopyBillToShip} />
       <LineItemsCard
         item={item}
@@ -68,10 +73,7 @@ export function EditorPanel(props: EditorPanelProps) {
         onPatchExtra={onPatchExtra}
       />
       <AccountsFooterCard bankAed={bankAed} bankUsd={bankUsd} onPatchBank={onPatchBank} />
-      <div className="flex flex-wrap gap-2">
-        <Button type="button" onClick={onSave} disabled={saving}>{saving ? "Saving…" : "Save"}</Button>
-        {msg ? <p className={msg === "Saved." ? "text-primary text-sm" : "text-destructive text-sm"} role="status">{msg}</p> : null}
-      </div>
+      <div className="h-10" />
     </div>
   );
 }

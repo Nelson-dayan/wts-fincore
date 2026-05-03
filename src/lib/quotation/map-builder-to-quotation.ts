@@ -9,20 +9,18 @@ export function parseCostFromGenerator(cost: string): number {
   return Number.isFinite(n) ? n : 0;
 }
 
-/** One DB page from PDF builder line items (detail + cost). */
 export function pagesFromGeneratorData(data: QuotationData): QuotationPageInput[] {
-  const raw = data.items?.length ? data.items : [{ detail: "", cost: "" }];
-  const items: QuotationItemInput[] = raw.map((it, i) => {
-    const detail = String(it.detail ?? "").trim();
-    const name = detail || `Item ${i + 1}`;
-    return {
-      number: i + 1,
-      name,
+  if (!data.pages || data.pages.length === 0) return [];
+  
+  return data.pages.map((p) => ({
+    pageNumber: p.pageNumber,
+    items: p.items.map((it) => ({
+      number: it.number,
+      name: it.name || "Item",
       displayName: "",
-      description: "",
-      quantity: 1,
-      price: parseCostFromGenerator(String(it.cost ?? "")),
-    };
-  });
-  return [{ pageNumber: 1, items }];
+      description: it.description || "",
+      quantity: it.quantity || 1,
+      price: typeof it.price === "number" ? it.price : parseCostFromGenerator(String(it.price)),
+    })),
+  }));
 }

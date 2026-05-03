@@ -20,6 +20,17 @@ export const projectSchema = new Schema(
       default: "medium",
       index: true,
     },
+    
+    // New Advanced B2B Fields
+    currency: { type: String, default: "AED", trim: true },
+    category: { type: String, default: "", trim: true },
+    clientReference: { type: String, default: "", trim: true },
+    notes: { type: String, default: "" },
+    
+    // Timeline Fields
+    startDate: { type: Date },
+    targetEndDate: { type: Date },
+    actualEndDate: { type: Date },
   },
   schemaOptions
 );
