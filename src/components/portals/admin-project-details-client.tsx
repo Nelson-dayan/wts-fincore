@@ -473,11 +473,6 @@ export function AdminProjectDetailsClient({ projectId }: { projectId: string }) 
           <CardContent className="py-4">
             <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground mb-1">
               Revenue (Base)
-      <Card className="mb-4 border-primary/20 bg-primary/4 dark:bg-primary/7">
-        <CardContent className="flex flex-col gap-1 py-4 sm:flex-row sm:items-baseline sm:justify-between sm:gap-4">
-          <div>
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-              Total expenses (this project)
             </p>
             <p className="text-2xl font-bold text-foreground">
               ₹{formatAed(data.financials?.totalReceivedBase ?? 0)}
