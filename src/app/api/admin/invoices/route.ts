@@ -105,6 +105,7 @@ export async function POST(req: Request) {
         return NextResponse.json({ message: msg }, { status: 400 });
       }
     }
+    console.error("INVOICE CREATE ERROR:", error);
     return authErrorResponse(error, "Failed to create invoice");
   }
 }

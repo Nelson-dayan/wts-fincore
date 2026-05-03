@@ -172,20 +172,31 @@ export async function createInvoiceForPurchaseOrder(
     taxEnabled = false;
   }
 
-  const pages: invoiceTotals.InvoiceTotalsPage[] = [
-    {
-      pageNumber: 1,
-      items: [
+  const pages: invoiceTotals.InvoiceTotalsPage[] = Array.isArray(quotation.pages) && quotation.pages.length > 0 
+    ? quotation.pages.map((p: any) => ({
+        pageNumber: p.pageNumber || 1,
+        items: Array.isArray(p.items) ? p.items.map((it: any) => ({
+          number: it.number || 1,
+          name: it.name || "Item",
+          description: it.description || "",
+          quantity: it.quantity || 1,
+          price: typeof it.price === "number" ? it.price : (it.price != null && typeof it.price === "object" ? parseFloat(it.price.toString()) : 0)
+        })) : []
+      }))
+    : [
         {
-          number: 1,
-          name: "Description of services / goods",
-          description: "",
-          quantity: 1,
-          price: 0,
+          pageNumber: 1,
+          items: [
+            {
+              number: 1,
+              name: "Description of services / goods",
+              description: "",
+              quantity: 1,
+              price: 0,
+            },
+          ],
         },
-      ],
-    },
-  ];
+      ];
 
   const { subtotal, tax, total } = invoiceTotals.computeInvoiceTotals(
     pages,
@@ -196,6 +207,8 @@ export async function createInvoiceForPurchaseOrder(
   const created = await InvoiceModel.create({
     invoiceNumber,
     invoiceType,
+    currency: quotation.currency ?? "AED",
+    exchangeRate: toDecimal128(1),
     projectId: po.projectId,
     poId: po._id,
     createdBy: new mongoose.Types.ObjectId(input.createdBy),
@@ -223,11 +236,19 @@ export async function createInvoiceForPurchaseOrder(
       tax: toDecimal128(tax),
       total: toDecimal128(total),
     },
+    totalAmountBase: toDecimal128(total),
+    totalsCache: {
+      totalReceivedBase: toDecimal128(0),
+      totalFeesBase: toDecimal128(0),
+      totalIntendedBase: toDecimal128(total),
+      overpaidAmountBase: toDecimal128(0),
+      version: 0,
+    },
     branding: {
       customLogoUrl: "",
       customSignatureUrl: "",
     },
-    status: "unpaid",
+    status: "DRAFT",
     dueDate: due,
     extras: {
       paymentTerms: "30 DAYS",
