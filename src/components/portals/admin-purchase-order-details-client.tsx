@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Dropdown } from "@/components/ui/select";
 import { readResponseJson } from "@/lib/http/read-response-json";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { SaveConfirmModal } from "@/components/ui/save-confirm-modal";
@@ -331,16 +332,17 @@ export function AdminPurchaseOrderDetailsClient({ purchaseOrderId }: { purchaseO
               <div className="grid gap-3 sm:grid-cols-2">
                 <div className="space-y-1.5">
                   <Label htmlFor="po-st">Status</Label>
-                  <select
+                  <Dropdown
                     id="po-st"
                     value={status}
                     onChange={(e) => setStatus(e.target.value)}
-                    className="flex h-10 w-full rounded-lg border border-input/90 bg-background px-3 text-sm"
-                  >
-                    <option value="linked">linked</option>
-                    <option value="active">active</option>
-                    <option value="completed">completed</option>
-                  </select>
+                    className="h-10 rounded-lg border-input/90 bg-background text-sm"
+                    options={[
+                      { value: "linked", label: "linked" },
+                      { value: "active", label: "active" },
+                      { value: "completed", label: "completed" },
+                    ]}
+                  />
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="po-ext">Client / external PO # (optional)</Label>

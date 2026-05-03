@@ -145,7 +145,7 @@ export function UsersTableRow({
         <div className="flex justify-end gap-1.5">
           {isEditing ? (
             <>
-              <Button size="sm" className="h-8 rounded-lg px-3" onClick={() => onSave(user._id)} disabled={savingId === user._id}>
+              <Button size="sm" className="rounded-lg px-3" onClick={() => onSave(user._id)} disabled={savingId === user._id}>
                 {savingId === user._id ? (
                   <>
                     <Loader2 className="mr-1.5 size-3.5 animate-spin" aria-hidden />
@@ -155,20 +155,20 @@ export function UsersTableRow({
                   "Save"
                 )}
               </Button>
-              <Button size="sm" variant="outline" className="h-8 rounded-lg px-2" onClick={onCancelEdit}>
+              <Button size="sm" variant="outline" className="rounded-lg px-2.5" onClick={onCancelEdit}>
                 <X className="size-4" aria-label="Cancel edit" />
               </Button>
             </>
           ) : (
             <>
-              <Button size="sm" variant="outline" className="h-8 rounded-lg px-2.5" onClick={() => onStartEdit(user)}>
+              <Button size="sm" variant="outline" className="rounded-lg px-2.5" onClick={() => onStartEdit(user)}>
                 <Pencil className="size-3.5" aria-hidden />
                 <span className="sr-only sm:not-sr-only sm:ml-1.5 sm:text-xs">Edit</span>
               </Button>
               <Button
                 size="sm"
                 variant="destructive"
-                className="h-8 rounded-lg px-2.5"
+                className="rounded-lg px-2.5"
                 onClick={() => onDelete(user._id)}
                 disabled={savingId === user._id}
               >

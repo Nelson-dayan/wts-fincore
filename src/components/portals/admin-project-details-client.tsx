@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { DashboardPageHeader } from "@/components/dashboard/page-header";
@@ -11,6 +11,8 @@ import { Select } from "@/components/ui/select";
 import { readResponseJson } from "@/lib/http/read-response-json";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { SaveConfirmModal } from "@/components/ui/save-confirm-modal";
+import { AdminInvoicesCreateHelper } from "@/components/portals/admin-invoices-create-helper";
+
 
 type ProjectDetailsPayload = {
   project?: {
@@ -144,7 +146,7 @@ export function AdminProjectDetailsClient({ projectId }: { projectId: string }) 
   const [saveConfirmOpen, setSaveConfirmOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 
-  async function load() {
+  const load = useCallback(async () => {
     const response = await fetch(`/api/admin/projects/${encodeURIComponent(projectId)}`, {
       cache: "no-store",
     });
@@ -178,11 +180,11 @@ export function AdminProjectDetailsClient({ projectId }: { projectId: string }) 
         actualEndDate: payload.project.actualEndDate ? new Date(payload.project.actualEndDate).toISOString().split('T')[0] : "",
       });
     }
-  }
+  }, [projectId]);
 
   useEffect(() => {
     load().catch((e) => setError(e instanceof Error ? e.message : "Failed to load details"));
-  }, [projectId]);
+  }, [load]);
 
   async function saveProject(): Promise<boolean> {
     setSaving(true);
@@ -471,6 +473,11 @@ export function AdminProjectDetailsClient({ projectId }: { projectId: string }) 
           <CardContent className="py-4">
             <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground mb-1">
               Revenue (Base)
+      <Card className="mb-4 border-primary/20 bg-primary/4 dark:bg-primary/7">
+        <CardContent className="flex flex-col gap-1 py-4 sm:flex-row sm:items-baseline sm:justify-between sm:gap-4">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+              Total expenses (this project)
             </p>
             <p className="text-2xl font-bold text-foreground">
               ₹{formatAed(data.financials?.totalReceivedBase ?? 0)}
@@ -525,6 +532,7 @@ export function AdminProjectDetailsClient({ projectId }: { projectId: string }) 
           createdAt: new Date(String(po.createdAt)).toLocaleString(),
         }))}
       />
+      <AdminInvoicesCreateHelper projectId={projectId} embedded />
       <SectionTable
         title="Invoices"
         columns={[
