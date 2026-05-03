@@ -33,48 +33,51 @@ function formatMoney(n: number): string {
 
 /** Round-trip from DB when `pdfBuilderData` was saved; else best-effort from admin quotation fields. */
 export function quotationItemToGeneratorData(item: StoredQuotationItem): QuotationData {
+  const doc = item.documentInfo ?? {};
+  const client = item.clientSnapshot ?? {};
+  const company = item.companySnapshot ?? {};
+
+  let data = defaultQuotationData();
   if (item.pdfBuilderData && typeof item.pdfBuilderData === "object") {
-    return normalizeQuotationData(item.pdfBuilderData);
+    data = normalizeQuotationData(item.pdfBuilderData);
   }
 
-  const base = defaultQuotationData();
-  const doc = item.documentInfo ?? {};
+  // Ensure DB fields always take precedence over stale pdfBuilderData
+  const pagesRaw = item.pages || [];
+  if (pagesRaw.length > 0) {
+    data.pages = pagesRaw.map((p, i) => ({
+      pageNumber: p.pageNumber || i + 1,
+      items: (p.items || []).map((it, j) => ({
+        number: it.number || j + 1,
+        name: String(it.name ?? it.description ?? "").trim(),
+        description: String(it.description ?? "").trim(),
+        quantity: Number(it.quantity) || 1,
+        price: Number(it.price) || 0,
+      })),
+    }));
+  }
+
   const rawDate = doc.date ? new Date(String(doc.date)) : null;
   const dateStr =
     rawDate && !Number.isNaN(rawDate.getTime())
       ? rawDate.toISOString().slice(0, 10)
       : "";
 
-  const client = item.clientSnapshot ?? {};
-  const company = item.companySnapshot ?? {};
-  const page0 = item.pages?.[0];
-  const rows = page0?.items?.length
-    ? page0.items.map((it) => ({
-        detail: String(it.name ?? "").trim() || String(it.description ?? "").trim(),
-        cost: formatMoney(Number(it.price) || 0),
-      }))
-    : base.items;
-
   return normalizeQuotationData({
-    ...base,
-    page1Title: String(doc.subject ?? "").trim(),
-    clientName: String(client.company ?? client.name ?? "").trim(),
-    refNo: String(doc.quotationCode ?? doc.geCode ?? "").trim(),
-    date: dateStr,
-    companyName: String(company.name ?? "").trim(),
-    companyAddress: String(company.address ?? "").trim(),
-    page2Title: "",
-    description: String(doc.description ?? "").trim(),
-    tableHeaderDetail: base.tableHeaderDetail,
-    tableHeaderCost: base.tableHeaderCost,
-    items: rows,
-    paymentMilestone: String(item.quotationInfo?.terms ?? "").trim(),
-    page3Title: base.page3Title,
-    contactName: String(client.name ?? "").trim(),
-    contactPhone: String(client.phone ?? "").trim(),
-    contactEmail: String(client.email ?? "").trim(),
-    logo: typeof company.logoUrl === "string" && company.logoUrl ? company.logoUrl : base.logo,
-    bgColor: base.bgColor,
-    accentColor: base.accentColor,
+    ...data,
+    page1Title: String(doc.subject ?? data.page1Title).trim(),
+    clientName: String(client.company ?? client.name ?? data.clientName).trim(),
+    refNo: String(doc.quotationCode ?? doc.geCode ?? data.refNo).trim(),
+    date: dateStr || data.date,
+    companyName: String(company.name ?? data.companyName).trim(),
+    companyAddress: String(company.address ?? data.companyAddress).trim(),
+    currency: String((item as any).currency ?? data.currency),
+    taxRate: Number(doc.taxRate) ?? data.taxRate,
+    discount: Number((item as any).discount) ?? data.discount,
+    paymentMilestone: String(item.quotationInfo?.terms ?? data.paymentMilestone).trim(),
+    contactName: String(client.name ?? data.contactName).trim(),
+    contactPhone: String(client.phone ?? data.contactPhone).trim(),
+    contactEmail: String(client.email ?? data.contactEmail).trim(),
   });
 }
+

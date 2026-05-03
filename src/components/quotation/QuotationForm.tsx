@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { SaveConfirmModal } from "@/components/ui/save-confirm-modal";
 import { cn } from "@/lib/utils/cn";
 import { UploadCard } from "@/components/ui/upload-card";
-import type { QuotationData, QuotationItem } from "@/types/quotation-generator";
+import type { QuotationData, QuotationItem, QuotationPage } from "@/types/quotation-generator";
 
 export type QuotationFormProps = {
   data: QuotationData;
@@ -45,20 +45,57 @@ export function QuotationForm({
     onChange({ ...data, ...partial });
   };
 
-  const setItem = (index: number, partial: Partial<QuotationItem>) => {
-    const items = data.items.map((row, i) =>
-      i === index ? { ...row, ...partial } : row
-    );
-    patch({ items });
+  const setItem = (pageIndex: number, lineIndex: number, partial: Partial<QuotationItem>) => {
+    const pages = data.pages.map((p, pIdx) => {
+      if (pIdx !== pageIndex) return p;
+      return {
+        ...p,
+        items: p.items.map((row, rIdx) => (rIdx === lineIndex ? { ...row, ...partial } : row)),
+      };
+    });
+    patch({ pages });
   };
 
-  const addRow = () => {
-    patch({ items: [...data.items, { detail: "", cost: "" }] });
+  const addRow = (pageIndex: number) => {
+    const pages = data.pages.map((p, pIdx) => {
+      if (pIdx !== pageIndex) return p;
+      const num = p.items.length > 0 ? p.items[p.items.length - 1].number + 1 : 1;
+      return {
+        ...p,
+        items: [...p.items, { number: num, name: "", description: "", quantity: 1, price: 0 }],
+      };
+    });
+    patch({ pages });
   };
 
-  const removeRow = (index: number) => {
-    if (data.items.length <= 1) return;
-    patch({ items: data.items.filter((_, i) => i !== index) });
+  const removeRow = (pageIndex: number, lineIndex: number) => {
+    const pages = data.pages.map((p, pIdx) => {
+      if (pIdx !== pageIndex) return p;
+      return {
+        ...p,
+        items: p.items.filter((_, i) => i !== lineIndex),
+      };
+    });
+    patch({ pages });
+  };
+
+  const addPage = () => {
+    const pageNum = data.pages.length + 1;
+    patch({
+      pages: [
+        ...data.pages,
+        {
+          pageNumber: pageNum,
+          items: [{ number: 1, name: "", description: "", quantity: 1, price: 0 }],
+        },
+      ],
+    });
+  };
+
+  const removePage = (pageIndex: number) => {
+    if (data.pages.length <= 1) return;
+    const pages = data.pages.filter((_, i) => i !== pageIndex).map((p, i) => ({ ...p, pageNumber: i + 1 }));
+    patch({ pages });
   };
 
   return (
@@ -206,14 +243,14 @@ export function QuotationForm({
 
           <div className="space-y-3 rounded-lg border border-border/80 bg-background/60 p-3 dark:bg-background/40">
             <p className="text-sm font-medium text-foreground">Cost table</p>
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid gap-3 sm:grid-cols-4">
               <div className="grid gap-2">
                 <Label htmlFor="qg-th-detail">Header — left column</Label>
                 <Input
                   id="qg-th-detail"
                   value={data.tableHeaderDetail}
                   onChange={(e) => patch({ tableHeaderDetail: e.target.value })}
-                  placeholder="Details"
+                  placeholder="Item Description"
                 />
               </div>
               <div className="grid gap-2">
@@ -222,64 +259,147 @@ export function QuotationForm({
                   id="qg-th-cost"
                   value={data.tableHeaderCost}
                   onChange={(e) => patch({ tableHeaderCost: e.target.value })}
-                  placeholder="Total Cost (USD)"
+                  placeholder="Total"
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="qg-currency">Currency Code</Label>
+                <Input
+                  id="qg-currency"
+                  value={data.currency}
+                  onChange={(e) => patch({ currency: e.target.value.toUpperCase() })}
+                  placeholder="AED"
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="qg-taxrate">Tax Rate (%)</Label>
+                <Input
+                  id="qg-taxrate"
+                  type="number"
+                  min={0}
+                  step={1}
+                  value={data.taxRate}
+                  onChange={(e) => patch({ taxRate: Number(e.target.value) || 0 })}
+                  placeholder="5"
+                />
+              </div>
+            </div>
+            <div className="grid gap-2 sm:grid-cols-2">
+              <div className="grid gap-2">
+                <Label htmlFor="qg-discount">Discount (Absolute)</Label>
+                <Input
+                  id="qg-discount"
+                  type="number"
+                  min={0}
+                  step={0.01}
+                  value={data.discount}
+                  onChange={(e) => patch({ discount: Number(e.target.value) || 0 })}
+                  placeholder="0.00"
                 />
               </div>
             </div>
 
-            <div className="space-y-2 pt-1">
-              <div className="flex flex-wrap items-end justify-between gap-2">
-                <span className="text-sm font-medium text-foreground">Table rows</span>
-                <Button type="button" variant="outline" size="sm" onClick={addRow}>
-                  <Plus className="size-4" />
-                  Add row
+            <div className="space-y-4 pt-2">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="text-sm font-medium text-foreground">Line Items (Pages)</span>
+                <Button type="button" variant="outline" size="sm" onClick={addPage}>
+                  <Plus className="size-4 mr-1" />
+                  Add page
                 </Button>
               </div>
-              <div className="hidden gap-2 px-3 pb-0.5 text-[0.7rem] font-semibold uppercase tracking-wide text-muted-foreground sm:grid sm:grid-cols-[1fr_120px_auto]">
-                <span>Details (left cell)</span>
-                <span className="text-right">Total cost (USD)</span>
-                <span />
-              </div>
-              <div className="space-y-2 rounded-lg border border-border/70 bg-muted/15 p-2 dark:bg-muted/10">
-                {data.items.map((row, index) => (
-                  <div
-                    key={index}
-                    className="grid gap-3 rounded-md border border-border/60 bg-card/90 p-3 sm:grid-cols-[1fr_120px_auto] sm:items-end"
-                  >
-                    <div className="grid gap-1.5">
-                      <span className="text-[0.65rem] font-semibold uppercase tracking-wide text-muted-foreground sm:hidden">
-                        Details (left)
-                      </span>
-                      <Input
-                        aria-label={`Row ${index + 1} — details`}
-                        value={row.detail}
-                        onChange={(e) => setItem(index, { detail: e.target.value })}
-                        placeholder="e.g. QMetry Automation Framework (QAF)"
-                      />
+
+              <div className="space-y-4">
+                {data.pages.map((page, pageIndex) => (
+                  <div key={pageIndex} className="space-y-2 rounded-lg border border-border/70 bg-muted/15 p-3 dark:bg-muted/10">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-sm font-semibold">Page {page.pageNumber}</h4>
+                      <div className="flex gap-2">
+                        <Button type="button" variant="outline" size="sm" onClick={() => addRow(pageIndex)}>
+                          <Plus className="size-3.5 mr-1" />
+                          Add row
+                        </Button>
+                        <Button 
+                          type="button" 
+                          variant="ghost" 
+                          size="sm" 
+                          className="text-destructive" 
+                          disabled={data.pages.length <= 1}
+                          onClick={() => removePage(pageIndex)}
+                        >
+                          <Trash2 className="size-3.5 mr-1" />
+                          Remove Page
+                        </Button>
+                      </div>
                     </div>
-                    <div className="grid gap-1.5">
-                      <span className="text-[0.65rem] font-semibold uppercase tracking-wide text-muted-foreground sm:hidden">
-                        Total cost (USD)
-                      </span>
-                      <Input
-                        aria-label={`Row ${index + 1} — amount`}
-                        value={row.cost}
-                        onChange={(e) => setItem(index, { cost: e.target.value })}
-                        placeholder="e.g. 5,000.00"
-                        className="tabular-nums text-right"
-                      />
+
+                    <div className="space-y-2">
+                      {page.items.map((row, lineIndex) => (
+                        <div
+                          key={lineIndex}
+                          className="grid gap-2 rounded-md border border-border/60 bg-card/90 p-3 sm:grid-cols-[50px_1fr_80px_120px_auto] sm:items-start"
+                        >
+                          <div className="grid gap-1.5">
+                            <Label className="text-[0.65rem] uppercase text-muted-foreground">#</Label>
+                            <Input
+                              type="number"
+                              value={row.number}
+                              onChange={(e) => setItem(pageIndex, lineIndex, { number: Number(e.target.value) })}
+                              className="px-2"
+                            />
+                          </div>
+                          <div className="grid gap-1.5">
+                            <Label className="text-[0.65rem] uppercase text-muted-foreground">Item Name & Desc</Label>
+                            <Input
+                              value={row.name}
+                              onChange={(e) => setItem(pageIndex, lineIndex, { name: e.target.value })}
+                              placeholder="Name"
+                              className="mb-1"
+                            />
+                            <textarea
+                              value={row.description}
+                              onChange={(e) => setItem(pageIndex, lineIndex, { description: e.target.value })}
+                              placeholder="Description"
+                              rows={2}
+                              className={cn(
+                                "flex w-full rounded-md border border-input/90 bg-background/80 px-3 py-1.5 text-sm shadow-sm",
+                                "focus-visible:border-primary/35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45"
+                              )}
+                            />
+                          </div>
+                          <div className="grid gap-1.5">
+                            <Label className="text-[0.65rem] uppercase text-muted-foreground">Qty</Label>
+                            <Input
+                              type="number"
+                              value={row.quantity}
+                              onChange={(e) => setItem(pageIndex, lineIndex, { quantity: Number(e.target.value) })}
+                              className="px-2 text-right"
+                            />
+                          </div>
+                          <div className="grid gap-1.5">
+                            <Label className="text-[0.65rem] uppercase text-muted-foreground">Unit Price</Label>
+                            <Input
+                              type="number"
+                              step="0.01"
+                              value={row.price}
+                              onChange={(e) => setItem(pageIndex, lineIndex, { price: Number(e.target.value) })}
+                              className="px-2 text-right tabular-nums"
+                            />
+                          </div>
+                          <div className="mt-[22px] flex justify-center">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              disabled={page.items.length <= 1}
+                              onClick={() => removeRow(pageIndex, lineIndex)}
+                              aria-label="Remove row"
+                            >
+                              <Trash2 className="size-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
                     </div>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="justify-self-end sm:justify-self-center"
-                      disabled={data.items.length <= 1}
-                      onClick={() => removeRow(index)}
-                      aria-label={`Remove row ${index + 1}`}
-                    >
-                      <Trash2 className="size-4" />
-                    </Button>
                   </div>
                 ))}
               </div>

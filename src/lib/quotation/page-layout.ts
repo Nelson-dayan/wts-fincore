@@ -48,11 +48,11 @@ export function getQuotationLandscapeLogoCornerInsetPx(portrait: {
   };
 }
 
-/** Total height of the 3-page preview stack (matches `QuotationPreview` layout). */
-export function getQuotationPreviewStackHeightPx(pageHeightPx: number) {
+/** Total height of the multi-page preview stack (matches `QuotationPreview` layout). */
+export function getQuotationPreviewStackHeightPx(pageHeightPx: number, totalPages: number) {
   return (
     QUOTATION_PREVIEW_ROOT_VERTICAL_PADDING_PX +
-    3 * pageHeightPx +
-    2 * QUOTATION_PREVIEW_INTER_PAGE_GAP_PX
+    totalPages * pageHeightPx +
+    (totalPages - 1) * QUOTATION_PREVIEW_INTER_PAGE_GAP_PX
   );
 }

@@ -15,14 +15,19 @@ function withAlpha(hex: string, alpha: number) {
 
 type Page2Props = {
   data: QuotationData;
+  pageIndex: number;
+  globalPageNum: number;
 };
 
-export function Page2({ data }: Page2Props) {
+function formatMoney(amount: number) {
+  return new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(amount);
+}
+
+export function Page2({ data, pageIndex, globalPageNum }: Page2Props) {
   const {
     page1Title,
     page2Title,
     description,
-    items,
     paymentMilestone,
     tableHeaderDetail,
     tableHeaderCost,
@@ -34,12 +39,33 @@ export function Page2({ data }: Page2Props) {
     page2TextAlign,
     tableBlockAlign = "center",
     pageOrientation,
+    pages,
+    currency,
+    taxRate,
+    discount,
   } = data;
   const isLandscape = pageOrientation === "landscape";
-  const rows = items.length > 0 ? items : [{ detail: "", cost: "" }];
-  const hDetail = tableHeaderDetail.trim();
-  const hCost = tableHeaderCost.trim();
-  const showThead = Boolean(hDetail || hCost);
+  const pageData = pages[pageIndex];
+  const rows = pageData?.items && pageData.items.length > 0 ? pageData.items : [];
+  
+  const hDetail = tableHeaderDetail.trim() || "Description";
+  const hCost = tableHeaderCost.trim() || "Total";
+  const showThead = true;
+
+  const isLastPage = pageIndex === pages.length - 1;
+
+  // Totals Calculation (only on last page)
+  const subtotal = pages.reduce(
+    (sum, p) =>
+      sum +
+      p.items.reduce((rowSum, row) => rowSum + row.quantity * row.price, 0),
+    0
+  );
+  
+  const discountAmount = discount;
+  const taxableAmount = Math.max(0, subtotal - discountAmount);
+  const taxAmount = (taxableAmount * taxRate) / 100;
+  const grandTotal = taxableAmount + taxAmount;
 
   const customTitle = page2Title.trim();
   const p1 = page1Title.trim();
@@ -72,8 +98,8 @@ export function Page2({ data }: Page2Props) {
   const page2BlockMaxClass = isLandscape ? "max-w-xl" : "max-w-4xl";
 
   return (
-    <QuotationPageFrame data={data} page={2}>
-      <div className="flex h-full min-h-0 flex-col justify-center gap-5 pt-1">
+    <QuotationPageFrame data={data} page={globalPageNum}>
+      <div className="flex h-full min-h-0 flex-col justify-start gap-5 pt-1">
         {customTitle ? (
           <h2
             className={`shrink-0 text-[17px] font-normal leading-snug md:text-[19px] ${headingAlignClass}`}
@@ -120,12 +146,21 @@ export function Page2({ data }: Page2Props) {
           >
             <table className="w-full table-fixed border-collapse text-[13px] md:text-[14px]">
               <colgroup>
-                <col style={{ width: "72%" }} />
-                <col style={{ width: "28%" }} />
+                <col style={{ width: "6%" }} />
+                <col style={{ width: "44%" }} />
+                <col style={{ width: "8%" }} />
+                <col style={{ width: "21%" }} />
+                <col style={{ width: "21%" }} />
               </colgroup>
               {showThead ? (
                 <thead>
                   <tr style={{ backgroundColor: headerBg }}>
+                    <th
+                      className="border px-3 py-2.5 text-center font-bold"
+                      style={{ borderColor, color: QUOTATION_PDF_COLORS.slate900 }}
+                    >
+                      #
+                    </th>
                     <th
                       className="border px-3 py-2.5 text-left font-bold wrap-break-word"
                       style={{ borderColor, color: QUOTATION_PDF_COLORS.slate900 }}
@@ -133,10 +168,22 @@ export function Page2({ data }: Page2Props) {
                       {hDetail}
                     </th>
                     <th
-                      className="border px-3 py-2.5 text-right font-bold whitespace-nowrap"
+                      className="border px-3 py-2.5 text-center font-bold"
                       style={{ borderColor, color: QUOTATION_PDF_COLORS.slate900 }}
                     >
-                      {hCost}
+                      Qty
+                    </th>
+                    <th
+                      className="border px-3 py-2.5 text-right font-bold wrap-break-word"
+                      style={{ borderColor, color: QUOTATION_PDF_COLORS.slate900 }}
+                    >
+                      Price ({currency})
+                    </th>
+                    <th
+                      className="border px-3 py-2.5 text-right font-bold wrap-break-word"
+                      style={{ borderColor, color: QUOTATION_PDF_COLORS.slate900 }}
+                    >
+                      {hCost} ({currency})
                     </th>
                   </tr>
                 </thead>
@@ -145,22 +192,70 @@ export function Page2({ data }: Page2Props) {
                 {rows.map((row, i) => (
                   <tr key={i} style={{ backgroundColor: bodyBg }}>
                     <td
+                      className="border px-3 py-2.5 text-center align-top tabular-nums"
+                      style={{ borderColor, color: QUOTATION_PDF_COLORS.slate800 }}
+                    >
+                      {row.number || i + 1}
+                    </td>
+                    <td
                       className="border px-3 py-2.5 text-left align-top wrap-break-word"
                       style={{ borderColor, color: QUOTATION_PDF_COLORS.slate800 }}
                     >
-                      {row.detail.trim()}
+                      <div className="font-semibold text-slate-900">{row.name.trim()}</div>
+                      {row.description.trim() && (
+                        <div className="mt-1 text-slate-700 whitespace-pre-wrap text-[12px]">{row.description.trim()}</div>
+                      )}
                     </td>
                     <td
-                      className="border px-3 py-2.5 text-right align-top tabular-nums whitespace-nowrap"
+                      className="border px-3 py-2.5 text-center align-top tabular-nums"
+                      style={{ borderColor, color: QUOTATION_PDF_COLORS.slate800 }}
+                    >
+                      {row.quantity}
+                    </td>
+                    <td
+                      className="border px-3 py-2.5 text-right align-top tabular-nums"
+                      style={{ borderColor, color: QUOTATION_PDF_COLORS.slate800 }}
+                    >
+                      {formatMoney(row.price)}
+                    </td>
+                    <td
+                      className="border px-3 py-2.5 text-right align-top tabular-nums whitespace-nowrap font-medium"
                       style={{ borderColor, color: QUOTATION_PDF_COLORS.slate900 }}
                     >
-                      {row.cost.trim() ? <em>{row.cost.trim()}</em> : null}
+                      {formatMoney(row.quantity * row.price)}
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
+          
+          {isLastPage && (
+            <div className="mt-4 flex justify-end">
+              <div className="w-64 rounded-lg border p-3 text-[13px] md:text-[14px]" style={{ borderColor, backgroundColor: bodyBg, color: QUOTATION_PDF_COLORS.slate900 }}>
+                <div className="flex justify-between py-1">
+                  <span style={{ color: QUOTATION_PDF_COLORS.slate700 }}>Subtotal:</span>
+                  <span className="font-medium tabular-nums">{formatMoney(subtotal)} {currency}</span>
+                </div>
+                {discountAmount > 0 && (
+                  <div className="flex justify-between py-1">
+                    <span style={{ color: QUOTATION_PDF_COLORS.slate700 }}>Discount:</span>
+                    <span className="font-medium tabular-nums text-red-600">-{formatMoney(discountAmount)} {currency}</span>
+                  </div>
+                )}
+                {taxRate > 0 && (
+                  <div className="flex justify-between py-1 border-b pb-2 mb-2" style={{ borderColor }}>
+                    <span style={{ color: QUOTATION_PDF_COLORS.slate700 }}>Tax ({taxRate}%):</span>
+                    <span className="font-medium tabular-nums">{formatMoney(taxAmount)} {currency}</span>
+                  </div>
+                )}
+                <div className="flex justify-between pt-1 font-bold text-[15px]">
+                  <span>Total:</span>
+                  <span className="tabular-nums">{formatMoney(grandTotal)} {currency}</span>
+                </div>
+              </div>
+            </div>
+          )}
         </section>
 
         {milestoneLines.length > 0 ? (
