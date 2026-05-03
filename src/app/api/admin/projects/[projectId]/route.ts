@@ -25,7 +25,7 @@ export async function GET(_req: Request, ctx: RouteCtx) {
     const { projectId } = await ctx.params;
 
     const project = await ProjectModel.findById(projectId)
-      .select("name description status priority budget clientId assignedTo createdAt updatedAt")
+      .select("name description status priority budget currency category clientReference notes startDate targetEndDate actualEndDate clientId assignedTo createdAt updatedAt")
       .lean();
     if (!project) {
       return NextResponse.json({ message: "Project not found" }, { status: 404 });
@@ -111,6 +111,13 @@ export async function PATCH(req: Request, ctx: RouteCtx) {
       priority?: "low" | "medium" | "high";
       budget?: number;
       assignedTo?: string[];
+      currency?: string;
+      category?: string;
+      clientReference?: string;
+      notes?: string;
+      startDate?: string;
+      targetEndDate?: string;
+      actualEndDate?: string;
     };
 
     if (Array.isArray(body.assignedTo) && body.assignedTo.length > 0) {
@@ -123,19 +130,29 @@ export async function PATCH(req: Request, ctx: RouteCtx) {
       }
     }
 
+    const $set: Record<string, unknown> = {
+      name: body.name !== undefined ? String(body.name).trim() : undefined,
+      description: body.description !== undefined ? String(body.description) : undefined,
+      status: body.status,
+      priority: body.priority,
+      budget: body.budget,
+      assignedTo: body.assignedTo,
+    };
+    
+    if (body.currency !== undefined) $set.currency = String(body.currency).trim().toUpperCase();
+    if (body.category !== undefined) $set.category = String(body.category).trim();
+    if (body.clientReference !== undefined) $set.clientReference = String(body.clientReference).trim();
+    if (body.notes !== undefined) $set.notes = String(body.notes).trim();
+    if (body.startDate !== undefined) $set.startDate = body.startDate ? new Date(body.startDate) : null;
+    if (body.targetEndDate !== undefined) $set.targetEndDate = body.targetEndDate ? new Date(body.targetEndDate) : null;
+    if (body.actualEndDate !== undefined) $set.actualEndDate = body.actualEndDate ? new Date(body.actualEndDate) : null;
+
+    // Remove undefined keys before update
+    Object.keys($set).forEach(key => $set[key] === undefined && delete $set[key]);
+
     const updated = await ProjectModel.findByIdAndUpdate(
       projectId,
-      {
-        $set: {
-          name: body.name !== undefined ? String(body.name).trim() : undefined,
-          description:
-            body.description !== undefined ? String(body.description) : undefined,
-          status: body.status,
-          priority: body.priority,
-          budget: body.budget,
-          assignedTo: body.assignedTo,
-        },
-      },
+      { $set },
       { new: true }
     ).lean();
 

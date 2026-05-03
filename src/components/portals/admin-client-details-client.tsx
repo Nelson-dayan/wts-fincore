@@ -33,6 +33,16 @@ const EMPTY_FORM: ClientProfileForm = {
   address: "",
   clientLogoText: "",
   clientSignatureText: "",
+  taxId: "",
+  currency: "AED",
+  paymentTerms: "",
+  notes: "",
+  billingAddress: "",
+  shippingAddress: "",
+  country: "",
+  state: "",
+  city: "",
+  zipCode: "",
 };
 
 export function AdminClientDetailsClient({ clientId }: { clientId: string }) {
@@ -66,6 +76,16 @@ export function AdminClientDetailsClient({ clientId }: { clientId: string }) {
               address: payload.client.address ?? "",
               clientLogoText: payload.client.clientLogoText ?? "",
               clientSignatureText: payload.client.clientSignatureText ?? "",
+              taxId: payload.client.taxId ?? "",
+              currency: payload.client.currency ?? "AED",
+              paymentTerms: payload.client.paymentTerms ?? "",
+              notes: payload.client.notes ?? "",
+              billingAddress: payload.client.billingAddress ?? "",
+              shippingAddress: payload.client.shippingAddress ?? "",
+              country: payload.client.country ?? "",
+              state: payload.client.state ?? "",
+              city: payload.client.city ?? "",
+              zipCode: payload.client.zipCode ?? "",
             });
           }
         }

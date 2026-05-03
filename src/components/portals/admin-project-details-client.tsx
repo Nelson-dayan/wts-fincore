@@ -20,6 +20,13 @@ type ProjectDetailsPayload = {
     priority: "low" | "medium" | "high";
     budget?: unknown;
     clientId: string;
+    currency?: string;
+    category?: string;
+    clientReference?: string;
+    notes?: string;
+    startDate?: string;
+    targetEndDate?: string;
+    actualEndDate?: string;
     createdAt: string;
   };
   client?: {
@@ -125,6 +132,13 @@ export function AdminProjectDetailsClient({ projectId }: { projectId: string }) 
     status: "lead" as "lead" | "in_progress" | "completed" | "on_hold",
     priority: "medium" as "low" | "medium" | "high",
     budget: "",
+    currency: "AED",
+    category: "",
+    clientReference: "",
+    notes: "",
+    startDate: "",
+    targetEndDate: "",
+    actualEndDate: "",
   });
   const [saveConfirmOpen, setSaveConfirmOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
@@ -154,6 +168,13 @@ export function AdminProjectDetailsClient({ projectId }: { projectId: string }) 
         status: payload.project.status ?? "lead",
         priority: payload.project.priority ?? "medium",
         budget: normalizedBudget,
+        currency: payload.project.currency ?? "AED",
+        category: payload.project.category ?? "",
+        clientReference: payload.project.clientReference ?? "",
+        notes: payload.project.notes ?? "",
+        startDate: payload.project.startDate ? new Date(payload.project.startDate).toISOString().split('T')[0] : "",
+        targetEndDate: payload.project.targetEndDate ? new Date(payload.project.targetEndDate).toISOString().split('T')[0] : "",
+        actualEndDate: payload.project.actualEndDate ? new Date(payload.project.actualEndDate).toISOString().split('T')[0] : "",
       });
     }
   }
@@ -175,6 +196,13 @@ export function AdminProjectDetailsClient({ projectId }: { projectId: string }) 
           status: form.status,
           priority: form.priority,
           budget: Number(form.budget || 0),
+          currency: form.currency,
+          category: form.category,
+          clientReference: form.clientReference,
+          notes: form.notes,
+          startDate: form.startDate || undefined,
+          targetEndDate: form.targetEndDate || undefined,
+          actualEndDate: form.actualEndDate || undefined,
         }),
       });
       const payload = await readResponseJson<{ message?: string }>(response);
@@ -278,51 +306,144 @@ export function AdminProjectDetailsClient({ projectId }: { projectId: string }) 
             </div>
           </div>
         </CardHeader>
-        <CardContent className="grid gap-3 sm:grid-cols-2">
+        <CardContent className="grid gap-4 sm:grid-cols-2">
           {editing ? (
             <>
-              <Input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} />
-              <Input value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} />
-              <Select
-                value={form.status}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, status: e.target.value as typeof f.status }))
-                }
-                options={[
-                  { value: "lead", label: "lead" },
-                  { value: "in_progress", label: "in_progress" },
-                  { value: "completed", label: "completed" },
-                  { value: "on_hold", label: "on_hold" },
-                ]}
-              />
-              <Select
-                value={form.priority}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, priority: e.target.value as typeof f.priority }))
-                }
-                options={[
-                  { value: "low", label: "low" },
-                  { value: "medium", label: "medium" },
-                  { value: "high", label: "high" },
-                ]}
-              />
-              <Input
-                type="number"
-                value={form.budget}
-                onChange={(e) => setForm((f) => ({ ...f, budget: e.target.value }))}
-              />
+              <div className="space-y-2 sm:col-span-2">
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Core Info</p>
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-muted-foreground">Project Name</label>
+                <Input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-muted-foreground">Client Reference / PO</label>
+                <Input value={form.clientReference} onChange={(e) => setForm((f) => ({ ...f, clientReference: e.target.value }))} />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-muted-foreground">Status</label>
+                <Select
+                  value={form.status}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, status: e.target.value as typeof f.status }))
+                  }
+                  options={[
+                    { value: "lead", label: "Lead" },
+                    { value: "in_progress", label: "In Progress" },
+                    { value: "completed", label: "Completed" },
+                    { value: "on_hold", label: "On Hold" },
+                  ]}
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-muted-foreground">Category</label>
+                <Input value={form.category} onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))} placeholder="e.g. Retainer, Fixed Price" />
+              </div>
+
+              <div className="space-y-2 sm:col-span-2 mt-2 pt-2 border-t">
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Financial & Priority</p>
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-muted-foreground">Budget</label>
+                <Input type="number" value={form.budget} onChange={(e) => setForm((f) => ({ ...f, budget: e.target.value }))} />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-muted-foreground">Currency</label>
+                <Input value={form.currency} onChange={(e) => setForm((f) => ({ ...f, currency: e.target.value }))} placeholder="AED" />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-muted-foreground">Priority</label>
+                <Select
+                  value={form.priority}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, priority: e.target.value as typeof f.priority }))
+                  }
+                  options={[
+                    { value: "low", label: "Low" },
+                    { value: "medium", label: "Medium" },
+                    { value: "high", label: "High" },
+                  ]}
+                />
+              </div>
+
+              <div className="space-y-2 sm:col-span-2 mt-2 pt-2 border-t">
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Timeline</p>
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-muted-foreground">Start Date</label>
+                <Input type="date" value={form.startDate} onChange={(e) => setForm((f) => ({ ...f, startDate: e.target.value }))} />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-muted-foreground">Target End Date</label>
+                <Input type="date" value={form.targetEndDate} onChange={(e) => setForm((f) => ({ ...f, targetEndDate: e.target.value }))} />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-muted-foreground">Actual End Date</label>
+                <Input type="date" value={form.actualEndDate} onChange={(e) => setForm((f) => ({ ...f, actualEndDate: e.target.value }))} />
+              </div>
+
+              <div className="space-y-2 sm:col-span-2 mt-2 pt-2 border-t">
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Additional Details</p>
+              </div>
+              <div className="space-y-1 sm:col-span-2">
+                <label className="text-xs font-medium text-muted-foreground">Description</label>
+                <Input value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} />
+              </div>
+              <div className="space-y-1 sm:col-span-2">
+                <label className="text-xs font-medium text-muted-foreground">Internal Notes</label>
+                <Input value={form.notes} onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))} placeholder="Private notes..." />
+              </div>
             </>
           ) : (
             <>
-              <p><strong>Name:</strong> {data.project?.name ?? "-"}</p>
-              <p><strong>Status:</strong> {data.project?.status ?? "-"}</p>
-              <p><strong>Priority:</strong> {data.project?.priority ?? "-"}</p>
-              <p><strong>Budget:</strong> {normalizeBudget(data.project?.budget) || "-"}</p>
-              <p><strong>Description:</strong> {data.project?.description ?? "-"}</p>
-              <p>
-                <strong>Client:</strong>{" "}
-                {data.client ? `${data.client.name} (${data.client.company})` : "-"}
-              </p>
+              <div className="space-y-1 border p-3 rounded-lg bg-muted/10">
+                <p className="text-[10px] uppercase font-semibold text-muted-foreground">Name</p>
+                <p className="font-medium text-sm">{data.project?.name ?? "-"}</p>
+              </div>
+              <div className="space-y-1 border p-3 rounded-lg bg-muted/10">
+                <p className="text-[10px] uppercase font-semibold text-muted-foreground">Client</p>
+                <p className="font-medium text-sm">{data.client ? `${data.client.name} (${data.client.company})` : "-"}</p>
+              </div>
+              <div className="space-y-1 border p-3 rounded-lg bg-muted/10">
+                <p className="text-[10px] uppercase font-semibold text-muted-foreground">Status & Priority</p>
+                <p className="font-medium text-sm capitalize">{data.project?.status?.replace('_', ' ') ?? "-"} • {data.project?.priority ?? "-"}</p>
+              </div>
+              <div className="space-y-1 border p-3 rounded-lg bg-muted/10">
+                <p className="text-[10px] uppercase font-semibold text-muted-foreground">Category</p>
+                <p className="font-medium text-sm">{data.project?.category || "-"}</p>
+              </div>
+              <div className="space-y-1 border p-3 rounded-lg bg-muted/10">
+                <p className="text-[10px] uppercase font-semibold text-muted-foreground">Budget</p>
+                <p className="font-medium text-sm">{data.project?.currency || "AED"} {normalizeBudget(data.project?.budget) || "-"}</p>
+              </div>
+              <div className="space-y-1 border p-3 rounded-lg bg-muted/10">
+                <p className="text-[10px] uppercase font-semibold text-muted-foreground">Client Reference</p>
+                <p className="font-medium text-sm">{data.project?.clientReference || "-"}</p>
+              </div>
+              
+              <div className="sm:col-span-2 grid grid-cols-1 sm:grid-cols-3 gap-4 border p-3 rounded-lg bg-muted/10">
+                <div>
+                  <p className="text-[10px] uppercase font-semibold text-muted-foreground">Start Date</p>
+                  <p className="font-medium text-sm">{data.project?.startDate ? new Date(data.project.startDate).toLocaleDateString() : "-"}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] uppercase font-semibold text-muted-foreground">Target End Date</p>
+                  <p className="font-medium text-sm">{data.project?.targetEndDate ? new Date(data.project.targetEndDate).toLocaleDateString() : "-"}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] uppercase font-semibold text-muted-foreground">Actual End Date</p>
+                  <p className="font-medium text-sm">{data.project?.actualEndDate ? new Date(data.project.actualEndDate).toLocaleDateString() : "-"}</p>
+                </div>
+              </div>
+
+              <div className="sm:col-span-2 space-y-1 border p-3 rounded-lg bg-muted/10">
+                <p className="text-[10px] uppercase font-semibold text-muted-foreground">Description</p>
+                <p className="text-sm">{data.project?.description || "-"}</p>
+              </div>
+              <div className="sm:col-span-2 space-y-1 border p-3 rounded-lg bg-muted/10">
+                <p className="text-[10px] uppercase font-semibold text-muted-foreground">Internal Notes</p>
+                <p className="text-sm">{data.project?.notes || "-"}</p>
+              </div>
             </>
           )}
         </CardContent>

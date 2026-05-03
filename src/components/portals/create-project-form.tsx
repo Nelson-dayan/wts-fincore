@@ -23,6 +23,12 @@ export function CreateProjectForm() {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [budget, setBudget] = useState("");
+  const [currency, setCurrency] = useState("AED");
+  const [category, setCategory] = useState("");
+  const [clientReference, setClientReference] = useState("");
+  const [notes, setNotes] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [targetEndDate, setTargetEndDate] = useState("");
   const [clientQuery, setClientQuery] = useState("");
   const [clientId, setClientId] = useState("");
   const [clientLabel, setClientLabel] = useState("");
@@ -88,6 +94,12 @@ export function CreateProjectForm() {
           clientId,
           status,
           priority,
+          currency,
+          category,
+          clientReference,
+          notes,
+          startDate: startDate || undefined,
+          targetEndDate: targetEndDate || undefined,
           assignedTo: assignedToUserId ? [assignedToUserId] : [],
         }),
       });
@@ -120,11 +132,38 @@ export function CreateProjectForm() {
           </div>
           <div className="space-y-1">
             <Label htmlFor="project-budget">Budget</Label>
+            <div className="flex gap-2">
+              <Input
+                id="project-currency"
+                value={currency}
+                onChange={(e) => setCurrency(e.target.value)}
+                placeholder="AED"
+                className="w-24"
+              />
+              <Input
+                id="project-budget"
+                type="number"
+                value={budget}
+                onChange={(e) => setBudget(e.target.value)}
+                className="flex-1"
+              />
+            </div>
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="project-category">Category</Label>
             <Input
-              id="project-budget"
-              type="number"
-              value={budget}
-              onChange={(e) => setBudget(e.target.value)}
+              id="project-category"
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+              placeholder="e.g. Fixed Price, Retainer"
+            />
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="project-client-ref">Client Reference / PO</Label>
+            <Input
+              id="project-client-ref"
+              value={clientReference}
+              onChange={(e) => setClientReference(e.target.value)}
             />
           </div>
           <div className="space-y-1">
@@ -160,6 +199,24 @@ export function CreateProjectForm() {
               ]}
             />
           </div>
+          <div className="space-y-1">
+            <Label htmlFor="project-start-date">Start Date</Label>
+            <Input
+              id="project-start-date"
+              type="date"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+            />
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="project-target-date">Target End Date</Label>
+            <Input
+              id="project-target-date"
+              type="date"
+              value={targetEndDate}
+              onChange={(e) => setTargetEndDate(e.target.value)}
+            />
+          </div>
           <div className="space-y-1 sm:col-span-2">
             <Label htmlFor="project-assigned">Assigned To</Label>
             <Select
@@ -182,6 +239,15 @@ export function CreateProjectForm() {
               id="project-description"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
+            />
+          </div>
+          <div className="space-y-1 sm:col-span-2">
+            <Label htmlFor="project-notes">Internal Notes</Label>
+            <Input
+              id="project-notes"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Private notes about the project..."
             />
           </div>
           <div className="space-y-1 sm:col-span-2">
