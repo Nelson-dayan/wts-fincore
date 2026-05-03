@@ -51,8 +51,6 @@ export function AdminInvoiceDetailClient({
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState("");
   const [pdfExporting, setPdfExporting] = useState(false);
-  const [logoErr, setLogoErr] = useState("");
-  const logoInputRef = useRef<HTMLInputElement>(null);
   const [saveConfirmOpen, setSaveConfirmOpen] = useState(false);
 
   const load = useCallback(async () => {
@@ -274,30 +272,7 @@ export function AdminInvoiceDetailClient({
     });
   }
 
-  async function onLogoPicked(files: FileList | null) {
-    const f = files?.[0];
-    setLogoErr("");
-    if (!f || !item) return;
-    if (!/^image\/(png|jpe?g|webp)$/i.test(f.type)) {
-      setLogoErr("Use PNG, JPG, or WebP for the logo.");
-      return;
-    }
-    if (f.size > 2 * 1024 * 1024) {
-      setLogoErr("Logo must be under 2 MB.");
-      return;
-    }
-    try {
-      const dataUrl = await readImageFileAsDataUrl(f);
-      setItem({
-        ...item,
-        companySnapshot: { ...item.companySnapshot, logoUrl: dataUrl },
-      });
-    } catch {
-      setLogoErr("Could not read logo file.");
-    } finally {
-      if (logoInputRef.current) logoInputRef.current.value = "";
-    }
-  }
+
 
   if (loading && !error) {
     return <p className="text-muted-foreground text-sm">Loading…</p>;
@@ -342,8 +317,6 @@ export function AdminInvoiceDetailClient({
             extras={extras}
             bankAed={bankAed}
             bankUsd={bankUsd}
-            logoErr={logoErr}
-            logoInputRef={logoInputRef}
             taxLabelPreview={taxLabelPreview}
             liveTotals={liveTotals}
             saving={saving}
@@ -356,7 +329,6 @@ export function AdminInvoiceDetailClient({
             onAddLine={addLine}
             onRemoveLine={removeLine}
             onCopyBillToShip={copyBillToShip}
-            onPickLogo={onLogoPicked}
             onSave={() => setSaveConfirmOpen(true)}
             onDownloadPdf={() => void downloadPdf()}
           />

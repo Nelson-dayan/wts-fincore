@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { readFileAsPdfSafeDataUrl } from "@/lib/portals/read-file-as-pdf-safe-data-url";
+import { UploadCard } from "@/components/ui/upload-card";
 import { safeString } from "./helpers";
 import type { ClientForm } from "./types";
 
@@ -46,61 +46,16 @@ export function CreateClientCard({ form, saving, onFormChange, onSubmit }: Creat
               Upload client logo &amp; signature (optional)
             </p>
             <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-1.5">
-                <Label className="text-foreground/90">Upload client logo</Label>
-                <Input
-                  type="file"
-                  accept="image/*"
-                  className="h-11 cursor-pointer border-border/80 bg-background/60 file:mr-3 file:rounded-lg file:border-0 file:bg-primary/12 file:px-3 file:py-2 file:text-xs file:font-semibold file:text-primary hover:file:bg-primary/18"
-                  onChange={async (e) => {
-                    const file = e.target.files?.[0];
-                    if (!file) return;
-                    const text = await readFileAsPdfSafeDataUrl(file);
-                    onFormChange({ ...form, clientLogoText: text });
-                    e.target.value = "";
-                  }}
-                />
-                {form.clientLogoText ? (
-                  <div className="pt-1">
-                    {/* eslint-disable-next-line @next/next/no-img-element -- data URL preview */}
-                    <img
-                      src={form.clientLogoText}
-                      alt=""
-                      className="h-10 max-w-40 rounded-md border border-border object-contain"
-                    />
-                  </div>
-                ) : (
-                  <p className="text-xs text-muted-foreground">No image yet</p>
-                )}
-              </div>
-
-              <div className="space-y-1.5">
-                <Label className="text-foreground/90">Upload client signature</Label>
-                <Input
-                  type="file"
-                  accept="image/*"
-                  className="h-11 cursor-pointer border-border/80 bg-background/60 file:mr-3 file:rounded-lg file:border-0 file:bg-primary/12 file:px-3 file:py-2 file:text-xs file:font-semibold file:text-primary hover:file:bg-primary/18"
-                  onChange={async (e) => {
-                    const file = e.target.files?.[0];
-                    if (!file) return;
-                    const text = await readFileAsPdfSafeDataUrl(file);
-                    onFormChange({ ...form, clientSignatureText: text });
-                    e.target.value = "";
-                  }}
-                />
-                {form.clientSignatureText ? (
-                  <div className="pt-1">
-                    {/* eslint-disable-next-line @next/next/no-img-element -- data URL preview */}
-                    <img
-                      src={form.clientSignatureText}
-                      alt=""
-                      className="h-10 max-w-50 rounded-md border border-border object-contain object-left"
-                    />
-                  </div>
-                ) : (
-                  <p className="text-xs text-muted-foreground">No image yet</p>
-                )}
-              </div>
+              <UploadCard
+                label="Upload client logo"
+                value={form.clientLogoText}
+                onChange={(val) => onFormChange({ ...form, clientLogoText: val })}
+              />
+              <UploadCard
+                label="Upload client signature"
+                value={form.clientSignatureText}
+                onChange={(val) => onFormChange({ ...form, clientSignatureText: val })}
+              />
             </div>
           </div>
 

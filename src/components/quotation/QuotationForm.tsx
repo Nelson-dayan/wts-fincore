@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils/cn";
+import { UploadCard } from "@/components/ui/upload-card";
 import type { QuotationData, QuotationItem } from "@/types/quotation-generator";
 
 export type QuotationFormProps = {
@@ -55,67 +56,19 @@ export function QuotationForm({
     patch({ items: data.items.filter((_, i) => i !== index) });
   };
 
-  const onLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !file.type.startsWith("image/")) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      patch({ logo: reader.result as string });
-    };
-    reader.readAsDataURL(file);
-    e.target.value = "";
-  };
-
-  const clearLogo = () => patch({ logo: undefined });
-
-  const onBackgroundChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !file.type.startsWith("image/")) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      patch({ backgroundImage: reader.result as string });
-    };
-    reader.readAsDataURL(file);
-    e.target.value = "";
-  };
-
-  const clearBackground = () => patch({ backgroundImage: undefined });
-
   return (
     <Card className="mx-auto w-full max-w-4xl shrink-0 border-border/80 shadow-md">
       <CardHeader className="space-y-1">
         <CardTitle>{formTitle}</CardTitle>
       </CardHeader>
       <CardContent className="flex flex-col gap-6">
-        <fieldset className="grid gap-3 rounded-xl border border-border/80 bg-muted/25 p-4 text-left dark:bg-muted/15">
-          <div className="flex items-start gap-2">
-            <span className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg bg-background text-ring ring-1 ring-border/80">
-              <ImageUp className="size-4 opacity-80" aria-hidden />
-            </span>
-            <div className="min-w-0 flex-1 space-y-2 text-left">
-              <Label htmlFor="qg-logo">Upload logo</Label>
-              <Input
-                id="qg-logo"
-                type="file"
-                accept="image/png,image/jpeg,image/webp,image/svg+xml,image/*"
-                onChange={onLogoChange}
-                className="cursor-pointer file:mr-3 file:rounded-md file:border-0 file:bg-primary file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-primary-foreground hover:file:bg-primary/90"
-              />
-              {data.logo ? (
-                <div className="flex flex-wrap items-center gap-3 pt-1">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={data.logo}
-                    alt="Logo preview"
-                    className="h-14 w-auto max-w-50 object-contain"
-                  />
-                  <Button type="button" variant="outline" size="sm" onClick={clearLogo}>
-                    Remove logo
-                  </Button>
-                </div>
-              ) : null}
-            </div>
-          </div>
+        <fieldset className="grid gap-3 text-left">
+          <UploadCard
+            label="Upload logo"
+            value={data.logo}
+            onChange={(val) => patch({ logo: val || undefined })}
+            placeholder="PNG, JPG, SVG"
+          />
         </fieldset>
 
         <fieldset className="grid gap-4 text-left">
@@ -508,27 +461,12 @@ export function QuotationForm({
                   Use gradient background (disable for flat color)
                 </label>
                 <div className="grid gap-2">
-                  <Label htmlFor="qg-bg-image">Custom background image</Label>
-                  <Input
-                    id="qg-bg-image"
-                    type="file"
-                    accept="image/png,image/jpeg,image/webp,image/*"
-                    onChange={onBackgroundChange}
-                    className="cursor-pointer file:mr-3 file:rounded-md file:border-0 file:bg-primary file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-primary-foreground hover:file:bg-primary/90"
+                  <UploadCard
+                    label="Custom background image"
+                    value={data.backgroundImage}
+                    onChange={(val) => patch({ backgroundImage: val || undefined })}
+                    placeholder="PNG, JPG, WebP"
                   />
-                  {data.backgroundImage ? (
-                    <div className="flex flex-wrap items-center gap-3 pt-1">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={data.backgroundImage}
-                        alt="Background preview"
-                        className="h-16 w-auto max-w-60 rounded-lg border border-border bg-background object-cover p-1"
-                      />
-                      <Button type="button" variant="outline" size="sm" onClick={clearBackground}>
-                        Remove background
-                      </Button>
-                    </div>
-                  ) : null}
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="grid gap-2">

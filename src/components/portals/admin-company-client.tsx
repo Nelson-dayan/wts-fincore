@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
-import { readFileAsPdfSafeDataUrl } from "@/lib/portals/read-file-as-pdf-safe-data-url";
+import { UploadCard } from "@/components/ui/upload-card";
 import { readResponseJson } from "@/lib/http/read-response-json";
 
 type CompanyData = {
@@ -210,116 +210,19 @@ export function AdminCompanyClient() {
                     {/* Card Container */}
                     <div className="grid gap-5 sm:grid-cols-2">
 
-                      {/* LOGO CARD */}
-                      <div className="group relative rounded-xl border border-border/60 bg-card/70 p-4 shadow-sm backdrop-blur transition-all hover:border-primary/30 hover:shadow-md">
+                      <UploadCard
+                        label="Logo"
+                        value={primaryForm.logoText}
+                        onChange={(val) => setPrimaryForm((f) => ({ ...f, logoText: val }))}
+                        placeholder="Upload Logo (PNG, JPG max 2MB)"
+                      />
 
-                        <div className="mb-3 flex items-center justify-between">
-                          <Label className="text-xs font-medium text-foreground/80">
-                            Logo
-                          </Label>
-
-                          {primaryForm.logoText && (
-                            <span className="text-[10px] font-medium text-primary">
-                              Uploaded
-                            </span>
-                          )}
-                        </div>
-
-                        {/* Upload Area */}
-                        <label className="relative flex h-28 w-full cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed border-border/70 bg-background/50 transition hover:border-primary/40 hover:bg-primary/5">
-
-                          <Input
-                            type="file"
-                            accept="image/*"
-                            className="absolute inset-0 z-10 cursor-pointer opacity-0"
-                            onChange={async (e) => {
-                              const file = e.target.files?.[0];
-                              if (!file) return;
-                              const text = await readFileAsPdfSafeDataUrl(file);
-                              setPrimaryForm((f) => ({ ...f, logoText: text }));
-                              e.target.value = "";
-                            }}
-                          />
-
-                          {primaryForm.logoText ? (
-                            <img
-                              src={primaryForm.logoText}
-                              alt="Logo preview"
-                              className="h-12 max-w-[120px] object-contain"
-                            />
-                          ) : (
-                            <div className="text-center">
-                              <p className="text-xs font-medium text-foreground/80">
-                                Upload Logo
-                              </p>
-                              <p className="text-[11px] text-muted-foreground">
-                                PNG, JPG (max 2MB)
-                              </p>
-                            </div>
-                          )}
-                        </label>
-
-                        {!primaryForm.logoText && (
-                          <p className="mt-2 text-[11px] text-muted-foreground">
-                            Recommended: transparent background
-                          </p>
-                        )}
-                      </div>
-
-                      {/* SIGNATURE CARD */}
-                      <div className="group relative rounded-xl border border-border/60 bg-card/70 p-4 shadow-sm backdrop-blur transition-all hover:border-primary/30 hover:shadow-md">
-
-                        <div className="mb-3 flex items-center justify-between">
-                          <Label className="text-xs font-medium text-foreground/80">
-                            Signature
-                          </Label>
-
-                          {primaryForm.signatureText && (
-                            <span className="text-[10px] font-medium text-primary">
-                              Uploaded
-                            </span>
-                          )}
-                        </div>
-
-                        <label className="relative flex h-28 w-full cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed border-border/70 bg-background/50 transition hover:border-primary/40 hover:bg-primary/5">
-
-                          <Input
-                            type="file"
-                            accept="image/*"
-                            className="absolute inset-0 z-10 cursor-pointer opacity-0"
-                            onChange={async (e) => {
-                              const file = e.target.files?.[0];
-                              if (!file) return;
-                              const text = await readFileAsPdfSafeDataUrl(file);
-                              setPrimaryForm((f) => ({ ...f, signatureText: text }));
-                              e.target.value = "";
-                            }}
-                          />
-
-                          {primaryForm.signatureText ? (
-                            <img
-                              src={primaryForm.signatureText}
-                              alt="Signature preview"
-                              className="h-12 w-full object-contain object-left"
-                            />
-                          ) : (
-                            <div className="text-center">
-                              <p className="text-xs font-medium text-foreground/80">
-                                Upload Signature
-                              </p>
-                              <p className="text-[11px] text-muted-foreground">
-                                White background preferred
-                              </p>
-                            </div>
-                          )}
-                        </label>
-
-                        {!primaryForm.signatureText && (
-                          <p className="mt-2 text-[11px] text-muted-foreground">
-                            Used for invoices & approvals
-                          </p>
-                        )}
-                      </div>
+                      <UploadCard
+                        label="Signature"
+                        value={primaryForm.signatureText}
+                        onChange={(val) => setPrimaryForm((f) => ({ ...f, signatureText: val }))}
+                        placeholder="Upload Signature"
+                      />
 
                     </div>
                   </div>
