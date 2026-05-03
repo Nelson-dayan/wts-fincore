@@ -52,7 +52,7 @@ export async function PATCH(req: Request, ctx: Ctx) {
 
     const body = (await req.json()) as {
       invoiceNumber?: string;
-      status?: "unpaid" | "partial" | "paid" | "overdue";
+      status?: string;
       dueDate?: string;
       documentInfo?: Record<string, unknown>;
       clientSnapshot?: Record<string, unknown>;
@@ -85,8 +85,12 @@ export async function PATCH(req: Request, ctx: Ctx) {
       }
     }
 
-    if (body.status && ["unpaid", "partial", "paid", "overdue"].includes(body.status)) {
-      inv.status = body.status;
+    if (body.status) {
+      const s = String(body.status).toUpperCase();
+      if (s === "UNPAID") inv.status = "DRAFT";
+      else if (["DRAFT", "SENT", "PARTIAL", "PAID", "OVERDUE", "CANCELLED"].includes(s)) {
+        inv.status = s;
+      }
     }
 
     if (body.dueDate) {
@@ -179,6 +183,11 @@ export async function PATCH(req: Request, ctx: Ctx) {
         tax: toDecimal128(tax),
         total: toDecimal128(total),
       };
+      const exRate = inv.exchangeRate ? Number(inv.exchangeRate) : 1;
+      inv.totalAmountBase = toDecimal128(total * exRate);
+      if (inv.totalsCache) {
+        inv.totalsCache.totalIntendedBase = toDecimal128(total * exRate);
+      }
       if (inv.extras == null) {
         inv.set("extras", {});
       }
