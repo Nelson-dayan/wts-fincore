@@ -194,65 +194,135 @@ export function AdminCompanyClient() {
                 </div>
               </div>
 
-              <div>
-                <h3 className="mb-4 text-sm font-semibold text-foreground">Brand on PDFs</h3>
-                <div className="grid gap-5 sm:grid-cols-2">
-                  <div className="space-y-1.5">
-                    <Label className="text-foreground/90">Logo</Label>
-                    <Input
-                      type="file"
-                      accept="image/*"
-                      className="h-11 cursor-pointer border-border/80 bg-background/60 file:mr-3 file:rounded-lg file:border-0 file:bg-primary/12 file:px-3 file:py-2 file:text-xs file:font-semibold file:text-primary hover:file:bg-primary/18"
-                      onChange={async (e) => {
-                        const file = e.target.files?.[0];
-                        if (!file) return;
-                        const text = await readFileAsPdfSafeDataUrl(file);
-                        setPrimaryForm((f) => ({ ...f, logoText: text }));
-                        e.target.value = "";
-                      }}
-                    />
-                    {primaryForm.logoText ? (
-                      <div className="pt-2">
-                        {/* eslint-disable-next-line @next/next/no-img-element -- data URL */}
-                        <img
-                          src={primaryForm.logoText}
-                          alt="Logo preview"
-                          className="h-14 max-w-50 rounded-lg border border-border object-contain"
-                        />
+                  <div className="space-y-6">
+                    {/* Section Header */}
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h3 className="text-base font-semibold tracking-tight text-foreground">
+                          Brand Assets
+                        </h3>
+                        <p className="text-xs text-muted-foreground">
+                          These will appear on generated PDFs and documents
+                        </p>
                       </div>
-                    ) : (
-                      <p className="text-xs text-muted-foreground">No logo on file</p>
-                    )}
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-foreground/90">Signature image</Label>
-                    <Input
-                      type="file"
-                      accept="image/*"
-                      className="h-11 cursor-pointer border-border/80 bg-background/60 file:mr-3 file:rounded-lg file:border-0 file:bg-primary/12 file:px-3 file:py-2 file:text-xs file:font-semibold file:text-primary hover:file:bg-primary/18"
-                      onChange={async (e) => {
-                        const file = e.target.files?.[0];
-                        if (!file) return;
-                        const text = await readFileAsPdfSafeDataUrl(file);
-                        setPrimaryForm((f) => ({ ...f, signatureText: text }));
-                        e.target.value = "";
-                      }}
-                    />
-                    {primaryForm.signatureText ? (
-                      <div className="pt-2">
-                        {/* eslint-disable-next-line @next/next/no-img-element -- data URL */}
-                        <img
-                          src={primaryForm.signatureText}
-                          alt="Signature preview"
-                          className="h-14 max-w-55 rounded-lg border border-border object-contain object-left"
-                        />
+                    </div>
+
+                    {/* Card Container */}
+                    <div className="grid gap-5 sm:grid-cols-2">
+
+                      {/* LOGO CARD */}
+                      <div className="group relative rounded-xl border border-border/60 bg-card/70 p-4 shadow-sm backdrop-blur transition-all hover:border-primary/30 hover:shadow-md">
+
+                        <div className="mb-3 flex items-center justify-between">
+                          <Label className="text-xs font-medium text-foreground/80">
+                            Logo
+                          </Label>
+
+                          {primaryForm.logoText && (
+                            <span className="text-[10px] font-medium text-primary">
+                              Uploaded
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Upload Area */}
+                        <label className="relative flex h-28 w-full cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed border-border/70 bg-background/50 transition hover:border-primary/40 hover:bg-primary/5">
+
+                          <Input
+                            type="file"
+                            accept="image/*"
+                            className="absolute inset-0 z-10 cursor-pointer opacity-0"
+                            onChange={async (e) => {
+                              const file = e.target.files?.[0];
+                              if (!file) return;
+                              const text = await readFileAsPdfSafeDataUrl(file);
+                              setPrimaryForm((f) => ({ ...f, logoText: text }));
+                              e.target.value = "";
+                            }}
+                          />
+
+                          {primaryForm.logoText ? (
+                            <img
+                              src={primaryForm.logoText}
+                              alt="Logo preview"
+                              className="h-12 max-w-[120px] object-contain"
+                            />
+                          ) : (
+                            <div className="text-center">
+                              <p className="text-xs font-medium text-foreground/80">
+                                Upload Logo
+                              </p>
+                              <p className="text-[11px] text-muted-foreground">
+                                PNG, JPG (max 2MB)
+                              </p>
+                            </div>
+                          )}
+                        </label>
+
+                        {!primaryForm.logoText && (
+                          <p className="mt-2 text-[11px] text-muted-foreground">
+                            Recommended: transparent background
+                          </p>
+                        )}
                       </div>
-                    ) : (
-                      <p className="text-xs text-muted-foreground">No signature on file</p>
-                    )}
+
+                      {/* SIGNATURE CARD */}
+                      <div className="group relative rounded-xl border border-border/60 bg-card/70 p-4 shadow-sm backdrop-blur transition-all hover:border-primary/30 hover:shadow-md">
+
+                        <div className="mb-3 flex items-center justify-between">
+                          <Label className="text-xs font-medium text-foreground/80">
+                            Signature
+                          </Label>
+
+                          {primaryForm.signatureText && (
+                            <span className="text-[10px] font-medium text-primary">
+                              Uploaded
+                            </span>
+                          )}
+                        </div>
+
+                        <label className="relative flex h-28 w-full cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed border-border/70 bg-background/50 transition hover:border-primary/40 hover:bg-primary/5">
+
+                          <Input
+                            type="file"
+                            accept="image/*"
+                            className="absolute inset-0 z-10 cursor-pointer opacity-0"
+                            onChange={async (e) => {
+                              const file = e.target.files?.[0];
+                              if (!file) return;
+                              const text = await readFileAsPdfSafeDataUrl(file);
+                              setPrimaryForm((f) => ({ ...f, signatureText: text }));
+                              e.target.value = "";
+                            }}
+                          />
+
+                          {primaryForm.signatureText ? (
+                            <img
+                              src={primaryForm.signatureText}
+                              alt="Signature preview"
+                              className="h-12 w-full object-contain object-left"
+                            />
+                          ) : (
+                            <div className="text-center">
+                              <p className="text-xs font-medium text-foreground/80">
+                                Upload Signature
+                              </p>
+                              <p className="text-[11px] text-muted-foreground">
+                                White background preferred
+                              </p>
+                            </div>
+                          )}
+                        </label>
+
+                        {!primaryForm.signatureText && (
+                          <p className="mt-2 text-[11px] text-muted-foreground">
+                            Used for invoices & approvals
+                          </p>
+                        )}
+                      </div>
+
+                    </div>
                   </div>
-                </div>
-              </div>
 
               <div>
                 <h3 className="mb-4 flex items-center gap-2 text-sm font-semibold text-foreground">
