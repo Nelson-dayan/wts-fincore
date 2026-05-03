@@ -63,13 +63,14 @@ export function QuotationStatusEditor({
     <div
       className={cn(
         "flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end",
-        (variant === "banner" || variant === "inline") && "sm:items-center"
+        (variant === "banner" || variant === "inline") && "sm:items-center",
+        variant === "inline" && "flex-row flex-nowrap items-center gap-2 sm:flex-nowrap"
       )}
     >
       <div
         className={cn(
           "grid min-w-[11rem] gap-2",
-          variant === "inline" && "min-w-0 flex-1 sm:min-w-[8.5rem]"
+          variant === "inline" && "min-w-0 flex-1 sm:min-w-[9.5rem]"
         )}
       >
         {variant !== "inline" ? (
@@ -84,7 +85,7 @@ export function QuotationStatusEditor({
           options={STATUS_OPTIONS}
           className={cn(
             variant === "banner" && "h-10 bg-background",
-            variant === "inline" && "h-8 text-xs"
+            variant === "inline" && "h-9 text-sm"
           )}
           aria-label="Quotation status"
         />
@@ -97,7 +98,7 @@ export function QuotationStatusEditor({
         className={cn(
           "w-full sm:w-auto",
           variant === "banner" && "h-10 rounded-xl",
-          variant === "inline" && "shrink-0"
+          variant === "inline" && "w-auto shrink-0"
         )}
       >
         {saving ? "…" : "Update"}
@@ -119,19 +120,8 @@ export function QuotationStatusEditor({
 
   if (variant === "inline") {
     return (
-      <div className="min-w-[12rem] max-w-[16rem]" onClick={(e) => e.stopPropagation()}>
+      <div className="min-w-[14rem] max-w-[18rem]" onClick={(e) => e.stopPropagation()}>
         {inner}
-        {msg ? (
-          <p
-            className={cn(
-              "mt-1 text-xs",
-              msg === "Status updated." ? "text-emerald-600 dark:text-emerald-400" : "text-destructive"
-            )}
-            role="status"
-          >
-            {msg}
-          </p>
-        ) : null}
       </div>
     );
   }

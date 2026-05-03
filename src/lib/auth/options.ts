@@ -5,12 +5,20 @@ import { UserModel } from "@/lib/db/models";
 import { verifyPassword } from "@/lib/auth/password";
 import GoogleProvider from "next-auth/providers/google";
 
+const googleClientId = process.env.GOOGLE_CLIENT_ID?.trim();
+const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET?.trim();
+const hasGoogleAuth = Boolean(googleClientId && googleClientSecret);
+
 export const authOptions: NextAuthOptions = {
   providers: [
-    GoogleProvider({
-      clientId: process.env.GOOGLE_CLIENT_ID as string,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET as string,
-    }),
+    ...(hasGoogleAuth
+      ? [
+          GoogleProvider({
+            clientId: googleClientId as string,
+            clientSecret: googleClientSecret as string,
+          }),
+        ]
+      : []),
     CredentialsProvider({
       name: "credentials",
       credentials: {
@@ -45,7 +53,7 @@ export const authOptions: NextAuthOptions = {
   secret: process.env.NEXTAUTH_SECRET,
   callbacks: {
     async signIn({ user, account }) {
-      if (account?.provider === "google") {
+      if (account?.provider === "google" && hasGoogleAuth) {
         await connectDB();
         const existingUser = await UserModel.findOne({ email: user.email?.trim().toLowerCase() });
         if (!existingUser || !existingUser.isActive) {
@@ -55,7 +63,7 @@ export const authOptions: NextAuthOptions = {
       return true;
     },
     async jwt({ token, user, account }) {
-      if (account?.provider === "google") {
+      if (account?.provider === "google" && hasGoogleAuth) {
         await connectDB();
         const dbUser = await UserModel.findOne({ email: user.email?.trim().toLowerCase() });
         if (dbUser) {

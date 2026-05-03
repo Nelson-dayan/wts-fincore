@@ -1,7 +1,8 @@
 import * as React from "react";
+import { ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 
-type Option = {
+export type DropdownOption = {
   value: string;
   label: string;
 };
@@ -11,13 +12,15 @@ export function Select({
   options,
   ...props
 }: React.SelectHTMLAttributes<HTMLSelectElement> & {
-  options: Option[];
+  options: DropdownOption[];
 }) {
   return (
     <div className="relative">
       <select
         className={cn(
-          "h-9 w-full appearance-none rounded-xl border border-border bg-background px-3 pr-9 text-sm shadow-sm transition-colors focus:border-primary/40 focus:outline-none",
+          "h-10 w-full appearance-none rounded-lg border border-input bg-background/60 px-3.5 pr-9 text-sm shadow-sm transition-all duration-200",
+          "hover:border-border focus:border-ring/60 focus:bg-background",
+          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:ring-offset-0",
           className
         )}
         {...props}
@@ -28,9 +31,13 @@ export function Select({
           </option>
         ))}
       </select>
-      <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-xs text-muted-foreground">
-        ▼
-      </span>
+      <ChevronDown
+        className="pointer-events-none absolute inset-y-0 right-3 my-auto size-4 text-muted-foreground"
+        aria-hidden
+      />
     </div>
   );
 }
+
+// "Dropdown" alias for consistent naming across the app.
+export const Dropdown = Select;

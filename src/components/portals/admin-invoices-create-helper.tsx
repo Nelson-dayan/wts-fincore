@@ -8,6 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Dropdown } from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   invoiceCountAtOrOverCap,
   MAX_INVOICES_PER_PURCHASE_ORDER,
@@ -16,7 +18,14 @@ import { readResponseJson } from "@/lib/http/read-response-json";
 
 type PoRow = { _id: string; poNumber: string; quotationNumber?: string };
 
-export function AdminInvoicesCreateHelper({ projectId }: { projectId: string }) {
+export function AdminInvoicesCreateHelper({
+  projectId,
+  /** When true, hides “Back to project” (e.g. helper is already on the project page). */
+  embedded = false,
+}: {
+  projectId: string;
+  embedded?: boolean;
+}) {
   const router = useRouter();
   const [pos, setPos] = useState<PoRow[]>([]);
   const [loadingPo, setLoadingPo] = useState(true);
@@ -28,6 +37,7 @@ export function AdminInvoicesCreateHelper({ projectId }: { projectId: string }) 
   const loadPos = useCallback(async () => {
     setLoadingPo(true);
     setPoError("");
+    const startedAt = Date.now();
     try {
       const qs = new URLSearchParams({ page: "1", limit: "25", q: "" });
       if (projectId) qs.set("projectId", projectId);
@@ -60,6 +70,11 @@ export function AdminInvoicesCreateHelper({ projectId }: { projectId: string }) 
       setPoError(e instanceof Error ? e.message : "Could not load POs");
       setPos([]);
     } finally {
+      const elapsed = Date.now() - startedAt;
+      const minSkeletonMs = 320;
+      if (elapsed < minSkeletonMs) {
+        await new Promise((resolve) => setTimeout(resolve, minSkeletonMs - elapsed));
+      }
       setLoadingPo(false);
     }
   }, [projectId]);
@@ -96,7 +111,7 @@ export function AdminInvoicesCreateHelper({ projectId }: { projectId: string }) 
               All purchase orders
             </Link>
           </Button>
-          {projectId ? (
+          {projectId && !embedded ? (
             <Button size="sm" variant="outline" asChild>
               <Link href={`/admin/projects/${encodeURIComponent(projectId)}`}>Back to project</Link>
             </Button>
@@ -110,7 +125,14 @@ export function AdminInvoicesCreateHelper({ projectId }: { projectId: string }) 
         ) : null}
 
         {loadingPo ? (
-          <p className="text-muted-foreground text-sm">Loading purchase orders…</p>
+          <div className="space-y-2.5">
+            <Skeleton className="h-4 w-36" />
+            <div className="flex flex-col gap-2.5 sm:flex-row sm:items-end">
+              <Skeleton className="h-10 w-full sm:max-w-md" />
+              <Skeleton className="h-10 w-36" />
+            </div>
+            <Skeleton className="h-3 w-44" />
+          </div>
         ) : pos.length === 0 ? (
           <p className="text-muted-foreground text-sm">
             No purchase orders yet. Open a{" "}
@@ -120,50 +142,48 @@ export function AdminInvoicesCreateHelper({ projectId }: { projectId: string }) 
             and create a PO from there first.
           </p>
         ) : (
-          <div className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
-            <div className="space-y-1.5">
-              <Label htmlFor="inv-po-pick">Purchase order</Label>
-              <select
-                id="inv-po-pick"
-                value={selectedPoId}
-                onChange={(e) => setSelectedPoId(e.target.value)}
-                className="flex h-10 w-full rounded-lg border border-input/90 bg-background px-3 text-sm"
+          <div className="space-y-1.5">
+            <div className="flex flex-col gap-2.5 sm:flex-row sm:items-end">
+              <div className="w-full max-w-full sm:max-w-md sm:flex-1">
+                <Label htmlFor="inv-po-pick">Purchase order</Label>
+                <Dropdown
+                  id="inv-po-pick"
+                  value={selectedPoId}
+                  onChange={(e) => setSelectedPoId(e.target.value)}
+                  className="mt-1.5"
+                  options={pos.map((p) => {
+                    const n = invoiceCounts[p._id];
+                    const cap =
+                      typeof n === "number" &&
+                      MAX_INVOICES_PER_PURCHASE_ORDER != null &&
+                      invoiceCountAtOrOverCap(n)
+                        ? " (full)"
+                        : "";
+                    return {
+                      value: p._id,
+                      label: `${p.poNumber}${p.quotationNumber ? ` · ${p.quotationNumber}` : ""}${cap}`,
+                    };
+                  })}
+                />
+              </div>
+              <Button
+                type="button"
+                className="shrink-0 sm:self-end"
+                disabled={!selectedPoId || atCapSelected}
+                onClick={() => goCreate(selectedPoId)}
               >
-                {pos.map((p) => {
-                  const n = invoiceCounts[p._id];
-                  const cap =
-                    typeof n === "number" &&
-                    MAX_INVOICES_PER_PURCHASE_ORDER != null &&
-                    invoiceCountAtOrOverCap(n)
-                      ? " (full)"
-                      : "";
-                  return (
-                    <option key={p._id} value={p._id}>
-                      {p.poNumber}
-                      {p.quotationNumber ? ` · ${p.quotationNumber}` : ""}
-                      {cap}
-                    </option>
-                  );
-                })}
-              </select>
-              {selectedPoId ? (
-                <p className="text-muted-foreground text-[0.75rem]">
-                  {selectedCount} invoice(s) on this PO
-                  {MAX_INVOICES_PER_PURCHASE_ORDER != null
-                    ? ` (max ${MAX_INVOICES_PER_PURCHASE_ORDER}).`
-                    : "."}
-                  {atCapSelected ? " Limit reached — choose another PO." : ""}
-                </p>
-              ) : null}
+                Create invoice
+              </Button>
             </div>
-            <Button
-              type="button"
-              className="w-full sm:w-auto"
-              disabled={!selectedPoId || atCapSelected}
-              onClick={() => goCreate(selectedPoId)}
-            >
-              Create invoice
-            </Button>
+            {selectedPoId ? (
+              <p className="text-muted-foreground text-[0.75rem]">
+                {selectedCount} invoice(s) on this PO
+                {MAX_INVOICES_PER_PURCHASE_ORDER != null
+                  ? ` (max ${MAX_INVOICES_PER_PURCHASE_ORDER}).`
+                  : "."}
+                {atCapSelected ? " Limit reached — choose another PO." : ""}
+              </p>
+            ) : null}
           </div>
         )}
 
@@ -176,10 +196,11 @@ export function AdminInvoicesCreateHelper({ projectId }: { projectId: string }) 
               placeholder="e.g. 507f1f77bcf86cd799439011"
               value={manualPoId}
               onChange={(e) => setManualPoId(e.target.value)}
-              className="font-mono text-sm sm:max-w-md"
+              className="font-mono text-sm sm:max-w-sm"
             />
             <Button
               type="button"
+              size="sm"
               variant="secondary"
               disabled={!manualPoId.trim()}
               onClick={() => goCreate(manualPoId)}

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { FileSpreadsheet, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   invoiceCountAtOrOverCap,
   MAX_INVOICES_PER_PURCHASE_ORDER,
@@ -109,7 +110,11 @@ export function PurchaseOrderInvoicesSection({
           </Button>
         ) : null}
         {loading ? (
-          <p className="text-muted-foreground text-sm">Loading invoices…</p>
+          <div className="space-y-2.5">
+            <Skeleton className="h-9 w-52" />
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-10 w-full" />
+          </div>
         ) : rows.length === 0 ? (
           <p className="text-muted-foreground text-sm">
             No invoices yet. Use <strong className="text-foreground">New invoice from this PO</strong> — the

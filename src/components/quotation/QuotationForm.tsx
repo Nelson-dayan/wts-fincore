@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Dropdown } from "@/components/ui/select";
 import { cn } from "@/lib/utils/cn";
 import type { QuotationData, QuotationItem } from "@/types/quotation-generator";
 
@@ -366,21 +367,22 @@ export function QuotationForm({
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div className="grid gap-2">
                     <Label htmlFor="qg-page-format">Paper format</Label>
-                    <select
+                    <Dropdown
                       id="qg-page-format"
                       value={data.pageFormat}
                       onChange={(e) =>
                         patch({ pageFormat: e.target.value as QuotationData["pageFormat"] })
                       }
-                      className="h-10 rounded-lg border border-input/90 bg-background px-3 text-sm"
-                    >
-                      <option value="a4">A4</option>
-                      <option value="letter">Letter</option>
-                    </select>
+                      className="h-10 rounded-lg border-input/90 bg-background text-sm"
+                      options={[
+                        { value: "a4", label: "A4" },
+                        { value: "letter", label: "Letter" },
+                      ]}
+                    />
                   </div>
                   <div className="grid gap-2">
                     <Label htmlFor="qg-page-orientation">Orientation</Label>
-                    <select
+                    <Dropdown
                       id="qg-page-orientation"
                       value={data.pageOrientation}
                       onChange={(e) =>
@@ -389,11 +391,12 @@ export function QuotationForm({
                             e.target.value as QuotationData["pageOrientation"],
                         })
                       }
-                      className="h-10 rounded-lg border border-input/90 bg-background px-3 text-sm"
-                    >
-                      <option value="landscape">Landscape</option>
-                      <option value="portrait">Portrait</option>
-                    </select>
+                      className="h-10 rounded-lg border-input/90 bg-background text-sm"
+                      options={[
+                        { value: "landscape", label: "Landscape" },
+                        { value: "portrait", label: "Portrait" },
+                      ]}
+                    />
                   </div>
                 </div>
               </div>
@@ -405,22 +408,23 @@ export function QuotationForm({
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div className="grid gap-2">
                     <Label htmlFor="qg-logo-align">Logo position (all pages)</Label>
-                    <select
+                    <Dropdown
                       id="qg-logo-align"
                       value={data.logoAlign}
                       onChange={(e) =>
                         patch({ logoAlign: e.target.value as QuotationData["logoAlign"] })
                       }
-                      className="h-10 rounded-lg border border-input/90 bg-background px-3 text-sm"
-                    >
-                      <option value="left">Left</option>
-                      <option value="center">Center</option>
-                      <option value="right">Right</option>
-                    </select>
+                      className="h-10 rounded-lg border-input/90 bg-background text-sm"
+                      options={[
+                        { value: "left", label: "Left" },
+                        { value: "center", label: "Center" },
+                        { value: "right", label: "Right" },
+                      ]}
+                    />
                   </div>
                   <div className="grid gap-2">
                     <Label htmlFor="qg-table-block-align">Page 2 — cost table block</Label>
-                    <select
+                    <Dropdown
                       id="qg-table-block-align"
                       value={data.tableBlockAlign}
                       onChange={(e) =>
@@ -428,48 +432,51 @@ export function QuotationForm({
                           tableBlockAlign: e.target.value as QuotationData["tableBlockAlign"],
                         })
                       }
-                      className="h-10 rounded-lg border border-input/90 bg-background px-3 text-sm"
-                    >
-                      <option value="left">Left</option>
-                      <option value="center">Center</option>
-                      <option value="right">Right</option>
-                    </select>
+                      className="h-10 rounded-lg border-input/90 bg-background text-sm"
+                      options={[
+                        { value: "left", label: "Left" },
+                        { value: "center", label: "Center" },
+                        { value: "right", label: "Right" },
+                      ]}
+                    />
                   </div>
                 </div>
                 <div className="grid gap-3 sm:grid-cols-3">
                   <div className="grid gap-2">
                     <Label htmlFor="qg-align-cover">Cover</Label>
-                    <select
+                    <Dropdown
                       id="qg-align-cover"
                       value={data.coverTextAlign}
                       onChange={(e) =>
                         patch({ coverTextAlign: e.target.value as QuotationData["coverTextAlign"] })
                       }
-                      className="h-10 rounded-lg border border-input/90 bg-background px-3 text-sm"
-                    >
-                      <option value="left">Left</option>
-                      <option value="center">Center</option>
-                      <option value="right">Right</option>
-                    </select>
+                      className="h-10 rounded-lg border-input/90 bg-background text-sm"
+                      options={[
+                        { value: "left", label: "Left" },
+                        { value: "center", label: "Center" },
+                        { value: "right", label: "Right" },
+                      ]}
+                    />
                   </div>
                   <div className="grid gap-2">
                     <Label htmlFor="qg-align-page2">Page 2 title/intro</Label>
-                    <select
+                    <Dropdown
                       id="qg-align-page2"
                       value={data.page2TextAlign}
                       onChange={(e) =>
                         patch({ page2TextAlign: e.target.value as QuotationData["page2TextAlign"] })
                       }
-                      className="h-10 rounded-lg border border-input/90 bg-background px-3 text-sm"
-                    >
-                      <option value="left">Left</option>
-                      <option value="center">Center</option>
-                      <option value="right">Right</option>
-                    </select>
+                      className="h-10 rounded-lg border-input/90 bg-background text-sm"
+                      options={[
+                        { value: "left", label: "Left" },
+                        { value: "center", label: "Center" },
+                        { value: "right", label: "Right" },
+                      ]}
+                    />
                   </div>
                   <div className="grid gap-2">
                     <Label htmlFor="qg-align-contact">Contact block</Label>
-                    <select
+                    <Dropdown
                       id="qg-align-contact"
                       value={data.contactTextAlign}
                       onChange={(e) =>
@@ -477,12 +484,13 @@ export function QuotationForm({
                           contactTextAlign: e.target.value as QuotationData["contactTextAlign"],
                         })
                       }
-                      className="h-10 rounded-lg border border-input/90 bg-background px-3 text-sm"
-                    >
-                      <option value="left">Left</option>
-                      <option value="center">Center</option>
-                      <option value="right">Right</option>
-                    </select>
+                      className="h-10 rounded-lg border-input/90 bg-background text-sm"
+                      options={[
+                        { value: "left", label: "Left" },
+                        { value: "center", label: "Center" },
+                        { value: "right", label: "Right" },
+                      ]}
+                    />
                   </div>
                 </div>
               </div>

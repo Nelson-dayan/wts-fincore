@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Building2, Landmark, Loader2, Percent, Save } from "lucide-react";
 import { DashboardPageHeader } from "@/components/dashboard/page-header";
 import { Button } from "@/components/ui/button";
@@ -29,6 +30,7 @@ function s(v: string | undefined | null): string {
 }
 
 export function AdminCompanyClient() {
+  const router = useRouter();
   const [primaryForm, setPrimaryForm] = useState<CompanyData>({
     name: "",
     address: "",
@@ -90,6 +92,7 @@ export function AdminCompanyClient() {
       setMessageOk(true);
       setMessage("Saved. Quotations and PDFs will use these details.");
       await loadPrimary({ quiet: true });
+      router.refresh();
     } catch (e) {
       setMessageOk(false);
       setMessage(e instanceof Error ? e.message : "Failed to update");

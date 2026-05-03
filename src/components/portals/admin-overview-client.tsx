@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import type { LucideIcon } from "lucide-react";
 import {
   Activity,
+  ArrowUpRight,
   Building2,
   ClipboardList,
   CreditCard,
@@ -54,18 +56,28 @@ const metricMeta: Record<MetricKey, { label: string; icon: LucideIcon }> = {
 const sections: Array<{
   id: string;
   title: string;
+  description: string;
   keys: MetricKey[];
 }> = [
   {
     id: "organization",
     title: "Organization",
+    description: "Team, client, project and audit coverage.",
     keys: ["users", "clients", "projects", "activityLogs"],
   },
   {
     id: "commercial",
     title: "Commercial and billing",
+    description: "Pipeline and money movement across documents.",
     keys: ["quotations", "purchaseOrders", "invoices", "payments", "expenses"],
   },
+];
+
+const quickLinks: Array<{ href: string; label: string }> = [
+  { href: "/admin/projects", label: "Projects" },
+  { href: "/admin/quotations", label: "Quotations" },
+  { href: "/admin/invoices", label: "Invoices" },
+  { href: "/admin/expenses", label: "Expenses" },
 ];
 
 function formatCount(n: number): string {
@@ -108,12 +120,55 @@ export function AdminOverviewClient() {
         </div>
       ) : null}
 
+      <section className="mb-7 grid gap-4 md:grid-cols-3">
+        <Card className="dashboard-stat-card md:col-span-2">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base font-semibold">Operations summary</CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-3 sm:grid-cols-3">
+            <div className="rounded-xl border border-border/60 bg-background/65 px-3 py-3">
+              <p className="text-xs uppercase tracking-wide text-muted-foreground">Active projects</p>
+              <p className="mt-1 text-2xl font-semibold tabular-nums">{formatCount(data?.projects ?? 0)}</p>
+            </div>
+            <div className="rounded-xl border border-border/60 bg-background/65 px-3 py-3">
+              <p className="text-xs uppercase tracking-wide text-muted-foreground">Open invoices</p>
+              <p className="mt-1 text-2xl font-semibold tabular-nums">{formatCount(data?.invoices ?? 0)}</p>
+            </div>
+            <div className="rounded-xl border border-border/60 bg-background/65 px-3 py-3">
+              <p className="text-xs uppercase tracking-wide text-muted-foreground">Payments logged</p>
+              <p className="mt-1 text-2xl font-semibold tabular-nums">{formatCount(data?.payments ?? 0)}</p>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="dashboard-stat-card">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base font-semibold">Quick actions</CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-2">
+            {quickLinks.map((item) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                className="inline-flex items-center justify-between rounded-lg border border-border/65 bg-background/65 px-3 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-accent/60"
+              >
+                {item.label}
+                <ArrowUpRight className="size-3.5 text-muted-foreground" aria-hidden />
+              </Link>
+            ))}
+          </CardContent>
+        </Card>
+      </section>
+
       <div className="flex flex-col gap-9 md:gap-11">
         {sections.map((section) => (
           <section key={section.id} aria-labelledby={`dash-section-${section.id}`}>
-            <h2 id={`dash-section-${section.id}`} className="dashboard-section-label">
-              {section.title}
-            </h2>
+            <div className="mb-3">
+              <h2 id={`dash-section-${section.id}`} className="dashboard-section-label">
+                {section.title}
+              </h2>
+              <p className="mt-1 text-sm text-muted-foreground">{section.description}</p>
+            </div>
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
               {section.keys.map((key) => {
                 const meta = metricMeta[key];
@@ -135,6 +190,9 @@ export function AdminOverviewClient() {
                     <CardContent>
                       <p className="text-3xl font-semibold tabular-nums tracking-tight text-foreground">
                         {data != null ? formatCount(count) : "—"}
+                      </p>
+                      <p className="mt-1.5 text-xs text-muted-foreground">
+                        {count === 0 ? "No records right now" : "Updated from live data"}
                       </p>
                     </CardContent>
                   </Card>

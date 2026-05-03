@@ -274,7 +274,7 @@ export function AdminProjectsClient({ initialClientId = "" }: { initialClientId?
                         })}
                       </td>
                       <td className="px-0 py-3.5 pr-5 text-right">
-                        <Button size="sm" variant="secondary" className="h-8 rounded-lg px-2.5" asChild>
+                        <Button size="sm" variant="secondary" className="rounded-lg px-2.5" asChild>
                           <Link href={`/admin/projects/${project._id}`}>
                             <ExternalLink className="size-3.5" aria-hidden />
                             <span className="sr-only sm:not-sr-only sm:ml-1.5 sm:text-xs">Open</span>

@@ -25,7 +25,7 @@ export function PortalNavLink({
     <Link
       href={href}
       className={cn(
-        "relative inline-flex shrink-0 items-center rounded-xl px-3 py-2 text-sm font-medium tracking-tight outline-none transition-[transform,box-shadow,background-color,color] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)]",
+        "relative inline-flex shrink-0 cursor-pointer items-center rounded-xl px-3 py-2 text-sm font-medium tracking-tight outline-none transition-[transform,box-shadow,background-color,color] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)]",
         "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background motion-reduce:transition-none",
         active
           ? [

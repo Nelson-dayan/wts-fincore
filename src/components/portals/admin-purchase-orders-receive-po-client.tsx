@@ -6,6 +6,8 @@ import { useRouter } from "next/navigation";
 import { Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dropdown } from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
 import { readResponseJson } from "@/lib/http/read-response-json";
 
 type QRow = {
@@ -130,7 +132,10 @@ export function AdminPurchaseOrdersReceivePoClient({
       </CardHeader>
       <CardContent className="space-y-3">
         {loadingQ ? (
-          <p className="text-muted-foreground text-sm">Loading…</p>
+          <div className="space-y-2.5">
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-16 w-full" />
+          </div>
         ) : qError ? (
           <p className="text-destructive text-sm">{qError}</p>
         ) : quotations.length === 0 ? (
@@ -142,91 +147,75 @@ export function AdminPurchaseOrdersReceivePoClient({
             .
           </p>
         ) : (
-          <div className="overflow-x-auto rounded-xl border border-emerald-500/35 bg-background/70 shadow-sm dark:bg-background/40">
-            <table className="w-full min-w-160 text-left text-sm">
-              <caption className="sr-only">
-                New purchase order: select quotation, upload PDF, save
-              </caption>
-              <thead>
-                <tr className="border-b border-border/80 bg-muted/45 text-[0.7rem] font-semibold uppercase tracking-wide text-muted-foreground dark:bg-muted/25">
-                  <th scope="col" className="px-3 py-3 text-foreground">
-                    Quotation
-                  </th>
-                  <th scope="col" className="px-3 py-3 text-foreground min-w-50">
-                    Upload PDF / image
-                  </th>
-                  <th scope="col" className="px-3 py-3 text-right text-foreground w-32">
-                    Action
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr className="align-middle border-b border-border/50">
-                  <td className="px-3 py-3">
-                    <label htmlFor="recv-q" className="sr-only">
-                      Kaun si quotation
-                    </label>
-                    <select
-                      id="recv-q"
-                      value={quotationId}
-                      onChange={(e) => setQuotationId(e.target.value)}
-                      className="flex h-10 w-full min-w-50 rounded-lg border border-input/90 bg-background px-3 text-sm"
-                    >
-                      {quotations.map((q) => (
-                        <option key={q._id} value={q._id}>
-                          {q.quotationNumber} · {q.status}
-                          {q.projectName ? ` · ${q.projectName}` : ""}
-                        </option>
-                      ))}
-                    </select>
-                  </td>
-                  <td className="px-3 py-3">
-                    {/*
-                      Styled &lt;input type="file"&gt; often fails to open the OS picker on Windows/Edge.
-                      Hidden input + button calling .click() is reliable.
-                    */}
-                    <input
-                      key={fileKey}
-                      ref={fileInputRef}
-                      id="recv-file"
-                      type="file"
-                      className="sr-only"
-                      accept=".pdf,application/pdf,image/png,image/jpeg,image/jpg,image/pjpeg,image/webp,.png,.jpg,.jpeg,.webp"
-                      onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-                    />
-                    <div className="flex max-w-60 flex-col gap-2">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="w-full justify-center"
-                        onClick={() => fileInputRef.current?.click()}
-                      >
-                        Choose file
-                      </Button>
-                      <p
-                        className="text-muted-foreground truncate text-[0.7rem] leading-tight"
-                        title={file?.name ?? undefined}
-                      >
-                        {file ? file.name : "No file selected"}
-                      </p>
-                    </div>
-                  </td>
-                  <td className="px-3 py-3 text-right">
-                    <Button
-                      type="button"
-                      size="sm"
-                      disabled={submitting || !quotationId || !file}
-                      className="gap-1.5 whitespace-nowrap"
-                      onClick={() => void submit()}
-                    >
-                      <Upload className="size-3.5" aria-hidden />
-                      {submitting ? "…" : "Save PO"}
-                    </Button>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+          <div className="rounded-xl border border-emerald-500/35 bg-background/75 p-4 shadow-sm dark:bg-background/40">
+            <p className="mb-3 text-xs font-medium text-muted-foreground">
+              Select quotation, attach file, then save the PO.
+            </p>
+            <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,0.72fr)_auto] md:items-end">
+              <div className="space-y-1.5">
+                <label
+                  htmlFor="recv-q"
+                  className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground"
+                >
+                  Quotation
+                </label>
+                <Dropdown
+                  id="recv-q"
+                  value={quotationId}
+                  onChange={(e) => setQuotationId(e.target.value)}
+                  className="min-w-50"
+                  options={quotations.map((q) => ({
+                    value: q._id,
+                    label: `${q.quotationNumber} · ${q.status}${q.projectName ? ` · ${q.projectName}` : ""}`,
+                  }))}
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label
+                  htmlFor="recv-file"
+                  className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground"
+                >
+                  Upload PDF / image
+                </label>
+                {/*
+                  Styled <input type="file"> often fails to open the OS picker on Windows/Edge.
+                  Hidden input + button calling .click() is reliable.
+                */}
+                <input
+                  key={fileKey}
+                  ref={fileInputRef}
+                  id="recv-file"
+                  type="file"
+                  className="sr-only"
+                  accept=".pdf,application/pdf,image/png,image/jpeg,image/jpg,image/pjpeg,image/webp,.png,.jpg,.jpeg,.webp"
+                  onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+                />
+                <div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full justify-center"
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    Choose file
+                  </Button>
+                </div>
+              </div>
+
+              <Button
+                type="button"
+                disabled={submitting || !quotationId || !file}
+                className="gap-1.5 whitespace-nowrap"
+                onClick={() => void submit()}
+              >
+                <Upload className="size-3.5" aria-hidden />
+                {submitting ? "Saving…" : "Save PO"}
+              </Button>
+            </div>
+            <p className="truncate text-[11px] text-muted-foreground" title={file?.name ?? undefined}>
+              {file ? `Selected file: ${file.name}` : "No file selected"}
+            </p>
           </div>
         )}
 

@@ -117,6 +117,12 @@
   }
 }
 
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
 body {
   background: hsl(var(--background));
   color: hsl(var(--foreground));
