@@ -19,6 +19,7 @@ import { SectionTable } from "@/components/portals/admin-client-details/section-
 import type { ClientDetailsPayload, ClientProfileForm } from "@/components/portals/admin-client-details/types";
 import { readResponseJson } from "@/lib/http/read-response-json";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { SaveConfirmModal } from "@/components/ui/save-confirm-modal";
 
 function formatAed(n: number) {
   return n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -175,17 +176,15 @@ export function AdminClientDetailsClient({ clientId }: { clientId: string }) {
         </div>
       ) : null}
 
-      <ConfirmDialog
+      <SaveConfirmModal
         open={saveConfirmOpen}
-        onOpenChange={setSaveConfirmOpen}
-        title="Save client profile?"
-        description="Your changes will be saved to this client record."
-        confirmLabel="Save"
-        loading={saving}
+        onClose={() => setSaveConfirmOpen(false)}
         onConfirm={async () => {
           const ok = await saveClient();
           if (ok) setSaveConfirmOpen(false);
         }}
+        loading={saving}
+        entityName="client"
       />
       <ConfirmDialog
         open={deleteConfirmOpen}

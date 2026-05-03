@@ -9,6 +9,7 @@ import { LineItemsCard } from "@/components/portals/admin-quotation-details/line
 import { QuotationHeaderActions } from "@/components/portals/admin-quotation-details/quotation-header-actions";
 import { QuotationStatusEditor } from "@/components/portals/admin-quotation-details/quotation-status-card";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { SaveConfirmModal } from "@/components/ui/save-confirm-modal";
 import { QuotationInfoCard } from "@/components/portals/admin-quotation-details/quotation-info-card";
 import { SnapshotsCard } from "@/components/portals/admin-quotation-details/snapshots-card";
 import { SummaryCard } from "@/components/portals/admin-quotation-details/summary-card";
@@ -257,17 +258,15 @@ export function AdminQuotationDetailsClient({ quotationId }: { quotationId: stri
         </div>
       ) : null}
 
-      <ConfirmDialog
+      <SaveConfirmModal
         open={saveConfirmOpen}
-        onOpenChange={setSaveConfirmOpen}
-        title="Save quotation?"
-        description="Your edits will be written to this quotation and totals will be recalculated."
-        confirmLabel="Save"
-        loading={saving}
+        onClose={() => setSaveConfirmOpen(false)}
         onConfirm={async () => {
           const ok = await save();
           if (ok) setSaveConfirmOpen(false);
         }}
+        loading={saving}
+        entityName="quotation"
       />
       <ConfirmDialog
         open={deleteConfirmOpen}

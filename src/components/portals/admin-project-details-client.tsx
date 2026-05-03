@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { readResponseJson } from "@/lib/http/read-response-json";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { SaveConfirmModal } from "@/components/ui/save-confirm-modal";
 
 type ProjectDetailsPayload = {
   project?: {
@@ -245,17 +246,15 @@ export function AdminProjectDetailsClient({ projectId }: { projectId: string }) 
 
   return (
     <div className="animate-fade-in">
-      <ConfirmDialog
+      <SaveConfirmModal
         open={saveConfirmOpen}
-        onOpenChange={setSaveConfirmOpen}
-        title="Save project?"
-        description="Your changes will be saved to this project."
-        confirmLabel="Save"
-        loading={saving}
+        onClose={() => setSaveConfirmOpen(false)}
         onConfirm={async () => {
           const ok = await saveProject();
           if (ok) setSaveConfirmOpen(false);
         }}
+        loading={saving}
+        entityName="project"
       />
       <ConfirmDialog
         open={deleteConfirmOpen}

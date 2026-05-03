@@ -14,6 +14,7 @@ import { computeInvoiceTotals } from "@/lib/invoice/invoice-totals";
 import { exportInvoicePdf } from "@/utils/exportPdf";
 import { readResponseJson } from "@/lib/http/read-response-json";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { SaveConfirmModal } from "@/components/ui/save-confirm-modal";
 
 
 function toDocData(item: Item): InvoiceDocData {
@@ -286,17 +287,15 @@ export function AdminInvoiceDetailClient({
   const taxLabelPreview = taxEnabledPreview ? `Tax (${taxRatePreview}%)` : "Tax";
   return (
     <div className="animate-fade-in">
-      <ConfirmDialog
+      <SaveConfirmModal
         open={saveConfirmOpen}
-        onOpenChange={setSaveConfirmOpen}
-        title="Save invoice?"
-        description="Your invoice data will be written to the database."
-        confirmLabel="Save"
-        loading={saving}
+        onClose={() => setSaveConfirmOpen(false)}
         onConfirm={async () => {
           const ok = await save();
           if (ok) setSaveConfirmOpen(false);
         }}
+        loading={saving}
+        entityName="invoice record"
       />
       <DashboardPageHeader title={item ? item.invoiceNumber : "Invoice"} />
       {poInvoiceCount != null ? (

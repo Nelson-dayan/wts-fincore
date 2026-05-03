@@ -45,6 +45,14 @@ export function EditorPanel(props: EditorPanelProps) {
         <Button
           size="sm"
           variant="default"
+          onClick={onSave}
+          disabled={saving}
+        >
+          {saving ? "Saving…" : "Save Invoice"}
+        </Button>
+        <Button
+          size="sm"
+          variant="default"
           disabled={pdfExporting}
           onClick={() => onDownloadPdf()}
         >
@@ -65,10 +73,7 @@ export function EditorPanel(props: EditorPanelProps) {
         onPatchExtra={onPatchExtra}
       />
       <AccountsFooterCard bankAed={bankAed} bankUsd={bankUsd} onPatchBank={onPatchBank} />
-      <div className="flex flex-wrap gap-2">
-        <Button type="button" onClick={onSave} disabled={saving}>{saving ? "Saving…" : "Save"}</Button>
-        {msg ? <p className={msg === "Saved." ? "text-primary text-sm" : "text-destructive text-sm"} role="status">{msg}</p> : null}
-      </div>
+      <div className="h-10" />
     </div>
   );
 }

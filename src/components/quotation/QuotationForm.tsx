@@ -1,10 +1,13 @@
 "use client";
 
+import { useState } from "react";
+
 import { ImageUp, Plus, Save, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { SaveConfirmModal } from "@/components/ui/save-confirm-modal";
 import { cn } from "@/lib/utils/cn";
 import { UploadCard } from "@/components/ui/upload-card";
 import type { QuotationData, QuotationItem } from "@/types/quotation-generator";
@@ -36,6 +39,8 @@ export function QuotationForm({
   formTitle = "Quotation",
   onCancelEdit,
 }: QuotationFormProps) {
+  const [saveConfirmOpen, setSaveConfirmOpen] = useState(false);
+
   const patch = (partial: Partial<QuotationData>) => {
     onChange({ ...data, ...partial });
   };
@@ -58,10 +63,41 @@ export function QuotationForm({
 
   return (
     <Card className="mx-auto w-full max-w-4xl shrink-0 border-border/80 shadow-md">
-      <CardHeader className="space-y-1">
+      <SaveConfirmModal
+        open={saveConfirmOpen}
+        onClose={() => setSaveConfirmOpen(false)}
+        onConfirm={() => {
+          onSaveQuotation();
+          setSaveConfirmOpen(false);
+        }}
+        entityName="quotation"
+      />
+      <CardHeader className="sticky top-0 z-50 flex flex-row items-center justify-between border-b border-border/80 bg-card/95 py-4 shadow-sm backdrop-blur supports-backdrop-filter:bg-card/80">
         <CardTitle>{formTitle}</CardTitle>
+        <div className="flex items-center gap-2">
+          {onCancelEdit ? (
+            <Button size="sm" type="button" variant="ghost" onClick={onCancelEdit}>
+              Cancel
+            </Button>
+          ) : null}
+          <Button size="sm" type="button" variant="outline" onClick={onReset}>
+            Reset
+          </Button>
+          <Button size="sm" type="button" variant="secondary" onClick={() => setSaveConfirmOpen(true)}>
+            <Save className="mr-2 size-4" aria-hidden />
+            Save quotation
+          </Button>
+          <Button size="sm" type="button" onClick={onDownloadPdf} disabled={exporting}>
+            {exporting ? "Building PDF…" : "Download PDF"}
+          </Button>
+          {saveNotice ? (
+            <span className="text-muted-foreground text-sm ml-2" role="status">
+              {saveNotice}
+            </span>
+          ) : null}
+        </div>
       </CardHeader>
-      <CardContent className="flex flex-col gap-6">
+      <CardContent className="flex flex-col gap-6 pt-6">
         <fieldset className="grid gap-3 text-left">
           <UploadCard
             label="Upload logo"
@@ -537,37 +573,6 @@ export function QuotationForm({
             </div>
           </details>
         </fieldset>
-
-        <div className="sticky bottom-0 z-10 -mx-5 flex flex-wrap items-center gap-2 border-t border-border/80 bg-card/95 px-5 pb-2 pt-3 backdrop-blur supports-backdrop-filter:bg-card/80">
-          {onCancelEdit ? (
-            <Button type="button" variant="ghost" onClick={onCancelEdit}>
-              Cancel
-            </Button>
-          ) : null}
-          <Button type="button" variant="outline" onClick={onReset}>
-            Reset form
-          </Button>
-          <Button type="button" variant="secondary" onClick={onSaveQuotation}>
-            <Save className="size-4" aria-hidden />
-            Save quotation
-          </Button>
-          <Button type="button" onClick={onDownloadPdf} disabled={exporting}>
-            {exporting ? "Building PDF…" : "Download PDF"}
-          </Button>
-          {saveNotice ? (
-            <span className="text-muted-foreground w-full text-sm sm:ml-1 sm:w-auto" role="status">
-              {saveNotice}
-            </span>
-          ) : null}
-          {pdfError ? (
-            <p
-              className="text-destructive w-full text-sm sm:ml-1 sm:w-auto"
-              role="alert"
-            >
-              {pdfError}
-            </p>
-          ) : null}
-        </div>
       </CardContent>
     </Card>
   );

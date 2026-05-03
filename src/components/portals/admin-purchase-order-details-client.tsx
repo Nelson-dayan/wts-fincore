@@ -13,6 +13,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { readResponseJson } from "@/lib/http/read-response-json";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { SaveConfirmModal } from "@/components/ui/save-confirm-modal";
+import { cn } from "@/lib/utils/cn";
 
 type PoPayload = {
   _id: string;
@@ -160,17 +162,15 @@ export function AdminPurchaseOrderDetailsClient({ purchaseOrderId }: { purchaseO
 
   return (
     <div className="animate-fade-in">
-      <ConfirmDialog
+      <SaveConfirmModal
         open={saveConfirmOpen}
-        onOpenChange={setSaveConfirmOpen}
-        title="Save purchase order?"
-        description="Your changes will be saved to this purchase order."
-        confirmLabel="Save"
-        loading={saving}
+        onClose={() => setSaveConfirmOpen(false)}
         onConfirm={async () => {
           const ok = await save();
           if (ok) setSaveConfirmOpen(false);
         }}
+        loading={saving}
+        entityName="purchase order"
       />
       <ConfirmDialog
         open={deleteConfirmOpen}
@@ -230,7 +230,10 @@ export function AdminPurchaseOrderDetailsClient({ purchaseOrderId }: { purchaseO
             </p>
           </div>
 
-          <div className="mb-4 flex flex-wrap gap-2">
+          <div className="sticky top-0 z-50 -mx-4 mb-4 flex flex-wrap items-center gap-2 border-b border-border/80 bg-background/95 px-4 py-3 backdrop-blur supports-backdrop-filter:bg-background/80 sm:-mx-8 sm:px-8">
+            <Button size="sm" onClick={() => setSaveConfirmOpen(true)} disabled={saving}>
+              {saving ? "Saving…" : "Save PO"}
+            </Button>
             <Link href={`/admin/quotations/${item.quotationId}`}>
               <Button size="sm" variant="outline">
                 Open quotation
@@ -244,14 +247,14 @@ export function AdminPurchaseOrderDetailsClient({ purchaseOrderId }: { purchaseO
             </Link>
             <Link href="/admin/purchase-orders">
               <Button size="sm" variant="outline">
-                All purchase orders
+                All POs
               </Button>
             </Link>
             <Button
               type="button"
               size="sm"
               variant="destructive"
-              className="gap-1.5"
+              className="gap-1.5 ml-auto"
               disabled={deleting}
               onClick={() => setDeleteConfirmOpen(true)}
             >
@@ -262,6 +265,17 @@ export function AdminPurchaseOrderDetailsClient({ purchaseOrderId }: { purchaseO
           {deleteError ? (
             <p className="text-destructive mb-4 text-sm" role="alert">
               {deleteError}
+            </p>
+          ) : null}
+          {saveMsg ? (
+            <p
+              className={cn(
+                "mb-4 text-sm",
+                saveMsg === "Saved." ? "text-primary" : "text-destructive"
+              )}
+              role="status"
+            >
+              {saveMsg}
             </p>
           ) : null}
 
@@ -377,19 +391,6 @@ export function AdminPurchaseOrderDetailsClient({ purchaseOrderId }: { purchaseO
                   </div>
                 ) : null}
               </div>
-              <Button type="button" onClick={() => setSaveConfirmOpen(true)} disabled={saving}>
-                {saving ? "Saving…" : "Save changes"}
-              </Button>
-              {saveMsg ? (
-                <p
-                  className={
-                    saveMsg === "Saved." ? "text-sm text-primary" : "text-sm text-destructive"
-                  }
-                  role="status"
-                >
-                  {saveMsg}
-                </p>
-              ) : null}
             </CardContent>
           </Card>
 
