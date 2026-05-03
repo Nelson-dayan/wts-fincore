@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { EditorPanel } from "@/components/portals/admin-invoice-detail/editor-panel";
+import { PaymentsCard } from "@/components/portals/admin-invoice-detail/payments-card";
 import { InvoicePrintStyle } from "@/components/portals/admin-invoice-detail/print-style";
 import type { Bank, Item } from "@/components/portals/admin-invoice-detail/types";
 import { readImageFileAsDataUrl } from "@/components/portals/admin-invoice-detail/utils";
@@ -360,9 +361,22 @@ export function AdminInvoiceDetailClient({
             onDownloadPdf={() => void downloadPdf()}
           />
 
-          <div className="print:col-span-full">
-            <p className="text-muted-foreground mb-2 text-xs print:hidden">Live preview</p>
-            <InvoiceSecDocument data={previewDocData} />
+          <div className="flex flex-col gap-8 print:col-span-full">
+            <div>
+              <p className="text-muted-foreground mb-2 text-xs print:hidden">Live preview</p>
+              <InvoiceSecDocument data={previewDocData} />
+            </div>
+
+            {invoiceId && item._id && (
+              <div className="print:hidden">
+                <PaymentsCard 
+                  invoiceId={item._id} 
+                  companyId={String(item.companyId || "")} 
+                  invoiceCurrency={item.currency || (item.invoiceType === "usd" ? "USD" : "AED")}
+                  invoiceExchangeRate={item.exchangeRate || 1}
+                />
+              </div>
+            )}
           </div>
         </div>
       ) : null}

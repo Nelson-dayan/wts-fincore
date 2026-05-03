@@ -39,6 +39,12 @@ type ProjectDetailsPayload = {
     createdAt: string;
   }>;
   expenseTotal?: number;
+  financials?: {
+    totalReceivedBase: number;
+    totalFeesBase: number;
+    totalExpensesBase: number;
+    profitBase: number;
+  };
   message?: string;
 };
 
@@ -340,22 +346,40 @@ export function AdminProjectDetailsClient({ projectId }: { projectId: string }) 
         </Link>
       </div>
 
-      <Card className="mb-4 border-primary/20 bg-primary/[0.04] dark:bg-primary/[0.07]">
-        <CardContent className="flex flex-col gap-1 py-4 sm:flex-row sm:items-baseline sm:justify-between sm:gap-4">
-          <div>
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-              Total expenses (this project)
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 mb-4">
+        <Card className="border-primary/20 bg-primary/[0.04] dark:bg-primary/[0.07]">
+          <CardContent className="py-4">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground mb-1">
+              Revenue (Base)
             </p>
-            <p className="mt-1 text-2xl font-semibold tabular-nums text-foreground">
-              {formatAed(data.expenseTotal ?? 0)}{" "}
-              <span className="text-base font-medium text-muted-foreground">AED</span>
+            <p className="text-2xl font-bold text-foreground">
+              ₹{formatAed(data.financials?.totalReceivedBase ?? 0)}
             </p>
-          </div>
-          <p className="text-xs text-muted-foreground sm:max-w-xs sm:text-right">
-            Sum of expense lines linked to this project. Add new lines from Admin → Expenses.
-          </p>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+        
+        <Card className="border-red-500/20 bg-red-500/[0.04] dark:bg-red-500/[0.07]">
+          <CardContent className="py-4">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-red-600/70 mb-1">
+              Expenses & Fees (Base)
+            </p>
+            <p className="text-2xl font-bold text-red-600">
+              ₹{formatAed((data.financials?.totalExpensesBase ?? 0) + (data.financials?.totalFeesBase ?? 0))}
+            </p>
+          </CardContent>
+        </Card>
+        
+        <Card className="border-green-500/30 bg-green-500/[0.05] dark:bg-green-500/[0.08] sm:col-span-2">
+          <CardContent className="py-4">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-green-700/70 dark:text-green-400/70 mb-1">
+              Net Profit (Base)
+            </p>
+            <p className="text-3xl font-bold text-green-700 dark:text-green-400">
+              ₹{formatAed(data.financials?.profitBase ?? 0)}
+            </p>
+          </CardContent>
+        </Card>
+      </div>
       <SectionTable
         title="Quotations"
         columns={[

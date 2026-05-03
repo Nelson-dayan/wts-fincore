@@ -9,6 +9,9 @@ export type Bank = {
 export type Item = {
   _id?: string;
   invoiceNumber: string;
+  companyId?: string;
+  currency?: string;
+  exchangeRate?: number;
   invoiceType?: "aed" | "usd";
   projectId: string;
   poId: string;

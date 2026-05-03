@@ -43,24 +43,41 @@ export async function GET(_req: Request, ctx: RouteCtx) {
         .select("_id poNumber type status createdAt")
         .sort({ createdAt: -1 })
         .lean(),
-      InvoiceModel.find({ projectId })
-        .select("_id invoiceNumber status dueDate createdAt")
+      InvoiceModel.find({ projectId, isDeleted: { $ne: true } })
+        .select("_id invoiceNumber status dueDate totals totalsCache totalAmountBase createdAt")
         .sort({ createdAt: -1 })
         .lean(),
-      ExpenseModel.find({ projectId })
-        .select("_id title amount category createdAt")
+      ExpenseModel.find({ projectId, isDeleted: { $ne: true } })
+        .select("_id title amount currency baseAmount category createdAt")
         .sort({ createdAt: -1 })
         .lean(),
     ]);
 
     const expenseTotal = expensesRaw.reduce((sum, e) => sum + decimalToNumber(e.amount), 0);
+    const expenseTotalBase = expensesRaw.reduce((sum, e) => sum + decimalToNumber(e.baseAmount || e.amount), 0);
+
     const expenses = expensesRaw.map((e) => ({
       _id: String(e._id),
       title: e.title,
       amount: decimalToNumber(e.amount),
+      currency: e.currency || "AED",
+      baseAmount: decimalToNumber(e.baseAmount || e.amount),
       category: e.category,
       createdAt: e.createdAt,
     }));
+
+    // Profit Tracking using our pure Base Engine logic
+    const totalReceivedBase = invoices.reduce((sum, inv) => {
+      const cache = inv.totalsCache as any;
+      return sum + (cache ? decimalToNumber(cache.totalReceivedBase) : 0);
+    }, 0);
+    
+    const totalFeesBase = invoices.reduce((sum, inv) => {
+      const cache = inv.totalsCache as any;
+      return sum + (cache ? decimalToNumber(cache.totalFeesBase) : 0);
+    }, 0);
+
+    const profitBase = totalReceivedBase - expenseTotalBase;
 
     return NextResponse.json({
       project,
@@ -70,6 +87,12 @@ export async function GET(_req: Request, ctx: RouteCtx) {
       invoices,
       expenses,
       expenseTotal,
+      financials: {
+        totalReceivedBase,
+        totalFeesBase,
+        totalExpensesBase: expenseTotalBase,
+        profitBase
+      }
     });
   } catch (error) {
     return authErrorResponse(error, "Failed to load project details");
