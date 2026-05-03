@@ -25,6 +25,7 @@ type PoPayload = {
   quotationNumber?: string;
   type: string;
   status: string;
+  fileUrl: string;
   externalPoNumber?: string;
   currency?: string;
   totalAmount?: number | null;
