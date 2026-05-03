@@ -10,7 +10,10 @@ export const purchaseOrderSchema = new Schema(
     fileUrl: { type: String, default: "" },
     externalPoNumber: { type: String, default: "" },
     generatedFromQuotation: { type: Boolean, default: false },
+    currency: { type: String, default: "AED" },
+    exchangeRate: optionalDecimalField,
     totalAmount: optionalDecimalField,
+    totalAmountBase: optionalDecimalField,
     status: {
       type: String,
       enum: ["linked", "active", "completed"],

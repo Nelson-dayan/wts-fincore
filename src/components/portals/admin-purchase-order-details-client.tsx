@@ -27,6 +27,7 @@ type PoPayload = {
   status: string;
   fileUrl: string;
   externalPoNumber?: string;
+  currency?: string;
   totalAmount?: number | null;
   createdAt: string;
 };
@@ -306,7 +307,7 @@ export function AdminPurchaseOrderDetailsClient({ purchaseOrderId }: { purchaseO
                 <p className="sm:col-span-2">
                   <strong>PO amount:</strong>{" "}
                   <span className="tabular-nums">
-                    AED{" "}
+                    {item.currency ?? "AED"}{" "}
                     {Number(item.totalAmount).toLocaleString("en-IN", {
                       minimumFractionDigits: 2,
                       maximumFractionDigits: 2,
@@ -355,7 +356,7 @@ export function AdminPurchaseOrderDetailsClient({ purchaseOrderId }: { purchaseO
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor="po-amt">PO total amount — AED (optional)</Label>
+                  <Label htmlFor="po-amt">PO total amount — {item?.currency ?? "AED"} (optional)</Label>
                   <Input
                     id="po-amt"
                     inputMode="decimal"

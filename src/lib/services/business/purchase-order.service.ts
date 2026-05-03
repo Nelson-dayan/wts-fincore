@@ -30,10 +30,11 @@ export interface CreatePurchaseOrderInput {
 async function assertQuotationRules(
   input: CreatePurchaseOrderInput,
   session: ClientSession
-): Promise<void> {
+) {
   const quotation = await QuotationModel.findById(input.quotationId)
-    .select("status projectId")
-    .session(session);
+    .select("status projectId currency")
+    .session(session)
+    .lean();
 
   if (!quotation) {
     throw new Error("Quotation not found for purchase order");
@@ -47,6 +48,8 @@ async function assertQuotationRules(
   if (input.type === "internal" && quotation.status !== "approved") {
     throw new Error("Internal purchase orders require an approved quotation");
   }
+
+  return quotation;
 }
 
 export async function createPurchaseOrder(
@@ -58,7 +61,15 @@ export async function createPurchaseOrder(
   try {
     let createdId = "";
     await session.withTransaction(async () => {
-      await assertQuotationRules(input, session);
+      const quotation = await assertQuotationRules(input, session);
+
+      let totalAmountBase: number | undefined;
+      // Default to 1 if we decide to implement exchange rates later
+      const defaultExchangeRate = 1;
+      
+      if (input.totalAmount != null) {
+        totalAmountBase = input.totalAmount * defaultExchangeRate;
+      }
 
       const created = await PurchaseOrderModel.create(
         [
@@ -70,7 +81,10 @@ export async function createPurchaseOrder(
             fileUrl: input.type === "client" ? String(input.fileUrl ?? "").trim() : "",
             externalPoNumber: input.externalPoNumber ?? "",
             generatedFromQuotation: input.type === "internal",
+            currency: quotation.currency ?? "AED",
+            exchangeRate: defaultExchangeRate,
             totalAmount: input.totalAmount,
+            totalAmountBase,
             status: input.status ?? "linked",
             createdBy: input.createdBy,
           },

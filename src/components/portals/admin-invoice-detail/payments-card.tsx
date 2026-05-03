@@ -99,7 +99,7 @@ export function PaymentsCard({
       });
       const data = await readResponseJson(res);
       
-      if (!res.ok) throw new Error(data.message || "Failed to record payment");
+      if (!res.ok) throw new Error((data as any).message || "Failed to record payment");
       
       setDrawerOpen(false);
       loadPayments();
