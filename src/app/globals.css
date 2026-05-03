@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import url("https://api.fontshare.com/v2/css?f[]=satoshi@900,700,500,300,400&display=swap");
 
 /* Elegant SaaS / Enterprise Tokens — premium neutrals + refined blue */
 
@@ -8,7 +9,8 @@
 
   --card: 0 0% 100%;
   --card-foreground: 240 10% 9%;
-  --primary: 214 88% 54%;
+  --primary: 221 83% 53%;
+  --brand-accent: 262 83% 58%;
   --primary-foreground: 0 0% 100%;
 
   --secondary: 220 14% 96%;
@@ -24,12 +26,12 @@
   --destructive-foreground: 0 0% 100%;
   --border: 240 8% 88%;
   --input: 240 8% 88%;
-  --ring: 214 88% 54%;
+  --ring: 221 83% 53%;
   --radius: 0.625rem;
   --gradient-auth: linear-gradient(
     135deg,
-    hsl(214 88% 56% / 0.12) 0%,
-    hsl(202 92% 54% / 0.08) 45%,
+    hsl(var(--primary) / 0.18) 0%,
+    hsl(var(--brand-accent) / 0.12) 40%,
     transparent 75%
   );
 
@@ -43,6 +45,27 @@
 
   --font-geist-sans: var(--font-geist-sans);
   --font-geist-mono: var(--font-geist-mono);
+  --font-sans: var(--font-geist-sans);
+  --font-brand: 'Satoshi', var(--font-geist-sans);
+
+  /* Typography Scale */
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 0.95rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.375rem;
+  --text-2xl: 1.75rem;
+  --text-3xl: 2.25rem;
+  --text-4xl: 2.75rem;
+  --text-5xl: 3.5rem;
+
+  /* Spacing Scale */
+  --space-xs: 0.25rem;
+  --space-sm: 0.5rem;
+  --space-md: 0.875rem;
+  --space-lg: 1.25rem;
+  --space-xl: 2rem;
+  --space-2xl: 3rem;
 }
 
 .dark {
@@ -117,19 +140,64 @@
   }
 }
 
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
 body {
   background: hsl(var(--background));
   color: hsl(var(--foreground));
   font-family: var(--font-geist-sans), system-ui, sans-serif;
   font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+h1 {
+  font-family: var(--font-brand);
+  font-size: var(--text-5xl);
+  font-weight: 600;
+  letter-spacing: -0.03em;
+}
+
+h2 {
+  font-family: var(--font-brand);
+  font-size: var(--text-3xl);
+  font-weight: 600;
+}
+
+h3 {
+  font-size: var(--text-xl);
+  font-weight: 500;
+}
+
+p {
+  font-size: var(--text-base);
+  line-height: 1.6;
+  color: hsl(var(--muted-foreground));
+}
+
+.hover-lift {
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+.hover-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-premium-lg);
 }
 
 /* Scrollbars hidden — content still scrolls (trackpad, wheel, touch) */
 * {
   scrollbar-width: none;
   -ms-overflow-style: none;
+  transition:
+    background-color 0.2s ease,
+    border-color 0.2s ease,
+    color 0.2s ease,
+    box-shadow 0.2s ease;
 }
 
 *::-webkit-scrollbar {

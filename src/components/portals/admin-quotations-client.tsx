@@ -299,7 +299,7 @@ export function AdminQuotationsClient({
                     <th className="px-5 py-3.5 pr-3">Quotation #</th>
                     <th className="px-0 py-3.5 pr-3">Project</th>
                     <th className="px-0 py-3.5 pr-3">Total</th>
-                    <th className="px-0 py-3.5 pr-3">Purchase orders</th>
+                    <th className="px-0 py-3.5 pr-3">PO links</th>
                     <th className="px-0 py-3.5 pr-3">Status</th>
                     <th className="px-0 py-3.5 pr-3">Created</th>
                     <th className="px-0 py-3.5 pr-5 text-right">Actions</th>
@@ -326,10 +326,10 @@ export function AdminQuotationsClient({
                           <span className="line-clamp-2">{row.projectName || "—"}</span>
                         </td>
                         <td className="whitespace-nowrap px-0 py-3.5 pr-3 tabular-nums text-foreground">
-                          {formatMoney(row.totalAmount ?? null)}
+                          {row.totalAmount != null ? `AED ${formatMoney(row.totalAmount ?? null)}` : "—"}
                         </td>
-                        <td className="max-w-48 px-0 py-3.5 pr-3 align-top">
-                          <div className="flex flex-col gap-0.5">
+                        <td className="max-w-48 px-0 py-3.5 pr-3 align-middle">
+                          <div className="flex flex-col gap-1">
                             <span
                               className={cn(
                                 "inline-flex w-fit rounded-full px-2.5 py-0.5 text-xs font-semibold tabular-nums",
@@ -341,7 +341,7 @@ export function AdminQuotationsClient({
                               {poCount} PO{poCount === 1 ? "" : "s"}
                             </span>
                             {poPreview ? (
-                              <span className="text-[11px] leading-snug text-muted-foreground line-clamp-2">
+                              <span className="text-[11px] leading-snug text-muted-foreground line-clamp-1">
                                 {poPreview}
                               </span>
                             ) : (
@@ -349,7 +349,7 @@ export function AdminQuotationsClient({
                             )}
                           </div>
                         </td>
-                        <td className="px-0 py-3.5 pr-3 align-top">
+                        <td className="px-0 py-3.5 pr-3 align-middle">
                           <QuotationStatusEditor
                             quotationId={row._id}
                             currentStatus={normalizeQuotationStatus(row.status)}
@@ -362,8 +362,8 @@ export function AdminQuotationsClient({
                             ? new Date(row.createdAt).toLocaleString()
                             : "—"}
                         </td>
-                        <td className="px-0 py-3.5 pr-5 text-right">
-                          <div className="flex flex-wrap justify-end gap-2">
+                        <td className="whitespace-nowrap px-0 py-3.5 pr-5 text-right align-middle">
+                          <div className="flex flex-nowrap items-center justify-end gap-2">
                             <Button
                               type="button"
                               variant="secondary"

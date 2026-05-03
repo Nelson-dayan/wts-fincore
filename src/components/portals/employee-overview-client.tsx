@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowUpRight } from "lucide-react";
+import { ArrowUpRight, FileText, FolderKanban, Receipt, ShieldCheck } from "lucide-react";
 import { DashboardPageHeader } from "@/components/dashboard/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -71,11 +71,49 @@ export function EmployeeOverviewClient() {
           {error}
         </div>
       ) : null}
+
+      <section className="mb-7 grid gap-4 sm:grid-cols-3">
+        <Card className="dashboard-stat-card">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Projects</CardTitle>
+            <FolderKanban className="size-4 text-primary/85" aria-hidden />
+          </CardHeader>
+          <CardContent>
+            <p className="text-3xl font-semibold tabular-nums">{(data?.myProjects.length ?? 0).toLocaleString()}</p>
+          </CardContent>
+        </Card>
+        <Card className="dashboard-stat-card">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Quotations</CardTitle>
+            <FileText className="size-4 text-primary/85" aria-hidden />
+          </CardHeader>
+          <CardContent>
+            <p className="text-3xl font-semibold tabular-nums">
+              {(data?.myQuotations.length ?? 0).toLocaleString()}
+            </p>
+          </CardContent>
+        </Card>
+        <Card className="dashboard-stat-card">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Invoices</CardTitle>
+            <Receipt className="size-4 text-primary/85" aria-hidden />
+          </CardHeader>
+          <CardContent>
+            <p className="text-3xl font-semibold tabular-nums">{(data?.myInvoices.length ?? 0).toLocaleString()}</p>
+          </CardContent>
+        </Card>
+      </section>
+
       <div className="grid gap-6 lg:grid-cols-3">
         <Card className="dashboard-panel-card">
           <CardHeader className="flex flex-row items-start justify-between gap-2 space-y-0 pb-3">
-            <CardTitle className="text-base font-semibold">My projects</CardTitle>
-            <Button variant="ghost" size="sm" className="h-8 shrink-0 gap-1 px-2 text-xs" asChild>
+            <div className="flex items-center gap-2">
+              <span className="inline-flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary ring-1 ring-primary/15">
+                <FolderKanban className="size-4" aria-hidden />
+              </span>
+              <CardTitle className="text-base font-semibold">My projects</CardTitle>
+            </div>
+            <Button variant="ghost" size="sm" className="shrink-0 gap-1 px-2.5" asChild>
               <Link href="/employee/projects">
                 View all
                 <ArrowUpRight className="size-3.5 opacity-70" aria-hidden />
@@ -102,8 +140,13 @@ export function EmployeeOverviewClient() {
 
         <Card className="dashboard-panel-card">
           <CardHeader className="flex flex-row items-start justify-between gap-2 space-y-0 pb-3">
-            <CardTitle className="text-base font-semibold">My quotations</CardTitle>
-            <Button variant="ghost" size="sm" className="h-8 shrink-0 gap-1 px-2 text-xs" asChild>
+            <div className="flex items-center gap-2">
+              <span className="inline-flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary ring-1 ring-primary/15">
+                <FileText className="size-4" aria-hidden />
+              </span>
+              <CardTitle className="text-base font-semibold">My quotations</CardTitle>
+            </div>
+            <Button variant="ghost" size="sm" className="shrink-0 gap-1 px-2.5" asChild>
               <Link href="/employee/quotations">
                 View all
                 <ArrowUpRight className="size-3.5 opacity-70" aria-hidden />
@@ -128,8 +171,13 @@ export function EmployeeOverviewClient() {
 
         <Card className="dashboard-panel-card">
           <CardHeader className="flex flex-row items-start justify-between gap-2 space-y-0 pb-3">
-            <CardTitle className="text-base font-semibold">My invoices</CardTitle>
-            <Button variant="ghost" size="sm" className="h-8 shrink-0 gap-1 px-2 text-xs" asChild>
+            <div className="flex items-center gap-2">
+              <span className="inline-flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary ring-1 ring-primary/15">
+                <Receipt className="size-4" aria-hidden />
+              </span>
+              <CardTitle className="text-base font-semibold">My invoices</CardTitle>
+            </div>
+            <Button variant="ghost" size="sm" className="shrink-0 gap-1 px-2.5" asChild>
               <Link href="/employee/invoices">
                 View all
                 <ArrowUpRight className="size-3.5 opacity-70" aria-hidden />
@@ -154,6 +202,18 @@ export function EmployeeOverviewClient() {
           </CardContent>
         </Card>
       </div>
+
+      <Card className="mt-6 border-border/75 bg-muted/20">
+        <CardContent className="flex items-start gap-3 p-4">
+          <span className="inline-flex size-8 shrink-0 items-center justify-center rounded-lg bg-emerald-500/12 text-emerald-700 ring-1 ring-emerald-500/25 dark:text-emerald-400">
+            <ShieldCheck className="size-4" aria-hidden />
+          </span>
+          <p className="text-sm text-muted-foreground">
+            This dashboard reflects your assigned work only. Use the section cards above for quick navigation and
+            latest status.
+          </p>
+        </CardContent>
+      </Card>
     </div>
   );
 }

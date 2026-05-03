@@ -1,12 +1,17 @@
 "use client";
 
+import { useState } from "react";
+
 import { ImageUp, Plus, Save, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { SaveConfirmModal } from "@/components/ui/save-confirm-modal";
+import { Dropdown } from "@/components/ui/select";
 import { cn } from "@/lib/utils/cn";
-import type { QuotationData, QuotationItem } from "@/types/quotation-generator";
+import { UploadCard } from "@/components/ui/upload-card";
+import type { QuotationData, QuotationItem, QuotationPage } from "@/types/quotation-generator";
 
 export type QuotationFormProps = {
   data: QuotationData;
@@ -35,87 +40,109 @@ export function QuotationForm({
   formTitle = "Quotation",
   onCancelEdit,
 }: QuotationFormProps) {
+  const [saveConfirmOpen, setSaveConfirmOpen] = useState(false);
+
   const patch = (partial: Partial<QuotationData>) => {
     onChange({ ...data, ...partial });
   };
 
-  const setItem = (index: number, partial: Partial<QuotationItem>) => {
-    const items = data.items.map((row, i) =>
-      i === index ? { ...row, ...partial } : row
-    );
-    patch({ items });
+  const setItem = (pageIndex: number, lineIndex: number, partial: Partial<QuotationItem>) => {
+    const pages = data.pages.map((p, pIdx) => {
+      if (pIdx !== pageIndex) return p;
+      return {
+        ...p,
+        items: p.items.map((row, rIdx) => (rIdx === lineIndex ? { ...row, ...partial } : row)),
+      };
+    });
+    patch({ pages });
   };
 
-  const addRow = () => {
-    patch({ items: [...data.items, { detail: "", cost: "" }] });
+  const addRow = (pageIndex: number) => {
+    const pages = data.pages.map((p, pIdx) => {
+      if (pIdx !== pageIndex) return p;
+      const num = p.items.length > 0 ? p.items[p.items.length - 1].number + 1 : 1;
+      return {
+        ...p,
+        items: [...p.items, { number: num, name: "", description: "", quantity: 1, price: 0 }],
+      };
+    });
+    patch({ pages });
   };
 
-  const removeRow = (index: number) => {
-    if (data.items.length <= 1) return;
-    patch({ items: data.items.filter((_, i) => i !== index) });
+  const removeRow = (pageIndex: number, lineIndex: number) => {
+    const pages = data.pages.map((p, pIdx) => {
+      if (pIdx !== pageIndex) return p;
+      return {
+        ...p,
+        items: p.items.filter((_, i) => i !== lineIndex),
+      };
+    });
+    patch({ pages });
   };
 
-  const onLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !file.type.startsWith("image/")) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      patch({ logo: reader.result as string });
-    };
-    reader.readAsDataURL(file);
-    e.target.value = "";
+  const addPage = () => {
+    const pageNum = data.pages.length + 1;
+    patch({
+      pages: [
+        ...data.pages,
+        {
+          pageNumber: pageNum,
+          items: [{ number: 1, name: "", description: "", quantity: 1, price: 0 }],
+        },
+      ],
+    });
   };
 
-  const clearLogo = () => patch({ logo: undefined });
-
-  const onBackgroundChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !file.type.startsWith("image/")) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      patch({ backgroundImage: reader.result as string });
-    };
-    reader.readAsDataURL(file);
-    e.target.value = "";
+  const removePage = (pageIndex: number) => {
+    if (data.pages.length <= 1) return;
+    const pages = data.pages.filter((_, i) => i !== pageIndex).map((p, i) => ({ ...p, pageNumber: i + 1 }));
+    patch({ pages });
   };
-
-  const clearBackground = () => patch({ backgroundImage: undefined });
 
   return (
     <Card className="mx-auto w-full max-w-4xl shrink-0 border-border/80 shadow-md">
-      <CardHeader className="space-y-1">
+      <SaveConfirmModal
+        open={saveConfirmOpen}
+        onClose={() => setSaveConfirmOpen(false)}
+        onConfirm={() => {
+          onSaveQuotation();
+          setSaveConfirmOpen(false);
+        }}
+        entityName="quotation"
+      />
+      <CardHeader className="sticky top-0 z-50 flex flex-row items-center justify-between border-b border-border/80 bg-card/95 py-4 shadow-sm backdrop-blur supports-backdrop-filter:bg-card/80">
         <CardTitle>{formTitle}</CardTitle>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-6">
-        <fieldset className="grid gap-3 rounded-xl border border-border/80 bg-muted/25 p-4 text-left dark:bg-muted/15">
-          <div className="flex items-start gap-2">
-            <span className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg bg-background text-ring ring-1 ring-border/80">
-              <ImageUp className="size-4 opacity-80" aria-hidden />
+        <div className="flex items-center gap-2">
+          {onCancelEdit ? (
+            <Button size="sm" type="button" variant="ghost" onClick={onCancelEdit}>
+              Cancel
+            </Button>
+          ) : null}
+          <Button size="sm" type="button" variant="outline" onClick={onReset}>
+            Reset
+          </Button>
+          <Button size="sm" type="button" variant="secondary" onClick={() => setSaveConfirmOpen(true)}>
+            <Save className="mr-2 size-4" aria-hidden />
+            Save quotation
+          </Button>
+          <Button size="sm" type="button" onClick={onDownloadPdf} disabled={exporting}>
+            {exporting ? "Building PDF…" : "Download PDF"}
+          </Button>
+          {saveNotice ? (
+            <span className="text-muted-foreground text-sm ml-2" role="status">
+              {saveNotice}
             </span>
-            <div className="min-w-0 flex-1 space-y-2 text-left">
-              <Label htmlFor="qg-logo">Upload logo</Label>
-              <Input
-                id="qg-logo"
-                type="file"
-                accept="image/png,image/jpeg,image/webp,image/svg+xml,image/*"
-                onChange={onLogoChange}
-                className="cursor-pointer file:mr-3 file:rounded-md file:border-0 file:bg-primary file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-primary-foreground hover:file:bg-primary/90"
-              />
-              {data.logo ? (
-                <div className="flex flex-wrap items-center gap-3 pt-1">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={data.logo}
-                    alt="Logo preview"
-                    className="h-14 w-auto max-w-50 object-contain"
-                  />
-                  <Button type="button" variant="outline" size="sm" onClick={clearLogo}>
-                    Remove logo
-                  </Button>
-                </div>
-              ) : null}
-            </div>
-          </div>
+          ) : null}
+        </div>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-6 pt-6">
+        <fieldset className="grid gap-3 text-left">
+          <UploadCard
+            label="Upload logo"
+            value={data.logo}
+            onChange={(val) => patch({ logo: val || undefined })}
+            placeholder="PNG, JPG, SVG"
+          />
         </fieldset>
 
         <fieldset className="grid gap-4 text-left">
@@ -217,14 +244,14 @@ export function QuotationForm({
 
           <div className="space-y-3 rounded-lg border border-border/80 bg-background/60 p-3 dark:bg-background/40">
             <p className="text-sm font-medium text-foreground">Cost table</p>
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid gap-3 sm:grid-cols-4">
               <div className="grid gap-2">
                 <Label htmlFor="qg-th-detail">Header — left column</Label>
                 <Input
                   id="qg-th-detail"
                   value={data.tableHeaderDetail}
                   onChange={(e) => patch({ tableHeaderDetail: e.target.value })}
-                  placeholder="Details"
+                  placeholder="Item Description"
                 />
               </div>
               <div className="grid gap-2">
@@ -233,64 +260,147 @@ export function QuotationForm({
                   id="qg-th-cost"
                   value={data.tableHeaderCost}
                   onChange={(e) => patch({ tableHeaderCost: e.target.value })}
-                  placeholder="Total Cost (USD)"
+                  placeholder="Total"
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="qg-currency">Currency Code</Label>
+                <Input
+                  id="qg-currency"
+                  value={data.currency}
+                  onChange={(e) => patch({ currency: e.target.value.toUpperCase() })}
+                  placeholder="AED"
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="qg-taxrate">Tax Rate (%)</Label>
+                <Input
+                  id="qg-taxrate"
+                  type="number"
+                  min={0}
+                  step={1}
+                  value={data.taxRate}
+                  onChange={(e) => patch({ taxRate: Number(e.target.value) || 0 })}
+                  placeholder="5"
+                />
+              </div>
+            </div>
+            <div className="grid gap-2 sm:grid-cols-2">
+              <div className="grid gap-2">
+                <Label htmlFor="qg-discount">Discount (Absolute)</Label>
+                <Input
+                  id="qg-discount"
+                  type="number"
+                  min={0}
+                  step={0.01}
+                  value={data.discount}
+                  onChange={(e) => patch({ discount: Number(e.target.value) || 0 })}
+                  placeholder="0.00"
                 />
               </div>
             </div>
 
-            <div className="space-y-2 pt-1">
-              <div className="flex flex-wrap items-end justify-between gap-2">
-                <span className="text-sm font-medium text-foreground">Table rows</span>
-                <Button type="button" variant="outline" size="sm" onClick={addRow}>
-                  <Plus className="size-4" />
-                  Add row
+            <div className="space-y-4 pt-2">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="text-sm font-medium text-foreground">Line Items (Pages)</span>
+                <Button type="button" variant="outline" size="sm" onClick={addPage}>
+                  <Plus className="size-4 mr-1" />
+                  Add page
                 </Button>
               </div>
-              <div className="hidden gap-2 px-3 pb-0.5 text-[0.7rem] font-semibold uppercase tracking-wide text-muted-foreground sm:grid sm:grid-cols-[1fr_120px_auto]">
-                <span>Details (left cell)</span>
-                <span className="text-right">Total cost (USD)</span>
-                <span />
-              </div>
-              <div className="space-y-2 rounded-lg border border-border/70 bg-muted/15 p-2 dark:bg-muted/10">
-                {data.items.map((row, index) => (
-                  <div
-                    key={index}
-                    className="grid gap-3 rounded-md border border-border/60 bg-card/90 p-3 sm:grid-cols-[1fr_120px_auto] sm:items-end"
-                  >
-                    <div className="grid gap-1.5">
-                      <span className="text-[0.65rem] font-semibold uppercase tracking-wide text-muted-foreground sm:hidden">
-                        Details (left)
-                      </span>
-                      <Input
-                        aria-label={`Row ${index + 1} — details`}
-                        value={row.detail}
-                        onChange={(e) => setItem(index, { detail: e.target.value })}
-                        placeholder="e.g. QMetry Automation Framework (QAF)"
-                      />
+
+              <div className="space-y-4">
+                {data.pages.map((page, pageIndex) => (
+                  <div key={pageIndex} className="space-y-2 rounded-lg border border-border/70 bg-muted/15 p-3 dark:bg-muted/10">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-sm font-semibold">Page {page.pageNumber}</h4>
+                      <div className="flex gap-2">
+                        <Button type="button" variant="outline" size="sm" onClick={() => addRow(pageIndex)}>
+                          <Plus className="size-3.5 mr-1" />
+                          Add row
+                        </Button>
+                        <Button 
+                          type="button" 
+                          variant="ghost" 
+                          size="sm" 
+                          className="text-destructive" 
+                          disabled={data.pages.length <= 1}
+                          onClick={() => removePage(pageIndex)}
+                        >
+                          <Trash2 className="size-3.5 mr-1" />
+                          Remove Page
+                        </Button>
+                      </div>
                     </div>
-                    <div className="grid gap-1.5">
-                      <span className="text-[0.65rem] font-semibold uppercase tracking-wide text-muted-foreground sm:hidden">
-                        Total cost (USD)
-                      </span>
-                      <Input
-                        aria-label={`Row ${index + 1} — amount`}
-                        value={row.cost}
-                        onChange={(e) => setItem(index, { cost: e.target.value })}
-                        placeholder="e.g. 5,000.00"
-                        className="tabular-nums text-right"
-                      />
+
+                    <div className="space-y-2">
+                      {page.items.map((row, lineIndex) => (
+                        <div
+                          key={lineIndex}
+                          className="grid gap-2 rounded-md border border-border/60 bg-card/90 p-3 sm:grid-cols-[50px_1fr_80px_120px_auto] sm:items-start"
+                        >
+                          <div className="grid gap-1.5">
+                            <Label className="text-[0.65rem] uppercase text-muted-foreground">#</Label>
+                            <Input
+                              type="number"
+                              value={row.number}
+                              onChange={(e) => setItem(pageIndex, lineIndex, { number: Number(e.target.value) })}
+                              className="px-2"
+                            />
+                          </div>
+                          <div className="grid gap-1.5">
+                            <Label className="text-[0.65rem] uppercase text-muted-foreground">Item Name & Desc</Label>
+                            <Input
+                              value={row.name}
+                              onChange={(e) => setItem(pageIndex, lineIndex, { name: e.target.value })}
+                              placeholder="Name"
+                              className="mb-1"
+                            />
+                            <textarea
+                              value={row.description}
+                              onChange={(e) => setItem(pageIndex, lineIndex, { description: e.target.value })}
+                              placeholder="Description"
+                              rows={2}
+                              className={cn(
+                                "flex w-full rounded-md border border-input/90 bg-background/80 px-3 py-1.5 text-sm shadow-sm",
+                                "focus-visible:border-primary/35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45"
+                              )}
+                            />
+                          </div>
+                          <div className="grid gap-1.5">
+                            <Label className="text-[0.65rem] uppercase text-muted-foreground">Qty</Label>
+                            <Input
+                              type="number"
+                              value={row.quantity}
+                              onChange={(e) => setItem(pageIndex, lineIndex, { quantity: Number(e.target.value) })}
+                              className="px-2 text-right"
+                            />
+                          </div>
+                          <div className="grid gap-1.5">
+                            <Label className="text-[0.65rem] uppercase text-muted-foreground">Unit Price</Label>
+                            <Input
+                              type="number"
+                              step="0.01"
+                              value={row.price}
+                              onChange={(e) => setItem(pageIndex, lineIndex, { price: Number(e.target.value) })}
+                              className="px-2 text-right tabular-nums"
+                            />
+                          </div>
+                          <div className="mt-[22px] flex justify-center">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              disabled={page.items.length <= 1}
+                              onClick={() => removeRow(pageIndex, lineIndex)}
+                              aria-label="Remove row"
+                            >
+                              <Trash2 className="size-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
                     </div>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="justify-self-end sm:justify-self-center"
-                      disabled={data.items.length <= 1}
-                      onClick={() => removeRow(index)}
-                      aria-label={`Remove row ${index + 1}`}
-                    >
-                      <Trash2 className="size-4" />
-                    </Button>
                   </div>
                 ))}
               </div>
@@ -366,21 +476,22 @@ export function QuotationForm({
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div className="grid gap-2">
                     <Label htmlFor="qg-page-format">Paper format</Label>
-                    <select
+                    <Dropdown
                       id="qg-page-format"
                       value={data.pageFormat}
                       onChange={(e) =>
                         patch({ pageFormat: e.target.value as QuotationData["pageFormat"] })
                       }
-                      className="h-10 rounded-lg border border-input/90 bg-background px-3 text-sm"
-                    >
-                      <option value="a4">A4</option>
-                      <option value="letter">Letter</option>
-                    </select>
+                      className="h-10 rounded-lg border-input/90 bg-background text-sm"
+                      options={[
+                        { value: "a4", label: "A4" },
+                        { value: "letter", label: "Letter" },
+                      ]}
+                    />
                   </div>
                   <div className="grid gap-2">
                     <Label htmlFor="qg-page-orientation">Orientation</Label>
-                    <select
+                    <Dropdown
                       id="qg-page-orientation"
                       value={data.pageOrientation}
                       onChange={(e) =>
@@ -389,11 +500,12 @@ export function QuotationForm({
                             e.target.value as QuotationData["pageOrientation"],
                         })
                       }
-                      className="h-10 rounded-lg border border-input/90 bg-background px-3 text-sm"
-                    >
-                      <option value="landscape">Landscape</option>
-                      <option value="portrait">Portrait</option>
-                    </select>
+                      className="h-10 rounded-lg border-input/90 bg-background text-sm"
+                      options={[
+                        { value: "landscape", label: "Landscape" },
+                        { value: "portrait", label: "Portrait" },
+                      ]}
+                    />
                   </div>
                 </div>
               </div>
@@ -405,22 +517,23 @@ export function QuotationForm({
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div className="grid gap-2">
                     <Label htmlFor="qg-logo-align">Logo position (all pages)</Label>
-                    <select
+                    <Dropdown
                       id="qg-logo-align"
                       value={data.logoAlign}
                       onChange={(e) =>
                         patch({ logoAlign: e.target.value as QuotationData["logoAlign"] })
                       }
-                      className="h-10 rounded-lg border border-input/90 bg-background px-3 text-sm"
-                    >
-                      <option value="left">Left</option>
-                      <option value="center">Center</option>
-                      <option value="right">Right</option>
-                    </select>
+                      className="h-10 rounded-lg border-input/90 bg-background text-sm"
+                      options={[
+                        { value: "left", label: "Left" },
+                        { value: "center", label: "Center" },
+                        { value: "right", label: "Right" },
+                      ]}
+                    />
                   </div>
                   <div className="grid gap-2">
                     <Label htmlFor="qg-table-block-align">Page 2 — cost table block</Label>
-                    <select
+                    <Dropdown
                       id="qg-table-block-align"
                       value={data.tableBlockAlign}
                       onChange={(e) =>
@@ -428,48 +541,51 @@ export function QuotationForm({
                           tableBlockAlign: e.target.value as QuotationData["tableBlockAlign"],
                         })
                       }
-                      className="h-10 rounded-lg border border-input/90 bg-background px-3 text-sm"
-                    >
-                      <option value="left">Left</option>
-                      <option value="center">Center</option>
-                      <option value="right">Right</option>
-                    </select>
+                      className="h-10 rounded-lg border-input/90 bg-background text-sm"
+                      options={[
+                        { value: "left", label: "Left" },
+                        { value: "center", label: "Center" },
+                        { value: "right", label: "Right" },
+                      ]}
+                    />
                   </div>
                 </div>
                 <div className="grid gap-3 sm:grid-cols-3">
                   <div className="grid gap-2">
                     <Label htmlFor="qg-align-cover">Cover</Label>
-                    <select
+                    <Dropdown
                       id="qg-align-cover"
                       value={data.coverTextAlign}
                       onChange={(e) =>
                         patch({ coverTextAlign: e.target.value as QuotationData["coverTextAlign"] })
                       }
-                      className="h-10 rounded-lg border border-input/90 bg-background px-3 text-sm"
-                    >
-                      <option value="left">Left</option>
-                      <option value="center">Center</option>
-                      <option value="right">Right</option>
-                    </select>
+                      className="h-10 rounded-lg border-input/90 bg-background text-sm"
+                      options={[
+                        { value: "left", label: "Left" },
+                        { value: "center", label: "Center" },
+                        { value: "right", label: "Right" },
+                      ]}
+                    />
                   </div>
                   <div className="grid gap-2">
                     <Label htmlFor="qg-align-page2">Page 2 title/intro</Label>
-                    <select
+                    <Dropdown
                       id="qg-align-page2"
                       value={data.page2TextAlign}
                       onChange={(e) =>
                         patch({ page2TextAlign: e.target.value as QuotationData["page2TextAlign"] })
                       }
-                      className="h-10 rounded-lg border border-input/90 bg-background px-3 text-sm"
-                    >
-                      <option value="left">Left</option>
-                      <option value="center">Center</option>
-                      <option value="right">Right</option>
-                    </select>
+                      className="h-10 rounded-lg border-input/90 bg-background text-sm"
+                      options={[
+                        { value: "left", label: "Left" },
+                        { value: "center", label: "Center" },
+                        { value: "right", label: "Right" },
+                      ]}
+                    />
                   </div>
                   <div className="grid gap-2">
                     <Label htmlFor="qg-align-contact">Contact block</Label>
-                    <select
+                    <Dropdown
                       id="qg-align-contact"
                       value={data.contactTextAlign}
                       onChange={(e) =>
@@ -477,12 +593,13 @@ export function QuotationForm({
                           contactTextAlign: e.target.value as QuotationData["contactTextAlign"],
                         })
                       }
-                      className="h-10 rounded-lg border border-input/90 bg-background px-3 text-sm"
-                    >
-                      <option value="left">Left</option>
-                      <option value="center">Center</option>
-                      <option value="right">Right</option>
-                    </select>
+                      className="h-10 rounded-lg border-input/90 bg-background text-sm"
+                      options={[
+                        { value: "left", label: "Left" },
+                        { value: "center", label: "Center" },
+                        { value: "right", label: "Right" },
+                      ]}
+                    />
                   </div>
                 </div>
               </div>
@@ -508,27 +625,12 @@ export function QuotationForm({
                   Use gradient background (disable for flat color)
                 </label>
                 <div className="grid gap-2">
-                  <Label htmlFor="qg-bg-image">Custom background image</Label>
-                  <Input
-                    id="qg-bg-image"
-                    type="file"
-                    accept="image/png,image/jpeg,image/webp,image/*"
-                    onChange={onBackgroundChange}
-                    className="cursor-pointer file:mr-3 file:rounded-md file:border-0 file:bg-primary file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-primary-foreground hover:file:bg-primary/90"
+                  <UploadCard
+                    label="Custom background image"
+                    value={data.backgroundImage}
+                    onChange={(val) => patch({ backgroundImage: val || undefined })}
+                    placeholder="PNG, JPG, WebP"
                   />
-                  {data.backgroundImage ? (
-                    <div className="flex flex-wrap items-center gap-3 pt-1">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={data.backgroundImage}
-                        alt="Background preview"
-                        className="h-16 w-auto max-w-60 rounded-lg border border-border bg-background object-cover p-1"
-                      />
-                      <Button type="button" variant="outline" size="sm" onClick={clearBackground}>
-                        Remove background
-                      </Button>
-                    </div>
-                  ) : null}
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="grid gap-2">
@@ -599,37 +701,6 @@ export function QuotationForm({
             </div>
           </details>
         </fieldset>
-
-        <div className="sticky bottom-0 z-10 -mx-5 flex flex-wrap items-center gap-2 border-t border-border/80 bg-card/95 px-5 pb-2 pt-3 backdrop-blur supports-backdrop-filter:bg-card/80">
-          {onCancelEdit ? (
-            <Button type="button" variant="ghost" onClick={onCancelEdit}>
-              Cancel
-            </Button>
-          ) : null}
-          <Button type="button" variant="outline" onClick={onReset}>
-            Reset form
-          </Button>
-          <Button type="button" variant="secondary" onClick={onSaveQuotation}>
-            <Save className="size-4" aria-hidden />
-            Save quotation
-          </Button>
-          <Button type="button" onClick={onDownloadPdf} disabled={exporting}>
-            {exporting ? "Building PDF…" : "Download PDF"}
-          </Button>
-          {saveNotice ? (
-            <span className="text-muted-foreground w-full text-sm sm:ml-1 sm:w-auto" role="status">
-              {saveNotice}
-            </span>
-          ) : null}
-          {pdfError ? (
-            <p
-              className="text-destructive w-full text-sm sm:ml-1 sm:w-auto"
-              role="alert"
-            >
-              {pdfError}
-            </p>
-          ) : null}
-        </div>
       </CardContent>
     </Card>
   );

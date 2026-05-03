@@ -3,6 +3,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Dropdown } from "@/components/ui/select";
 import type { Item } from "./types";
 
 type HeadingCardProps = {
@@ -26,9 +27,9 @@ export function HeadingCard({ item, extras, onItemChange, onPatchExtra }: Headin
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="space-y-1.5 sm:col-span-2">
             <Label htmlFor="inv-type">Invoice type</Label>
-            <select
+            <Dropdown
               id="inv-type"
-              className="flex h-10 w-full rounded-lg border border-input/90 bg-background px-3 text-sm focus-visible:ring-1 focus-visible:ring-primary outline-none transition-colors"
+              className="h-10 rounded-lg border-input/90 bg-background text-sm focus-visible:ring-1 focus-visible:ring-primary"
               value={item.invoiceType ?? "aed"}
               onChange={(e) => {
                 const val = e.target.value === "usd" ? "usd" : "aed";
@@ -46,10 +47,11 @@ export function HeadingCard({ item, extras, onItemChange, onPatchExtra }: Headin
                 });
                 onPatchExtra("footerCurrencyLine", isUsd ? "CURRENCY IN USD" : "CURRENCY IN AED");
               }}
-            >
-              <option value="aed">AED Invoice (Local)</option>
-              <option value="usd">USD Invoice (International)</option>
-            </select>
+              options={[
+                { value: "aed", label: "AED Invoice (Local)" },
+                { value: "usd", label: "USD Invoice (International)" },
+              ]}
+            />
           </div>
           <div className="space-y-1.5 sm:col-span-2">
             <Label htmlFor="inv-doc-title">Document title</Label>

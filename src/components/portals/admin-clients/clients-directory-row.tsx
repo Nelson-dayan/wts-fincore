@@ -132,7 +132,7 @@ export function ClientsDirectoryRow({
             <>
               <Button
                 size="sm"
-                className="h-8 rounded-lg px-3"
+                className="rounded-lg px-3"
                 onClick={() => onSave(client._id)}
                 disabled={savingId === client._id}
               >
@@ -145,7 +145,7 @@ export function ClientsDirectoryRow({
                   "Save"
                 )}
               </Button>
-              <Button size="sm" variant="outline" className="h-8 rounded-lg px-2" onClick={onCancelEdit}>
+              <Button size="sm" variant="outline" className="rounded-lg px-2.5" onClick={onCancelEdit}>
                 <X className="size-4" aria-label="Cancel" />
               </Button>
             </>
@@ -155,7 +155,7 @@ export function ClientsDirectoryRow({
                 <Pencil className="size-3.5" aria-hidden />
                 <span className="sr-only sm:not-sr-only sm:ml-1.5 sm:text-xs">Edit</span>
               </Button> */}
-              <Button size="sm" variant="secondary" className="h-8 rounded-lg px-2.5" asChild>
+              <Button size="sm" variant="secondary" className="rounded-lg px-2.5" asChild>
                 <Link href={clientDetailsHref}>
                   <ExternalLink className="size-3.5" aria-hidden />
                   <span className="sr-only sm:not-sr-only sm:ml-1.5 sm:text-xs">Profile</span>

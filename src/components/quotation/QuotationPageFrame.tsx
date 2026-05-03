@@ -51,7 +51,7 @@ const RIBBON_GRAY_FOLD = "#18191c";
 
 type QuotationPageFrameProps = {
   data: QuotationData;
-  page: 1 | 2 | 3;
+  page: number;
   children: ReactNode;
 };
 

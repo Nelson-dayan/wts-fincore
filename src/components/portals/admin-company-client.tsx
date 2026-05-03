@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Building2, Landmark, Loader2, Percent, Save } from "lucide-react";
 import { DashboardPageHeader } from "@/components/dashboard/page-header";
 import { Button } from "@/components/ui/button";
@@ -8,7 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
-import { readFileAsPdfSafeDataUrl } from "@/lib/portals/read-file-as-pdf-safe-data-url";
+import { UploadCard } from "@/components/ui/upload-card";
 import { readResponseJson } from "@/lib/http/read-response-json";
 
 type CompanyData = {
@@ -29,6 +30,7 @@ function s(v: string | undefined | null): string {
 }
 
 export function AdminCompanyClient() {
+  const router = useRouter();
   const [primaryForm, setPrimaryForm] = useState<CompanyData>({
     name: "",
     address: "",
@@ -90,6 +92,7 @@ export function AdminCompanyClient() {
       setMessageOk(true);
       setMessage("Saved. Quotations and PDFs will use these details.");
       await loadPrimary({ quiet: true });
+      router.refresh();
     } catch (e) {
       setMessageOk(false);
       setMessage(e instanceof Error ? e.message : "Failed to update");
@@ -194,65 +197,38 @@ export function AdminCompanyClient() {
                 </div>
               </div>
 
-              <div>
-                <h3 className="mb-4 text-sm font-semibold text-foreground">Brand on PDFs</h3>
-                <div className="grid gap-5 sm:grid-cols-2">
-                  <div className="space-y-1.5">
-                    <Label className="text-foreground/90">Logo</Label>
-                    <Input
-                      type="file"
-                      accept="image/*"
-                      className="h-11 cursor-pointer border-border/80 bg-background/60 file:mr-3 file:rounded-lg file:border-0 file:bg-primary/12 file:px-3 file:py-2 file:text-xs file:font-semibold file:text-primary hover:file:bg-primary/18"
-                      onChange={async (e) => {
-                        const file = e.target.files?.[0];
-                        if (!file) return;
-                        const text = await readFileAsPdfSafeDataUrl(file);
-                        setPrimaryForm((f) => ({ ...f, logoText: text }));
-                        e.target.value = "";
-                      }}
-                    />
-                    {primaryForm.logoText ? (
-                      <div className="pt-2">
-                        {/* eslint-disable-next-line @next/next/no-img-element -- data URL */}
-                        <img
-                          src={primaryForm.logoText}
-                          alt="Logo preview"
-                          className="h-14 max-w-50 rounded-lg border border-border object-contain"
-                        />
+                  <div className="space-y-6">
+                    {/* Section Header */}
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h3 className="text-base font-semibold tracking-tight text-foreground">
+                          Brand Assets
+                        </h3>
+                        <p className="text-xs text-muted-foreground">
+                          These will appear on generated PDFs and documents
+                        </p>
                       </div>
-                    ) : (
-                      <p className="text-xs text-muted-foreground">No logo on file</p>
-                    )}
+                    </div>
+
+                    {/* Card Container */}
+                    <div className="grid gap-5 sm:grid-cols-2">
+
+                      <UploadCard
+                        label="Logo"
+                        value={primaryForm.logoText}
+                        onChange={(val) => setPrimaryForm((f) => ({ ...f, logoText: val }))}
+                        placeholder="Upload Logo (PNG, JPG max 2MB)"
+                      />
+
+                      <UploadCard
+                        label="Signature"
+                        value={primaryForm.signatureText}
+                        onChange={(val) => setPrimaryForm((f) => ({ ...f, signatureText: val }))}
+                        placeholder="Upload Signature"
+                      />
+
+                    </div>
                   </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-foreground/90">Signature image</Label>
-                    <Input
-                      type="file"
-                      accept="image/*"
-                      className="h-11 cursor-pointer border-border/80 bg-background/60 file:mr-3 file:rounded-lg file:border-0 file:bg-primary/12 file:px-3 file:py-2 file:text-xs file:font-semibold file:text-primary hover:file:bg-primary/18"
-                      onChange={async (e) => {
-                        const file = e.target.files?.[0];
-                        if (!file) return;
-                        const text = await readFileAsPdfSafeDataUrl(file);
-                        setPrimaryForm((f) => ({ ...f, signatureText: text }));
-                        e.target.value = "";
-                      }}
-                    />
-                    {primaryForm.signatureText ? (
-                      <div className="pt-2">
-                        {/* eslint-disable-next-line @next/next/no-img-element -- data URL */}
-                        <img
-                          src={primaryForm.signatureText}
-                          alt="Signature preview"
-                          className="h-14 max-w-55 rounded-lg border border-border object-contain object-left"
-                        />
-                      </div>
-                    ) : (
-                      <p className="text-xs text-muted-foreground">No signature on file</p>
-                    )}
-                  </div>
-                </div>
-              </div>
 
               <div>
                 <h3 className="mb-4 flex items-center gap-2 text-sm font-semibold text-foreground">

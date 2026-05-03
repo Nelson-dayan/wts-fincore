@@ -24,7 +24,7 @@ export async function GET(req: Request) {
       : {};
     const [itemsRaw, total] = await Promise.all([
       ClientModel.find(filter)
-      .select("name company email phone website address clientLogoText clientSignatureText createdAt")
+      .select("name company email phone website address billingAddress shippingAddress taxId currency paymentTerms country state city zipCode notes clientLogoText clientSignatureText createdAt")
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit)
@@ -63,6 +63,16 @@ export async function POST(req: Request) {
       phone?: string;
       clientLogoText?: string;
       clientSignatureText?: string;
+      taxId?: string;
+      currency?: string;
+      paymentTerms?: string;
+      notes?: string;
+      billingAddress?: string;
+      shippingAddress?: string;
+      country?: string;
+      state?: string;
+      city?: string;
+      zipCode?: string;
     };
     const name = String(body.name ?? "").trim();
     const company = String(body.company ?? "").trim();
@@ -89,6 +99,16 @@ export async function POST(req: Request) {
       clientLogoUrl: String(body.clientLogoText ?? ""),
       clientLogoText: String(body.clientLogoText ?? ""),
       clientSignatureText: String(body.clientSignatureText ?? ""),
+      taxId: String(body.taxId ?? "").trim(),
+      currency: String(body.currency ?? "AED").trim().toUpperCase(),
+      paymentTerms: String(body.paymentTerms ?? "").trim(),
+      notes: String(body.notes ?? "").trim(),
+      billingAddress: String(body.billingAddress ?? "").trim(),
+      shippingAddress: String(body.shippingAddress ?? "").trim(),
+      country: String(body.country ?? "").trim(),
+      state: String(body.state ?? "").trim(),
+      city: String(body.city ?? "").trim(),
+      zipCode: String(body.zipCode ?? "").trim(),
       createdBy: session.user.id,
     });
 

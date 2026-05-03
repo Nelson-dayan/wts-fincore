@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { EditorPanel } from "@/components/portals/admin-invoice-detail/editor-panel";
+import { PaymentsCard } from "@/components/portals/admin-invoice-detail/payments-card";
 import { InvoicePrintStyle } from "@/components/portals/admin-invoice-detail/print-style";
 import type { Bank, Item } from "@/components/portals/admin-invoice-detail/types";
 import { readImageFileAsDataUrl } from "@/components/portals/admin-invoice-detail/utils";
@@ -13,6 +14,7 @@ import { computeInvoiceTotals } from "@/lib/invoice/invoice-totals";
 import { exportInvoicePdf } from "@/utils/exportPdf";
 import { readResponseJson } from "@/lib/http/read-response-json";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { SaveConfirmModal } from "@/components/ui/save-confirm-modal";
 
 
 function toDocData(item: Item): InvoiceDocData {
@@ -50,8 +52,6 @@ export function AdminInvoiceDetailClient({
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState("");
   const [pdfExporting, setPdfExporting] = useState(false);
-  const [logoErr, setLogoErr] = useState("");
-  const logoInputRef = useRef<HTMLInputElement>(null);
   const [saveConfirmOpen, setSaveConfirmOpen] = useState(false);
 
   const load = useCallback(async () => {
@@ -273,30 +273,7 @@ export function AdminInvoiceDetailClient({
     });
   }
 
-  async function onLogoPicked(files: FileList | null) {
-    const f = files?.[0];
-    setLogoErr("");
-    if (!f || !item) return;
-    if (!/^image\/(png|jpe?g|webp)$/i.test(f.type)) {
-      setLogoErr("Use PNG, JPG, or WebP for the logo.");
-      return;
-    }
-    if (f.size > 2 * 1024 * 1024) {
-      setLogoErr("Logo must be under 2 MB.");
-      return;
-    }
-    try {
-      const dataUrl = await readImageFileAsDataUrl(f);
-      setItem({
-        ...item,
-        companySnapshot: { ...item.companySnapshot, logoUrl: dataUrl },
-      });
-    } catch {
-      setLogoErr("Could not read logo file.");
-    } finally {
-      if (logoInputRef.current) logoInputRef.current.value = "";
-    }
-  }
+
 
   if (loading && !error) {
     return <p className="text-muted-foreground text-sm">Loading…</p>;
@@ -310,17 +287,15 @@ export function AdminInvoiceDetailClient({
   const taxLabelPreview = taxEnabledPreview ? `Tax (${taxRatePreview}%)` : "Tax";
   return (
     <div className="animate-fade-in">
-      <ConfirmDialog
+      <SaveConfirmModal
         open={saveConfirmOpen}
-        onOpenChange={setSaveConfirmOpen}
-        title="Save invoice?"
-        description="Your invoice data will be written to the database."
-        confirmLabel="Save"
-        loading={saving}
+        onClose={() => setSaveConfirmOpen(false)}
         onConfirm={async () => {
           const ok = await save();
           if (ok) setSaveConfirmOpen(false);
         }}
+        loading={saving}
+        entityName="invoice record"
       />
       <DashboardPageHeader title={item ? item.invoiceNumber : "Invoice"} />
       {poInvoiceCount != null ? (
@@ -341,8 +316,6 @@ export function AdminInvoiceDetailClient({
             extras={extras}
             bankAed={bankAed}
             bankUsd={bankUsd}
-            logoErr={logoErr}
-            logoInputRef={logoInputRef}
             taxLabelPreview={taxLabelPreview}
             liveTotals={liveTotals}
             saving={saving}
@@ -355,14 +328,26 @@ export function AdminInvoiceDetailClient({
             onAddLine={addLine}
             onRemoveLine={removeLine}
             onCopyBillToShip={copyBillToShip}
-            onPickLogo={onLogoPicked}
             onSave={() => setSaveConfirmOpen(true)}
             onDownloadPdf={() => void downloadPdf()}
           />
 
-          <div className="print:col-span-full">
-            <p className="text-muted-foreground mb-2 text-xs print:hidden">Live preview</p>
-            <InvoiceSecDocument data={previewDocData} />
+          <div className="flex flex-col gap-8 print:col-span-full">
+            <div>
+              <p className="text-muted-foreground mb-2 text-xs print:hidden">Live preview</p>
+              <InvoiceSecDocument data={previewDocData} />
+            </div>
+
+            {invoiceId && item._id && (
+              <div className="print:hidden">
+                <PaymentsCard 
+                  invoiceId={item._id} 
+                  companyId={String(item.companyId || "")} 
+                  invoiceCurrency={item.currency || (item.invoiceType === "usd" ? "USD" : "AED")}
+                  invoiceExchangeRate={item.exchangeRate || 1}
+                />
+              </div>
+            )}
           </div>
         </div>
       ) : null}

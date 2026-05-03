@@ -10,6 +10,16 @@ export type ClientDetailsPayload = {
     clientLogoText?: string;
     clientLogoUrl?: string;
     clientSignatureText?: string;
+    taxId?: string;
+    currency?: string;
+    paymentTerms?: string;
+    notes?: string;
+    billingAddress?: string;
+    shippingAddress?: string;
+    country?: string;
+    state?: string;
+    city?: string;
+    zipCode?: string;
     createdAt: string;
   };
   projects?: Array<{
@@ -67,4 +77,14 @@ export type ClientProfileForm = {
   address: string;
   clientLogoText: string;
   clientSignatureText: string;
+  taxId: string;
+  currency: string;
+  paymentTerms: string;
+  notes: string;
+  billingAddress: string;
+  shippingAddress: string;
+  country: string;
+  state: string;
+  city: string;
+  zipCode: string;
 };

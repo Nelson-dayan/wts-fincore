@@ -4,24 +4,19 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { UploadCard } from "@/components/ui/upload-card";
 import type { Item } from "./types";
 
 type CompanyCardProps = {
   item: Item;
-  logoErr: string;
-  logoInputRef: React.RefObject<HTMLInputElement | null>;
   onItemChange: (next: Item) => void;
   onPatchExtra: (key: string, value: string) => void;
-  onPickLogo: (files: FileList | null) => Promise<void>;
 };
 
 export function CompanyCard({
   item,
-  logoErr,
-  logoInputRef,
   onItemChange,
   onPatchExtra,
-  onPickLogo,
 }: CompanyCardProps) {
   const extras = item.extras as Record<string, unknown>;
 
@@ -48,12 +43,13 @@ export function CompanyCard({
           <Label>Company TRN</Label>
           <Input value={String(extras.companyTrn ?? "")} onChange={(e) => onPatchExtra("companyTrn", e.target.value)} />
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <input ref={logoInputRef} type="file" accept="image/png,image/jpeg,image/jpg,image/webp" className="sr-only" onChange={(e) => void onPickLogo(e.target.files)} />
-          <Button type="button" size="sm" variant="outline" onClick={() => logoInputRef.current?.click()}>
-            Replace logo image
-          </Button>
-          {logoErr ? <span className="text-destructive text-xs">{logoErr}</span> : null}
+        <div className="pt-2">
+          <UploadCard
+            label="Company Logo"
+            value={String(item.companySnapshot.logoUrl ?? "")}
+            onChange={(val) => onItemChange({ ...item, companySnapshot: { ...item.companySnapshot, logoUrl: val } })}
+            placeholder="Upload Logo"
+          />
         </div>
       </CardContent>
     </Card>

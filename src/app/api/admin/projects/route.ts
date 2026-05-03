@@ -19,7 +19,7 @@ export async function GET(req: Request) {
     if (clientId) filter.clientId = clientId;
     const [itemsRaw, total] = await Promise.all([
       ProjectModel.find(filter)
-      .select("name status priority budget createdAt clientId")
+      .select("name status priority budget currency category clientReference startDate targetEndDate actualEndDate createdAt clientId")
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit)
@@ -51,6 +51,13 @@ export async function POST(req: Request) {
       priority?: "low" | "medium" | "high";
       budget?: number;
       assignedTo?: string[];
+      currency?: string;
+      category?: string;
+      clientReference?: string;
+      notes?: string;
+      startDate?: string;
+      targetEndDate?: string;
+      actualEndDate?: string;
     };
     const name = String(body.name ?? "").trim();
     const clientId = String(body.clientId ?? "").trim();
@@ -85,6 +92,13 @@ export async function POST(req: Request) {
       status: body.status ?? "lead",
       priority: body.priority ?? "medium",
       budget: body.budget,
+      currency: String(body.currency ?? "AED").trim().toUpperCase(),
+      category: String(body.category ?? "").trim(),
+      clientReference: String(body.clientReference ?? "").trim(),
+      notes: String(body.notes ?? "").trim(),
+      startDate: body.startDate ? new Date(body.startDate) : undefined,
+      targetEndDate: body.targetEndDate ? new Date(body.targetEndDate) : undefined,
+      actualEndDate: body.actualEndDate ? new Date(body.actualEndDate) : undefined,
     });
 
     await logActivity({

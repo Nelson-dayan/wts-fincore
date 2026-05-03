@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils/cn";
-import { readFileAsPdfSafeDataUrl } from "@/lib/portals/read-file-as-pdf-safe-data-url";
+import { UploadCard } from "@/components/ui/upload-card";
 import type { ClientDetailsPayload, ClientProfileForm } from "./types";
 
 function DetailTile({
@@ -122,80 +122,105 @@ export function ClientProfileCard({
       <CardContent className="grid gap-4 text-sm sm:grid-cols-2">
         {editing ? (
           <>
+            {/* Top Logo Section */}
             <div className="space-y-3 sm:col-span-2">
               <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Brand (quotation PDF)</p>
               <div className="grid gap-4 sm:grid-cols-2">
+                <UploadCard
+                  label="Upload client logo"
+                  value={form.clientLogoText}
+                  onChange={(val) => onFormChange({ clientLogoText: val })}
+                />
+                <UploadCard
+                  label="Upload client signature"
+                  value={form.clientSignatureText}
+                  onChange={(val) => onFormChange({ clientSignatureText: val })}
+                />
+              </div>
+            </div>
+
+            <div className="sm:col-span-2 mt-4 pt-4 border-t space-y-4">
+              <h4 className="font-semibold text-primary">Basic Information</h4>
+              <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
-                  <Label>Upload client logo</Label>
-                  <Input
-                    type="file"
-                    accept="image/*"
-                    className="cursor-pointer file:mr-3 file:rounded-md file:border-0 file:bg-primary/10 file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-primary hover:file:bg-primary/15"
-                    onChange={async (e) => {
-                      const file = e.target.files?.[0];
-                      if (!file) return;
-                      const text = await readFileAsPdfSafeDataUrl(file);
-                      onFormChange({ clientLogoText: text });
-                      e.target.value = "";
-                    }}
-                  />
-                  {form.clientLogoText ? (
-                    // eslint-disable-next-line @next/next/no-img-element -- data URL
-                    <img
-                      src={form.clientLogoText}
-                      alt=""
-                      className="mt-1 h-12 max-w-50 rounded-md border border-border object-contain"
-                    />
-                  ) : null}
+                  <Label>Name</Label>
+                  <Input value={form.name} onChange={(e) => onFormChange({ name: e.target.value })} />
                 </div>
                 <div className="space-y-2">
-                  <Label>Upload client signature</Label>
-                  <Input
-                    type="file"
-                    accept="image/*"
-                    className="cursor-pointer file:mr-3 file:rounded-md file:border-0 file:bg-primary/10 file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-primary hover:file:bg-primary/15"
-                    onChange={async (e) => {
-                      const file = e.target.files?.[0];
-                      if (!file) return;
-                      const text = await readFileAsPdfSafeDataUrl(file);
-                      onFormChange({ clientSignatureText: text });
-                      e.target.value = "";
-                    }}
-                  />
-                  {form.clientSignatureText ? (
-                    // eslint-disable-next-line @next/next/no-img-element -- data URL
-                    <img
-                      src={form.clientSignatureText}
-                      alt=""
-                      className="mt-1 h-12 max-w-60 rounded-md border border-border object-contain object-left"
-                    />
-                  ) : null}
+                  <Label>Company Name</Label>
+                  <Input value={form.company} onChange={(e) => onFormChange({ company: e.target.value })} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Email</Label>
+                  <Input type="email" value={form.email} onChange={(e) => onFormChange({ email: e.target.value })} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Phone</Label>
+                  <Input value={form.phone} onChange={(e) => onFormChange({ phone: e.target.value })} />
                 </div>
               </div>
             </div>
-            <div className="space-y-2">
-              <Label>Name</Label>
-              <Input value={form.name} onChange={(e) => onFormChange({ name: e.target.value })} />
+
+            <div className="sm:col-span-2 mt-4 pt-4 border-t space-y-4">
+              <h4 className="font-semibold text-primary">Billing & Accounting</h4>
+              <div className="grid gap-4 sm:grid-cols-3">
+                <div className="space-y-2">
+                  <Label>Tax ID / GST No</Label>
+                  <Input value={form.taxId} onChange={(e) => onFormChange({ taxId: e.target.value })} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Preferred Currency</Label>
+                  <Input value={form.currency} onChange={(e) => onFormChange({ currency: e.target.value })} placeholder="AED" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Payment Terms</Label>
+                  <Input value={form.paymentTerms} onChange={(e) => onFormChange({ paymentTerms: e.target.value })} placeholder="Net 30" />
+                </div>
+              </div>
             </div>
-            <div className="space-y-2">
-              <Label>Client Company</Label>
-              <Input value={form.company} onChange={(e) => onFormChange({ company: e.target.value })} />
+
+            <div className="sm:col-span-2 mt-4 pt-4 border-t space-y-4">
+              <h4 className="font-semibold text-primary">Location</h4>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Billing Address</Label>
+                  <Input value={form.billingAddress} onChange={(e) => onFormChange({ billingAddress: e.target.value })} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Shipping Address</Label>
+                  <Input value={form.shippingAddress} onChange={(e) => onFormChange({ shippingAddress: e.target.value })} />
+                </div>
+              </div>
+              <div className="grid gap-4 sm:grid-cols-4">
+                <div className="space-y-2">
+                  <Label>City</Label>
+                  <Input value={form.city} onChange={(e) => onFormChange({ city: e.target.value })} />
+                </div>
+                <div className="space-y-2">
+                  <Label>State / Province</Label>
+                  <Input value={form.state} onChange={(e) => onFormChange({ state: e.target.value })} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Zip / Postal Code</Label>
+                  <Input value={form.zipCode} onChange={(e) => onFormChange({ zipCode: e.target.value })} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Country</Label>
+                  <Input value={form.country} onChange={(e) => onFormChange({ country: e.target.value })} />
+                </div>
+              </div>
             </div>
-            <div className="space-y-2">
-              <Label>Email</Label>
-              <Input type="email" value={form.email} onChange={(e) => onFormChange({ email: e.target.value })} />
-            </div>
-            <div className="space-y-2">
-              <Label>Phone</Label>
-              <Input value={form.phone} onChange={(e) => onFormChange({ phone: e.target.value })} />
-            </div>
-            <div className="space-y-2">
-              <Label>Website</Label>
-              <Input value={form.website} onChange={(e) => onFormChange({ website: e.target.value })} />
-            </div>
-            <div className="space-y-2 sm:col-span-2">
-              <Label>Address</Label>
-              <Input value={form.address} onChange={(e) => onFormChange({ address: e.target.value })} />
+
+            <div className="sm:col-span-2 mt-4 pt-4 border-t space-y-4">
+              <h4 className="font-semibold text-primary">Additional Information</h4>
+              <div className="space-y-2">
+                <Label>Website</Label>
+                <Input value={form.website} onChange={(e) => onFormChange({ website: e.target.value })} />
+              </div>
+              <div className="space-y-2">
+                <Label>Internal Notes</Label>
+                <Input value={form.notes} onChange={(e) => onFormChange({ notes: e.target.value })} placeholder="Private notes about this client..." />
+              </div>
             </div>
           </>
         ) : (
@@ -228,41 +253,83 @@ export function ClientProfileCard({
                 )}
               </div>
             </div>
-            <DetailTile label="Name">{data.client?.name ?? "—"}</DetailTile>
-            <DetailTile label="Company">{data.client?.company ?? "—"}</DetailTile>
-            <DetailTile label="Email">
-              {data.client?.email ? (
-                <span className="inline-flex items-center gap-2 break-all">
-                  <Mail className="size-3.5 shrink-0 text-primary/70" aria-hidden />
-                  {data.client.email}
-                </span>
-              ) : (
-                "—"
-              )}
-            </DetailTile>
-            <DetailTile label="Phone">
-              {data.client?.phone ? (
-                <span className="inline-flex items-center gap-2 tabular-nums">
-                  <Phone className="size-3.5 shrink-0 text-primary/70" aria-hidden />
-                  {data.client.phone}
-                </span>
-              ) : (
-                "—"
-              )}
-            </DetailTile>
-            <DetailTile label="Website" className="sm:col-span-2">
-              {data.client?.website ? <span className="break-all">{data.client.website}</span> : "—"}
-            </DetailTile>
-            <DetailTile label="Address" className="sm:col-span-2">
-              {data.client?.address ? (
-                <span className="inline-flex items-start gap-2">
-                  <MapPin className="mt-0.5 size-3.5 shrink-0 text-primary/70" aria-hidden />
-                  {data.client.address}
-                </span>
-              ) : (
-                "—"
-              )}
-            </DetailTile>
+            
+            <div className="sm:col-span-2 mt-2">
+              <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Basic Information</h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <DetailTile label="Name">{data.client?.name ?? "—"}</DetailTile>
+                <DetailTile label="Company">{data.client?.company ?? "—"}</DetailTile>
+                <DetailTile label="Email">
+                  {data.client?.email ? (
+                    <span className="inline-flex items-center gap-2 break-all">
+                      <Mail className="size-3.5 shrink-0 text-primary/70" aria-hidden />
+                      {data.client.email}
+                    </span>
+                  ) : (
+                    "—"
+                  )}
+                </DetailTile>
+                <DetailTile label="Phone">
+                  {data.client?.phone ? (
+                    <span className="inline-flex items-center gap-2 tabular-nums">
+                      <Phone className="size-3.5 shrink-0 text-primary/70" aria-hidden />
+                      {data.client.phone}
+                    </span>
+                  ) : (
+                    "—"
+                  )}
+                </DetailTile>
+              </div>
+            </div>
+
+            <div className="sm:col-span-2 mt-2">
+              <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Billing & Accounting</h4>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <DetailTile label="Tax ID / GST No">{data.client?.taxId || "—"}</DetailTile>
+                <DetailTile label="Currency">{data.client?.currency || "AED"}</DetailTile>
+                <DetailTile label="Payment Terms">{data.client?.paymentTerms || "—"}</DetailTile>
+              </div>
+            </div>
+
+            <div className="sm:col-span-2 mt-2">
+              <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Location</h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <DetailTile label="Billing Address">
+                  {data.client?.billingAddress || data.client?.address ? (
+                    <span className="inline-flex items-start gap-2">
+                      <MapPin className="mt-0.5 size-3.5 shrink-0 text-primary/70" aria-hidden />
+                      {data.client.billingAddress || data.client.address}
+                    </span>
+                  ) : "—"}
+                </DetailTile>
+                <DetailTile label="Shipping Address">
+                  {data.client?.shippingAddress ? (
+                    <span className="inline-flex items-start gap-2">
+                      <MapPin className="mt-0.5 size-3.5 shrink-0 text-primary/70" aria-hidden />
+                      {data.client.shippingAddress}
+                    </span>
+                  ) : "—"}
+                </DetailTile>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-4">
+                <DetailTile label="City">{data.client?.city || "—"}</DetailTile>
+                <DetailTile label="State / Province">{data.client?.state || "—"}</DetailTile>
+                <DetailTile label="Zip / Postal">{data.client?.zipCode || "—"}</DetailTile>
+                <DetailTile label="Country">{data.client?.country || "—"}</DetailTile>
+              </div>
+            </div>
+
+            <div className="sm:col-span-2 mt-2 mb-2">
+              <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Additional Details</h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <DetailTile label="Website">
+                  {data.client?.website ? <span className="break-all">{data.client.website}</span> : "—"}
+                </DetailTile>
+                <DetailTile label="Notes">
+                  {data.client?.notes || "—"}
+                </DetailTile>
+              </div>
+            </div>
           </>
         )}
       </CardContent>
