@@ -15,6 +15,7 @@ import {
   MAX_INVOICES_PER_PURCHASE_ORDER,
 } from "@/lib/invoice/invoice-limits";
 import { readResponseJson } from "@/lib/http/read-response-json";
+import { usePortalConfig } from "@/components/portals/portal-config-context";
 
 type PoRow = { _id: string; poNumber: string; quotationNumber?: string };
 
@@ -27,6 +28,7 @@ export function AdminInvoicesCreateHelper({
   embedded?: boolean;
 }) {
   const router = useRouter();
+  const { apiPrefix, pathPrefix } = usePortalConfig();
   const [pos, setPos] = useState<PoRow[]>([]);
   const [loadingPo, setLoadingPo] = useState(true);
   const [poError, setPoError] = useState("");
@@ -41,7 +43,7 @@ export function AdminInvoicesCreateHelper({
     try {
       const qs = new URLSearchParams({ page: "1", limit: "25", q: "" });
       if (projectId) qs.set("projectId", projectId);
-      const res = await fetch(`/api/admin/purchase-orders?${qs}`, { cache: "no-store" });
+      const res = await fetch(`${apiPrefix}/purchase-orders?${qs}`, { cache: "no-store" });
       const data = await readResponseJson<{ items?: PoRow[]; message?: string }>(res);
       if (!res.ok) throw new Error(data.message ?? "Could not load POs");
       const list = data.items ?? [];
@@ -51,7 +53,7 @@ export function AdminInvoicesCreateHelper({
       for (const p of list) {
         try {
           const ir = await fetch(
-            `/api/admin/invoices?poId=${encodeURIComponent(p._id)}&page=1&limit=10&q=`,
+            `${apiPrefix}/invoices?poId=${encodeURIComponent(p._id)}&page=1&limit=10&q=`,
             { cache: "no-store" }
           );
           const ij = await readResponseJson<{ total?: number }>(ir);
@@ -77,7 +79,7 @@ export function AdminInvoicesCreateHelper({
       }
       setLoadingPo(false);
     }
-  }, [projectId]);
+  }, [apiPrefix, projectId]);
 
   useEffect(() => {
     loadPos().catch(() => {});
@@ -87,7 +89,7 @@ export function AdminInvoicesCreateHelper({
     const id = poId.trim();
     if (!id) return;
     router.push(
-      `/admin/invoices/new?poId=${encodeURIComponent(id)}`
+      `${pathPrefix}/invoices/new?poId=${encodeURIComponent(id)}`
     );
   }
 
@@ -106,14 +108,14 @@ export function AdminInvoicesCreateHelper({
       <CardContent className="space-y-4">
         <div className="flex flex-wrap gap-2">
           <Button size="sm" variant="outline" asChild className="gap-2">
-            <Link href="/admin/purchase-orders">
+            <Link href={`${pathPrefix}/purchase-orders`}>
               <Package className="size-4" aria-hidden />
               All purchase orders
             </Link>
           </Button>
           {projectId && !embedded ? (
             <Button size="sm" variant="outline" asChild>
-              <Link href={`/admin/projects/${encodeURIComponent(projectId)}`}>Back to project</Link>
+              <Link href={`${pathPrefix}/projects/${encodeURIComponent(projectId)}`}>Back to project</Link>
             </Button>
           ) : null}
         </div>
@@ -136,7 +138,7 @@ export function AdminInvoicesCreateHelper({
         ) : pos.length === 0 ? (
           <p className="text-muted-foreground text-sm">
             No purchase orders yet. Open a{" "}
-            <Link href="/admin/quotations" className="text-primary underline-offset-4 hover:underline">
+            <Link href={`${pathPrefix}/quotations`} className="text-primary underline-offset-4 hover:underline">
               quotation
             </Link>{" "}
             and create a PO from there first.

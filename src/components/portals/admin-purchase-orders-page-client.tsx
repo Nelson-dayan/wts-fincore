@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { AdminPurchaseOrdersReceivePoClient } from "@/components/portals/admin-purchase-orders-receive-po-client";
 import { ResourceTableClient } from "@/components/portals/resource-table-client";
+import { usePortalConfig } from "@/components/portals/portal-config-context";
 
 export function AdminPurchaseOrdersPageClient({
   projectId,
@@ -11,6 +12,7 @@ export function AdminPurchaseOrdersPageClient({
   projectId: string;
   endpoint: string;
 }) {
+  const { pathPrefix } = usePortalConfig();
   const [poListRefreshKey, setPoListRefreshKey] = useState(0);
 
   return (
@@ -25,7 +27,9 @@ export function AdminPurchaseOrdersPageClient({
         description=""
         endpoint={endpoint}
         refreshKey={poListRefreshKey}
-        extraRowLinks={[{ label: "Invoice", hrefPattern: "/admin/invoices/new?poId={id}" }]}
+        extraRowLinks={[
+          { label: "Invoice", hrefPattern: `${pathPrefix}/invoices/new?poId={id}` },
+        ]}
         columns={[
           { key: "poNumber", label: "PO #" },
           { key: "quotationNumber", label: "Quotation" },
@@ -35,7 +39,7 @@ export function AdminPurchaseOrdersPageClient({
           { key: "hasFile", label: "Document" },
           { key: "createdAt", label: "Created" },
         ]}
-        rowDetailPathPrefix="/admin/purchase-orders"
+        rowDetailPathPrefix={`${pathPrefix}/purchase-orders`}
         rowDetailHash="#po-invoices"
         emptyMessage="No purchase orders yet."
       />

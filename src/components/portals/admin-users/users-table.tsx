@@ -3,13 +3,13 @@
 import {
   ChevronLeft,
   ChevronRight,
-  Loader2,
   Search,
   UserRound,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
 import { UsersTableRow } from "@/components/portals/admin-users/users-table-row";
 import type { AdminUser } from "./types";
 
@@ -119,9 +119,53 @@ export function UsersTable({
             {error}
           </div>
         ) : loading && users.length === 0 ? (
-          <div className="flex flex-col items-center justify-center gap-3 py-20 text-muted-foreground">
-            <Loader2 className="size-8 animate-spin text-primary" aria-hidden />
-            <p className="text-sm font-medium">Loading directory…</p>
+          <div className="overflow-x-auto" aria-busy="true">
+            <table className="w-full min-w-230 text-left text-sm">
+              <thead>
+                <tr className="border-b border-border/80 bg-muted/30 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground dark:bg-muted/15">
+                  <th className="px-5 py-3.5 pr-3">Member</th>
+                  <th className="px-0 py-3.5 pr-3">Email</th>
+                  <th className="px-0 py-3.5 pr-3">Role</th>
+                  <th className="px-0 py-3.5 pr-3">Status</th>
+                  <th className="px-0 py-3.5 pr-3">Phone</th>
+                  <th className="px-0 py-3.5 pr-3">Joined</th>
+                  <th className="px-0 py-3.5 pr-4 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border/60">
+                {Array.from({ length: 8 }).map((_, ri) => (
+                  <tr key={ri} className="bg-card">
+                    <td className="px-5 py-3.5 pr-3">
+                      <div className="flex items-center gap-3">
+                        <Skeleton className="size-10 shrink-0 rounded-full" />
+                        <Skeleton className="h-4 w-36 max-w-full" />
+                      </div>
+                    </td>
+                    <td className="px-0 py-3.5 pr-3">
+                      <Skeleton className="h-4 w-44 max-w-full" />
+                    </td>
+                    <td className="px-0 py-3.5 pr-3">
+                      <Skeleton className="h-4 w-20" />
+                    </td>
+                    <td className="px-0 py-3.5 pr-3">
+                      <Skeleton className="h-7 w-20 rounded-full" />
+                    </td>
+                    <td className="px-0 py-3.5 pr-3">
+                      <Skeleton className="h-4 w-28" />
+                    </td>
+                    <td className="px-0 py-3.5 pr-3">
+                      <Skeleton className="h-4 w-24" />
+                    </td>
+                    <td className="px-0 py-3.5 pr-4 text-right">
+                      <div className="flex justify-end gap-2">
+                        <Skeleton className="h-8 w-16 rounded-md" />
+                        <Skeleton className="h-8 w-16 rounded-md" />
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         ) : !loading && users.length === 0 ? (
           <div className="flex flex-col items-center justify-center gap-3 px-6 py-20 text-center">

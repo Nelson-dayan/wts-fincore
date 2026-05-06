@@ -10,16 +10,30 @@ import {
   formFileEntryToBlob,
   validatePoDataUrlString,
 } from "@/lib/api/po-upload";
+import { assertEmployeeCanAccessPurchaseOrder } from "@/lib/auth/employee-resource-access";
 
 type Ctx = { params: Promise<{ purchaseOrderId: string }> };
 
 export async function GET(_req: Request, ctx: Ctx) {
   try {
-    await requireRole(["admin"]);
+    const session = await requireRole(["admin", "employee"]);
     await connectDB();
     const { purchaseOrderId } = await ctx.params;
     if (!mongoose.Types.ObjectId.isValid(purchaseOrderId)) {
       return NextResponse.json({ message: "Invalid purchase order id" }, { status: 400 });
+    }
+    if (session.user.role === "employee") {
+      try {
+        await assertEmployeeCanAccessPurchaseOrder(session.user.id, purchaseOrderId);
+      } catch (e) {
+        if (e instanceof Error && e.message === "FORBIDDEN") {
+          return NextResponse.json({ message: "Forbidden" }, { status: 403 });
+        }
+        if (e instanceof Error && e.message === "NOT_FOUND") {
+          return NextResponse.json({ message: "Purchase order not found" }, { status: 404 });
+        }
+        throw e;
+      }
     }
     const raw = await PurchaseOrderModel.findById(purchaseOrderId)
       .populate("quotationId", "quotationNumber")
@@ -74,11 +88,25 @@ export async function GET(_req: Request, ctx: Ctx) {
 
 export async function PATCH(req: Request, ctx: Ctx) {
   try {
-    const session = await requireRole(["admin"]);
+    const session = await requireRole(["admin", "employee"]);
     await connectDB();
     const { purchaseOrderId } = await ctx.params;
     if (!mongoose.Types.ObjectId.isValid(purchaseOrderId)) {
       return NextResponse.json({ message: "Invalid purchase order id" }, { status: 400 });
+    }
+
+    if (session.user.role === "employee") {
+      try {
+        await assertEmployeeCanAccessPurchaseOrder(session.user.id, purchaseOrderId);
+      } catch (e) {
+        if (e instanceof Error && e.message === "FORBIDDEN") {
+          return NextResponse.json({ message: "Forbidden" }, { status: 403 });
+        }
+        if (e instanceof Error && e.message === "NOT_FOUND") {
+          return NextResponse.json({ message: "Purchase order not found" }, { status: 404 });
+        }
+        throw e;
+      }
     }
 
     const ct = (req.headers.get("content-type") ?? "").toLowerCase();

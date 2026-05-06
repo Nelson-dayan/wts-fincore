@@ -12,6 +12,7 @@ import { readResponseJson } from "@/lib/http/read-response-json";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { SaveConfirmModal } from "@/components/ui/save-confirm-modal";
 import { AdminInvoicesCreateHelper } from "@/components/portals/admin-invoices-create-helper";
+import { usePortalConfig } from "@/components/portals/portal-config-context";
 
 
 type ProjectDetailsPayload = {
@@ -123,8 +124,16 @@ function SectionTable({
   );
 }
 
-export function AdminProjectDetailsClient({ projectId }: { projectId: string }) {
+export function AdminProjectDetailsClient({
+  projectId,
+  allowProjectMutations = true,
+}: {
+  projectId: string;
+  /** When false, project profile is view-only (e.g. employee portal). */
+  allowProjectMutations?: boolean;
+}) {
   const router = useRouter();
+  const { apiPrefix, pathPrefix } = usePortalConfig();
   const [data, setData] = useState<ProjectDetailsPayload>({});
   const [error, setError] = useState("");
   const [editing, setEditing] = useState(false);
@@ -147,7 +156,7 @@ export function AdminProjectDetailsClient({ projectId }: { projectId: string }) 
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 
   const load = useCallback(async () => {
-    const response = await fetch(`/api/admin/projects/${encodeURIComponent(projectId)}`, {
+    const response = await fetch(`${apiPrefix}/projects/${encodeURIComponent(projectId)}`, {
       cache: "no-store",
     });
     const raw = await response.text();
@@ -180,7 +189,7 @@ export function AdminProjectDetailsClient({ projectId }: { projectId: string }) 
         actualEndDate: payload.project.actualEndDate ? new Date(payload.project.actualEndDate).toISOString().split('T')[0] : "",
       });
     }
-  }, [projectId]);
+  }, [projectId, apiPrefix]);
 
   useEffect(() => {
     load().catch((e) => setError(e instanceof Error ? e.message : "Failed to load details"));
@@ -190,7 +199,7 @@ export function AdminProjectDetailsClient({ projectId }: { projectId: string }) 
     setSaving(true);
     setError("");
     try {
-      const response = await fetch(`/api/admin/projects/${projectId}`, {
+      const response = await fetch(`${apiPrefix}/projects/${projectId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -225,7 +234,7 @@ export function AdminProjectDetailsClient({ projectId }: { projectId: string }) 
     setSaving(true);
     setError("");
     try {
-      const response = await fetch(`/api/admin/projects/${projectId}`, {
+      const response = await fetch(`${apiPrefix}/projects/${projectId}`, {
         method: "DELETE",
       });
       const payload = await readResponseJson<{ message?: string }>(response);
@@ -233,8 +242,8 @@ export function AdminProjectDetailsClient({ projectId }: { projectId: string }) 
       const parentClientId = data.project?.clientId?.trim();
       router.replace(
         parentClientId
-          ? `/admin/clients/${encodeURIComponent(parentClientId)}`
-          : "/admin/projects"
+          ? `${pathPrefix}/clients/${encodeURIComponent(parentClientId)}`
+          : `${pathPrefix}/projects`
       );
       router.refresh();
       return true;
@@ -285,7 +294,8 @@ export function AdminProjectDetailsClient({ projectId }: { projectId: string }) 
           <div className="flex items-center justify-between gap-2">
             <CardTitle className="text-base">Project Profile</CardTitle>
             <div className="flex gap-2">
-              {editing ? (
+              {allowProjectMutations ? (
+                editing ? (
                 <>
                   <Button size="sm" onClick={() => setSaveConfirmOpen(true)} disabled={saving}>
                     Save
@@ -303,7 +313,8 @@ export function AdminProjectDetailsClient({ projectId }: { projectId: string }) 
                     Delete
                   </Button>
                 </>
-              )}
+              )
+              ) : null}
             </div>
           </div>
         </CardHeader>
@@ -451,19 +462,19 @@ export function AdminProjectDetailsClient({ projectId }: { projectId: string }) 
       </Card>
 
       <div className="mb-2 flex flex-wrap justify-end gap-2">
-        <Link href={`/admin/quotations?projectId=${projectId}#quotation-builder`}>
+        <Link href={`${pathPrefix}/quotations?projectId=${projectId}#quotation-builder`}>
           <Button size="sm">Create quotation</Button>
         </Link>
-        <Link href={`/admin/quotations?projectId=${projectId}`}>
+        <Link href={`${pathPrefix}/quotations?projectId=${projectId}`}>
           <Button size="sm" variant="outline">View All Quotations for Project</Button>
         </Link>
-        <Link href={`/admin/purchase-orders?projectId=${projectId}`}>
+        <Link href={`${pathPrefix}/purchase-orders?projectId=${projectId}`}>
           <Button size="sm" variant="outline">View All POs for Project</Button>
         </Link>
-        <Link href={`/admin/invoices?projectId=${projectId}`}>
+        <Link href={`${pathPrefix}/invoices?projectId=${projectId}`}>
           <Button size="sm" variant="outline">View All Invoices for Project</Button>
         </Link>
-        <Link href="/admin/expenses">
+        <Link href={`${pathPrefix}/expenses`}>
           <Button size="sm" variant="outline">All expenses</Button>
         </Link>
       </div>

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { DashboardPageHeader } from "@/components/dashboard/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import { readResponseJson } from "@/lib/http/read-response-json";
 
 type Row = Record<string, unknown> & { _id?: string };
@@ -82,6 +83,7 @@ export function ResourceTableClient({
   refreshKey = 0,
 }: ResourceTableClientProps) {
   const detailPrefix = rowDetailPathPrefix?.replace(/\/$/, "") ?? "";
+  const hasActionsCol = Boolean(detailPrefix || (extraRowLinks && extraRowLinks.length > 0));
   const [rows, setRows] = useState<Row[]>([]);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
@@ -165,7 +167,40 @@ export function ResourceTableClient({
               {error}
             </div>
           ) : loading ? (
-            <p className="text-muted-foreground py-8 text-center text-sm">Loading…</p>
+            <div className="overflow-x-auto" aria-busy="true">
+              <table className="w-full min-w-190 text-left text-sm">
+                <thead className="text-muted-foreground">
+                  <tr>
+                    {columns.map((column) => (
+                      <th key={column.key} className="py-2 pr-3">
+                        {column.label}
+                      </th>
+                    ))}
+                    {hasActionsCol ? (
+                      <th className="py-2 pr-3 text-right">
+                        <span className="sr-only">Actions</span>
+                      </th>
+                    ) : null}
+                  </tr>
+                </thead>
+                <tbody>
+                  {Array.from({ length: 8 }).map((_, ri) => (
+                    <tr key={ri} className="border-t border-border/70">
+                      {columns.map((column) => (
+                        <td key={column.key} className="py-2.5 pr-3">
+                          <Skeleton className="h-4 w-full max-w-[8rem]" />
+                        </td>
+                      ))}
+                      {hasActionsCol ? (
+                        <td className="py-2.5 pr-3 text-right">
+                          <Skeleton className="ml-auto h-8 w-14" />
+                        </td>
+                      ) : null}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full min-w-190 text-left text-sm">
@@ -176,7 +211,7 @@ export function ResourceTableClient({
                         {column.label}
                       </th>
                     ))}
-                    {detailPrefix || (extraRowLinks && extraRowLinks.length > 0) ? (
+                    {hasActionsCol ? (
                       <th className="py-2 pr-3 text-right">
                         <span className="sr-only">Actions</span>
                       </th>
@@ -187,10 +222,7 @@ export function ResourceTableClient({
                   {rows.length === 0 ? (
                     <tr className="border-t border-border/70">
                       <td
-                        colSpan={
-                          columns.length +
-                          (detailPrefix || (extraRowLinks && extraRowLinks.length > 0) ? 1 : 0)
-                        }
+                        colSpan={columns.length + (hasActionsCol ? 1 : 0)}
                         className="text-muted-foreground py-10 px-2 text-center text-sm leading-relaxed"
                       >
                         {emptyMessage}
@@ -207,7 +239,7 @@ export function ResourceTableClient({
                             {formatCell(row[column.key])}
                           </td>
                         ))}
-                        {detailPrefix || (extraRowLinks && extraRowLinks.length > 0) ? (
+                        {hasActionsCol ? (
                           <td className="py-2 pr-3 text-right">
                             {row._id ? (
                               <span className="inline-flex flex-wrap items-center justify-end gap-x-3 gap-y-1">
@@ -248,7 +280,7 @@ export function ResourceTableClient({
             <div className="mt-4 flex items-center justify-between text-sm">
               <button
                 className="rounded-md border border-border px-3 py-1.5 disabled:opacity-50"
-                disabled={page <= 1}
+                disabled={loading || page <= 1}
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
               >
                 Previous
@@ -258,7 +290,7 @@ export function ResourceTableClient({
               </span>
               <button
                 className="rounded-md border border-border px-3 py-1.5 disabled:opacity-50"
-                disabled={page >= Math.max(1, Math.ceil(total / limit))}
+                disabled={loading || page >= Math.max(1, Math.ceil(total / limit))}
                 onClick={() =>
                   setPage((p) => Math.min(Math.ceil(total / limit), p + 1))
                 }

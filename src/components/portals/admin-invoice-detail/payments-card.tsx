@@ -1,14 +1,16 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { format } from "date-fns";
 import { Plus, CreditCard, RotateCcw, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { decimalToNumber } from "@/lib/services/business/money";
 import { readResponseJson } from "@/lib/http/read-response-json";
+import { usePortalConfig } from "@/components/portals/portal-config-context";
 
 interface PaymentRow {
   _id: string;
@@ -36,8 +38,9 @@ export function PaymentsCard({
   invoiceCurrency?: string;
   invoiceExchangeRate?: number;
 }) {
+  const { apiPrefix } = usePortalConfig();
   const [payments, setPayments] = useState<PaymentRow[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   // Form State
@@ -51,10 +54,11 @@ export function PaymentsCard({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
 
-  const loadPayments = async () => {
+  const loadPayments = useCallback(async () => {
+    if (!invoiceId) return;
     setLoading(true);
     try {
-      const res = await fetch(`/api/admin/payments?invoiceId=${invoiceId}&limit=50`);
+      const res = await fetch(`${apiPrefix}/payments?invoiceId=${invoiceId}&limit=50`);
       const data = await res.json();
       if (res.ok) setPayments(data.items || []);
     } catch (e) {
@@ -62,11 +66,17 @@ export function PaymentsCard({
     } finally {
       setLoading(false);
     }
-  };
+  }, [apiPrefix, invoiceId]);
 
   useEffect(() => {
-    if (invoiceId) loadPayments();
-  }, [invoiceId]);
+    if (!invoiceId) {
+      setPayments([]);
+      setLoading(false);
+      return;
+    }
+    setPayments([]);
+    void loadPayments();
+  }, [invoiceId, loadPayments]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -92,7 +102,7 @@ export function PaymentsCard({
         fees: feeAmount > 0 ? [{ type: "GATEWAY_FEE", amount: Number(feeAmount), currency }] : []
       };
 
-      const res = await fetch("/api/admin/payments", {
+      const res = await fetch(`${apiPrefix}/payments`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
@@ -267,10 +277,26 @@ export function PaymentsCard({
             </tr>
           </thead>
           <tbody className="divide-y">
-            {loading ? (
-              <tr>
-                <td colSpan={5} className="text-center py-8 text-muted-foreground">Loading ledger...</td>
-              </tr>
+            {loading && payments.length === 0 ? (
+              Array.from({ length: 5 }).map((_, i) => (
+                <tr key={i}>
+                  <td className="px-4 py-3">
+                    <Skeleton className="h-4 w-36" />
+                  </td>
+                  <td className="px-4 py-3">
+                    <Skeleton className="h-6 w-20 rounded-full" />
+                  </td>
+                  <td className="px-4 py-3">
+                    <Skeleton className="h-4 w-24" />
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    <Skeleton className="ml-auto h-4 w-24" />
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    <Skeleton className="ml-auto h-4 w-28" />
+                  </td>
+                </tr>
+              ))
             ) : payments.length === 0 ? (
               <tr>
                 <td colSpan={5} className="text-center py-8 text-muted-foreground">No transactions recorded yet.</td>

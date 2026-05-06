@@ -8,13 +8,13 @@ import {
   ChevronRight,
   ExternalLink,
   FolderKanban,
-  Loader2,
   Search,
 } from "lucide-react";
 import { DashboardPageHeader } from "@/components/dashboard/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
 import { readResponseJson } from "@/lib/http/read-response-json";
 
 type ProjectRow = {
@@ -211,9 +211,49 @@ export function AdminProjectsClient({ initialClientId = "" }: { initialClientId?
               {error}
             </div>
           ) : loading && items.length === 0 ? (
-            <div className="flex flex-col items-center justify-center gap-3 py-20 text-muted-foreground">
-              <Loader2 className="size-8 animate-spin text-primary" aria-hidden />
-              <p className="text-sm font-medium">Loading projects…</p>
+            <div className="overflow-x-auto" aria-busy="true">
+              <table className="w-full min-w-180 text-left text-sm">
+                <thead>
+                  <tr className="border-b border-border/80 bg-muted/30 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground dark:bg-muted/15">
+                    <th className="px-5 py-3.5 pr-3">Project</th>
+                    <th className="px-0 py-3.5 pr-3">Status</th>
+                    <th className="px-0 py-3.5 pr-3">Priority</th>
+                    <th className="px-0 py-3.5 pr-3">Budget</th>
+                    <th className="px-0 py-3.5 pr-3">Created</th>
+                    <th className="px-0 py-3.5 pr-5 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border/60">
+                  {Array.from({ length: 8 }).map((_, ri) => (
+                    <tr key={ri} className="bg-card">
+                      <td className="px-5 py-3.5 pr-3">
+                        <div className="flex items-center gap-3">
+                          <Skeleton className="size-10 shrink-0 rounded-xl" />
+                          <div className="min-w-0 flex-1 space-y-2">
+                            <Skeleton className="h-4 w-40 max-w-full" />
+                            <Skeleton className="h-3 w-24" />
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-0 py-3.5 pr-3">
+                        <Skeleton className="h-7 w-20 rounded-full" />
+                      </td>
+                      <td className="px-0 py-3.5 pr-3">
+                        <Skeleton className="h-7 w-16 rounded-full" />
+                      </td>
+                      <td className="px-0 py-3.5 pr-3">
+                        <Skeleton className="h-4 w-16" />
+                      </td>
+                      <td className="px-0 py-3.5 pr-3">
+                        <Skeleton className="h-4 w-28" />
+                      </td>
+                      <td className="px-0 py-3.5 pr-5 text-right">
+                        <Skeleton className="ml-auto h-8 w-[4.5rem] rounded-lg" />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           ) : !loading && items.length === 0 ? (
             <div className="flex flex-col items-center justify-center gap-3 px-6 py-20 text-center">

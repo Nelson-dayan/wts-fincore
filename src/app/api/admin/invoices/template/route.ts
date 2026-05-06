@@ -7,10 +7,11 @@ import { authErrorResponse } from "@/lib/api/route-auth";
 import { aedAmountInWords } from "@/lib/invoice/aed-amount-words";
 import { computeInvoiceTotals } from "@/lib/invoice/invoice-totals";
 import { generateUniqueInvoiceNumber } from "@/lib/services/business/invoice.service";
+import { assertEmployeeCanAccessPurchaseOrder } from "@/lib/auth/employee-resource-access";
 
 export async function GET(req: Request) {
   try {
-    await requireRole(["admin"]);
+    const session = await requireRole(["admin", "employee"]);
     await connectDB();
     const url = new URL(req.url);
     const poId = String(url.searchParams.get("poId") ?? "").trim();
@@ -21,6 +22,17 @@ export async function GET(req: Request) {
 
     const po = await PurchaseOrderModel.findById(poId).lean();
     if (!po) return NextResponse.json({ message: "Purchase order not found" }, { status: 404 });
+
+    if (session.user.role === "employee") {
+      try {
+        await assertEmployeeCanAccessPurchaseOrder(session.user.id, poId);
+      } catch (e) {
+        if (e instanceof Error && e.message === "FORBIDDEN") {
+          return NextResponse.json({ message: "Forbidden" }, { status: 403 });
+        }
+        throw e;
+      }
+    }
 
     const quotation = await QuotationModel.findById(po.quotationId).lean();
     if (!quotation) {

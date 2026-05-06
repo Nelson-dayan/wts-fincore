@@ -15,7 +15,9 @@ import { Dropdown } from "@/components/ui/select";
 import { readResponseJson } from "@/lib/http/read-response-json";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { SaveConfirmModal } from "@/components/ui/save-confirm-modal";
+import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils/cn";
+import { usePortalConfig } from "@/components/portals/portal-config-context";
 
 type PoPayload = {
   _id: string;
@@ -36,6 +38,7 @@ const MAX_PO_UPLOAD_BYTES = 9 * 1024 * 1024;
 
 export function AdminPurchaseOrderDetailsClient({ purchaseOrderId }: { purchaseOrderId: string }) {
   const router = useRouter();
+  const { apiPrefix, pathPrefix } = usePortalConfig();
   const [item, setItem] = useState<PoPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -56,7 +59,7 @@ export function AdminPurchaseOrderDetailsClient({ purchaseOrderId }: { purchaseO
     setLoading(true);
     setError("");
     try {
-      const res = await fetch(`/api/admin/purchase-orders/${purchaseOrderId}`, { cache: "no-store" });
+      const res = await fetch(`${apiPrefix}/purchase-orders/${purchaseOrderId}`, { cache: "no-store" });
       const data = await readResponseJson<{ item?: PoPayload; message?: string }>(res);
       if (!res.ok) throw new Error(data.message ?? "Failed to load");
       const po = data.item;
@@ -81,7 +84,7 @@ export function AdminPurchaseOrderDetailsClient({ purchaseOrderId }: { purchaseO
 
   useEffect(() => {
     load().catch(() => {});
-  }, [purchaseOrderId]);
+  }, [purchaseOrderId, apiPrefix]);
 
   async function save(): Promise<boolean> {
     if (!item) return false;
@@ -97,7 +100,7 @@ export function AdminPurchaseOrderDetailsClient({ purchaseOrderId }: { purchaseO
         fd.set("externalPoNumber", externalPoNumber);
         if (totalAmountStr.trim() !== "") fd.set("totalAmount", totalAmountStr.trim());
         if (file) fd.set("file", file);
-        const res = await fetch(`/api/admin/purchase-orders/${purchaseOrderId}`, {
+        const res = await fetch(`${apiPrefix}/purchase-orders/${purchaseOrderId}`, {
           method: "PATCH",
           body: fd,
         });
@@ -116,7 +119,7 @@ export function AdminPurchaseOrderDetailsClient({ purchaseOrderId }: { purchaseO
           const n = Number.parseFloat(totalAmountStr.trim().replace(/,/g, ""));
           if (Number.isFinite(n)) payload.totalAmount = n;
         }
-        const res = await fetch(`/api/admin/purchase-orders/${purchaseOrderId}`, {
+        const res = await fetch(`${apiPrefix}/purchase-orders/${purchaseOrderId}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
@@ -141,14 +144,14 @@ export function AdminPurchaseOrderDetailsClient({ purchaseOrderId }: { purchaseO
     setDeleting(true);
     setDeleteError("");
     try {
-      const res = await fetch(`/api/admin/purchase-orders/${purchaseOrderId}`, {
+      const res = await fetch(`${apiPrefix}/purchase-orders/${purchaseOrderId}`, {
         method: "DELETE",
       });
       const data = await readResponseJson<{ message?: string }>(res);
       if (!res.ok) throw new Error(data.message ?? "Could not delete purchase order");
       const back = item.projectId.trim()
-        ? `/admin/purchase-orders?projectId=${encodeURIComponent(item.projectId)}`
-        : "/admin/purchase-orders";
+        ? `${pathPrefix}/purchase-orders?projectId=${encodeURIComponent(item.projectId)}`
+        : `${pathPrefix}/purchase-orders`;
       router.push(back);
       return true;
     } catch (e) {
@@ -159,7 +162,20 @@ export function AdminPurchaseOrderDetailsClient({ purchaseOrderId }: { purchaseO
   }
 
   if (loading && !error) {
-    return <p className="text-sm text-muted-foreground">Loading…</p>;
+    return (
+      <div className="animate-fade-in space-y-6">
+        <div className="space-y-2">
+          <Skeleton className="h-8 w-72 max-w-full" />
+          <Skeleton className="h-4 w-full max-w-xl" />
+        </div>
+        <Skeleton className="h-36 w-full rounded-xl" />
+        <Skeleton className="h-52 w-full rounded-xl" />
+        <div className="grid gap-4 md:grid-cols-2">
+          <Skeleton className="min-h-[14rem] rounded-xl" />
+          <Skeleton className="min-h-[14rem] rounded-xl" />
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -236,22 +252,23 @@ export function AdminPurchaseOrderDetailsClient({ purchaseOrderId }: { purchaseO
             <Button size="sm" onClick={() => setSaveConfirmOpen(true)} disabled={saving}>
               {saving ? "Saving…" : "Save PO"}
             </Button>
-            <Link href={`/admin/quotations/${item.quotationId}`}>
+            <Link href={`${pathPrefix}/quotations/${item.quotationId}`}>
               <Button size="sm" variant="outline">
                 Open quotation
                 {item.quotationNumber ? ` (${item.quotationNumber})` : ""}
               </Button>
             </Link>
-            <Link href={`/admin/projects/${item.projectId}`}>
+            <Link href={`${pathPrefix}/projects/${item.projectId}`}>
               <Button size="sm" variant="outline">
                 Open project
               </Button>
             </Link>
-            <Link href="/admin/purchase-orders">
+            <Link href={`${pathPrefix}/purchase-orders`}>
               <Button size="sm" variant="outline">
                 All POs
               </Button>
             </Link>
+            {pathPrefix === "/admin" ? (
             <Button
               type="button"
               size="sm"
@@ -263,6 +280,7 @@ export function AdminPurchaseOrderDetailsClient({ purchaseOrderId }: { purchaseO
               <Trash2 className="size-3.5" aria-hidden />
               {deleting ? "Deleting…" : "Delete PO"}
             </Button>
+            ) : null}
           </div>
           {deleteError ? (
             <p className="text-destructive mb-4 text-sm" role="alert">

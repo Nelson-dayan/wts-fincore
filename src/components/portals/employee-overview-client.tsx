@@ -2,11 +2,12 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowUpRight, FileText, FolderKanban, Receipt, ShieldCheck } from "lucide-react";
+import { ArrowUpRight, FileText, FolderKanban, Receipt } from "lucide-react";
 import { DashboardPageHeader } from "@/components/dashboard/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { readResponseJson } from "@/lib/http/read-response-json";
+import { Skeleton } from "@/components/ui/skeleton";
 
 type EmployeeOverview = {
   myProjects: Array<{
@@ -31,13 +32,29 @@ type EmployeeOverview = {
   }>;
 };
 
+function OverviewListSkeleton({ rows = 5 }: { rows?: number }) {
+  return (
+    <div className="space-y-2.5">
+      {Array.from({ length: rows }).map((_, i) => (
+        <div key={i} className="dashboard-list-row space-y-2 py-2">
+          <Skeleton className="h-4 w-3/5 max-w-[14rem]" />
+          <Skeleton className="h-3 w-2/5 max-w-[10rem]" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export function EmployeeOverviewClient() {
   const [data, setData] = useState<EmployeeOverview | null>(null);
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let alive = true;
     async function load() {
+      setLoading(true);
+      setError("");
       try {
         const response = await fetch("/api/employee/overview", { cache: "no-store" });
         const payload = await readResponseJson<EmployeeOverview | { message?: string }>(
@@ -51,6 +68,8 @@ export function EmployeeOverviewClient() {
         if (alive) setData(payload as EmployeeOverview);
       } catch (e) {
         if (alive) setError(e instanceof Error ? e.message : "Failed to load");
+      } finally {
+        if (alive) setLoading(false);
       }
     }
     load();
@@ -64,7 +83,7 @@ export function EmployeeOverviewClient() {
       <DashboardPageHeader
         eyebrow="Workspace"
         title="Your dashboard"
-        description="Projects you are on, plus quotations and invoices you have created—all in one place."
+        description="Projects assigned to you, plus recent quotations and invoices on those projects."
       />
       {error ? (
         <div className="mb-6 rounded-xl border border-destructive/40 bg-destructive/5 p-4 text-sm text-destructive">
@@ -79,7 +98,13 @@ export function EmployeeOverviewClient() {
             <FolderKanban className="size-4 text-primary/85" aria-hidden />
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-semibold tabular-nums">{(data?.myProjects.length ?? 0).toLocaleString()}</p>
+            {loading ? (
+              <Skeleton className="h-9 w-16" />
+            ) : (
+              <p className="text-3xl font-semibold tabular-nums">
+                {(data?.myProjects.length ?? 0).toLocaleString()}
+              </p>
+            )}
           </CardContent>
         </Card>
         <Card className="dashboard-stat-card">
@@ -88,9 +113,13 @@ export function EmployeeOverviewClient() {
             <FileText className="size-4 text-primary/85" aria-hidden />
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-semibold tabular-nums">
-              {(data?.myQuotations.length ?? 0).toLocaleString()}
-            </p>
+            {loading ? (
+              <Skeleton className="h-9 w-16" />
+            ) : (
+              <p className="text-3xl font-semibold tabular-nums">
+                {(data?.myQuotations.length ?? 0).toLocaleString()}
+              </p>
+            )}
           </CardContent>
         </Card>
         <Card className="dashboard-stat-card">
@@ -99,7 +128,13 @@ export function EmployeeOverviewClient() {
             <Receipt className="size-4 text-primary/85" aria-hidden />
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-semibold tabular-nums">{(data?.myInvoices.length ?? 0).toLocaleString()}</p>
+            {loading ? (
+              <Skeleton className="h-9 w-16" />
+            ) : (
+              <p className="text-3xl font-semibold tabular-nums">
+                {(data?.myInvoices.length ?? 0).toLocaleString()}
+              </p>
+            )}
           </CardContent>
         </Card>
       </section>
@@ -121,7 +156,9 @@ export function EmployeeOverviewClient() {
             </Button>
           </CardHeader>
           <CardContent className="space-y-2 text-sm">
-            {data?.myProjects.length ? (
+            {loading ? (
+              <OverviewListSkeleton />
+            ) : data?.myProjects.length ? (
               data.myProjects.map((project) => (
                 <div key={project._id} className="dashboard-list-row">
                   <p className="font-medium leading-snug text-foreground">{project.name}</p>
@@ -154,7 +191,9 @@ export function EmployeeOverviewClient() {
             </Button>
           </CardHeader>
           <CardContent className="space-y-2 text-sm">
-            {data?.myQuotations.length ? (
+            {loading ? (
+              <OverviewListSkeleton />
+            ) : data?.myQuotations.length ? (
               data.myQuotations.map((quotation) => (
                 <div key={quotation._id} className="dashboard-list-row">
                   <p className="font-medium text-foreground">{quotation.quotationNumber}</p>
@@ -164,7 +203,7 @@ export function EmployeeOverviewClient() {
                 </div>
               ))
             ) : (
-              <p className="py-2 text-muted-foreground">No quotations created yet.</p>
+              <p className="py-2 text-muted-foreground">No quotations on your projects yet.</p>
             )}
           </CardContent>
         </Card>
@@ -185,7 +224,9 @@ export function EmployeeOverviewClient() {
             </Button>
           </CardHeader>
           <CardContent className="space-y-2 text-sm">
-            {data?.myInvoices.length ? (
+            {loading ? (
+              <OverviewListSkeleton />
+            ) : data?.myInvoices.length ? (
               data.myInvoices.map((invoice) => (
                 <div key={invoice._id} className="dashboard-list-row">
                   <p className="font-medium text-foreground">{invoice.invoiceNumber}</p>
@@ -197,23 +238,11 @@ export function EmployeeOverviewClient() {
                 </div>
               ))
             ) : (
-              <p className="py-2 text-muted-foreground">No invoices created yet.</p>
+              <p className="py-2 text-muted-foreground">No invoices on your projects yet.</p>
             )}
           </CardContent>
         </Card>
       </div>
-
-      <Card className="mt-6 border-border/75 bg-muted/20">
-        <CardContent className="flex items-start gap-3 p-4">
-          <span className="inline-flex size-8 shrink-0 items-center justify-center rounded-lg bg-emerald-500/12 text-emerald-700 ring-1 ring-emerald-500/25 dark:text-emerald-400">
-            <ShieldCheck className="size-4" aria-hidden />
-          </span>
-          <p className="text-sm text-muted-foreground">
-            This dashboard reflects your assigned work only. Use the section cards above for quick navigation and
-            latest status.
-          </p>
-        </CardContent>
-      </Card>
     </div>
   );
 }

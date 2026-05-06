@@ -7,6 +7,7 @@ import { decimalToNumber } from "@/lib/services/business/money";
 import type { QuotationRenderDraft } from "@/lib/services/business/quotation-render.types";
 import { renderQuotationDocx } from "@/lib/services/business/quotation-render-docx";
 import { renderQuotationPdf } from "@/lib/services/business/quotation-render-pdf";
+import { assertEmployeeCanAccessQuotation } from "@/lib/auth/employee-resource-access";
 
 interface RouteCtx {
   params: Promise<{ quotationId: string }>;
@@ -69,9 +70,22 @@ function leanToDraft(q: Record<string, unknown>): QuotationRenderDraft {
 
 export async function GET(req: Request, ctx: RouteCtx) {
   try {
-    await requireRole(["admin"]);
+    const session = await requireRole(["admin", "employee"]);
     await connectDB();
     const { quotationId } = await ctx.params;
+    if (session.user.role === "employee") {
+      try {
+        await assertEmployeeCanAccessQuotation(session.user.id, quotationId);
+      } catch (e) {
+        if (e instanceof Error && e.message === "FORBIDDEN") {
+          return NextResponse.json({ message: "Forbidden" }, { status: 403 });
+        }
+        if (e instanceof Error && e.message === "NOT_FOUND") {
+          return NextResponse.json({ message: "Quotation not found" }, { status: 404 });
+        }
+        throw e;
+      }
+    }
     const url = new URL(req.url);
     const format = url.searchParams.get("format") === "docx" ? "docx" : "pdf";
 

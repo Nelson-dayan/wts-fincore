@@ -11,6 +11,7 @@ import {
   MAX_INVOICES_PER_PURCHASE_ORDER,
 } from "@/lib/invoice/invoice-limits";
 import { readResponseJson } from "@/lib/http/read-response-json";
+import { usePortalConfig } from "@/components/portals/portal-config-context";
 
 type Row = {
   _id: string;
@@ -27,6 +28,7 @@ export function PurchaseOrderInvoicesSection({
   purchaseOrderId: string;
   poNumber: string;
 }) {
+  const { apiPrefix, pathPrefix } = usePortalConfig();
   const [rows, setRows] = useState<Row[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -43,7 +45,7 @@ export function PurchaseOrderInvoicesSection({
         limit: "10",
         q: "",
       });
-      const res = await fetch(`/api/admin/invoices?${qs}`, { cache: "no-store" });
+      const res = await fetch(`${apiPrefix}/invoices?${qs}`, { cache: "no-store" });
       const data = await readResponseJson<{ items?: Row[]; message?: string; total?: number }>(
         res
       );
@@ -65,7 +67,7 @@ export function PurchaseOrderInvoicesSection({
     } finally {
       setLoading(false);
     }
-  }, [purchaseOrderId]);
+  }, [apiPrefix, purchaseOrderId]);
 
   useEffect(() => {
     load().catch(() => {});
@@ -103,7 +105,7 @@ export function PurchaseOrderInvoicesSection({
         ) : null}
         {!err && !loading && !atCap ? (
           <Button size="default" className="w-full gap-2 sm:w-auto" asChild>
-            <Link href={`/admin/invoices/new?poId=${encodeURIComponent(purchaseOrderId)}`}>
+            <Link href={`${pathPrefix}/invoices/new?poId=${encodeURIComponent(purchaseOrderId)}`}>
               <Plus className="size-4" aria-hidden />
               New invoice from this PO
             </Link>
@@ -138,7 +140,7 @@ export function PurchaseOrderInvoicesSection({
                   })}
                 </span>
                 <Button size="sm" variant="outline" asChild>
-                  <Link href={`/admin/invoices/${r._id}`}>Open</Link>
+                  <Link href={`${pathPrefix}/invoices/${r._id}`}>Open</Link>
                 </Button>
               </li>
             ))}

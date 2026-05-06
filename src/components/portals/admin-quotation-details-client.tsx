@@ -19,10 +19,13 @@ import { DashboardPageHeader } from "@/components/dashboard/page-header";
 import { QuotationPurchaseOrdersSection } from "@/components/portals/quotation-purchase-orders-section";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { Skeleton } from "@/components/ui/skeleton";
 import { readResponseJson } from "@/lib/http/read-response-json";
+import { usePortalConfig } from "@/components/portals/portal-config-context";
 
 export function AdminQuotationDetailsClient({ quotationId }: { quotationId: string }) {
   const router = useRouter();
+  const { apiPrefix, pathPrefix } = usePortalConfig();
   const [item, setItem] = useState<QuotationPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -53,7 +56,7 @@ export function AdminQuotationDetailsClient({ quotationId }: { quotationId: stri
     setLoading(true);
     setError("");
     try {
-    const response = await fetch(`/api/admin/quotations/${quotationId}`, {
+    const response = await fetch(`${apiPrefix}/quotations/${quotationId}`, {
       cache: "no-store",
     });
     const payload = await readResponseJson<{ item?: QuotationPayload; message?: string }>(
@@ -99,7 +102,7 @@ export function AdminQuotationDetailsClient({ quotationId }: { quotationId: stri
 
   useEffect(() => {
     load();
-  }, [quotationId]);
+  }, [quotationId, apiPrefix]);
 
   function addPage() {
     setPages((prev) => {
@@ -173,7 +176,7 @@ export function AdminQuotationDetailsClient({ quotationId }: { quotationId: stri
         })),
       }));
 
-      const response = await fetch(`/api/admin/quotations/${quotationId}`, {
+      const response = await fetch(`${apiPrefix}/quotations/${quotationId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -220,7 +223,7 @@ export function AdminQuotationDetailsClient({ quotationId }: { quotationId: stri
     setSaving(true);
     setError("");
     try {
-      const response = await fetch(`/api/admin/quotations/${quotationId}`, {
+      const response = await fetch(`${apiPrefix}/quotations/${quotationId}`, {
         method: "DELETE",
       });
       const result = await readResponseJson<{ message?: string }>(response);
@@ -229,8 +232,8 @@ export function AdminQuotationDetailsClient({ quotationId }: { quotationId: stri
       const pid = item.projectId?.trim();
       router.replace(
         pid
-          ? `/admin/quotations?projectId=${encodeURIComponent(pid)}`
-          : "/admin/quotations"
+          ? `${pathPrefix}/quotations?projectId=${encodeURIComponent(pid)}`
+          : `${pathPrefix}/quotations`
       );
       router.refresh();
       return true;
@@ -243,7 +246,20 @@ export function AdminQuotationDetailsClient({ quotationId }: { quotationId: stri
   }
 
   if (loading && !error) {
-    return <p className="text-sm text-muted-foreground">Loading…</p>;
+    return (
+      <div className="animate-fade-in space-y-6">
+        <div className="space-y-2">
+          <Skeleton className="h-8 w-64 max-w-full" />
+          <Skeleton className="h-4 w-full max-w-2xl" />
+        </div>
+        <Skeleton className="h-32 w-full rounded-xl" />
+        <div className="grid gap-4 md:grid-cols-2">
+          <Skeleton className="h-48 rounded-xl" />
+          <Skeleton className="h-48 rounded-xl" />
+        </div>
+        <Skeleton className="h-72 w-full rounded-xl" />
+      </div>
+    );
   }
 
   return (

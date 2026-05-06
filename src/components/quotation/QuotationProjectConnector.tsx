@@ -5,6 +5,7 @@ import { Loader2, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { readResponseJson } from "@/lib/http/read-response-json";
+import { usePortalConfig } from "@/components/portals/portal-config-context";
 
 type ProjectRow = {
   _id: string;
@@ -39,6 +40,7 @@ export function QuotationProjectConnector({
   defaultsLoading = false,
   emptyHint = "Select a project to auto-fill quotation defaults.",
 }: QuotationProjectConnectorProps) {
+  const { apiPrefix } = usePortalConfig();
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<ProjectRow[]>([]);
   const [loading, setLoading] = useState(false);
@@ -56,7 +58,7 @@ export function QuotationProjectConnector({
         limit: "15",
         q: query.trim(),
       });
-      const res = await fetch(`/api/admin/projects?${qs.toString()}`, {
+      const res = await fetch(`${apiPrefix}/projects?${qs.toString()}`, {
         cache: "no-store",
       });
       const payload = await readResponseJson<{
@@ -71,7 +73,7 @@ export function QuotationProjectConnector({
     } finally {
       setLoading(false);
     }
-  }, [canSearch, query]);
+  }, [apiPrefix, canSearch, query]);
 
   return (
     <section className="rounded-xl border border-border/70 bg-card/95 p-4 shadow-(--shadow-premium) backdrop-blur-[2px]">

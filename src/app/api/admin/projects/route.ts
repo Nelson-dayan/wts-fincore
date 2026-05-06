@@ -8,7 +8,7 @@ import { logActivity } from "@/lib/services/activity/log-activity.service";
 
 export async function GET(req: Request) {
   try {
-    await requireRole(["admin"]);
+    const session = await requireRole(["admin", "employee"]);
     await connectDB();
     const url = new URL(req.url);
     const { page, limit, skip } = parsePagination(url.searchParams);
@@ -17,6 +17,9 @@ export async function GET(req: Request) {
     const filter: Record<string, unknown> = {};
     if (q) filter.name = { $regex: q, $options: "i" };
     if (clientId) filter.clientId = clientId;
+    if (session.user.role === "employee") {
+      filter.assignedTo = session.user.id;
+    }
     const [itemsRaw, total] = await Promise.all([
       ProjectModel.find(filter)
       .select("name status priority budget currency category clientReference startDate targetEndDate actualEndDate createdAt clientId")

@@ -8,6 +8,7 @@ import { Select } from "@/components/ui/select";
 import { readResponseJson } from "@/lib/http/read-response-json";
 import { cn } from "@/lib/utils/cn";
 import type { QuotationPayload } from "./types";
+import { usePortalConfig } from "@/components/portals/portal-config-context";
 
 const STATUS_OPTIONS: { value: QuotationPayload["status"]; label: string }[] = [
   { value: "draft", label: "draft" },
@@ -30,6 +31,7 @@ export function QuotationStatusEditor({
   onUpdated,
   variant = "card",
 }: StatusEditorProps) {
+  const { apiPrefix } = usePortalConfig();
   const [value, setValue] = useState<QuotationPayload["status"]>(currentStatus);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
@@ -43,7 +45,7 @@ export function QuotationStatusEditor({
     setSaving(true);
     setMsg(null);
     try {
-      const res = await fetch(`/api/admin/quotations/${quotationId}`, {
+      const res = await fetch(`${apiPrefix}/quotations/${quotationId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: value }),
@@ -69,8 +71,8 @@ export function QuotationStatusEditor({
     >
       <div
         className={cn(
-          "grid min-w-[11rem] gap-2",
-          variant === "inline" && "min-w-0 flex-1 sm:min-w-[9.5rem]"
+          "grid min-w-44 gap-2",
+          variant === "inline" && "min-w-0 flex-1 sm:min-w-38"
         )}
       >
         {variant !== "inline" ? (
@@ -120,7 +122,7 @@ export function QuotationStatusEditor({
 
   if (variant === "inline") {
     return (
-      <div className="min-w-[14rem] max-w-[18rem]" onClick={(e) => e.stopPropagation()}>
+      <div className="min-w-56 max-w-72" onClick={(e) => e.stopPropagation()}>
         {inner}
       </div>
     );
