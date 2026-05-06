@@ -45,8 +45,14 @@ export default async function EmployeePortalLayout({
             <PortalNavLink href="/employee/quotations" match="prefix" className="w-full justify-start">
               Quotations
             </PortalNavLink>
+            <PortalNavLink href="/employee/purchase-orders" match="prefix" className="w-full justify-start">
+              POs
+            </PortalNavLink>
             <PortalNavLink href="/employee/invoices" match="prefix" className="w-full justify-start">
               Invoices
+            </PortalNavLink>
+            <PortalNavLink href="/employee/payments" match="prefix" className="w-full justify-start">
+              Payments
             </PortalNavLink>
             <PortalNavLink href="/employee/expenses" match="prefix" className="w-full justify-start">
               Expenses
@@ -89,15 +95,17 @@ export default async function EmployeePortalLayout({
               <PortalNavLink href="/employee/projects" match="prefix" className="w-full justify-start">
                 Projects
               </PortalNavLink>
-              <PortalNavLink
-                href="/employee/quotations"
-                match="prefix"
-                className="w-full justify-start"
-              >
+              <PortalNavLink href="/employee/quotations" match="prefix" className="w-full justify-start">
                 Quotations
+              </PortalNavLink>
+              <PortalNavLink href="/employee/purchase-orders" match="prefix" className="w-full justify-start">
+                POs
               </PortalNavLink>
               <PortalNavLink href="/employee/invoices" match="prefix" className="w-full justify-start">
                 Invoices
+              </PortalNavLink>
+              <PortalNavLink href="/employee/payments" match="prefix" className="w-full justify-start">
+                Payments
               </PortalNavLink>
               <PortalNavLink href="/employee/expenses" match="prefix" className="w-full justify-start">
                 Expenses

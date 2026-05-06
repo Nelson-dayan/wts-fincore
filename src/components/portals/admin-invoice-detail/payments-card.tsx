@@ -27,6 +27,9 @@ interface PaymentRow {
   createdAt: string;
 }
 
+type ApiMessage = { message?: string };
+type SelectChangeEvent = React.ChangeEvent<HTMLSelectElement>;
+
 export function PaymentsCard({ 
   invoiceId, 
   companyId,
@@ -109,7 +112,12 @@ export function PaymentsCard({
       });
       const data = await readResponseJson(res);
       
-      if (!res.ok) throw new Error((data as any).message || "Failed to record payment");
+      if (!res.ok) {
+        throw new Error(
+          (typeof data === "object" && data !== null ? (data as ApiMessage).message : undefined) ||
+            "Failed to record payment"
+        );
+      }
       
       setDrawerOpen(false);
       loadPayments();
@@ -119,8 +127,8 @@ export function PaymentsCard({
       setReceivedAmount(0);
       setFeeAmount(0);
       setType("PAYMENT");
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to record payment");
     } finally {
       setSubmitting(false);
     }
@@ -173,7 +181,7 @@ export function PaymentsCard({
                     <Label>Type</Label>
                     <Select 
                       value={type} 
-                      onChange={(e: any) => setType(e.target.value)}
+                      onChange={(e: SelectChangeEvent) => setType(e.target.value as "PAYMENT" | "REFUND")}
                       options={[
                         {value: "PAYMENT", label: "Payment"},
                         {value: "REFUND", label: "Refund"}
@@ -184,7 +192,7 @@ export function PaymentsCard({
                     <Label>Method</Label>
                     <Select 
                       value={method} 
-                      onChange={(e: any) => setMethod(e.target.value)}
+                      onChange={(e: SelectChangeEvent) => setMethod(e.target.value)}
                       options={[
                         {value: "BANK_TRANSFER", label: "Bank Transfer"},
                         {value: "STRIPE", label: "Stripe"},

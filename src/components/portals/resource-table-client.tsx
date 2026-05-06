@@ -188,7 +188,7 @@ export function ResourceTableClient({
                     <tr key={ri} className="border-t border-border/70">
                       {columns.map((column) => (
                         <td key={column.key} className="py-2.5 pr-3">
-                          <Skeleton className="h-4 w-full max-w-[8rem]" />
+                          <Skeleton className="h-4 w-full max-w-32" />
                         </td>
                       ))}
                       {hasActionsCol ? (

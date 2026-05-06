@@ -14,7 +14,7 @@ export default async function EmployeePurchaseOrdersPage({ searchParams }: PageP
 
   return (
     <>
-      <DashboardPageHeader title="Purchase orders" description="POs for your assigned projects." />
+      <DashboardPageHeader title="POs" description="POs for your assigned projects." />
       <AdminPurchaseOrdersPageClient projectId={projectId} endpoint={endpoint} />
     </>
   );
