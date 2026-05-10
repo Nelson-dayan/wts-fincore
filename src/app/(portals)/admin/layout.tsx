@@ -8,6 +8,8 @@ import { PortalNavLink } from "@/components/layout/portal-nav-link";
 import { PortalShell } from "@/components/layout/portal-shell";
 import { SignOutButton } from "@/components/portals/sign-out-button";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
+import { CommandPalette } from "@/components/portals/command-palette";
+import { CommandPaletteTrigger } from "@/components/portals/command-palette-trigger";
 
 export default async function AdminPortalLayout({
   children,
@@ -156,15 +158,21 @@ export default async function AdminPortalLayout({
 
       <PortalShell>
         <header className="sticky top-0 z-30 hidden border-b border-border/60 bg-card/70 backdrop-blur md:block">
-          <div className="mx-auto flex w-full max-w-6xl items-center justify-end gap-2 px-4 py-3 sm:px-6">
-            <ThemeToggle />
-            <SignOutButton className="border-0 bg-transparent hover:bg-destructive/12" />
+          <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-4 px-4 py-3 sm:px-6">
+            <div className="flex-1 max-w-md">
+              <CommandPaletteTrigger />
+            </div>
+            <div className="flex items-center gap-2">
+              <ThemeToggle />
+              <SignOutButton className="border-0 bg-transparent hover:bg-destructive/12" />
+            </div>
           </div>
         </header>
         <div className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
           {children}
         </div>
       </PortalShell>
+      <CommandPalette />
     </div>
   );
 }
