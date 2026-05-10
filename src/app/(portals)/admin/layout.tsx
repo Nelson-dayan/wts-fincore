@@ -87,9 +87,6 @@ export default async function AdminPortalLayout({
               <PortalNavLink href="/admin/activity" match="prefix" className="w-full justify-start">
                 Activity Log
               </PortalNavLink>
-              <PortalNavLink href="/admin/profitability" match="prefix" className="w-full justify-start text-emerald-600 dark:text-emerald-400 font-bold">
-                Profitability
-              </PortalNavLink>
             </div>
           </details>
         </nav>
@@ -150,9 +147,6 @@ export default async function AdminPortalLayout({
                 </PortalNavLink>
                 <PortalNavLink href="/admin/activity" match="prefix" className="w-full justify-start">
                   Activity Log
-                </PortalNavLink>
-                <PortalNavLink href="/admin/profitability" match="prefix" className="w-full justify-start text-emerald-600 dark:text-emerald-400 font-bold">
-                  Profitability
                 </PortalNavLink>
               </div>
             </details>
