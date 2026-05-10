@@ -74,6 +74,10 @@ export async function PATCH(req: Request) {
                 body.defaultTax?.taxEnabled ?? current.defaultTax?.taxEnabled
               ),
             },
+            defaultExchangeRates: {
+              usdToInr: Number((body as any).defaultExchangeRates?.usdToInr ?? current.defaultExchangeRates?.usdToInr ?? 83.5),
+              aedToInr: Number((body as any).defaultExchangeRates?.aedToInr ?? current.defaultExchangeRates?.aedToInr ?? 22.7),
+            },
           },
         },
         { new: true }

@@ -40,4 +40,10 @@ export type Item = {
   dueDate: string;
   createdAt?: string;
   branding?: Record<string, unknown>;
+  totalsCache?: {
+    totalReceivedBase: number;
+    totalFeesBase: number;
+    totalIntendedBase: number;
+    overpaidAmountBase: number;
+  };
 };

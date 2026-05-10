@@ -15,6 +15,10 @@ export const companySchema = new Schema(
       taxRate: { type: Number, default: 0, min: 0 },
       taxEnabled: { type: Boolean, default: false },
     },
+    defaultExchangeRates: {
+      usdToInr: { type: Number, default: 83.5 },
+      aedToInr: { type: Number, default: 22.7 },
+    },
     isPrimary: { type: Boolean, default: false, index: true },
   },
   schemaOptions

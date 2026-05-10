@@ -353,6 +353,8 @@ export function AdminInvoiceDetailClient({
                   companyId={String(item.companyId || "")} 
                   invoiceCurrency={item.currency || (item.invoiceType === "usd" ? "USD" : "AED")}
                   invoiceExchangeRate={item.exchangeRate || 1}
+                  invoiceTotalAmount={liveTotals.total}
+                  invoiceTotalsCache={item.totalsCache}
                 />
               </div>
             )}

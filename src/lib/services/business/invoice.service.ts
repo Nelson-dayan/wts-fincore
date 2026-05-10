@@ -323,6 +323,14 @@ export function formatInvoiceForApi(row: Record<string, unknown>): Record<string
           total: decimalToNumber(totals.total),
         }
       : { subtotal: 0, tax: 0, total: 0 },
+    totalsCache: row.totalsCache
+      ? {
+          totalReceivedBase: decimalToNumber((row.totalsCache as any).totalReceivedBase),
+          totalFeesBase: decimalToNumber((row.totalsCache as any).totalFeesBase),
+          totalIntendedBase: decimalToNumber((row.totalsCache as any).totalIntendedBase),
+          overpaidAmountBase: decimalToNumber((row.totalsCache as any).overpaidAmountBase),
+        }
+      : undefined,
     pages: pages?.map((p) => ({
       pageNumber: p.pageNumber,
       items: p.items.map((item) => ({
