@@ -48,6 +48,11 @@ export async function PATCH(req: Request) {
           taxRate: Number(body.defaultTax?.taxRate ?? 0),
           taxEnabled: Boolean(body.defaultTax?.taxEnabled),
         },
+        defaultExchangeRates: {
+          usdToInr: Number((body as any).defaultExchangeRates?.usdToInr ?? 83.5),
+          aedToInr: Number((body as any).defaultExchangeRates?.aedToInr ?? 22.7),
+          isLocked: Boolean((body as any).defaultExchangeRates?.isLocked ?? false),
+        },
         isPrimary: true,
       });
     } else {
@@ -77,6 +82,7 @@ export async function PATCH(req: Request) {
             defaultExchangeRates: {
               usdToInr: Number((body as any).defaultExchangeRates?.usdToInr ?? current.defaultExchangeRates?.usdToInr ?? 83.5),
               aedToInr: Number((body as any).defaultExchangeRates?.aedToInr ?? current.defaultExchangeRates?.aedToInr ?? 22.7),
+              isLocked: Boolean((body as any).defaultExchangeRates?.isLocked ?? current.defaultExchangeRates?.isLocked ?? false),
             },
           },
         },

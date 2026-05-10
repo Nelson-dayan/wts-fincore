@@ -60,7 +60,7 @@ export async function GET(req: Request) {
     const [rawItems, total] = await Promise.all([
       InvoiceModel.find(filter)
         .select(
-          "invoiceNumber invoiceType status dueDate projectId poId createdAt totals extras.poNumberRef"
+          "invoiceNumber invoiceType status dueDate projectId poId companyId createdAt totals extras.poNumberRef"
         )
         .sort({ createdAt: -1 })
         .skip(skip)
@@ -80,6 +80,7 @@ export async function GET(req: Request) {
         dueDate: dd instanceof Date ? dd.toISOString() : dd,
         projectId: String(row.projectId ?? ""),
         poId: row.poId ? String(row.poId) : "",
+        companyId: String(row.companyId ?? ""),
         poNumberRef: String(extras?.poNumberRef ?? ""),
         total: decimalToNumber(totals?.total),
         createdAt:

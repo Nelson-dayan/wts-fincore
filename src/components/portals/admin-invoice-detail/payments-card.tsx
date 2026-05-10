@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { format } from "date-fns";
-import { Plus, CreditCard, RotateCcw, X, ChevronLeft, ChevronRight } from "lucide-react";
+import { Plus, CreditCard, RotateCcw, X, ChevronLeft, ChevronRight, Lock, Unlock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
@@ -67,9 +67,13 @@ export function PaymentsCard({
   const [exchangeRate, setExchangeRate] = useState(invoiceExchangeRate);
   const [intendedAmount, setIntendedAmount] = useState(0);
   const [receivedAmount, setReceivedAmount] = useState(0);
-  const [feeAmount, setFeeAmount] = useState(0);
+  type FeeRow = { type: string; amount: number };
+  const [fees, setFees] = useState<FeeRow[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+  
+  // Company Default Rates
+  const [defaultRates, setDefaultRates] = useState<{usdToInr: number, aedToInr: number, isLocked: boolean}>({ usdToInr: 83.5, aedToInr: 22.7, isLocked: false });
 
   const loadPayments = useCallback(async (currentPage: number) => {
     if (!invoiceId) return;
@@ -97,12 +101,44 @@ export function PaymentsCard({
     void loadPayments(page);
   }, [invoiceId, loadPayments, page]);
 
+  useEffect(() => {
+    if (drawerOpen) {
+      fetch(`${apiPrefix}/company`)
+        .then(res => res.json())
+        .then(data => {
+          if (data?.item?.defaultExchangeRates) {
+            setDefaultRates({
+              usdToInr: data.item.defaultExchangeRates.usdToInr ?? 83.5,
+              aedToInr: data.item.defaultExchangeRates.aedToInr ?? 22.7,
+              isLocked: data.item.defaultExchangeRates.isLocked ?? false,
+            });
+            // Auto-lock the rate on load if the company settings enforce it
+            if (data.item.defaultExchangeRates.isLocked) {
+              setExchangeRate(invoiceCurrency === "USD" ? (data.item.defaultExchangeRates.usdToInr ?? 83.5) : (data.item.defaultExchangeRates.aedToInr ?? 22.7));
+            }
+          }
+        })
+        .catch(console.error);
+    }
+  }, [drawerOpen, apiPrefix]);
+
+  const handleCurrencyChange = (newCurrency: string) => {
+    setCurrency(newCurrency);
+    if (newCurrency === "USD") {
+      setExchangeRate(defaultRates.usdToInr);
+    } else if (newCurrency === "AED") {
+      setExchangeRate(defaultRates.aedToInr);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
     setError("");
 
-    if (feeAmount > intendedAmount && type === "PAYMENT") {
+    const totalFees = fees.reduce((sum, f) => sum + f.amount, 0);
+
+    if (totalFees > intendedAmount && type === "PAYMENT") {
       setError("Fees cannot exceed intended amount.");
       setSubmitting(false);
       return;
@@ -118,7 +154,11 @@ export function PaymentsCard({
         exchangeRate: Number(exchangeRate),
         intendedAmount: Number(intendedAmount),
         receivedAmount: Number(receivedAmount),
-        fees: feeAmount > 0 ? [{ type: "GATEWAY_FEE", amount: Number(feeAmount), currency }] : []
+        fees: fees.filter(f => f.amount > 0).map(f => ({
+          type: f.type,
+          amount: Number(f.amount),
+          currency
+        }))
       };
 
       const res = await fetch(`${apiPrefix}/payments`, {
@@ -145,7 +185,7 @@ export function PaymentsCard({
       // Reset form
       setIntendedAmount(0);
       setReceivedAmount(0);
-      setFeeAmount(0);
+      setFees([]);
       setType("PAYMENT");
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to record payment");
@@ -217,7 +257,7 @@ export function PaymentsCard({
                     <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Type</Label>
                     <Select 
                       value={type} 
-                      onChange={(e: SelectChangeEvent) => setType(e.target.value as "PAYMENT" | "REFUND")}
+                      onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setType(e.target.value as "PAYMENT" | "REFUND")}
                       options={[
                         {value: "PAYMENT", label: "Payment"},
                         {value: "REFUND", label: "Refund"}
@@ -228,7 +268,7 @@ export function PaymentsCard({
                     <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Method</Label>
                     <Select 
                       value={method} 
-                      onChange={(e: SelectChangeEvent) => setMethod(e.target.value)}
+                      onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setMethod(e.target.value)}
                       options={[
                         {value: "BANK_TRANSFER", label: "Bank Transfer"},
                         {value: "STRIPE", label: "Stripe"},
@@ -244,11 +284,38 @@ export function PaymentsCard({
                 <div className="grid grid-cols-2 gap-5">
                   <div className="space-y-2.5">
                     <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Currency</Label>
-                    <Input value={currency} onChange={(e) => setCurrency(e.target.value.toUpperCase())} maxLength={3} className="font-mono uppercase" />
+                    <Select 
+                      value={currency} 
+                      onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleCurrencyChange(e.target.value)}
+                      options={[
+                        {value: "AED", label: "AED"},
+                        {value: "USD", label: "USD"}
+                      ]}
+                    />
                   </div>
                   <div className="space-y-2.5">
-                    <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Exchange Rate (to INR)</Label>
-                    <Input type="number" step="0.0001" min="0" required value={exchangeRate} onChange={(e) => setExchangeRate(Number(e.target.value))} className="font-mono" />
+                    <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex justify-between items-center">
+                      <span>Exchange Rate (to INR)</span>
+                      {defaultRates.isLocked ? (
+                        <span className="p-1 rounded-md bg-brand/10 text-brand" title="Locked by company settings">
+                          <Lock className="w-3.5 h-3.5" />
+                        </span>
+                      ) : (
+                        <span className="p-1 rounded-md text-muted-foreground" title="Editable">
+                          <Unlock className="w-3.5 h-3.5" />
+                        </span>
+                      )}
+                    </Label>
+                    <Input 
+                      type="number" 
+                      step="0.0001" 
+                      min="0" 
+                      required 
+                      value={exchangeRate} 
+                      onChange={(e) => setExchangeRate(Number(e.target.value))} 
+                      disabled={defaultRates.isLocked}
+                      className={`font-mono ${defaultRates.isLocked ? "bg-muted/50 text-muted-foreground border-dashed" : ""}`} 
+                    />
                   </div>
                 </div>
 
@@ -272,13 +339,77 @@ export function PaymentsCard({
                   </div>
 
                   {type === "PAYMENT" && (
-                    <div className="space-y-2 pt-3 border-t border-primary/10">
-                      <Label className="font-medium text-foreground">Deducted Fees (Optional)</Label>
-                      <div className="flex items-center relative">
-                        <span className="absolute left-3 text-sm font-semibold text-muted-foreground">{currency}</span>
-                        <Input type="number" step="0.01" min="0" value={feeAmount || ""} onChange={(e) => setFeeAmount(Number(e.target.value))} className="pl-12 font-mono text-base" placeholder="0.00" />
+                    <div className="space-y-3 pt-4 border-t border-primary/10">
+                      <div className="flex items-center justify-between">
+                        <Label className="font-medium text-foreground">Deducted Fees (Optional)</Label>
+                        <Button 
+                          type="button" 
+                          variant="outline" 
+                          size="sm" 
+                          className="h-7 text-xs px-2"
+                          onClick={() => setFees([...fees, { type: "GATEWAY_FEE", amount: 0 }])}
+                        >
+                          <Plus className="w-3 h-3 mr-1" /> Add Fee
+                        </Button>
                       </div>
-                      {feeAmount > 0 && <p className="text-xs font-medium text-red-500/80 text-right">≈ ₹{(feeAmount * exchangeRate).toLocaleString(undefined, { maximumFractionDigits: 2 })} Base Lost</p>}
+                      
+                      {fees.length === 0 ? (
+                        <div className="text-xs text-muted-foreground italic text-center py-2 bg-background/50 rounded border border-dashed">No fees added.</div>
+                      ) : (
+                        <div className="space-y-3">
+                          {fees.map((fee, idx) => (
+                            <div key={idx} className="flex items-start gap-2 relative group">
+                              <div className="flex-1 space-y-2">
+                                <Select 
+                                  value={fee.type} 
+                                  onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
+                                    const newFees = [...fees];
+                                    newFees[idx].type = e.target.value;
+                                    setFees(newFees);
+                                  }}
+                                  options={[
+                                    {value: "GATEWAY_FEE", label: "Gateway Fee (Stripe/PayPal)"},
+                                    {value: "BANK_CHARGE", label: "Bank Charge"},
+                                    {value: "FOREX", label: "Forex Markup"},
+                                    {value: "TDS", label: "TDS / Tax Deducted"},
+                                    {value: "OTHER", label: "Other"}
+                                  ]}
+                                />
+                                <div className="flex items-center relative">
+                                  <span className="absolute left-3 text-sm font-semibold text-muted-foreground">{currency}</span>
+                                  <Input 
+                                    type="number" 
+                                    step="0.01" 
+                                    min="0" 
+                                    value={fee.amount || ""} 
+                                    onChange={(e) => {
+                                      const newFees = [...fees];
+                                      newFees[idx].amount = Number(e.target.value);
+                                      setFees(newFees);
+                                    }} 
+                                    className="pl-12 font-mono text-sm h-9" 
+                                    placeholder="0.00" 
+                                  />
+                                </div>
+                              </div>
+                              <Button 
+                                type="button" 
+                                variant="ghost" 
+                                size="icon" 
+                                className="mt-1 h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 shrink-0"
+                                onClick={() => setFees(fees.filter((_, i) => i !== idx))}
+                              >
+                                <X className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          ))}
+                          {fees.reduce((s, f) => s + f.amount, 0) > 0 && (
+                            <p className="text-xs font-medium text-red-500/80 text-right mt-2">
+                              Total Fees: ≈ ₹{(fees.reduce((s, f) => s + f.amount, 0) * exchangeRate).toLocaleString(undefined, { maximumFractionDigits: 2 })} Base Lost
+                            </p>
+                          )}
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>

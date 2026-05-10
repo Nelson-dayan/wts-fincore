@@ -1,0 +1,528 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import { Plus, X, Lock, Unlock, CreditCard, RotateCcw, Loader2 } from "lucide-react";
+import { ResourceTableClient } from "@/components/portals/resource-table-client";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select } from "@/components/ui/select";
+import { ProjectSearchPicker } from "@/components/portals/project-search-picker";
+import { InvoiceRow } from "@/components/portals/invoice-search-picker"; // Keep this just for the type, or define it locally
+
+import { DashboardPageHeader } from "@/components/dashboard/page-header";
+
+type FeeRow = { type: string; amount: number };
+
+export function AdminPaymentsPageClient({ apiPrefix }: { apiPrefix: string }) {
+  const [modalOpen, setModalOpen] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  // Form State
+  const [selectedProjectId, setSelectedProjectId] = useState<string>("");
+  const [projectInvoices, setProjectInvoices] = useState<InvoiceRow[]>([]);
+  const [invoicesLoading, setInvoicesLoading] = useState(false);
+  const [selectedInvoice, setSelectedInvoice] = useState<InvoiceRow | null>(null);
+  const [type, setType] = useState("PAYMENT");
+  const [method, setMethod] = useState("BANK_TRANSFER");
+  const [currency, setCurrency] = useState("USD");
+  const [exchangeRate, setExchangeRate] = useState(83.5);
+  const [intendedAmount, setIntendedAmount] = useState(0);
+  const [receivedAmount, setReceivedAmount] = useState(0);
+  const [fees, setFees] = useState<FeeRow[]>([]);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
+  const [defaultRates, setDefaultRates] = useState<{ usdToInr: number; aedToInr: number; isLocked: boolean }>({
+    usdToInr: 83.5,
+    aedToInr: 22.7,
+    isLocked: false,
+  });
+
+  useEffect(() => {
+    if (modalOpen) {
+      fetch(`${apiPrefix}/company`)
+        .then((res) => res.json())
+        .then((data) => {
+          if (data?.item?.defaultExchangeRates) {
+            setDefaultRates({
+              usdToInr: data.item.defaultExchangeRates.usdToInr ?? 83.5,
+              aedToInr: data.item.defaultExchangeRates.aedToInr ?? 22.7,
+              isLocked: data.item.defaultExchangeRates.isLocked ?? false,
+            });
+          }
+        })
+        .catch(console.error);
+    } else {
+      // Reset when closed
+      setSelectedProjectId("");
+      setProjectInvoices([]);
+      setSelectedInvoice(null);
+      setType("PAYMENT");
+      setIntendedAmount(0);
+      setReceivedAmount(0);
+      setFees([]);
+      setError("");
+    }
+  }, [modalOpen, apiPrefix]);
+
+  const handleProjectSelect = async (projectId: string) => {
+    setSelectedProjectId(projectId);
+    setSelectedInvoice(null);
+    setProjectInvoices([]);
+    
+    if (!projectId) return;
+
+    setInvoicesLoading(true);
+    try {
+      const qs = new URLSearchParams({ page: "1", limit: "50", projectId });
+      const res = await fetch(`${apiPrefix}/invoices?${qs.toString()}`, {
+        cache: "no-store",
+      });
+      const data = await res.json();
+      if (res.ok && data.items) {
+        setProjectInvoices(data.items);
+      }
+    } catch (err) {
+      console.error("Failed to fetch invoices", err);
+    } finally {
+      setInvoicesLoading(false);
+    }
+  };
+
+  const handleInvoiceSelect = (invId: string) => {
+    const inv = projectInvoices.find((i) => String(i._id) === invId) || null;
+    setSelectedInvoice(inv);
+    if (inv) {
+      const invCurrency = inv.invoiceType === "usd" ? "USD" : "AED";
+      setCurrency(invCurrency);
+      
+      // Load default rate for the new currency
+      const newRate = invCurrency === "USD" ? defaultRates.usdToInr : defaultRates.aedToInr;
+      
+      // If locked, or if not previously set to a custom value, we might want to auto set it.
+      // It's safest to just set it to the default when invoice changes
+      setExchangeRate(newRate);
+    }
+  };
+
+  const handleCurrencyChange = (newCurrency: string) => {
+    setCurrency(newCurrency);
+    if (newCurrency === "USD") {
+      setExchangeRate(defaultRates.usdToInr);
+    } else if (newCurrency === "AED") {
+      setExchangeRate(defaultRates.aedToInr);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedInvoice) {
+      setError("Please select an invoice first.");
+      return;
+    }
+
+    setSubmitting(true);
+    setError("");
+
+    const totalFees = fees.reduce((sum, f) => sum + f.amount, 0);
+
+    if (totalFees > intendedAmount && type === "PAYMENT") {
+      setError("Fees cannot exceed intended amount.");
+      setSubmitting(false);
+      return;
+    }
+
+    try {
+      const payload = {
+        invoiceId: selectedInvoice._id,
+        companyId: selectedInvoice.companyId || undefined,
+        type,
+        method,
+        currency,
+        exchangeRate: Number(exchangeRate),
+        intendedAmount: Number(intendedAmount),
+        receivedAmount: Number(receivedAmount),
+        fees: fees
+          .filter((f) => f.amount > 0)
+          .map((f) => ({
+            type: f.type,
+            amount: Number(f.amount),
+            currency,
+          })),
+      };
+
+      const res = await fetch(`${apiPrefix}/payments`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "Failed to record payment");
+
+      setModalOpen(false);
+      setRefreshKey((k) => k + 1);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to record payment");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-2">
+        <DashboardPageHeader
+          title="Payments Ledger"
+          description="Global view of all recorded invoice payments and refunds."
+        />
+        <Button onClick={() => setModalOpen(true)} className="shrink-0 gap-2 font-medium">
+          <Plus className="w-4 h-4" /> Add Payment
+        </Button>
+      </div>
+
+      <ResourceTableClient
+        title="Payments"
+        description="All recorded invoice payments."
+        endpoint="/api/admin/payments"
+        showPageHeader={false}
+        refreshKey={refreshKey}
+        columns={[
+          { key: "invoiceId", label: "Invoice" },
+          { key: "amount", label: "Amount" },
+          { key: "method", label: "Method" },
+          { key: "transactionId", label: "Transaction ID" },
+          { key: "createdAt", label: "Created At" },
+        ]}
+      />
+
+      {modalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-0">
+          <div
+            className="absolute inset-0 bg-black/40 backdrop-blur-sm transition-opacity"
+            onClick={() => setModalOpen(false)}
+          />
+
+          <div
+            className="relative w-full max-w-[500px] bg-card rounded-2xl shadow-2xl border border-border/60 overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="px-6 py-5 border-b border-border/50 bg-muted/10 flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary shrink-0 ring-1 ring-primary/20">
+                  <CreditCard className="w-5 h-5" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-semibold tracking-tight">Record Transaction</h2>
+                  <p className="text-sm text-muted-foreground">Log a new payment or refund</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setModalOpen(false)}
+                className="p-2 rounded-full hover:bg-muted text-muted-foreground transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="p-6 overflow-y-auto overflow-x-hidden flex-1 custom-scrollbar">
+              <form id="global-payment-form" onSubmit={handleSubmit} className="space-y-6">
+                {error && (
+                  <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-sm font-medium">
+                    {error}
+                  </div>
+                )}
+
+                <div className="space-y-4">
+                  <div className="space-y-2.5">
+                    <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                      1. Connect Project
+                    </Label>
+                    <ProjectSearchPicker
+                      id="project-search"
+                      value={selectedProjectId}
+                      onChange={handleProjectSelect}
+                      helperText="Search for the project by name or client to find its invoices."
+                    />
+                  </div>
+
+                  {selectedProjectId && (
+                    <div className="space-y-2.5 animate-in fade-in slide-in-from-top-4 duration-300">
+                      <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                        2. Select Invoice
+                      </Label>
+                      {invoicesLoading ? (
+                        <div className="h-10 flex items-center justify-center rounded-xl border border-border/80 bg-muted/10 text-sm text-muted-foreground">
+                          <Loader2 className="w-4 h-4 animate-spin mr-2" /> Loading invoices...
+                        </div>
+                      ) : projectInvoices.length === 0 ? (
+                        <div className="h-10 flex items-center justify-center rounded-xl border border-dashed border-border/80 bg-muted/5 text-sm text-muted-foreground">
+                          No invoices found for this project.
+                        </div>
+                      ) : (
+                        <Select
+                          value={selectedInvoice?._id || ""}
+                          onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleInvoiceSelect(e.target.value)}
+                          options={[
+                            { value: "", label: "Select an invoice..." },
+                            ...projectInvoices.map(inv => ({
+                              value: String(inv._id),
+                              label: `${inv.invoiceNumber} — ${inv.invoiceType === "usd" ? "USD" : "AED"} ${inv.total?.toLocaleString()} (${inv.status || "Pending"})`
+                            }))
+                          ]}
+                        />
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {selectedInvoice && (
+                  <div className="animate-in fade-in slide-in-from-top-4 duration-300 space-y-6">
+                    {/* Selected Invoice Summary Banner */}
+                    <div className="p-3 bg-primary/5 border border-primary/10 rounded-xl flex justify-between items-center">
+                      <div>
+                        <p className="text-xs text-muted-foreground">Selected Invoice</p>
+                        <p className="font-semibold text-primary">{selectedInvoice.invoiceNumber}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-xs text-muted-foreground">Total</p>
+                        <p className="font-mono text-sm">
+                          {selectedInvoice.invoiceType === "usd" ? "USD" : "AED"}{" "}
+                          {selectedInvoice.total?.toLocaleString()}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-5">
+                      <div className="space-y-2.5">
+                        <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                          Type
+                        </Label>
+                        <Select
+                          value={type}
+                          onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setType(e.target.value)}
+                          options={[
+                            { value: "PAYMENT", label: "Payment (Received)" },
+                            { value: "REFUND", label: "Refund (Returned)" },
+                          ]}
+                        />
+                      </div>
+                      <div className="space-y-2.5">
+                        <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                          Method
+                        </Label>
+                        <Select
+                          value={method}
+                          onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setMethod(e.target.value)}
+                          options={[
+                            { value: "BANK_TRANSFER", label: "Bank Transfer" },
+                            { value: "STRIPE", label: "Stripe" },
+                            { value: "PAYPAL", label: "PayPal" },
+                            { value: "UPI", label: "UPI" },
+                            { value: "CASH", label: "Cash" },
+                            { value: "CHEQUE", label: "Cheque" },
+                            { value: "OTHER", label: "Other" },
+                          ]}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-5">
+                      <div className="space-y-2.5">
+                        <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                          Currency
+                        </Label>
+                        <Select
+                          value={currency}
+                          onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleCurrencyChange(e.target.value)}
+                          options={[
+                            { value: "AED", label: "AED" },
+                            { value: "USD", label: "USD" },
+                          ]}
+                        />
+                      </div>
+                      <div className="space-y-2.5">
+                        <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex justify-between items-center">
+                          <span>Exchange Rate (to INR)</span>
+                          {defaultRates.isLocked ? (
+                            <span className="p-1 rounded-md bg-brand/10 text-brand" title="Locked by company settings">
+                              <Lock className="w-3.5 h-3.5" />
+                            </span>
+                          ) : (
+                            <span className="p-1 rounded-md text-muted-foreground" title="Editable">
+                              <Unlock className="w-3.5 h-3.5" />
+                            </span>
+                          )}
+                        </Label>
+                        <Input
+                          type="number"
+                          step="0.0001"
+                          min="0"
+                          required
+                          value={exchangeRate}
+                          onChange={(e) => setExchangeRate(Number(e.target.value))}
+                          disabled={defaultRates.isLocked}
+                          className={`font-mono ${
+                            defaultRates.isLocked ? "bg-muted/50 text-muted-foreground border-dashed" : ""
+                          }`}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-4 bg-muted/20 border border-border/50 rounded-xl p-4">
+                      <div className="space-y-2.5">
+                        <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                          Intended Amount (Client Paid)
+                        </Label>
+                        <div className="flex items-center relative">
+                          <span className="absolute left-3 text-sm font-semibold text-muted-foreground">
+                            {currency}
+                          </span>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            min="0.01"
+                            required
+                            value={intendedAmount || ""}
+                            onChange={(e) => setIntendedAmount(Number(e.target.value))}
+                            className="pl-12 font-mono text-base bg-background/80"
+                            placeholder="0.00"
+                          />
+                        </div>
+                      </div>
+
+                      {type === "PAYMENT" && (
+                        <div className="space-y-2.5">
+                          <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                            Received Amount (Hit Bank)
+                          </Label>
+                          <div className="flex items-center relative">
+                            <span className="absolute left-3 text-sm font-semibold text-muted-foreground">
+                              {currency}
+                            </span>
+                            <Input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              required
+                              value={receivedAmount || ""}
+                              onChange={(e) => setReceivedAmount(Number(e.target.value))}
+                              className="pl-12 font-mono text-base bg-background/80"
+                              placeholder="0.00"
+                            />
+                          </div>
+                          {intendedAmount > 0 && receivedAmount > 0 && intendedAmount !== receivedAmount && (
+                            <p className="text-xs text-amber-600 dark:text-amber-500 font-medium text-right flex items-center justify-end gap-1">
+                              <RotateCcw className="w-3 h-3" /> Delta: {currency}{" "}
+                              {Math.abs(intendedAmount - receivedAmount).toFixed(2)}
+                            </p>
+                          )}
+                        </div>
+                      )}
+
+                      {type === "PAYMENT" && (
+                        <div className="space-y-3 pt-4 border-t border-border/60">
+                          <div className="flex items-center justify-between">
+                            <Label className="font-medium text-foreground">Deducted Fees (Optional)</Label>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="h-7 text-xs px-2"
+                              onClick={() => setFees([...fees, { type: "GATEWAY_FEE", amount: 0 }])}
+                            >
+                              <Plus className="w-3 h-3 mr-1" /> Add Fee
+                            </Button>
+                          </div>
+
+                          {fees.length === 0 ? (
+                            <div className="text-xs text-muted-foreground italic text-center py-2 bg-background/50 rounded border border-dashed">
+                              No fees added.
+                            </div>
+                          ) : (
+                            <div className="space-y-3">
+                              {fees.map((fee, idx) => (
+                                <div key={idx} className="flex items-start gap-2 relative group">
+                                  <div className="flex-1 space-y-2">
+                                    <Select
+                                      value={fee.type}
+                                      onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
+                                        const newFees = [...fees];
+                                        newFees[idx].type = e.target.value;
+                                        setFees(newFees);
+                                      }}
+                                      options={[
+                                        { value: "GATEWAY_FEE", label: "Gateway Fee (Stripe/PayPal)" },
+                                        { value: "BANK_CHARGE", label: "Bank Charge" },
+                                        { value: "FOREX", label: "Forex Markup" },
+                                        { value: "TDS", label: "TDS / Tax Deducted" },
+                                        { value: "OTHER", label: "Other" },
+                                      ]}
+                                    />
+                                    <div className="flex items-center relative">
+                                      <span className="absolute left-3 text-sm font-semibold text-muted-foreground">
+                                        {currency}
+                                      </span>
+                                      <Input
+                                        type="number"
+                                        step="0.01"
+                                        min="0"
+                                        value={fee.amount || ""}
+                                        onChange={(e) => {
+                                          const newFees = [...fees];
+                                          newFees[idx].amount = Number(e.target.value);
+                                          setFees(newFees);
+                                        }}
+                                        className="pl-12 font-mono text-sm h-9 bg-background/80"
+                                        placeholder="0.00"
+                                      />
+                                    </div>
+                                  </div>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    className="mt-1 h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 shrink-0"
+                                    onClick={() => setFees(fees.filter((_, i) => i !== idx))}
+                                  >
+                                    <X className="w-4 h-4" />
+                                  </Button>
+                                </div>
+                              ))}
+                              {fees.reduce((s, f) => s + f.amount, 0) > 0 && (
+                                <p className="text-xs font-medium text-red-500/80 text-right mt-2">
+                                  Total Fees: ≈ ₹
+                                  {(fees.reduce((s, f) => s + f.amount, 0) * exchangeRate).toLocaleString(
+                                    undefined,
+                                    { maximumFractionDigits: 2 }
+                                  )}{" "}
+                                  Base Lost
+                                </p>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </form>
+            </div>
+
+            {/* Footer */}
+            <div className="px-6 py-4 border-t border-border/50 bg-muted/10 shrink-0 flex items-center justify-end gap-3">
+              <Button type="button" variant="outline" onClick={() => setModalOpen(false)} disabled={submitting}>
+                Cancel
+              </Button>
+              <Button form="global-payment-form" type="submit" disabled={submitting || !selectedInvoice}>
+                {submitting ? "Saving..." : `Confirm ${type}`}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

@@ -23,6 +23,7 @@ type CompanyData = {
   signatureText?: string;
   isPrimary?: boolean;
   defaultTax?: { taxRate?: number; taxEnabled?: boolean };
+  defaultExchangeRates?: { usdToInr?: number; aedToInr?: number; isLocked?: boolean };
 };
 
 function s(v: string | undefined | null): string {
@@ -40,6 +41,7 @@ export function AdminCompanyClient() {
     logoText: "",
     signatureText: "",
     defaultTax: { taxRate: 0, taxEnabled: false },
+    defaultExchangeRates: { usdToInr: 83.5, aedToInr: 22.7, isLocked: false },
   });
   const [message, setMessage] = useState("");
   const [messageOk, setMessageOk] = useState(true);
@@ -58,7 +60,12 @@ export function AdminCompanyClient() {
         primaryRes
       );
       if (!primaryRes.ok) throw new Error(primaryPayload.message ?? "Failed to load company");
-      if (primaryPayload.item) setPrimaryForm(primaryPayload.item);
+      if (primaryPayload.item) {
+        setPrimaryForm({
+          ...primaryPayload.item,
+          defaultExchangeRates: primaryPayload.item.defaultExchangeRates ?? { usdToInr: 83.5, aedToInr: 22.7, isLocked: false }
+        });
+      }
       if (!opts?.quiet) setBootError("");
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Failed to load company";
@@ -272,6 +279,75 @@ export function AdminCompanyClient() {
                       options={[
                         { value: "false", label: "Off — manual per quote" },
                         { value: "true", label: "On — apply rate above" },
+                      ]}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <h3 className="mb-4 flex items-center gap-2 text-sm font-semibold text-foreground">
+                  <Landmark className="size-4 text-primary" aria-hidden />
+                  Exchange Rates (Base to INR)
+                </h3>
+                <div className="grid gap-5 sm:grid-cols-3">
+                  <div className="space-y-1.5">
+                    <Label className="text-foreground/90">USD to INR</Label>
+                    <Input
+                      type="number"
+                      min={0}
+                      step={0.0001}
+                      className="h-11 border-border/80 bg-background/60"
+                      value={String(primaryForm.defaultExchangeRates?.usdToInr ?? 83.5)}
+                      onChange={(e) => {
+                        const n = e.target.value === "" ? 83.5 : Number(e.target.value);
+                        setPrimaryForm((f) => ({
+                          ...f,
+                          defaultExchangeRates: {
+                            ...f.defaultExchangeRates,
+                            usdToInr: Number.isFinite(n) ? n : 83.5,
+                          },
+                        }));
+                      }}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-foreground/90">AED to INR</Label>
+                    <Input
+                      type="number"
+                      min={0}
+                      step={0.0001}
+                      className="h-11 border-border/80 bg-background/60"
+                      value={String(primaryForm.defaultExchangeRates?.aedToInr ?? 22.7)}
+                      onChange={(e) => {
+                        const n = e.target.value === "" ? 22.7 : Number(e.target.value);
+                        setPrimaryForm((f) => ({
+                          ...f,
+                          defaultExchangeRates: {
+                            ...f.defaultExchangeRates,
+                            aedToInr: Number.isFinite(n) ? n : 22.7,
+                          },
+                        }));
+                      }}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-foreground/90">Lock Rates</Label>
+                    <Select
+                      className="h-11"
+                      value={String(primaryForm.defaultExchangeRates?.isLocked ?? false)}
+                      onChange={(e) =>
+                        setPrimaryForm((f) => ({
+                          ...f,
+                          defaultExchangeRates: {
+                            ...f.defaultExchangeRates,
+                            isLocked: e.target.value === "true",
+                          },
+                        }))
+                      }
+                      options={[
+                        { value: "false", label: "Unlocked — Edit per payment" },
+                        { value: "true", label: "Locked — Enforce defaults" },
                       ]}
                     />
                   </div>
