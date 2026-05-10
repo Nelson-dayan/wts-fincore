@@ -15,13 +15,24 @@ export async function GET(req: Request) {
     await connectDB();
     const url = new URL(req.url);
     const poId = String(url.searchParams.get("poId") ?? "").trim();
-    const invoiceType = url.searchParams.get("invoiceType") === "usd" ? "usd" : "aed";
     if (!poId || !mongoose.Types.ObjectId.isValid(poId)) {
       return NextResponse.json({ message: "Valid poId is required" }, { status: 400 });
     }
 
     const po = await PurchaseOrderModel.findById(poId).lean();
     if (!po) return NextResponse.json({ message: "Purchase order not found" }, { status: 404 });
+
+    const quotation = await QuotationModel.findById(po.quotationId).lean();
+    if (!quotation) {
+      return NextResponse.json(
+        { message: "Quotation not found for this purchase order" },
+        { status: 404 }
+      );
+    }
+
+    const qCurrency = String(quotation.currency ?? "AED").toUpperCase();
+    const urlType = url.searchParams.get("invoiceType");
+    const invoiceType = urlType === "usd" ? "usd" : (urlType === "aed" ? "aed" : (qCurrency === "USD" ? "usd" : "aed"));
 
     if (session.user.role === "employee") {
       try {
@@ -32,14 +43,6 @@ export async function GET(req: Request) {
         }
         throw e;
       }
-    }
-
-    const quotation = await QuotationModel.findById(po.quotationId).lean();
-    if (!quotation) {
-      return NextResponse.json(
-        { message: "Quotation not found for this purchase order" },
-        { status: 404 }
-      );
     }
 
     const primary = await CompanyModel.findOne({ isPrimary: true }).sort({ updatedAt: -1 }).lean();
@@ -109,11 +112,15 @@ export async function GET(req: Request) {
     const clientCompany = s(clientSnap.company);
     const clientAddress = s(clientSnap.address);
 
+    const companyExRates = (primary as any)?.defaultExchangeRates || {};
+    const defaultExRate = invoiceType === "usd" ? (companyExRates.usdToInr || 83.5) : (companyExRates.aedToInr || 22.7);
+
     return NextResponse.json({
       item: {
         invoiceNumber,
         invoiceType,
-        currency: quotation.currency ?? "AED",
+        exchangeRate: defaultExRate,
+        currency: quotation.currency ?? (invoiceType === "usd" ? "USD" : "AED"),
         projectId: String(po.projectId ?? ""),
         poId: String(po._id),
         status: "unpaid",

@@ -13,6 +13,7 @@ import { InvoiceRow, InvoiceSearchPicker } from "@/components/portals/invoice-se
 import { DashboardPageHeader } from "@/components/dashboard/page-header";
 import { usePortalConfig } from "@/components/portals/portal-config-context";
 import { PaymentDetailModal } from "@/components/portals/payment-detail-modal";
+import { InvoiceLedgerModal } from "@/components/portals/invoice-ledger-modal";
 
 type FeeRow = { type: string; amount: number };
 
@@ -20,6 +21,7 @@ export function AdminPaymentsPageClient({ apiPrefix }: { apiPrefix: string }) {
   const { pathPrefix } = usePortalConfig();
   const [modalOpen, setModalOpen] = useState(false);
   const [viewingPaymentId, setViewingPaymentId] = useState<string | null>(null);
+  const [viewingLedgerInvoiceId, setViewingLedgerInvoiceId] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
 
   // Form State
@@ -236,6 +238,15 @@ export function AdminPaymentsPageClient({ apiPrefix }: { apiPrefix: string }) {
         }}
       />
 
+      <div className="mt-4 flex gap-4">
+        {/* We can't easily add a second 'onView' type action to the generic table, 
+            so we'll use a hack: if the user clicks 'Invoice Detail' link, it goes to the page.
+            But I'll add a 'Statement' button in the PaymentDetailModal instead, or 
+            I can modify ResourceTableClient to support multiple actions.
+            Actually, the user said "add the Financial Statement in the Payments page".
+        */}
+      </div>
+
       {/* Payment Action Overrides (View Details) */}
       <div className="absolute right-0 top-0 opacity-0 pointer-events-none">
         {/* This is a hack to add a custom action to ResourceTableClient without more complex prop drilling right now */}
@@ -246,6 +257,15 @@ export function AdminPaymentsPageClient({ apiPrefix }: { apiPrefix: string }) {
           paymentId={viewingPaymentId} 
           apiPrefix={apiPrefix} 
           onClose={() => setViewingPaymentId(null)} 
+          onOpenStatement={(id) => setViewingLedgerInvoiceId(id)}
+        />
+      )}
+
+      {viewingLedgerInvoiceId && (
+        <InvoiceLedgerModal 
+          invoiceId={viewingLedgerInvoiceId} 
+          apiPrefix={apiPrefix} 
+          onClose={() => setViewingLedgerInvoiceId(null)} 
         />
       )}
 

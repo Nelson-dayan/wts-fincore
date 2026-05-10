@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { X, CreditCard, Receipt, Calendar, User, ArrowRight, History } from "lucide-react";
+import { X, CreditCard, Receipt, Calendar, User, ArrowRight, History, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
@@ -10,9 +10,10 @@ interface PaymentDetailModalProps {
   paymentId: string;
   apiPrefix: string;
   onClose: () => void;
+  onOpenStatement?: (invoiceId: string) => void;
 }
 
-export function PaymentDetailModal({ paymentId, apiPrefix, onClose }: PaymentDetailModalProps) {
+export function PaymentDetailModal({ paymentId, apiPrefix, onClose, onOpenStatement }: PaymentDetailModalProps) {
   const [payment, setPayment] = useState<any>(null);
   const [relatedPayments, setRelatedPayments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -190,7 +191,18 @@ export function PaymentDetailModal({ paymentId, apiPrefix, onClose }: PaymentDet
         </div>
 
         {/* Footer */}
-        <div className="p-4 border-t bg-muted/10 flex justify-end">
+        <div className="p-4 border-t bg-muted/10 flex justify-between items-center">
+          {onOpenStatement && payment?.invoiceId?._id && (
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="text-primary font-bold gap-2"
+              onClick={() => onOpenStatement(payment.invoiceId._id)}
+            >
+              <FileText className="w-4 h-4" />
+              Full Financial Statement
+            </Button>
+          ) || <div />}
           <Button variant="outline" onClick={onClose}>Close</Button>
         </div>
       </div>
