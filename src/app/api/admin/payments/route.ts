@@ -37,10 +37,11 @@ export async function GET(req: Request) {
 
     const [items, total] = await Promise.all([
       PaymentModel.find(filter)
-      .sort({ createdAt: 1 })
+      .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit)
       .populate("createdBy", "name email")
+      .populate("invoiceId", "invoiceNumber")
       .lean(),
       PaymentModel.countDocuments(filter),
     ]);

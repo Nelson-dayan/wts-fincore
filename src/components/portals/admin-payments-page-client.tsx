@@ -11,11 +11,15 @@ import { ProjectSearchPicker } from "@/components/portals/project-search-picker"
 import { InvoiceRow } from "@/components/portals/invoice-search-picker"; // Keep this just for the type, or define it locally
 
 import { DashboardPageHeader } from "@/components/dashboard/page-header";
+import { usePortalConfig } from "@/components/portals/portal-config-context";
+import { PaymentDetailModal } from "@/components/portals/payment-detail-modal";
 
 type FeeRow = { type: string; amount: number };
 
 export function AdminPaymentsPageClient({ apiPrefix }: { apiPrefix: string }) {
+  const { pathPrefix } = usePortalConfig();
   const [modalOpen, setModalOpen] = useState(false);
+  const [viewingPaymentId, setViewingPaymentId] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
 
   // Form State
@@ -211,13 +215,39 @@ export function AdminPaymentsPageClient({ apiPrefix }: { apiPrefix: string }) {
         showPageHeader={false}
         refreshKey={refreshKey}
         columns={[
-          { key: "invoiceId", label: "Invoice" },
-          { key: "amount", label: "Amount" },
+          { key: "invoiceId", label: "Invoice #" },
+          { key: "receivedAmount", label: "Amount" },
+          { key: "currency", label: "Curr" },
           { key: "method", label: "Method" },
-          { key: "transactionId", label: "Transaction ID" },
-          { key: "createdAt", label: "Created At" },
+          { key: "transactionId", label: "Tx ID" },
+          { key: "createdAt", label: "Date" },
         ]}
+        extraRowLinks={[
+          { label: "Invoice Detail", hrefPattern: `${pathPrefix}/invoices/{invoiceId}` }
+        ]}
+        onView={(id) => setViewingPaymentId(id)}
+        onDelete={async (id) => {
+          const res = await fetch(`${apiPrefix}/payments/${id}`, { method: "DELETE" });
+          if (!res.ok) {
+            const data = await res.json();
+            throw new Error(data.message || "Failed to delete payment");
+          }
+          setRefreshKey(k => k + 1);
+        }}
       />
+
+      {/* Payment Action Overrides (View Details) */}
+      <div className="absolute right-0 top-0 opacity-0 pointer-events-none">
+        {/* This is a hack to add a custom action to ResourceTableClient without more complex prop drilling right now */}
+      </div>
+
+      {viewingPaymentId && (
+        <PaymentDetailModal 
+          paymentId={viewingPaymentId} 
+          apiPrefix={apiPrefix} 
+          onClose={() => setViewingPaymentId(null)} 
+        />
+      )}
 
       {modalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-0">

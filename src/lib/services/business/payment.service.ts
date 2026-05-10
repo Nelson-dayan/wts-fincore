@@ -165,6 +165,32 @@ export async function recordPayment(input: RecordPaymentInput) {
   }
 }
 
+export async function deletePayment(paymentId: string) {
+  const db = await connectDB();
+  const session = await db.startSession();
+  try {
+    let invoiceStatus = "SENT";
+
+    await session.withTransaction(async () => {
+      const payment = await PaymentModel.findById(paymentId).session(session);
+      if (!payment) throw new Error("Payment not found");
+
+      await PaymentModel.updateOne(
+        { _id: paymentId },
+        { $set: { isDeleted: true, deletedAt: new Date() } },
+        { session }
+      );
+
+      const { status } = await updateInvoiceCache(payment.invoiceId, session);
+      invoiceStatus = status;
+    });
+
+    return { success: true, invoiceStatus };
+  } finally {
+    await session.endSession();
+  }
+}
+
 export async function markOverdueInvoices(): Promise<number> {
   await connectDB();
   const now = new Date();
