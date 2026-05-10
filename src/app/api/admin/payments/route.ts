@@ -45,7 +45,15 @@ export async function GET(req: Request) {
       .lean(),
       PaymentModel.countDocuments(filter),
     ]);
-    return NextResponse.json({ items, page, limit, total, hasMore: skip + items.length < total });
+    // Convert Mongoose Decimal128 to numbers for React rendering
+    const sanitizedItems = JSON.parse(JSON.stringify(items), (key, value) => {
+      if (value && typeof value === 'object' && value.$numberDecimal) {
+        return parseFloat(value.$numberDecimal);
+      }
+      return value;
+    });
+
+    return NextResponse.json({ items: sanitizedItems, page, limit, total, hasMore: skip + items.length < total });
   } catch (error) {
     return authErrorResponse(error, "Failed to load payments");
   }

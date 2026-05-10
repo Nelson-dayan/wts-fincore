@@ -17,6 +17,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { SaveSuccessToast } from "@/components/ui/save-success-toast";
 import { usePortalConfig } from "@/components/portals/portal-config-context";
 import { useSaveFeedback } from "@/lib/hooks/use-save-feedback";
+import { InvoiceLedgerModal } from "@/components/portals/invoice-ledger-modal";
 
 
 function toDocData(item: Item): InvoiceDocData {
@@ -56,6 +57,7 @@ export function AdminInvoiceDetailClient({
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState("");
   const [pdfExporting, setPdfExporting] = useState(false);
+  const [ledgerOpen, setLedgerOpen] = useState(false);
   const [companyRates, setCompanyRates] = useState<{ usdToInr: number; aedToInr: number; isLocked: boolean }>({
     usdToInr: 83.5,
     aedToInr: 22.7,
@@ -358,6 +360,7 @@ export function AdminInvoiceDetailClient({
             onCopyBillToShip={copyBillToShip}
             onSave={() => void save()}
             onDownloadPdf={() => void downloadPdf()}
+            onOpenLedger={() => setLedgerOpen(true)}
             companyRates={companyRates}
           />
 
@@ -385,6 +388,13 @@ export function AdminInvoiceDetailClient({
       ) : null}
 
       <InvoicePrintStyle />
+      {ledgerOpen && item?._id && (
+        <InvoiceLedgerModal 
+          invoiceId={item._id} 
+          apiPrefix={apiPrefix} 
+          onClose={() => setLedgerOpen(false)} 
+        />
+      )}
     </div>
   );
 }

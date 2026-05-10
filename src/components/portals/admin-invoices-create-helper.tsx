@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dropdown } from "@/components/ui/select";
+import { ProjectSearchPicker } from "@/components/portals/project-search-picker";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   invoiceCountAtOrOverCap,
@@ -30,19 +31,24 @@ export function AdminInvoicesCreateHelper({
   const router = useRouter();
   const { apiPrefix, pathPrefix } = usePortalConfig();
   const [pos, setPos] = useState<PoRow[]>([]);
-  const [loadingPo, setLoadingPo] = useState(true);
+  const [loadingPo, setLoadingPo] = useState(false);
   const [poError, setPoError] = useState("");
+  const [selectedProjectId, setSelectedProjectId] = useState(projectId || "");
   const [selectedPoId, setSelectedPoId] = useState("");
   const [manualPoId, setManualPoId] = useState("");
   const [invoiceCounts, setInvoiceCounts] = useState<Record<string, number>>({});
 
   const loadPos = useCallback(async () => {
-    setLoadingPo(true);
     setPoError("");
+    if (!selectedProjectId) {
+      setPos([]);
+      setLoadingPo(false);
+      return;
+    }
     const startedAt = Date.now();
     try {
       const qs = new URLSearchParams({ page: "1", limit: "25", q: "" });
-      if (projectId) qs.set("projectId", projectId);
+      qs.set("projectId", selectedProjectId);
       const res = await fetch(`${apiPrefix}/purchase-orders?${qs}`, { cache: "no-store" });
       const data = await readResponseJson<{ items?: PoRow[]; message?: string }>(res);
       if (!res.ok) throw new Error(data.message ?? "Could not load POs");
@@ -79,7 +85,7 @@ export function AdminInvoicesCreateHelper({
       }
       setLoadingPo(false);
     }
-  }, [apiPrefix, projectId]);
+  }, [apiPrefix, selectedProjectId]);
 
   useEffect(() => {
     loadPos().catch(() => {});
@@ -120,6 +126,18 @@ export function AdminInvoicesCreateHelper({
           ) : null}
         </div>
 
+        {!projectId && (
+          <div className="space-y-2 max-w-md">
+            <Label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">1. Find Project / Client</Label>
+            <ProjectSearchPicker 
+              id="inv-project-search" 
+              value={selectedProjectId} 
+              onChange={(id) => setSelectedProjectId(id)} 
+              helperText="Search project or client name to find related POs."
+            />
+          </div>
+        )}
+
         {poError ? (
           <p className="text-destructive text-sm" role="alert">
             {poError}
@@ -135,9 +153,13 @@ export function AdminInvoicesCreateHelper({
             </div>
             <Skeleton className="h-3 w-44" />
           </div>
+        ) : !selectedProjectId ? (
+          <p className="text-muted-foreground text-sm flex items-center gap-2 bg-muted/20 p-3 rounded-lg border border-dashed">
+            Please select a project above to see its purchase orders.
+          </p>
         ) : pos.length === 0 ? (
           <p className="text-muted-foreground text-sm">
-            No purchase orders yet. Open a{" "}
+            No purchase orders yet for this project. Open a{" "}
             <Link href={`${pathPrefix}/quotations`} className="text-primary underline-offset-4 hover:underline">
               quotation
             </Link>{" "}
@@ -145,6 +167,7 @@ export function AdminInvoicesCreateHelper({
           </p>
         ) : (
           <div className="space-y-1.5">
+            <Label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">2. Select Purchase Order</Label>
             <div className="flex flex-col gap-2.5 sm:flex-row sm:items-end">
               <div className="w-full max-w-full sm:max-w-md sm:flex-1">
                 <Label htmlFor="inv-po-pick">Purchase order</Label>

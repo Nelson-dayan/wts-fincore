@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { ProjectSearchPicker } from "@/components/portals/project-search-picker";
-import { InvoiceRow } from "@/components/portals/invoice-search-picker"; // Keep this just for the type, or define it locally
+import { InvoiceRow, InvoiceSearchPicker } from "@/components/portals/invoice-search-picker";
 
 import { DashboardPageHeader } from "@/components/dashboard/page-header";
 import { usePortalConfig } from "@/components/portals/portal-config-context";
@@ -291,44 +291,18 @@ export function AdminPaymentsPageClient({ apiPrefix }: { apiPrefix: string }) {
                 <div className="space-y-4">
                   <div className="space-y-2.5">
                     <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                      1. Connect Project
+                      Search & Select Invoice
                     </Label>
-                    <ProjectSearchPicker
-                      id="project-search"
-                      value={selectedProjectId}
-                      onChange={handleProjectSelect}
-                      helperText="Search for the project by name or client to find its invoices."
+                    <InvoiceSearchPicker
+                      id="invoice-search"
+                      value={selectedInvoice?._id || ""}
+                      onChange={(inv) => {
+                        if (inv) handleInvoiceSelect(inv._id);
+                        else setSelectedInvoice(null);
+                      }}
+                      helperText="Type the invoice number (e.g. INV-001) to find it instantly."
                     />
                   </div>
-
-                  {selectedProjectId && (
-                    <div className="space-y-2.5 animate-in fade-in slide-in-from-top-4 duration-300">
-                      <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                        2. Select Invoice
-                      </Label>
-                      {invoicesLoading ? (
-                        <div className="h-10 flex items-center justify-center rounded-xl border border-border/80 bg-muted/10 text-sm text-muted-foreground">
-                          <Loader2 className="w-4 h-4 animate-spin mr-2" /> Loading invoices...
-                        </div>
-                      ) : projectInvoices.length === 0 ? (
-                        <div className="h-10 flex items-center justify-center rounded-xl border border-dashed border-border/80 bg-muted/5 text-sm text-muted-foreground">
-                          No invoices found for this project.
-                        </div>
-                      ) : (
-                        <Select
-                          value={selectedInvoice?._id || ""}
-                          onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleInvoiceSelect(e.target.value)}
-                          options={[
-                            { value: "", label: "Select an invoice..." },
-                            ...projectInvoices.map(inv => ({
-                              value: String(inv._id),
-                              label: `${inv.invoiceNumber} — ${inv.invoiceType === "usd" ? "USD" : "AED"} ${inv.total?.toLocaleString()} (${inv.status || "Pending"})`
-                            }))
-                          ]}
-                        />
-                      )}
-                    </div>
-                  )}
                 </div>
 
                 {selectedInvoice && (
