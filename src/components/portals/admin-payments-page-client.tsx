@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Plus, X, Lock, Unlock, CreditCard, RotateCcw, Loader2 } from "lucide-react";
+import { Plus, X, Lock, Unlock, CreditCard, RotateCcw, Loader2, Calculator } from "lucide-react";
 import { ResourceTableClient } from "@/components/portals/resource-table-client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -373,8 +373,20 @@ export function AdminPaymentsPageClient({ apiPrefix }: { apiPrefix: string }) {
 
                     <div className="space-y-4 bg-muted/20 border border-border/50 rounded-xl p-4">
                       <div className="space-y-2.5">
-                        <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                          Intended Amount (Client Paid)
+                        <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex justify-between items-center">
+                          <span>Intended Amount (Client Paid)</span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (selectedInvoice?.total) {
+                                setIntendedAmount(selectedInvoice.total);
+                                if (receivedAmount === 0) setReceivedAmount(selectedInvoice.total);
+                              }
+                            }}
+                            className="text-[10px] bg-primary/10 text-primary hover:bg-primary/20 px-2 py-0.5 rounded-md transition-colors"
+                          >
+                            Auto-fill Total
+                          </button>
                         </Label>
                         <div className="flex items-center relative">
                           <span className="absolute left-3 text-sm font-semibold text-muted-foreground">
@@ -395,8 +407,18 @@ export function AdminPaymentsPageClient({ apiPrefix }: { apiPrefix: string }) {
 
                       {type === "PAYMENT" && (
                         <div className="space-y-2.5">
-                          <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                            Received Amount (Hit Bank)
+                          <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex justify-between items-center">
+                            <span>Received Amount (Hit Bank)</span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const totalFees = fees.reduce((sum, f) => sum + (Number(f.amount) || 0), 0);
+                                setReceivedAmount(Math.max(0, intendedAmount - totalFees));
+                              }}
+                              className="text-[10px] bg-muted hover:bg-muted-foreground/20 text-muted-foreground px-2 py-0.5 rounded-md transition-colors flex items-center gap-1"
+                            >
+                              <Calculator className="w-3 h-3" /> Auto-calc
+                            </button>
                           </Label>
                           <div className="flex items-center relative">
                             <span className="absolute left-3 text-sm font-semibold text-muted-foreground">

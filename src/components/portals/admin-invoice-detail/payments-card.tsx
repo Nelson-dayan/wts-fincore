@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { format } from "date-fns";
-import { Plus, CreditCard, RotateCcw, X, ChevronLeft, ChevronRight, Lock, Unlock } from "lucide-react";
+import { Plus, CreditCard, RotateCcw, X, ChevronLeft, ChevronRight, Lock, Unlock, Calculator } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
@@ -321,7 +321,19 @@ export function PaymentsCard({
 
                 <div className="space-y-5 p-5 border rounded-xl bg-primary/5 border-primary/10">
                   <div className="space-y-2">
-                    <Label className="font-medium text-foreground">{type === "REFUND" ? "Refund Amount" : "Intended Amount (Client Paid)"}</Label>
+                    <Label className="font-medium text-foreground flex justify-between items-center">
+                      <span>{type === "REFUND" ? "Refund Amount" : "Intended Amount (Client Paid)"}</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIntendedAmount(invoiceTotalAmount);
+                          if (receivedAmount === 0) setReceivedAmount(invoiceTotalAmount);
+                        }}
+                        className="text-[10px] bg-primary/10 text-primary hover:bg-primary/20 px-2 py-0.5 rounded-md transition-colors"
+                      >
+                        Auto-fill Total
+                      </button>
+                    </Label>
                     <div className="flex items-center relative">
                       <span className="absolute left-3 text-sm font-semibold text-muted-foreground">{currency}</span>
                       <Input type="number" step="0.01" min="0" required value={intendedAmount || ""} onChange={(e) => setIntendedAmount(Number(e.target.value))} className="pl-12 font-mono text-base" placeholder="0.00" />
@@ -330,7 +342,19 @@ export function PaymentsCard({
                   </div>
 
                   <div className="space-y-2">
-                    <Label className="font-medium text-foreground">{type === "REFUND" ? "Refund Handed Over" : "Received Amount (Hit Bank)"}</Label>
+                    <Label className="font-medium text-foreground flex justify-between items-center">
+                      <span>{type === "REFUND" ? "Refund Handed Over" : "Received Amount (Hit Bank)"}</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const totalFees = fees.reduce((sum, f) => sum + (Number(f.amount) || 0), 0);
+                          setReceivedAmount(Math.max(0, intendedAmount - totalFees));
+                        }}
+                        className="text-[10px] bg-muted hover:bg-muted-foreground/20 text-muted-foreground px-2 py-0.5 rounded-md transition-colors flex items-center gap-1"
+                      >
+                        <Calculator className="w-3 h-3" /> Auto-calc
+                      </button>
+                    </Label>
                     <div className="flex items-center relative">
                       <span className="absolute left-3 text-sm font-semibold text-muted-foreground">{currency}</span>
                       <Input type="number" step="0.01" min="0" required value={receivedAmount || ""} onChange={(e) => setReceivedAmount(Number(e.target.value))} className="pl-12 font-mono text-base" placeholder="0.00" />

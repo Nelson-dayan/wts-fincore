@@ -185,9 +185,9 @@ export function AdminCompanyClient() {
                   <div className="space-y-1.5">
                     <Label className="text-foreground/90">Website</Label>
                     <Input
-                      type="url"
+                      type="text"
                       className="h-11 border-border/80 bg-background/60"
-                      placeholder="https://"
+                      placeholder="seclance.com"
                       value={s(primaryForm.website)}
                       onChange={(e) => setPrimaryForm((f) => ({ ...f, website: e.target.value }))}
                     />
