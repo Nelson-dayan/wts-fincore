@@ -4,8 +4,61 @@ import { stripUnsupportedColorsFromClone } from "@/utils/html2canvas-oklab-fix";
 
 type Html2CanvasOpts = NonNullable<Parameters<typeof html2canvas>[1]>;
 
+let sharedCanvasCtx: CanvasRenderingContext2D | null = null;
+function getSafeColor(val: any): any {
+  if (typeof val !== "string") return val;
+  const lower = val.toLowerCase();
+  if (
+    lower.includes("oklab") ||
+    lower.includes("oklch") ||
+    lower.includes("color-mix") ||
+    lower.includes("hwb") ||
+    lower.includes("color(")
+  ) {
+    if (!sharedCanvasCtx && typeof document !== "undefined") {
+      const canvas = document.createElement("canvas");
+      canvas.width = 1;
+      canvas.height = 1;
+      sharedCanvasCtx = canvas.getContext("2d", { willReadFrequently: true });
+    }
+    if (sharedCanvasCtx) {
+      sharedCanvasCtx.clearRect(0, 0, 1, 1);
+      sharedCanvasCtx.fillStyle = "rgba(0,0,0,0)";
+      sharedCanvasCtx.fillStyle = val;
+      sharedCanvasCtx.fillRect(0, 0, 1, 1);
+      const data = sharedCanvasCtx.getImageData(0, 0, 1, 1).data;
+      return `rgba(${data[0]}, ${data[1]}, ${data[2]}, ${data[3] / 255})`;
+    }
+    return "rgba(0,0,0,1)";
+  }
+  return val;
+}
+
 async function capturePage(el: HTMLElement, opts: Html2CanvasOpts) {
-  return html2canvas(el, opts);
+  if (typeof window === "undefined") return html2canvas(el, opts);
+  
+  const origGetComputedStyle = window.getComputedStyle;
+  window.getComputedStyle = function (element: Element, pseudoElt?: string | null) {
+    const style = origGetComputedStyle(element, pseudoElt);
+    return new Proxy(style, {
+      get(target: any, prop: string | symbol, receiver: any) {
+        const val = target[prop as keyof typeof target];
+        if (typeof val === "function") {
+          return function (...args: any[]) {
+            const res = val.apply(target, args);
+            return getSafeColor(res);
+          };
+        }
+        return getSafeColor(val);
+      },
+    });
+  };
+
+  try {
+    return await html2canvas(el, opts);
+  } finally {
+    window.getComputedStyle = origGetComputedStyle;
+  }
 }
 
 async function waitForImages(root: HTMLElement): Promise<void> {
