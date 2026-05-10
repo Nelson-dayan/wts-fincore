@@ -1,6 +1,6 @@
 import type { ClientSession, Types } from "mongoose";
 import { connectDB } from "@/lib/db/connect";
-import { InvoiceModel, PaymentModel } from "@/lib/db/models";
+import { CompanyModel, InvoiceModel, PaymentModel } from "@/lib/db/models";
 import { decimalToNumber } from "@/lib/services/business/money";
 import { getInvoiceSummary, PaymentInput, InvoiceInput } from "@/lib/invoice/finance-calculations";
 
@@ -92,11 +92,24 @@ export async function recordPayment(input: RecordPaymentInput) {
 
     await session.withTransaction(async () => {
       // 1. Validations
+      if (!input.invoiceId) throw new Error("invoiceId is required");
+      
+      const invoice = await InvoiceModel.findById(input.invoiceId).select("companyId exchangeRate totals").session(session);
+      if (!invoice) throw new Error("Invoice not found.");
+
+      let companyId = input.companyId || invoice.companyId;
+      if (!companyId) {
+        const primary = await CompanyModel.findOne({ isPrimary: true }).select("_id").session(session);
+        if (primary) companyId = primary._id;
+      }
+      
+      if (!companyId) throw new Error("companyId is required and could not be found on the invoice or primary company.");
+
       if (input.type === "REFUND" && !input.originalPaymentId) {
         throw new Error("Refunds must link to an originalPaymentId.");
       }
       
-      const totalFees = input.fees.reduce((sum, f) => sum + f.amount, 0);
+      const totalFees = (input.fees || []).reduce((sum, f) => sum + f.amount, 0);
       if (totalFees > input.intendedAmount) {
         throw new Error("Fees cannot exceed the intended amount.");
       }
@@ -106,9 +119,9 @@ export async function recordPayment(input: RecordPaymentInput) {
       const intendedAmountBase = input.intendedAmount * input.exchangeRate;
       const receivedAmountBase = input.receivedAmount * input.exchangeRate;
 
-      const feesWithBase = input.fees.map(f => ({
+      const feesWithBase = (input.fees || []).map(f => ({
         ...f,
-        baseAmount: f.amount * input.exchangeRate
+        baseAmount: (f.amount || 0) * input.exchangeRate
       }));
 
       // 3. Create Payment
@@ -116,7 +129,7 @@ export async function recordPayment(input: RecordPaymentInput) {
         [
           {
             invoiceId: input.invoiceId,
-            companyId: input.companyId,
+            companyId: companyId,
             type: input.type,
             method: input.method,
             currency: input.currency,

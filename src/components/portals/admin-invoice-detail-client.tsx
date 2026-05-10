@@ -56,6 +56,11 @@ export function AdminInvoiceDetailClient({
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState("");
   const [pdfExporting, setPdfExporting] = useState(false);
+  const [companyRates, setCompanyRates] = useState<{ usdToInr: number; aedToInr: number; isLocked: boolean }>({
+    usdToInr: 83.5,
+    aedToInr: 22.7,
+    isLocked: false,
+  });
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -82,6 +87,21 @@ export function AdminInvoiceDetailClient({
   useEffect(() => {
     load().catch(() => {});
   }, [load]);
+
+  useEffect(() => {
+    fetch(`${apiPrefix}/company`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (data?.item?.defaultExchangeRates) {
+          setCompanyRates({
+            usdToInr: data.item.defaultExchangeRates.usdToInr ?? 83.5,
+            aedToInr: data.item.defaultExchangeRates.aedToInr ?? 22.7,
+            isLocked: !!data.item.defaultExchangeRates.isLocked,
+          });
+        }
+      })
+      .catch(console.error);
+  }, [apiPrefix]);
 
   const liveTotals = useMemo(() => {
     if (!item) return { subtotal: 0, tax: 0, total: 0 };
@@ -338,6 +358,7 @@ export function AdminInvoiceDetailClient({
             onCopyBillToShip={copyBillToShip}
             onSave={() => void save()}
             onDownloadPdf={() => void downloadPdf()}
+            companyRates={companyRates}
           />
 
           <div className="flex flex-col gap-8 print:col-span-full">

@@ -135,6 +135,17 @@ export function PaymentsCard({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!invoiceId) return;
+
+    if (exchangeRate <= 0) {
+      setError("Exchange rate must be greater than 0");
+      return;
+    }
+    if (intendedAmount <= 0 && type !== "REFUND") {
+      setError("Amount must be greater than 0");
+      return;
+    }
+
     setSubmitting(true);
     setError("");
 

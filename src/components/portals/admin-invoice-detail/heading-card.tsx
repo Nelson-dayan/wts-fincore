@@ -11,9 +11,10 @@ type HeadingCardProps = {
   extras: Record<string, unknown>;
   onItemChange: (next: Item) => void;
   onPatchExtra: (key: string, value: string) => void;
+  companyRates: { usdToInr: number; aedToInr: number; isLocked: boolean };
 };
 
-export function HeadingCard({ item, extras, onItemChange, onPatchExtra }: HeadingCardProps) {
+export function HeadingCard({ item, extras, onItemChange, onPatchExtra, companyRates }: HeadingCardProps) {
   const taxOn = item.documentInfo.taxEnabled !== false;
   const rateRaw = item.documentInfo.taxRate;
   const taxRate = typeof rateRaw === "number" && Number.isFinite(rateRaw) ? rateRaw : 5;
@@ -35,9 +36,12 @@ export function HeadingCard({ item, extras, onItemChange, onPatchExtra }: Headin
                 const val = e.target.value === "usd" ? "usd" : "aed";
                 // When switching, we also update tax defaults and footer labels to help the user
                 const isUsd = val === "usd";
+                const newExRate = isUsd ? companyRates.usdToInr : companyRates.aedToInr;
+                
                 onItemChange({
                   ...item,
                   invoiceType: val,
+                  exchangeRate: newExRate,
                   documentInfo: {
                     ...item.documentInfo,
                     // Typically export/USD invoices have 0% tax
@@ -133,6 +137,21 @@ export function HeadingCard({ item, extras, onItemChange, onPatchExtra }: Headin
               value={String(extras.poNumberRef ?? "")}
               placeholder="Purchase order reference"
               onChange={(e) => onPatchExtra("poNumberRef", e.target.value)}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="inv-ex-rate">Exchange Rate (1 {item.invoiceType?.toUpperCase() || "AED"} to INR)</Label>
+            <Input
+              id="inv-ex-rate"
+              type="number"
+              step="0.0001"
+              value={item.exchangeRate ?? 1}
+              placeholder="e.g. 22.7"
+              disabled={companyRates.isLocked}
+              onChange={(e) => {
+                const val = parseFloat(e.target.value) || 0;
+                onItemChange({ ...item, exchangeRate: val });
+              }}
             />
           </div>
         </div>

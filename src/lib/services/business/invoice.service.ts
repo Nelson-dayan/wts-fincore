@@ -42,6 +42,7 @@ export async function countInvoicesForPurchaseOrder(poId: string): Promise<numbe
 }
 
 type CompanyDocLean = {
+  _id?: any;
   name?: string;
   address?: string;
   email?: string;
@@ -49,6 +50,7 @@ type CompanyDocLean = {
   logoText?: string;
   signatureText?: string;
   defaultTax?: { taxRate?: number; taxEnabled?: boolean };
+  defaultExchangeRates?: { usdToInr?: number; aedToInr?: number; isLocked?: boolean };
 };
 
 /** Primary company row for invoice defaults (logo lives in `logoText` as data URL). */
@@ -58,6 +60,7 @@ async function getPrimaryCompanyForInvoice(): Promise<CompanyDocLean | null> {
     .lean();
   if (!row) return null;
   return {
+    _id: row._id,
     name: row.name,
     address: row.address,
     email: row.email,
@@ -65,6 +68,7 @@ async function getPrimaryCompanyForInvoice(): Promise<CompanyDocLean | null> {
     logoText: row.logoText,
     signatureText: row.signatureText,
     defaultTax: row.defaultTax,
+    defaultExchangeRates: row.defaultExchangeRates,
   };
 }
 
@@ -208,7 +212,12 @@ export async function createInvoiceForPurchaseOrder(
     invoiceNumber,
     invoiceType,
     currency: quotation.currency ?? "AED",
-    exchangeRate: toDecimal128(1),
+    exchangeRate: toDecimal128(
+      invoiceType === "usd" 
+        ? (primaryCompany?.defaultExchangeRates?.usdToInr || 83.5)
+        : (primaryCompany?.defaultExchangeRates?.aedToInr || 22.7)
+    ),
+    companyId: (primaryCompany as any)?._id,
     projectId: po.projectId,
     poId: po._id,
     createdBy: new mongoose.Types.ObjectId(input.createdBy),

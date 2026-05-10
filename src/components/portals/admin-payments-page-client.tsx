@@ -135,6 +135,15 @@ export function AdminPaymentsPageClient({ apiPrefix }: { apiPrefix: string }) {
       return;
     }
 
+    if (Number(exchangeRate) <= 0) {
+      setError("Exchange rate must be greater than 0");
+      return;
+    }
+    if (Number(intendedAmount) <= 0 && type !== "REFUND") {
+      setError("Amount must be greater than 0");
+      return;
+    }
+
     setSubmitting(true);
     setError("");
 
