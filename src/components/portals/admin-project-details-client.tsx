@@ -32,6 +32,7 @@ type ProjectDetailsPayload = {
     startDate?: string;
     targetEndDate?: string;
     actualEndDate?: string;
+    fixCurrency?: boolean;
     createdAt: string;
   };
   client?: {
@@ -153,6 +154,7 @@ export function AdminProjectDetailsClient({
     startDate: "",
     targetEndDate: "",
     actualEndDate: "",
+    fixCurrency: false,
   });
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 
@@ -188,6 +190,7 @@ export function AdminProjectDetailsClient({
         startDate: payload.project.startDate ? new Date(payload.project.startDate).toISOString().split('T')[0] : "",
         targetEndDate: payload.project.targetEndDate ? new Date(payload.project.targetEndDate).toISOString().split('T')[0] : "",
         actualEndDate: payload.project.actualEndDate ? new Date(payload.project.actualEndDate).toISOString().split('T')[0] : "",
+        fixCurrency: !!payload.project.fixCurrency,
       });
     }
   }, [projectId, apiPrefix]);
@@ -217,6 +220,7 @@ export function AdminProjectDetailsClient({
           startDate: form.startDate || undefined,
           targetEndDate: form.targetEndDate || undefined,
           actualEndDate: form.actualEndDate || undefined,
+          fixCurrency: form.fixCurrency,
         }),
       });
       const payload = await readResponseJson<{ message?: string }>(response);
@@ -355,7 +359,28 @@ export function AdminProjectDetailsClient({
               </div>
               <div className="space-y-1">
                 <label className="text-xs font-medium text-muted-foreground">Currency</label>
-                <Input value={form.currency} onChange={(e) => setForm((f) => ({ ...f, currency: e.target.value }))} placeholder="AED" />
+                <div className="flex gap-2 items-center">
+                  <div className="flex-1">
+                    <Select
+                      value={form.currency}
+                      onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setForm((f) => ({ ...f, currency: e.target.value }))}
+                      options={[
+                        { value: "AED", label: "AED" },
+                        { value: "USD", label: "USD" },
+                      ]}
+                    />
+                  </div>
+                  <div className="flex items-center gap-1.5 ml-2 shrink-0">
+                    <input 
+                      type="checkbox" 
+                      id="fixCurrency"
+                      checked={form.fixCurrency} 
+                      onChange={(e) => setForm((f) => ({ ...f, fixCurrency: e.target.checked }))}
+                      className="size-4 rounded border-border bg-background"
+                    />
+                    <label htmlFor="fixCurrency" className="text-xs font-medium cursor-pointer">Fix Currency</label>
+                  </div>
+                </div>
               </div>
               <div className="space-y-1">
                 <label className="text-xs font-medium text-muted-foreground">Priority</label>
@@ -419,8 +444,11 @@ export function AdminProjectDetailsClient({
                 <p className="font-medium text-sm">{data.project?.category || "-"}</p>
               </div>
               <div className="space-y-1 border p-3 rounded-lg bg-muted/10">
-                <p className="text-[10px] uppercase font-semibold text-muted-foreground">Budget</p>
-                <p className="font-medium text-sm">{data.project?.currency || "AED"} {normalizeBudget(data.project?.budget) || "-"}</p>
+                <p className="text-[10px] uppercase font-semibold text-muted-foreground">Budget & Currency</p>
+                <p className="font-medium text-sm">
+                  {data.project?.currency || "AED"} {normalizeBudget(data.project?.budget) || "-"} 
+                  {data.project?.fixCurrency && <span className="ml-2 text-[10px] bg-brand/10 text-brand px-1.5 py-0.5 rounded-full uppercase tracking-wider font-bold">Locked</span>}
+                </p>
               </div>
               <div className="space-y-1 border p-3 rounded-lg bg-muted/10">
                 <p className="text-[10px] uppercase font-semibold text-muted-foreground">Client Reference</p>

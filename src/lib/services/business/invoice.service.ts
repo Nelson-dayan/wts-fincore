@@ -298,10 +298,11 @@ export function formatInvoiceForApi(row: Record<string, unknown>): Record<string
     _id: String(row._id),
     invoiceNumber: row.invoiceNumber,
     invoiceType: row.invoiceType === "usd" ? "usd" : "aed",
-    projectId: String(row.projectId ?? ""),
-    poId: row.poId ? String(row.poId) : "",
     createdBy: String(row.createdBy ?? ""),
     status: row.status,
+    fixCurrency: !!(row.projectId as any)?.fixCurrency,
+    projectId: String((row.projectId as any)?._id ?? row.projectId ?? ""),
+    poId: row.poId ? String(row.poId) : "",
     documentInfo: docInfo
       ? {
           ...docInfo,

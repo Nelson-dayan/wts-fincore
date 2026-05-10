@@ -36,7 +36,8 @@ export function PaymentsCard({
   invoiceCurrency = "AED",
   invoiceExchangeRate = 1,
   invoiceTotalAmount = 0,
-  invoiceTotalsCache
+  invoiceTotalsCache,
+  fixCurrency = false
 }: { 
   invoiceId: string;
   companyId: string;
@@ -49,6 +50,7 @@ export function PaymentsCard({
     totalIntendedBase: number;
     overpaidAmountBase: number;
   };
+  fixCurrency?: boolean;
 }) {
   const { apiPrefix } = usePortalConfig();
   const [payments, setPayments] = useState<PaymentRow[]>([]);
@@ -283,10 +285,16 @@ export function PaymentsCard({
 
                 <div className="grid grid-cols-2 gap-5">
                   <div className="space-y-2.5">
-                    <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Currency</Label>
+                    <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex justify-between items-center">
+                      <span>Currency</span>
+                      {fixCurrency && (
+                        <span className="text-[10px] bg-amber-500/10 text-amber-600 px-1.5 py-0.5 rounded-full uppercase font-bold">Locked by Project</span>
+                      )}
+                    </Label>
                     <Select 
                       value={currency} 
                       onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleCurrencyChange(e.target.value)}
+                      disabled={fixCurrency}
                       options={[
                         {value: "AED", label: "AED"},
                         {value: "USD", label: "USD"}
@@ -326,12 +334,14 @@ export function PaymentsCard({
                       <button
                         type="button"
                         onClick={() => {
-                          setIntendedAmount(invoiceTotalAmount);
-                          if (receivedAmount === 0) setReceivedAmount(invoiceTotalAmount);
+                          const remainingOriginal = Math.round((remainingIntended / exchangeRate) * 100) / 100;
+                          const targetAmount = remainingOriginal > 0 ? remainingOriginal : invoiceTotalAmount;
+                          setIntendedAmount(targetAmount);
+                          if (receivedAmount === 0) setReceivedAmount(targetAmount);
                         }}
                         className="text-[10px] bg-primary/10 text-primary hover:bg-primary/20 px-2 py-0.5 rounded-md transition-colors"
                       >
-                        Auto-fill Total
+                        Auto-fill Balance
                       </button>
                     </Label>
                     <div className="flex items-center relative">

@@ -60,6 +60,7 @@ export async function PATCH(req: Request, ctx: RouteCtx) {
       startDate?: string;
       targetEndDate?: string;
       actualEndDate?: string;
+      fixCurrency?: boolean;
     };
 
     if (Array.isArray(body.assignedTo) && body.assignedTo.length > 0) {
@@ -79,6 +80,7 @@ export async function PATCH(req: Request, ctx: RouteCtx) {
       priority: body.priority,
       budget: body.budget,
       assignedTo: body.assignedTo,
+      fixCurrency: body.fixCurrency,
     };
     
     if (body.currency !== undefined) $set.currency = String(body.currency).trim().toUpperCase();

@@ -15,6 +15,12 @@ export type InvoiceRow = {
   total?: number;
   companyId?: string;
   invoiceType?: "aed" | "usd";
+  totalsCache?: {
+    totalIntendedBase: number;
+    totalReceivedBase: number;
+  };
+  fixCurrency?: boolean;
+  exchangeRate?: number;
 };
 
 export function InvoiceSearchPicker({
@@ -63,6 +69,9 @@ export function InvoiceSearchPicker({
           total: p.total,
           companyId: p.companyId,
           invoiceType: p.invoiceType,
+          totalsCache: p.totalsCache,
+          fixCurrency: p.fixCurrency,
+          exchangeRate: p.exchangeRate,
         }))
       );
     } catch (e) {

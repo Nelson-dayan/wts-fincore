@@ -38,7 +38,7 @@ export async function GET(_req: Request, ctx: Ctx) {
         throw e;
       }
     }
-    const raw = await InvoiceModel.findById(invoiceId).lean();
+    const raw = await InvoiceModel.findById(invoiceId).populate("projectId", "fixCurrency").lean();
     if (!raw) {
       return NextResponse.json({ message: "Invoice not found" }, { status: 404 });
     }

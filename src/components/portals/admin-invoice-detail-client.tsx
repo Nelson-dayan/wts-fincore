@@ -355,6 +355,7 @@ export function AdminInvoiceDetailClient({
                   invoiceExchangeRate={item.exchangeRate || 1}
                   invoiceTotalAmount={liveTotals.total}
                   invoiceTotalsCache={item.totalsCache}
+                  fixCurrency={item.fixCurrency}
                 />
               </div>
             )}

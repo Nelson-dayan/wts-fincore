@@ -16,6 +16,7 @@ export type Item = {
   projectId: string;
   poId: string;
   status: string;
+  fixCurrency?: boolean;
   documentInfo: {
     date?: string;
     title?: string;

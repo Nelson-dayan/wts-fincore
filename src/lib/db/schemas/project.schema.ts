@@ -31,6 +31,7 @@ export const projectSchema = new Schema(
     startDate: { type: Date },
     targetEndDate: { type: Date },
     actualEndDate: { type: Date },
+    fixCurrency: { type: Boolean, default: false },
   },
   schemaOptions
 );

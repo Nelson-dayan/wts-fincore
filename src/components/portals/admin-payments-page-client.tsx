@@ -98,10 +98,24 @@ export function AdminPaymentsPageClient({ apiPrefix }: { apiPrefix: string }) {
       
       // Load default rate for the new currency
       const newRate = invCurrency === "USD" ? defaultRates.usdToInr : defaultRates.aedToInr;
-      
-      // If locked, or if not previously set to a custom value, we might want to auto set it.
-      // It's safest to just set it to the default when invoice changes
       setExchangeRate(newRate);
+
+      // Auto-fill remaining balance if possible
+      if (inv.total) {
+        const invExchangeRate = inv.exchangeRate || 1;
+        const totalIntendedBase = inv.totalsCache?.totalIntendedBase || 0;
+        const invoiceTotalBase = inv.total * invExchangeRate;
+        const remainingBase = Math.max(0, invoiceTotalBase - totalIntendedBase);
+        const remainingOriginal = Math.round((remainingBase / invExchangeRate) * 100) / 100;
+        
+        if (remainingOriginal > 0) {
+          setIntendedAmount(remainingOriginal);
+          setReceivedAmount(remainingOriginal);
+        } else {
+          setIntendedAmount(inv.total);
+          setReceivedAmount(inv.total);
+        }
+      }
     }
   };
 
@@ -331,12 +345,16 @@ export function AdminPaymentsPageClient({ apiPrefix }: { apiPrefix: string }) {
 
                     <div className="grid grid-cols-2 gap-5">
                       <div className="space-y-2.5">
-                        <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                          Currency
+                        <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex justify-between items-center">
+                          <span>Currency</span>
+                          {selectedInvoice?.fixCurrency && (
+                            <span className="text-[10px] bg-amber-500/10 text-amber-600 px-1.5 py-0.5 rounded-full uppercase font-bold">Locked by Project</span>
+                          )}
                         </Label>
                         <Select
                           value={currency}
                           onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleCurrencyChange(e.target.value)}
+                          disabled={!!selectedInvoice?.fixCurrency}
                           options={[
                             { value: "AED", label: "AED" },
                             { value: "USD", label: "USD" },
@@ -379,13 +397,20 @@ export function AdminPaymentsPageClient({ apiPrefix }: { apiPrefix: string }) {
                             type="button"
                             onClick={() => {
                               if (selectedInvoice?.total) {
-                                setIntendedAmount(selectedInvoice.total);
-                                if (receivedAmount === 0) setReceivedAmount(selectedInvoice.total);
+                                const invExchangeRate = selectedInvoice.exchangeRate || 1;
+                                const totalIntendedBase = selectedInvoice.totalsCache?.totalIntendedBase || 0;
+                                const invoiceTotalBase = selectedInvoice.total * invExchangeRate;
+                                const remainingBase = Math.max(0, invoiceTotalBase - totalIntendedBase);
+                                const remainingOriginal = Math.round((remainingBase / invExchangeRate) * 100) / 100;
+                                
+                                const targetAmount = remainingOriginal > 0 ? remainingOriginal : selectedInvoice.total;
+                                setIntendedAmount(targetAmount);
+                                if (receivedAmount === 0) setReceivedAmount(targetAmount);
                               }
                             }}
                             className="text-[10px] bg-primary/10 text-primary hover:bg-primary/20 px-2 py-0.5 rounded-md transition-colors"
                           >
-                            Auto-fill Total
+                            Auto-fill Balance
                           </button>
                         </Label>
                         <div className="flex items-center relative">
