@@ -146,16 +146,34 @@ export function PaymentsCard({
       return;
     }
 
-    setSubmitting(true);
-    setError("");
-
+    const tempId = "temp-" + Date.now();
     const totalFees = fees.reduce((sum, f) => sum + f.amount, 0);
+    
+    const optimisticPayment: PaymentRow = {
+      _id: tempId,
+      type,
+      method,
+      currency,
+      exchangeRate: Number(exchangeRate),
+      intendedAmount: Number(intendedAmount),
+      receivedAmount: Number(receivedAmount),
+      intendedAmountBase: Number(intendedAmount) * Number(exchangeRate),
+      receivedAmountBase: Number(receivedAmount) * Number(exchangeRate),
+      fees: fees.filter(f => f.amount > 0).map(f => ({
+        type: f.type,
+        amount: Number(f.amount),
+        currency
+      })),
+      status: "COMPLETED", // Assuming success
+      createdAt: new Date().toISOString()
+    };
 
-    if (totalFees > intendedAmount && type === "PAYMENT") {
-      setError("Fees cannot exceed intended amount.");
-      setSubmitting(false);
-      return;
-    }
+    // Store previous state for rollback
+    const previousPayments = [...payments];
+    
+    // Update state immediately
+    setPayments(prev => [optimisticPayment, ...prev]);
+    setDrawerOpen(false);
 
     try {
       const payload = {
@@ -167,11 +185,7 @@ export function PaymentsCard({
         exchangeRate: Number(exchangeRate),
         intendedAmount: Number(intendedAmount),
         receivedAmount: Number(receivedAmount),
-        fees: fees.filter(f => f.amount > 0).map(f => ({
-          type: f.type,
-          amount: Number(f.amount),
-          currency
-        }))
+        fees: optimisticPayment.fees
       };
 
       const res = await fetch(`${apiPrefix}/payments`, {
@@ -188,12 +202,11 @@ export function PaymentsCard({
         );
       }
       
-      setDrawerOpen(false);
-      // Reload current page or go back to page 1 to see the new record.
-      setPage(1);
-      if (page === 1) {
-        loadPayments(1);
-      }
+      // Replace temp ID with real ID from server
+      const typedData = data as { item: { _id: string } };
+      setPayments(prev => 
+        prev.map(p => p._id === tempId ? { ...p, _id: typedData.item._id } : p)
+      );
       
       // Reset form
       setIntendedAmount(0);
@@ -201,7 +214,10 @@ export function PaymentsCard({
       setFees([]);
       setType("PAYMENT");
     } catch (err: unknown) {
+      // Rollback on error
+      setPayments(previousPayments);
       setError(err instanceof Error ? err.message : "Failed to record payment");
+      setDrawerOpen(true); // Re-open drawer so they can fix and try again
     } finally {
       setSubmitting(false);
     }

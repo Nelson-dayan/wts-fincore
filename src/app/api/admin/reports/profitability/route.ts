@@ -8,6 +8,7 @@ import {
 } from "@/lib/db/models";
 import { requireRole } from "@/lib/auth/require-role";
 import { authErrorResponse } from "@/lib/api/route-auth";
+import { startOfMonth, subMonths, format } from "date-fns";
 
 export async function GET() {
   try {
@@ -21,7 +22,6 @@ export async function GET() {
       .lean();
 
     // 2. Aggregate Payments by Project (via Invoices)
-    // First, map project to its invoices
     const invoices = await InvoiceModel.find({})
       .select("_id projectId")
       .lean();
@@ -32,7 +32,7 @@ export async function GET() {
     });
 
     const payments = await PaymentModel.find({ status: "COMPLETED" })
-      .select("invoiceId receivedAmountBase feesBase")
+      .select("invoiceId receivedAmountBase feesBase createdAt")
       .lean();
 
     const projectRevenue: Record<string, number> = {};
@@ -48,7 +48,7 @@ export async function GET() {
 
     // 3. Aggregate Expenses by Project
     const expenses = await ExpenseModel.find({})
-      .select("projectId amountBase")
+      .select("projectId amountBase createdAt")
       .lean();
 
     const projectExpenses: Record<string, number> = {};
@@ -59,7 +59,36 @@ export async function GET() {
       }
     });
 
-    // 4. Combine into final report
+    // 4. Time Series Data (Last 6 Months)
+    const last6Months = Array.from({ length: 6 }).map((_, i) => {
+      const date = subMonths(new Date(), 5 - i);
+      return {
+        month: format(date, "MMM"),
+        date,
+        revenue: 0,
+        expenses: 0
+      };
+    });
+
+    payments.forEach((p: any) => {
+      const pDate = new Date(p.createdAt);
+      last6Months.forEach(m => {
+        if (pDate >= startOfMonth(m.date) && pDate < startOfMonth(subMonths(m.date, -1))) {
+          m.revenue += (Number(p.receivedAmountBase) || 0);
+        }
+      });
+    });
+
+    expenses.forEach((ex: any) => {
+      const exDate = new Date(ex.createdAt);
+      last6Months.forEach(m => {
+        if (exDate >= startOfMonth(m.date) && exDate < startOfMonth(subMonths(m.date, -1))) {
+          m.expenses += (Number(ex.amountBase) || 0);
+        }
+      });
+    });
+
+    // 5. Combine into final report
     const items = projects.map((p: any) => {
       const id = String(p._id);
       const revenue = projectRevenue[id] || 0;
@@ -82,7 +111,6 @@ export async function GET() {
       };
     });
 
-    // Totals for the header
     const totals = items.reduce((acc, curr) => ({
       revenue: acc.revenue + curr.revenue,
       expenses: acc.expenses + curr.expenses,
@@ -90,7 +118,11 @@ export async function GET() {
       profit: acc.profit + curr.profit
     }), { revenue: 0, expenses: 0, fees: 0, profit: 0 });
 
-    return NextResponse.json({ items, totals });
+    return NextResponse.json({ 
+      items, 
+      totals,
+      timeSeries: last6Months.map(({ month, revenue, expenses }) => ({ month, revenue, expenses }))
+    });
   } catch (error) {
     return authErrorResponse(error, "Failed to load profitability report");
   }
