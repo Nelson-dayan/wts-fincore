@@ -1,13 +1,10 @@
 "use client";
 
-import { useState } from "react";
-
 import { ImageUp, Plus, Save, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { SaveConfirmModal } from "@/components/ui/save-confirm-modal";
 import { Dropdown } from "@/components/ui/select";
 import { cn } from "@/lib/utils/cn";
 import { UploadCard } from "@/components/ui/upload-card";
@@ -40,8 +37,6 @@ export function QuotationForm({
   formTitle = "Quotation",
   onCancelEdit,
 }: QuotationFormProps) {
-  const [saveConfirmOpen, setSaveConfirmOpen] = useState(false);
-
   const patch = (partial: Partial<QuotationData>) => {
     onChange({ ...data, ...partial });
   };
@@ -101,15 +96,6 @@ export function QuotationForm({
 
   return (
     <Card className="mx-auto w-full max-w-4xl shrink-0 border-border/80 shadow-md">
-      <SaveConfirmModal
-        open={saveConfirmOpen}
-        onClose={() => setSaveConfirmOpen(false)}
-        onConfirm={() => {
-          onSaveQuotation();
-          setSaveConfirmOpen(false);
-        }}
-        entityName="quotation"
-      />
       <CardHeader className="sticky top-0 z-50 flex flex-row items-center justify-between border-b border-border/80 bg-card/95 py-4 shadow-sm backdrop-blur supports-backdrop-filter:bg-card/80">
         <CardTitle>{formTitle}</CardTitle>
         <div className="flex items-center gap-2">
@@ -121,7 +107,7 @@ export function QuotationForm({
           <Button size="sm" type="button" variant="outline" onClick={onReset}>
             Reset
           </Button>
-          <Button size="sm" type="button" variant="secondary" onClick={() => setSaveConfirmOpen(true)}>
+          <Button size="sm" type="button" variant="secondary" onClick={onSaveQuotation}>
             <Save className="mr-2 size-4" aria-hidden />
             Save quotation
           </Button>

@@ -19,7 +19,8 @@ import { SectionTable } from "@/components/portals/admin-client-details/section-
 import type { ClientDetailsPayload, ClientProfileForm } from "@/components/portals/admin-client-details/types";
 import { readResponseJson } from "@/lib/http/read-response-json";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { SaveConfirmModal } from "@/components/ui/save-confirm-modal";
+import { SaveSuccessToast } from "@/components/ui/save-success-toast";
+import { useSaveFeedback } from "@/lib/hooks/use-save-feedback";
 
 function formatAed(n: number) {
   return n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -48,12 +49,12 @@ const EMPTY_FORM: ClientProfileForm = {
 
 export function AdminClientDetailsClient({ clientId }: { clientId: string }) {
   const router = useRouter();
+  const { successMessage, clearSaveFeedback, showSaveSuccess } = useSaveFeedback();
   const [data, setData] = useState<ClientDetailsPayload>({});
   const [error, setError] = useState("");
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState<ClientProfileForm>(EMPTY_FORM);
-  const [saveConfirmOpen, setSaveConfirmOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 
   useEffect(() => {
@@ -103,6 +104,7 @@ export function AdminClientDetailsClient({ clientId }: { clientId: string }) {
   async function saveClient(): Promise<boolean> {
     setSaving(true);
     setError("");
+    clearSaveFeedback();
     try {
       const response = await fetch(`/api/admin/clients/${clientId}`, {
         method: "PATCH",
@@ -118,6 +120,7 @@ export function AdminClientDetailsClient({ clientId }: { clientId: string }) {
       });
       const details = await readResponseJson<ClientDetailsPayload>(refreshed);
       setData(details);
+      showSaveSuccess();
       return true;
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to update client");
@@ -151,6 +154,7 @@ export function AdminClientDetailsClient({ clientId }: { clientId: string }) {
 
   return (
     <div className="animate-fade-in">
+      <SaveSuccessToast message={successMessage} />
       <Link
         href="/admin/clients"
         className="group mb-6 inline-flex items-center gap-2 rounded-lg text-[0.8125rem] font-medium text-muted-foreground transition-[color,background-color] duration-200 hover:bg-accent/60 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/70 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
@@ -176,16 +180,6 @@ export function AdminClientDetailsClient({ clientId }: { clientId: string }) {
         </div>
       ) : null}
 
-      <SaveConfirmModal
-        open={saveConfirmOpen}
-        onClose={() => setSaveConfirmOpen(false)}
-        onConfirm={async () => {
-          const ok = await saveClient();
-          if (ok) setSaveConfirmOpen(false);
-        }}
-        loading={saving}
-        entityName="client"
-      />
       <ConfirmDialog
         open={deleteConfirmOpen}
         onOpenChange={setDeleteConfirmOpen}
@@ -206,7 +200,7 @@ export function AdminClientDetailsClient({ clientId }: { clientId: string }) {
         saving={saving}
         form={form}
         onFormChange={(patch) => setForm((prev) => ({ ...prev, ...patch }))}
-        onSave={() => setSaveConfirmOpen(true)}
+        onSave={() => void saveClient()}
         onCancel={() => setEditing(false)}
         onStartEdit={() => setEditing(true)}
         onDelete={() => setDeleteConfirmOpen(true)}

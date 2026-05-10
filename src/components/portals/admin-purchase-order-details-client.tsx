@@ -14,10 +14,11 @@ import { Label } from "@/components/ui/label";
 import { Dropdown } from "@/components/ui/select";
 import { readResponseJson } from "@/lib/http/read-response-json";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { SaveConfirmModal } from "@/components/ui/save-confirm-modal";
+import { SaveSuccessToast } from "@/components/ui/save-success-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils/cn";
 import { usePortalConfig } from "@/components/portals/portal-config-context";
+import { useSaveFeedback } from "@/lib/hooks/use-save-feedback";
 
 type PoPayload = {
   _id: string;
@@ -39,6 +40,7 @@ const MAX_PO_UPLOAD_BYTES = 9 * 1024 * 1024;
 export function AdminPurchaseOrderDetailsClient({ purchaseOrderId }: { purchaseOrderId: string }) {
   const router = useRouter();
   const { apiPrefix, pathPrefix } = usePortalConfig();
+  const { successMessage, clearSaveFeedback, showSaveSuccess } = useSaveFeedback();
   const [item, setItem] = useState<PoPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -52,7 +54,6 @@ export function AdminPurchaseOrderDetailsClient({ purchaseOrderId }: { purchaseO
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [saveMsg, setSaveMsg] = useState("");
   const [deleteError, setDeleteError] = useState("");
-  const [saveConfirmOpen, setSaveConfirmOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 
   async function load() {
@@ -89,6 +90,7 @@ export function AdminPurchaseOrderDetailsClient({ purchaseOrderId }: { purchaseO
   async function save(): Promise<boolean> {
     if (!item) return false;
     setSaving(true);
+    clearSaveFeedback();
     setSaveMsg("");
     try {
       if (item.type === "client") {
@@ -127,9 +129,9 @@ export function AdminPurchaseOrderDetailsClient({ purchaseOrderId }: { purchaseO
         const data = await readResponseJson<{ message?: string }>(res);
         if (!res.ok) throw new Error(data.message ?? "Save failed");
       }
-      setSaveMsg("Saved.");
       setFile(null);
       await load();
+      showSaveSuccess();
       return true;
     } catch (e) {
       setSaveMsg(e instanceof Error ? e.message : "Save failed");
@@ -180,16 +182,7 @@ export function AdminPurchaseOrderDetailsClient({ purchaseOrderId }: { purchaseO
 
   return (
     <div className="animate-fade-in">
-      <SaveConfirmModal
-        open={saveConfirmOpen}
-        onClose={() => setSaveConfirmOpen(false)}
-        onConfirm={async () => {
-          const ok = await save();
-          if (ok) setSaveConfirmOpen(false);
-        }}
-        loading={saving}
-        entityName="purchase order"
-      />
+      <SaveSuccessToast message={successMessage} />
       <ConfirmDialog
         open={deleteConfirmOpen}
         onOpenChange={setDeleteConfirmOpen}
@@ -249,7 +242,7 @@ export function AdminPurchaseOrderDetailsClient({ purchaseOrderId }: { purchaseO
           </div>
 
           <div className="sticky top-0 z-50 -mx-4 mb-4 flex flex-wrap items-center gap-2 border-b border-border/80 bg-background/95 px-4 py-3 backdrop-blur supports-backdrop-filter:bg-background/80 sm:-mx-8 sm:px-8">
-            <Button size="sm" onClick={() => setSaveConfirmOpen(true)} disabled={saving}>
+            <Button size="sm" onClick={() => void save()} disabled={saving}>
               {saving ? "Saving…" : "Save PO"}
             </Button>
             <Link href={`${pathPrefix}/quotations/${item.quotationId}`}>
@@ -289,10 +282,7 @@ export function AdminPurchaseOrderDetailsClient({ purchaseOrderId }: { purchaseO
           ) : null}
           {saveMsg ? (
             <p
-              className={cn(
-                "mb-4 text-sm",
-                saveMsg === "Saved." ? "text-primary" : "text-destructive"
-              )}
+              className={cn("mb-4 text-sm text-destructive")}
               role="status"
             >
               {saveMsg}

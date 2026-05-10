@@ -10,9 +10,10 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { readResponseJson } from "@/lib/http/read-response-json";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { SaveConfirmModal } from "@/components/ui/save-confirm-modal";
+import { SaveSuccessToast } from "@/components/ui/save-success-toast";
 import { AdminInvoicesCreateHelper } from "@/components/portals/admin-invoices-create-helper";
 import { usePortalConfig } from "@/components/portals/portal-config-context";
+import { useSaveFeedback } from "@/lib/hooks/use-save-feedback";
 
 
 type ProjectDetailsPayload = {
@@ -134,6 +135,7 @@ export function AdminProjectDetailsClient({
 }) {
   const router = useRouter();
   const { apiPrefix, pathPrefix } = usePortalConfig();
+  const { successMessage, clearSaveFeedback, showSaveSuccess } = useSaveFeedback();
   const [data, setData] = useState<ProjectDetailsPayload>({});
   const [error, setError] = useState("");
   const [editing, setEditing] = useState(false);
@@ -152,7 +154,6 @@ export function AdminProjectDetailsClient({
     targetEndDate: "",
     actualEndDate: "",
   });
-  const [saveConfirmOpen, setSaveConfirmOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 
   const load = useCallback(async () => {
@@ -198,6 +199,7 @@ export function AdminProjectDetailsClient({
   async function saveProject(): Promise<boolean> {
     setSaving(true);
     setError("");
+    clearSaveFeedback();
     try {
       const response = await fetch(`${apiPrefix}/projects/${projectId}`, {
         method: "PATCH",
@@ -221,6 +223,7 @@ export function AdminProjectDetailsClient({
       if (!response.ok) throw new Error(payload.message ?? "Failed to update project");
       setEditing(false);
       await load();
+      showSaveSuccess();
       return true;
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to update project");
@@ -257,16 +260,7 @@ export function AdminProjectDetailsClient({
 
   return (
     <div className="animate-fade-in">
-      <SaveConfirmModal
-        open={saveConfirmOpen}
-        onClose={() => setSaveConfirmOpen(false)}
-        onConfirm={async () => {
-          const ok = await saveProject();
-          if (ok) setSaveConfirmOpen(false);
-        }}
-        loading={saving}
-        entityName="project"
-      />
+      <SaveSuccessToast message={successMessage} />
       <ConfirmDialog
         open={deleteConfirmOpen}
         onOpenChange={setDeleteConfirmOpen}
@@ -297,7 +291,7 @@ export function AdminProjectDetailsClient({
               {allowProjectMutations ? (
                 editing ? (
                 <>
-                  <Button size="sm" onClick={() => setSaveConfirmOpen(true)} disabled={saving}>
+                  <Button size="sm" onClick={() => void saveProject()} disabled={saving}>
                     Save
                   </Button>
                   <Button size="sm" variant="outline" onClick={() => setEditing(false)}>
