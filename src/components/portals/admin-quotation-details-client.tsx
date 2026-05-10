@@ -9,7 +9,6 @@ import { LineItemsCard } from "@/components/portals/admin-quotation-details/line
 import { QuotationHeaderActions } from "@/components/portals/admin-quotation-details/quotation-header-actions";
 import { QuotationStatusEditor } from "@/components/portals/admin-quotation-details/quotation-status-card";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { SaveConfirmModal } from "@/components/ui/save-confirm-modal";
 import { QuotationInfoCard } from "@/components/portals/admin-quotation-details/quotation-info-card";
 import { SnapshotsCard } from "@/components/portals/admin-quotation-details/snapshots-card";
 import { SummaryCard } from "@/components/portals/admin-quotation-details/summary-card";
@@ -19,13 +18,19 @@ import { DashboardPageHeader } from "@/components/dashboard/page-header";
 import { QuotationPurchaseOrdersSection } from "@/components/portals/quotation-purchase-orders-section";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { Skeleton } from "@/components/ui/skeleton";
+import { SaveSuccessToast } from "@/components/ui/save-success-toast";
 import { readResponseJson } from "@/lib/http/read-response-json";
+import { usePortalConfig } from "@/components/portals/portal-config-context";
+import { useSaveFeedback } from "@/lib/hooks/use-save-feedback";
 
 export function AdminQuotationDetailsClient({ quotationId }: { quotationId: string }) {
   const router = useRouter();
+  const { apiPrefix, pathPrefix } = usePortalConfig();
   const [item, setItem] = useState<QuotationPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const { successMessage, clearSaveFeedback, showSaveSuccess } = useSaveFeedback();
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [refreshSnapshots, setRefreshSnapshots] = useState(false);
@@ -46,14 +51,13 @@ export function AdminQuotationDetailsClient({ quotationId }: { quotationId: stri
   const [remainingText, setRemainingText] = useState("");
   const [remainingAmount, setRemainingAmount] = useState("");
   const [confirmDate, setConfirmDate] = useState("");
-  const [saveConfirmOpen, setSaveConfirmOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 
   async function load() {
     setLoading(true);
     setError("");
     try {
-    const response = await fetch(`/api/admin/quotations/${quotationId}`, {
+    const response = await fetch(`${apiPrefix}/quotations/${quotationId}`, {
       cache: "no-store",
     });
     const payload = await readResponseJson<{ item?: QuotationPayload; message?: string }>(
@@ -99,7 +103,7 @@ export function AdminQuotationDetailsClient({ quotationId }: { quotationId: stri
 
   useEffect(() => {
     load();
-  }, [quotationId]);
+  }, [quotationId, apiPrefix]);
 
   function addPage() {
     setPages((prev) => {
@@ -158,6 +162,7 @@ export function AdminQuotationDetailsClient({ quotationId }: { quotationId: stri
   async function save(): Promise<boolean> {
     setSaving(true);
     setError("");
+    clearSaveFeedback();
     try {
       const payloadPages = pages.map((p) => ({
         pageNumber: p.pageNumber,
@@ -173,7 +178,7 @@ export function AdminQuotationDetailsClient({ quotationId }: { quotationId: stri
         })),
       }));
 
-      const response = await fetch(`/api/admin/quotations/${quotationId}`, {
+      const response = await fetch(`${apiPrefix}/quotations/${quotationId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -207,6 +212,7 @@ export function AdminQuotationDetailsClient({ quotationId }: { quotationId: stri
       setEditing(false);
       setRefreshSnapshots(false);
       await load();
+      showSaveSuccess();
       return true;
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to save");
@@ -220,7 +226,7 @@ export function AdminQuotationDetailsClient({ quotationId }: { quotationId: stri
     setSaving(true);
     setError("");
     try {
-      const response = await fetch(`/api/admin/quotations/${quotationId}`, {
+      const response = await fetch(`${apiPrefix}/quotations/${quotationId}`, {
         method: "DELETE",
       });
       const result = await readResponseJson<{ message?: string }>(response);
@@ -229,8 +235,8 @@ export function AdminQuotationDetailsClient({ quotationId }: { quotationId: stri
       const pid = item.projectId?.trim();
       router.replace(
         pid
-          ? `/admin/quotations?projectId=${encodeURIComponent(pid)}`
-          : "/admin/quotations"
+          ? `${pathPrefix}/quotations?projectId=${encodeURIComponent(pid)}`
+          : `${pathPrefix}/quotations`
       );
       router.refresh();
       return true;
@@ -243,7 +249,20 @@ export function AdminQuotationDetailsClient({ quotationId }: { quotationId: stri
   }
 
   if (loading && !error) {
-    return <p className="text-sm text-muted-foreground">Loading…</p>;
+    return (
+      <div className="animate-fade-in space-y-6">
+        <div className="space-y-2">
+          <Skeleton className="h-8 w-64 max-w-full" />
+          <Skeleton className="h-4 w-full max-w-2xl" />
+        </div>
+        <Skeleton className="h-32 w-full rounded-xl" />
+        <div className="grid gap-4 md:grid-cols-2">
+          <Skeleton className="h-48 rounded-xl" />
+          <Skeleton className="h-48 rounded-xl" />
+        </div>
+        <Skeleton className="h-72 w-full rounded-xl" />
+      </div>
+    );
   }
 
   return (
@@ -252,22 +271,37 @@ export function AdminQuotationDetailsClient({ quotationId }: { quotationId: stri
         title={item ? `Quotation ${item.quotationNumber}` : "Quotation"}
         description="When the client PO arrives, upload it in the green section below. Edit the rest of the quotation here."
       />
+      <SaveSuccessToast message={successMessage} />
       {error ? (
         <div className="mb-4 rounded-xl border border-destructive/40 bg-destructive/5 p-4 text-sm text-destructive">
           {error}
         </div>
       ) : null}
+      {editing ? (
+        <div className="sticky top-3 z-20 mb-4 rounded-xl border border-border/70 bg-background/95 p-3 shadow-sm backdrop-blur">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-sm text-muted-foreground">Editing mode active</p>
+            <div className="flex flex-wrap gap-2">
+              <Button size="sm" onClick={() => void save()} disabled={saving}>
+                {saving ? "Saving..." : "Save"}
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  setEditing(false);
+                  setRefreshSnapshots(false);
+                  load().catch(() => {});
+                }}
+                disabled={saving}
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
-      <SaveConfirmModal
-        open={saveConfirmOpen}
-        onClose={() => setSaveConfirmOpen(false)}
-        onConfirm={async () => {
-          const ok = await save();
-          if (ok) setSaveConfirmOpen(false);
-        }}
-        loading={saving}
-        entityName="quotation"
-      />
       <ConfirmDialog
         open={deleteConfirmOpen}
         onOpenChange={setDeleteConfirmOpen}
@@ -304,7 +338,7 @@ export function AdminQuotationDetailsClient({ quotationId }: { quotationId: stri
             item={item}
             editing={editing}
             saving={saving}
-            onSave={() => setSaveConfirmOpen(true)}
+            onSave={() => void save()}
             onCancel={() => {
               setEditing(false);
               setRefreshSnapshots(false);

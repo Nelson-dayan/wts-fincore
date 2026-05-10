@@ -1,18 +1,31 @@
+import { CreateRecordForm } from "@/components/portals/create-record-form";
 import { ResourceTableClient } from "@/components/portals/resource-table-client";
 
 export default function EmployeeExpensesPage() {
   return (
-    <ResourceTableClient
-      title="My Expenses"
-      description="Expenses created by you."
-      endpoint="/api/employee/expenses"
-      columns={[
-        { key: "title", label: "Title" },
-        { key: "amount", label: "Amount" },
-        { key: "category", label: "Category" },
-        { key: "projectName", label: "Project" },
-        { key: "createdAt", label: "Created At" },
-      ]}
-    />
+    <>
+      <CreateRecordForm
+        title="Create Expense"
+        endpoint="/api/admin/expenses"
+        fields={[
+          { name: "title", label: "Title", required: true },
+          { name: "amount", label: "Amount", type: "number", required: true },
+          { name: "category", label: "Category", required: true },
+          { name: "projectId", label: "Project", type: "projectSearch" },
+        ]}
+      />
+      <ResourceTableClient
+        title="Expenses"
+        description="Expenses on your assigned projects."
+        endpoint="/api/admin/expenses"
+        columns={[
+          { key: "title", label: "Title" },
+          { key: "amount", label: "Amount" },
+          { key: "category", label: "Category" },
+          { key: "projectName", label: "Project" },
+          { key: "createdAt", label: "Created At" },
+        ]}
+      />
+    </>
   );
 }

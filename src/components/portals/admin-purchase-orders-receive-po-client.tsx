@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dropdown } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { readResponseJson } from "@/lib/http/read-response-json";
+import { usePortalConfig } from "@/components/portals/portal-config-context";
 
 type QRow = {
   _id: string;
@@ -28,6 +29,7 @@ export function AdminPurchaseOrdersReceivePoClient({
   /** Called after a PO is saved so sibling lists (e.g. PO table) can refetch immediately. */
   onPoSaved?: () => void;
 }) {
+  const { apiPrefix, pathPrefix } = usePortalConfig();
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [fileKey, setFileKey] = useState(0);
@@ -46,7 +48,7 @@ export function AdminPurchaseOrdersReceivePoClient({
     try {
       const qs = new URLSearchParams({ page: "1", limit: "60", q: "" });
       if (projectId) qs.set("projectId", projectId);
-      const res = await fetch(`/api/admin/quotations?${qs}`, { cache: "no-store" });
+      const res = await fetch(`${apiPrefix}/quotations?${qs}`, { cache: "no-store" });
       const data = await readResponseJson<{ items?: QRow[]; message?: string }>(res);
       if (!res.ok) throw new Error(data.message ?? "Quotations load failed");
       const list = data.items ?? [];
@@ -62,7 +64,7 @@ export function AdminPurchaseOrdersReceivePoClient({
     } finally {
       setLoadingQ(false);
     }
-  }, [projectId]);
+  }, [apiPrefix, projectId]);
 
   useEffect(() => {
     loadQuotations().catch(() => {});
@@ -85,7 +87,7 @@ export function AdminPurchaseOrdersReceivePoClient({
     }
     setSubmitting(true);
     try {
-      const res = await fetch("/api/admin/purchase-orders", {
+      const res = await fetch(`${apiPrefix}/purchase-orders`, {
         method: "POST",
         body: (() => {
           const fd = new FormData();
@@ -141,7 +143,7 @@ export function AdminPurchaseOrdersReceivePoClient({
         ) : quotations.length === 0 ? (
           <p className="text-muted-foreground text-sm">
             No quotations.{" "}
-            <Link href="/admin/quotations" className="text-primary underline-offset-4 hover:underline">
+            <Link href={`${pathPrefix}/quotations`} className="text-primary underline-offset-4 hover:underline">
               Create one
             </Link>
             .

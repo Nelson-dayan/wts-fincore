@@ -1,17 +1,11 @@
-import { ResourceTableClient } from "@/components/portals/resource-table-client";
+import { AdminQuotationsClient } from "@/components/portals/admin-quotations-client";
 
-export default function EmployeeQuotationsPage() {
-  return (
-    <ResourceTableClient
-      title="My Quotations"
-      description="Quotations created by your account."
-      endpoint="/api/employee/quotations"
-      columns={[
-        { key: "quotationNumber", label: "Quotation #" },
-        { key: "status", label: "Status" },
-        { key: "projectId", label: "Project" },
-        { key: "createdAt", label: "Created At" },
-      ]}
-    />
-  );
+interface PageProps {
+  searchParams?: Promise<{ projectId?: string }>;
+}
+
+export default async function EmployeeQuotationsPage({ searchParams }: PageProps) {
+  const params = (await searchParams) ?? {};
+  const projectId = params.projectId ? String(params.projectId) : "";
+  return <AdminQuotationsClient initialProjectId={projectId} />;
 }

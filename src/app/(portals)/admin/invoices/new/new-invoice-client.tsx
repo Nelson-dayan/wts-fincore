@@ -3,9 +3,11 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { readResponseJson } from "@/lib/http/read-response-json";
+import { usePortalConfig } from "@/components/portals/portal-config-context";
 
 export function NewInvoiceClient() {
   const router = useRouter();
+  const { apiPrefix, pathPrefix } = usePortalConfig();
   const sp = useSearchParams();
   const poId = sp?.get("poId") ?? "";
   const invoiceType = sp?.get("invoiceType") === "usd" ? "usd" : "aed";
@@ -18,7 +20,7 @@ export function NewInvoiceClient() {
     setError("");
     void (async () => {
       try {
-        const res = await fetch("/api/admin/invoices", {
+        const res = await fetch(`${apiPrefix}/invoices`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ poId, invoiceType }),
@@ -26,12 +28,12 @@ export function NewInvoiceClient() {
         const data = await readResponseJson<{ id?: string; message?: string }>(res);
         if (!res.ok) throw new Error(data.message ?? "Could not create invoice");
         if (!data.id) throw new Error("Missing invoice id");
-        router.replace(`/admin/invoices/${data.id}`);
+        router.replace(`${pathPrefix}/invoices/${data.id}`);
       } catch (e) {
         setError(e instanceof Error ? e.message : "Network error");
       }
     })();
-  }, [invoiceType, poId, router]);
+  }, [invoiceType, poId, router, apiPrefix, pathPrefix]);
 
   if (!poId) {
     return (

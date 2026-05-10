@@ -14,10 +14,11 @@ import {
 } from "@/lib/services/business/quotation.service";
 import mongoose from "mongoose";
 import { decimalToNumber } from "@/lib/services/business/money";
+import { getEmployeeAssignedProjectIdStrings } from "@/lib/auth/employee-resource-access";
 
 export async function GET(req: Request) {
   try {
-    await requireRole(["admin"]);
+    const session = await requireRole(["admin", "employee"]);
     await connectDB();
     const url = new URL(req.url);
     const { page, limit, skip } = parsePagination(url.searchParams);
@@ -25,7 +26,23 @@ export async function GET(req: Request) {
     const projectId = String(url.searchParams.get("projectId") ?? "").trim();
     const filter: Record<string, unknown> = {};
     if (q) filter.quotationNumber = { $regex: q, $options: "i" };
-    if (projectId) filter.projectId = projectId;
+
+    if (session.user.role === "employee") {
+      const employeeProjectIds = await getEmployeeAssignedProjectIdStrings(session.user.id);
+      if (projectId) {
+        if (!employeeProjectIds.includes(projectId)) {
+          return NextResponse.json({ items: [], page, limit, total: 0, hasMore: false });
+        }
+        filter.projectId = projectId;
+      } else {
+        if (employeeProjectIds.length === 0) {
+          return NextResponse.json({ items: [], page, limit, total: 0, hasMore: false });
+        }
+        filter.projectId = { $in: employeeProjectIds };
+      }
+    } else if (projectId) {
+      filter.projectId = projectId;
+    }
     const [itemsRaw, total] = await Promise.all([
       QuotationModel.find(filter)
         .select("quotationNumber status projectId createdAt totals")

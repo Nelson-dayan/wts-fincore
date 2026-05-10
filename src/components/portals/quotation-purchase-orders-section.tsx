@@ -5,8 +5,10 @@ import Link from "next/link";
 import { FileSpreadsheet, FileText, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Label } from "@/components/ui/label";
 import { readResponseJson } from "@/lib/http/read-response-json";
+import { usePortalConfig } from "@/components/portals/portal-config-context";
 
 type PoRow = {
   _id: string;
@@ -31,6 +33,7 @@ export function QuotationPurchaseOrdersSection({
   quotationStatus: "draft" | "sent" | "approved" | "rejected";
   quotationNumber: string;
 }) {
+  const { apiPrefix, pathPrefix } = usePortalConfig();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [fileKey, setFileKey] = useState(0);
   const [rows, setRows] = useState<PoRow[]>([]);
@@ -51,7 +54,7 @@ export function QuotationPurchaseOrdersSection({
         limit: "50",
         q: "",
       });
-      const res = await fetch(`/api/admin/purchase-orders?${qs}`, { cache: "no-store" });
+      const res = await fetch(`${apiPrefix}/purchase-orders?${qs}`, { cache: "no-store" });
       const data = await readResponseJson<{
         items?: Array<PoRow & { hasFile?: boolean }>;
         message?: string;
@@ -73,7 +76,7 @@ export function QuotationPurchaseOrdersSection({
     } finally {
       setLoading(false);
     }
-  }, [quotationId]);
+  }, [apiPrefix, quotationId]);
 
   useEffect(() => {
     load().catch(() => {});
@@ -92,7 +95,7 @@ export function QuotationPurchaseOrdersSection({
     }
     setCreating(true);
     try {
-      const res = await fetch("/api/admin/purchase-orders", {
+      const res = await fetch(`${apiPrefix}/purchase-orders`, {
         method: "POST",
         body: (() => {
           const fd = new FormData();
@@ -219,7 +222,7 @@ export function QuotationPurchaseOrdersSection({
           </Button>
           <p className="text-muted-foreground mt-2 text-[0.75rem] leading-relaxed">
             You can also select a quotation and upload from the{" "}
-            <Link href="/admin/purchase-orders" className="text-primary underline-offset-2 hover:underline">
+            <Link href={`${pathPrefix}/purchase-orders`} className="text-primary underline-offset-2 hover:underline">
               Purchase Orders
             </Link>{" "}
             page.
@@ -232,7 +235,24 @@ export function QuotationPurchaseOrdersSection({
             Linked POs
           </p>
           {loading ? (
-            <p className="text-muted-foreground text-sm">Loading…</p>
+            <ul className="space-y-2 text-sm" aria-busy="true">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <li
+                  key={i}
+                  className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border/60 bg-muted/20 px-3 py-2 dark:bg-muted/10"
+                >
+                  <div className="min-w-0 flex-1 space-y-2">
+                    <Skeleton className="h-4 w-32" />
+                    <Skeleton className="h-3 w-48 max-w-full" />
+                  </div>
+                  <Skeleton className="h-4 w-24" />
+                  <div className="flex flex-wrap gap-2">
+                    <Skeleton className="h-8 w-[4.75rem] rounded-md" />
+                    <Skeleton className="h-8 w-[4.75rem] rounded-md" />
+                  </div>
+                </li>
+              ))}
+            </ul>
           ) : rows.length === 0 ? (
             <p className="text-muted-foreground text-sm">No POs yet — upload one above.</p>
           ) : (
@@ -256,10 +276,10 @@ export function QuotationPurchaseOrdersSection({
                   </span>
                   <div className="flex flex-wrap gap-2">
                     <Button size="sm" variant="outline" asChild>
-                      <Link href={`/admin/purchase-orders/${row._id}#po-invoices`}>Open PO</Link>
+                      <Link href={`${pathPrefix}/purchase-orders/${row._id}#po-invoices`}>Open PO</Link>
                     </Button>
                     <Button size="sm" className="gap-1" asChild>
-                      <Link href={`/admin/invoices/new?poId=${encodeURIComponent(row._id)}`}>
+                      <Link href={`${pathPrefix}/invoices/new?poId=${encodeURIComponent(row._id)}`}>
                         <FileSpreadsheet className="size-3.5" aria-hidden />
                         Invoice
                       </Link>
@@ -272,7 +292,7 @@ export function QuotationPurchaseOrdersSection({
         </div>
 
         <Button size="sm" variant="outline" asChild>
-          <Link href={`/admin/purchase-orders?projectId=${encodeURIComponent(projectId)}`}>
+          <Link href={`${pathPrefix}/purchase-orders?projectId=${encodeURIComponent(projectId)}`}>
             All POs for this project
           </Link>
         </Button>

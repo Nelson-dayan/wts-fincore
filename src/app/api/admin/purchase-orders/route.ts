@@ -15,6 +15,10 @@ import {
   formFileEntryToBlob,
   validatePoDataUrlString,
 } from "@/lib/api/po-upload";
+import {
+  assertEmployeeCanAccessProject,
+  getEmployeeAssignedProjectIdStrings,
+} from "@/lib/auth/employee-resource-access";
 
 function jsonBodyError() {
   return NextResponse.json(
@@ -28,7 +32,7 @@ function jsonBodyError() {
 
 export async function GET(req: Request) {
   try {
-    await requireRole(["admin"]);
+    const session = await requireRole(["admin", "employee"]);
     await connectDB();
     const url = new URL(req.url);
     const { page, limit, skip } = parsePagination(url.searchParams);
@@ -37,12 +41,38 @@ export async function GET(req: Request) {
     const quotationId = String(url.searchParams.get("quotationId") ?? "").trim();
     const filter: Record<string, unknown> = {};
     if (q) filter.poNumber = { $regex: q, $options: "i" };
-    if (projectId) filter.projectId = projectId;
-    if (quotationId) {
-      if (!mongoose.Types.ObjectId.isValid(quotationId)) {
-        return NextResponse.json({ message: "Invalid quotationId" }, { status: 400 });
+
+    if (session.user.role === "employee") {
+      const employeeProjectIds = await getEmployeeAssignedProjectIdStrings(session.user.id);
+      if (quotationId) {
+        if (!mongoose.Types.ObjectId.isValid(quotationId)) {
+          return NextResponse.json({ message: "Invalid quotationId" }, { status: 400 });
+        }
+        const qdoc = await QuotationModel.findById(quotationId).select("projectId").lean();
+        const qPid = qdoc?.projectId ? String(qdoc.projectId) : "";
+        if (!qPid || !employeeProjectIds.includes(qPid)) {
+          return NextResponse.json({ items: [], page, limit, total: 0, hasMore: false });
+        }
+        filter.quotationId = new mongoose.Types.ObjectId(quotationId);
+      } else if (projectId) {
+        if (!employeeProjectIds.includes(projectId)) {
+          return NextResponse.json({ items: [], page, limit, total: 0, hasMore: false });
+        }
+        filter.projectId = projectId;
+      } else {
+        if (employeeProjectIds.length === 0) {
+          return NextResponse.json({ items: [], page, limit, total: 0, hasMore: false });
+        }
+        filter.projectId = { $in: employeeProjectIds };
       }
-      filter.quotationId = new mongoose.Types.ObjectId(quotationId);
+    } else {
+      if (projectId) filter.projectId = projectId;
+      if (quotationId) {
+        if (!mongoose.Types.ObjectId.isValid(quotationId)) {
+          return NextResponse.json({ message: "Invalid quotationId" }, { status: 400 });
+        }
+        filter.quotationId = new mongoose.Types.ObjectId(quotationId);
+      }
     }
     const [rawItems, total] = await Promise.all([
       PurchaseOrderModel.find(filter)
@@ -97,7 +127,7 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   try {
-    const session = await requireRole(["admin"]);
+    const session = await requireRole(["admin", "employee"]);
     await connectDB();
 
     const ct = (req.headers.get("content-type") ?? "").toLowerCase();
@@ -185,6 +215,17 @@ export async function POST(req: Request) {
       return NextResponse.json({ message: "Quotation not found" }, { status: 404 });
     }
     const projectId = String(quotation.projectId);
+
+    if (session.user.role === "employee") {
+      try {
+        await assertEmployeeCanAccessProject(session.user.id, projectId);
+      } catch (e) {
+        if (e instanceof Error && e.message === "FORBIDDEN") {
+          return NextResponse.json({ message: "Forbidden" }, { status: 403 });
+        }
+        throw e;
+      }
+    }
 
     const poNumber = await generatePONumber();
     const { id } = await createPurchaseOrder({

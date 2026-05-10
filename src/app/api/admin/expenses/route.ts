@@ -6,6 +6,10 @@ import { authErrorResponse } from "@/lib/api/route-auth";
 import { parsePagination, parseSearch } from "@/lib/api/pagination";
 import { logActivity } from "@/lib/services/activity/log-activity.service";
 import { decimalToNumber } from "@/lib/services/business/money";
+import {
+  assertEmployeeCanAccessProject,
+  getEmployeeAssignedProjectIdStrings,
+} from "@/lib/auth/employee-resource-access";
 
 function formatExpenseRow(row: Record<string, unknown>) {
   const proj = row.projectId as unknown;
@@ -32,19 +36,30 @@ function formatExpenseRow(row: Record<string, unknown>) {
 
 export async function GET(req: Request) {
   try {
-    await requireRole(["admin"]);
+    const session = await requireRole(["admin", "employee"]);
     await connectDB();
     const url = new URL(req.url);
     const { page, limit, skip } = parsePagination(url.searchParams);
     const q = parseSearch(url.searchParams);
-    const filter = q
-      ? {
-          $or: [
-            { title: { $regex: q, $options: "i" } },
-            { category: { $regex: q, $options: "i" } },
-          ],
-        }
-      : {};
+
+    const parts: Record<string, unknown>[] = [];
+    if (session.user.role === "employee") {
+      const employeeProjectIds = await getEmployeeAssignedProjectIdStrings(session.user.id);
+      if (employeeProjectIds.length === 0) {
+        return NextResponse.json({ items: [], page, limit, total: 0, hasMore: false });
+      }
+      parts.push({ projectId: { $in: employeeProjectIds } });
+    }
+    if (q) {
+      parts.push({
+        $or: [
+          { title: { $regex: q, $options: "i" } },
+          { category: { $regex: q, $options: "i" } },
+        ],
+      });
+    }
+    const filter: Record<string, unknown> =
+      parts.length === 0 ? {} : parts.length === 1 ? parts[0]! : { $and: parts };
     const [itemsRaw, total] = await Promise.all([
       ExpenseModel.find(filter)
         .select("title amount category projectId createdAt")
@@ -64,7 +79,7 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   try {
-    const session = await requireRole(["admin"]);
+    const session = await requireRole(["admin", "employee"]);
     await connectDB();
     const body = (await req.json()) as {
       title?: string;
@@ -75,18 +90,33 @@ export async function POST(req: Request) {
     const title = String(body.title ?? "").trim();
     const category = String(body.category ?? "").trim();
     const amount = Number(body.amount ?? 0);
+    const projectId = String(body.projectId ?? "").trim();
     if (!title || !category || amount <= 0) {
       return NextResponse.json(
         { message: "title, category and amount (>0) are required" },
         { status: 400 }
       );
     }
+    if (!projectId) {
+      return NextResponse.json({ message: "projectId is required" }, { status: 400 });
+    }
+
+    if (session.user.role === "employee") {
+      try {
+        await assertEmployeeCanAccessProject(session.user.id, projectId);
+      } catch (e) {
+        if (e instanceof Error && e.message === "FORBIDDEN") {
+          return NextResponse.json({ message: "Forbidden" }, { status: 403 });
+        }
+        throw e;
+      }
+    }
 
     const created = await ExpenseModel.create({
       title,
       amount,
       category,
-      projectId: body.projectId ? String(body.projectId) : undefined,
+      projectId,
       createdBy: session.user.id,
     });
 

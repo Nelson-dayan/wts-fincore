@@ -6,6 +6,7 @@ export default function EmployeeProjectsPage() {
       title="My Projects"
       description="Projects currently assigned to you."
       endpoint="/api/employee/projects"
+      rowDetailPathPrefix="/employee/projects"
       columns={[
         { key: "name", label: "Name" },
         { key: "status", label: "Status" },

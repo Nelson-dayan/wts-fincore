@@ -25,6 +25,7 @@ import { generateQuotationRefNo } from "@/lib/quotation/generate-ref-no";
 import { exportQuotationPdf } from "@/utils/exportPdf";
 import { readResponseJson } from "@/lib/http/read-response-json";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { usePortalConfig } from "@/components/portals/portal-config-context";
 
 type PrimaryCompanySettings = {
   name?: string;
@@ -92,6 +93,7 @@ export function QuotationBuilderPanel({
   onDbSaveSuccess,
   onCancelEdit,
 }: QuotationBuilderPanelProps) {
+  const { apiPrefix } = usePortalConfig();
   const [data, setData] = useState<QuotationData>(() =>
     initialSnapshot ? normalizeQuotationData(initialSnapshot) : defaultQuotationData()
   );
@@ -128,7 +130,7 @@ export function QuotationBuilderPanel({
       setProjectDefaultsLoading(true);
       setProjectDefaultsError(null);
       try {
-        const res = await fetch(`/api/admin/projects/${encodeURIComponent(pid)}`, {
+        const res = await fetch(`${apiPrefix}/projects/${encodeURIComponent(pid)}`, {
           credentials: "include",
           cache: "no-store",
         });
@@ -172,7 +174,7 @@ export function QuotationBuilderPanel({
         setProjectDefaultsLoading(false);
       }
     },
-    []
+    [apiPrefix]
   );
 
   useEffect(() => {
@@ -255,7 +257,7 @@ export function QuotationBuilderPanel({
     let alive = true;
     (async () => {
       try {
-        const res = await fetch("/api/admin/company", {
+        const res = await fetch(`${apiPrefix}/company`, {
           credentials: "include",
           cache: "no-store",
         });
@@ -273,7 +275,7 @@ export function QuotationBuilderPanel({
     return () => {
       alive = false;
     };
-  }, [editingQuotationId, initialSnapshot]);
+  }, [apiPrefix, editingQuotationId, initialSnapshot]);
 
   const didAutoLoadDefaultsRef = useRef(false);
   useEffect(() => {
@@ -344,7 +346,7 @@ export function QuotationBuilderPanel({
     const localMsg = dbLocalMsgRef.current;
     setDbSaving(true);
     try {
-      const res = await fetch("/api/admin/quotations/from-builder", {
+      const res = await fetch(`${apiPrefix}/quotations/from-builder`, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
@@ -362,7 +364,7 @@ export function QuotationBuilderPanel({
       if (!res.ok) {
         if (res.status === 401 || res.status === 403) {
           setSaveNotice(
-            `${localMsg} Sign in as admin to save this quotation to the database.`
+            `${localMsg} You don't have permission to save this quotation to the database.`
           );
         } else {
           setSaveNotice(`${localMsg} Database: ${json.message ?? "save failed"}.`);
@@ -408,7 +410,7 @@ export function QuotationBuilderPanel({
       setSaveNotice(null);
       saveNoticeTimerRef.current = null;
     }, 5200);
-  }, [data, connectedProjectId, editingQuotationId, onDbSaveSuccess]);
+  }, [apiPrefix, data, connectedProjectId, editingQuotationId, onDbSaveSuccess]);
 
   const handleReset = useCallback(() => {
     const base = defaultQuotationData();

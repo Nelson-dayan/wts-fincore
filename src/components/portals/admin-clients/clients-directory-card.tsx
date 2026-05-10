@@ -1,9 +1,10 @@
 "use client";
 
-import { Building2, ChevronLeft, ChevronRight, FolderKanban, Loader2, Search, Users } from "lucide-react";
+import { Building2, ChevronLeft, ChevronRight, FolderKanban, Search, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
 import { safeString } from "./helpers";
 import { ClientsDirectoryRow } from "./clients-directory-row";
 import type { ClientRow } from "./types";
@@ -115,9 +116,54 @@ export function ClientsDirectoryCard({
             {error}
           </div>
         ) : loading && items.length === 0 ? (
-          <div className="flex flex-col items-center justify-center gap-3 py-20 text-muted-foreground">
-            <Loader2 className="size-8 animate-spin text-primary" aria-hidden />
-            <p className="text-sm font-medium">Loading clients…</p>
+          <div className="overflow-x-auto" aria-busy="true">
+            <table className="w-full min-w-250 text-left text-sm">
+              <thead>
+                <tr className="border-b border-border/80 bg-muted/30 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground dark:bg-muted/15">
+                  <th className="px-5 py-3.5 pr-3">Client</th>
+                  <th className="px-0 py-3.5 pr-3">Company</th>
+                  <th className="px-0 py-3.5 pr-3">Email</th>
+                  <th className="px-0 py-3.5 pr-3">Phone</th>
+                  <th className="px-0 py-3.5 pr-3">Website</th>
+                  <th className="px-0 py-3.5 pr-3">Address</th>
+                  <th className="px-0 py-3.5 pr-3">Projects</th>
+                  <th className="px-0 py-3.5 pr-5 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border/60">
+                {Array.from({ length: 8 }).map((_, ri) => (
+                  <tr key={ri} className="bg-card">
+                    <td className="px-5 py-3.5 pr-3">
+                      <Skeleton className="h-4 w-36 max-w-full" />
+                    </td>
+                    <td className="px-0 py-3.5 pr-3">
+                      <Skeleton className="h-4 w-32 max-w-full" />
+                    </td>
+                    <td className="px-0 py-3.5 pr-3">
+                      <Skeleton className="h-4 w-40 max-w-full" />
+                    </td>
+                    <td className="px-0 py-3.5 pr-3">
+                      <Skeleton className="h-4 w-28" />
+                    </td>
+                    <td className="px-0 py-3.5 pr-3">
+                      <Skeleton className="h-4 w-24" />
+                    </td>
+                    <td className="px-0 py-3.5 pr-3">
+                      <Skeleton className="h-4 w-48 max-w-full" />
+                    </td>
+                    <td className="px-0 py-3.5 pr-3">
+                      <Skeleton className="h-4 w-8" />
+                    </td>
+                    <td className="px-0 py-3.5 pr-5 text-right">
+                      <div className="flex justify-end gap-2">
+                        <Skeleton className="h-8 w-14 rounded-md" />
+                        <Skeleton className="h-8 w-14 rounded-md" />
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         ) : !loading && items.length === 0 ? (
           <div className="flex flex-col items-center justify-center gap-3 px-6 py-20 text-center">

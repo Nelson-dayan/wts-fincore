@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { requireRole } from "@/lib/auth/require-role";
 import { connectDB } from "@/lib/db/connect";
 import {
-  ClientModel,
   ExpenseModel,
   InvoiceModel,
   ProjectModel,
@@ -10,7 +9,7 @@ import {
   QuotationModel,
   UserModel,
 } from "@/lib/db/models";
-import { decimalToNumber } from "@/lib/services/business/money";
+import { buildProjectDetailPayload } from "@/lib/services/business/project-detail-payload";
 import { authErrorResponse } from "@/lib/api/route-auth";
 import { logActivity } from "@/lib/services/activity/log-activity.service";
 
@@ -20,80 +19,23 @@ interface RouteCtx {
 
 export async function GET(_req: Request, ctx: RouteCtx) {
   try {
-    await requireRole(["admin"]);
+    const session = await requireRole(["admin", "employee"]);
     await connectDB();
     const { projectId } = await ctx.params;
 
-    const project = await ProjectModel.findById(projectId)
-      .select("name description status priority budget currency category clientReference notes startDate targetEndDate actualEndDate clientId assignedTo createdAt updatedAt")
-      .lean();
-    if (!project) {
-      return NextResponse.json({ message: "Project not found" }, { status: 404 });
+    if (session.user.role === "employee") {
+      const assigned = await ProjectModel.exists({ _id: projectId, assignedTo: session.user.id });
+      if (!assigned) {
+        return NextResponse.json({ message: "Project not found" }, { status: 404 });
+      }
     }
 
-    const [client, quotations, purchaseOrders, invoices, expensesRaw] = await Promise.all([
-      ClientModel.findById(project.clientId)
-        .select("_id name company email address website clientLogoText clientSignatureText")
-        .lean(),
-      QuotationModel.find({ projectId })
-        .select("_id quotationNumber status createdAt")
-        .sort({ createdAt: -1 })
-        .lean(),
-      PurchaseOrderModel.find({ projectId })
-        .select("_id poNumber type status createdAt")
-        .sort({ createdAt: -1 })
-        .lean(),
-      InvoiceModel.find({ projectId, isDeleted: { $ne: true } })
-        .select("_id invoiceNumber status dueDate totals totalsCache totalAmountBase createdAt")
-        .sort({ createdAt: -1 })
-        .lean(),
-      ExpenseModel.find({ projectId, isDeleted: { $ne: true } })
-        .select("_id title amount currency baseAmount category createdAt")
-        .sort({ createdAt: -1 })
-        .lean(),
-    ]);
-
-    const expenseTotal = expensesRaw.reduce((sum, e) => sum + decimalToNumber(e.amount), 0);
-    const expenseTotalBase = expensesRaw.reduce((sum, e) => sum + decimalToNumber(e.baseAmount || e.amount), 0);
-
-    const expenses = expensesRaw.map((e) => ({
-      _id: String(e._id),
-      title: e.title,
-      amount: decimalToNumber(e.amount),
-      currency: e.currency || "AED",
-      baseAmount: decimalToNumber(e.baseAmount || e.amount),
-      category: e.category,
-      createdAt: e.createdAt,
-    }));
-
-    // Profit Tracking using our pure Base Engine logic
-    const totalReceivedBase = invoices.reduce((sum, inv) => {
-      const cache = inv.totalsCache as any;
-      return sum + (cache ? decimalToNumber(cache.totalReceivedBase) : 0);
-    }, 0);
-    
-    const totalFeesBase = invoices.reduce((sum, inv) => {
-      const cache = inv.totalsCache as any;
-      return sum + (cache ? decimalToNumber(cache.totalFeesBase) : 0);
-    }, 0);
-
-    const profitBase = totalReceivedBase - expenseTotalBase;
-
-    return NextResponse.json({
-      project,
-      client,
-      quotations,
-      purchaseOrders,
-      invoices,
-      expenses,
-      expenseTotal,
-      financials: {
-        totalReceivedBase,
-        totalFeesBase,
-        totalExpensesBase: expenseTotalBase,
-        profitBase
-      }
-    });
+    const payload = await buildProjectDetailPayload(projectId);
+    if (payload.notFound) {
+      return NextResponse.json({ message: "Project not found" }, { status: 404 });
+    }
+    const { notFound: _n, ...body } = payload;
+    return NextResponse.json(body);
   } catch (error) {
     return authErrorResponse(error, "Failed to load project details");
   }

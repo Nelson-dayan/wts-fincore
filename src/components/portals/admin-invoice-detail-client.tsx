@@ -13,8 +13,10 @@ import { aedAmountInWords } from "@/lib/invoice/aed-amount-words";
 import { computeInvoiceTotals } from "@/lib/invoice/invoice-totals";
 import { exportInvoicePdf } from "@/utils/exportPdf";
 import { readResponseJson } from "@/lib/http/read-response-json";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { SaveConfirmModal } from "@/components/ui/save-confirm-modal";
+import { Skeleton } from "@/components/ui/skeleton";
+import { SaveSuccessToast } from "@/components/ui/save-success-toast";
+import { usePortalConfig } from "@/components/portals/portal-config-context";
+import { useSaveFeedback } from "@/lib/hooks/use-save-feedback";
 
 
 function toDocData(item: Item): InvoiceDocData {
@@ -46,21 +48,22 @@ export function AdminInvoiceDetailClient({
   poInvoiceCount?: number;
 }) {
   const router = useRouter();
+  const { apiPrefix, pathPrefix } = usePortalConfig();
+  const { successMessage, clearSaveFeedback, showSaveSuccess } = useSaveFeedback();
   const [item, setItem] = useState<Item | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState("");
   const [pdfExporting, setPdfExporting] = useState(false);
-  const [saveConfirmOpen, setSaveConfirmOpen] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
       const endpoint = invoiceId
-        ? `/api/admin/invoices/${invoiceId}`
-        : `/api/admin/invoices/template?poId=${encodeURIComponent(
+        ? `${apiPrefix}/invoices/${invoiceId}`
+        : `${apiPrefix}/invoices/template?poId=${encodeURIComponent(
             String(poId ?? "")
           )}&invoiceType=${encodeURIComponent(invoiceType)}`;
       const res = await fetch(endpoint, { cache: "no-store" });
@@ -74,7 +77,7 @@ export function AdminInvoiceDetailClient({
     } finally {
       setLoading(false);
     }
-  }, [invoiceId, poId, invoiceType]);
+  }, [invoiceId, poId, invoiceType, apiPrefix]);
 
   useEffect(() => {
     load().catch(() => {});
@@ -129,6 +132,7 @@ export function AdminInvoiceDetailClient({
   async function save(): Promise<boolean> {
     if (!item) return false;
     setSaving(true);
+    clearSaveFeedback();
     setMsg("");
     try {
         const payload = {
@@ -144,7 +148,7 @@ export function AdminInvoiceDetailClient({
           branding: item.branding,
         };
       if (!invoiceId) {
-        const createRes = await fetch("/api/admin/invoices", {
+        const createRes = await fetch(`${apiPrefix}/invoices`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ poId: item.poId, invoiceType: item.invoiceType ?? invoiceType }),
@@ -153,7 +157,7 @@ export function AdminInvoiceDetailClient({
         if (!createRes.ok) throw new Error(createJson.message ?? "Create failed");
         const createdId = String(createJson.id ?? "").trim();
         if (!createdId) throw new Error("Missing invoice id");
-        const patchRes = await fetch(`/api/admin/invoices/${createdId}`, {
+        const patchRes = await fetch(`${apiPrefix}/invoices/${createdId}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
@@ -161,18 +165,18 @@ export function AdminInvoiceDetailClient({
         const patchJson = await readResponseJson<{ message?: string }>(patchRes);
         if (!patchRes.ok) throw new Error(patchJson.message ?? "Save failed");
         setMsg("Saved.");
-        router.replace(`/admin/invoices/${createdId}`);
+        router.replace(`${pathPrefix}/invoices/${createdId}`);
         return true;
       }
 
-      const res = await fetch(`/api/admin/invoices/${invoiceId}`, {
+      const res = await fetch(`${apiPrefix}/invoices/${invoiceId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
       const data = await readResponseJson<{ message?: string }>(res);
       if (!res.ok) throw new Error(data.message ?? "Save failed");
-      setMsg("Saved.");
+      showSaveSuccess();
       await load();
       return true;
     } catch (e) {
@@ -276,7 +280,20 @@ export function AdminInvoiceDetailClient({
 
 
   if (loading && !error) {
-    return <p className="text-muted-foreground text-sm">Loading…</p>;
+    return (
+      <div className="animate-fade-in space-y-6">
+        <Skeleton className="h-9 w-48 max-w-full" />
+        <div className="mt-6 grid gap-8 lg:grid-cols-2">
+          <div className="space-y-4">
+            <Skeleton className="h-[28rem] w-full rounded-xl" />
+          </div>
+          <div className="space-y-4">
+            <Skeleton className="h-[28rem] w-full rounded-xl" />
+            <Skeleton className="h-40 w-full rounded-xl" />
+          </div>
+        </div>
+      </div>
+    );
   }
 
   const extras = (item?.extras ?? {}) as Record<string, unknown>;
@@ -287,22 +304,13 @@ export function AdminInvoiceDetailClient({
   const taxLabelPreview = taxEnabledPreview ? `Tax (${taxRatePreview}%)` : "Tax";
   return (
     <div className="animate-fade-in">
-      <SaveConfirmModal
-        open={saveConfirmOpen}
-        onClose={() => setSaveConfirmOpen(false)}
-        onConfirm={async () => {
-          const ok = await save();
-          if (ok) setSaveConfirmOpen(false);
-        }}
-        loading={saving}
-        entityName="invoice record"
-      />
       <DashboardPageHeader title={item ? item.invoiceNumber : "Invoice"} />
       {poInvoiceCount != null ? (
         <p className="text-muted-foreground mt-1 text-xs">
           Invoices on this PO: {poInvoiceCount}
         </p>
       ) : null}
+      <SaveSuccessToast message={successMessage} />
       {error ? (
         <div className="mb-4 rounded-xl border border-destructive/40 bg-destructive/5 p-4 text-sm text-destructive">
           {error}
@@ -328,7 +336,7 @@ export function AdminInvoiceDetailClient({
             onAddLine={addLine}
             onRemoveLine={removeLine}
             onCopyBillToShip={copyBillToShip}
-            onSave={() => setSaveConfirmOpen(true)}
+            onSave={() => void save()}
             onDownloadPdf={() => void downloadPdf()}
           />
 

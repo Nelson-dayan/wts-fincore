@@ -13,6 +13,7 @@ import {
   pagesFromStoredDoc,
   toDecimal128,
 } from "@/lib/services/business/quotation.service";
+import { assertEmployeeCanAccessProject, assertEmployeeCanAccessQuotation } from "@/lib/auth/employee-resource-access";
 
 interface RouteCtx {
   params: Promise<{ quotationId: string }>;
@@ -65,9 +66,22 @@ function formatQuotation(quotation: Record<string, unknown>) {
 
 export async function GET(_req: Request, ctx: RouteCtx) {
   try {
-    await requireRole(["admin"]);
+    const session = await requireRole(["admin", "employee"]);
     await connectDB();
     const { quotationId } = await ctx.params;
+    if (session.user.role === "employee") {
+      try {
+        await assertEmployeeCanAccessQuotation(session.user.id, quotationId);
+      } catch (e) {
+        if (e instanceof Error && e.message === "FORBIDDEN") {
+          return NextResponse.json({ message: "Forbidden" }, { status: 403 });
+        }
+        if (e instanceof Error && e.message === "NOT_FOUND") {
+          return NextResponse.json({ message: "Quotation not found" }, { status: 404 });
+        }
+        throw e;
+      }
+    }
     const raw = await QuotationModel.findById(quotationId)
       .populate("projectId", "name")
       .lean();
@@ -93,9 +107,22 @@ export async function GET(_req: Request, ctx: RouteCtx) {
 
 export async function PATCH(req: Request, ctx: RouteCtx) {
   try {
-    const session = await requireRole(["admin"]);
+    const session = await requireRole(["admin", "employee"]);
     await connectDB();
     const { quotationId } = await ctx.params;
+    if (session.user.role === "employee") {
+      try {
+        await assertEmployeeCanAccessQuotation(session.user.id, quotationId);
+      } catch (e) {
+        if (e instanceof Error && e.message === "FORBIDDEN") {
+          return NextResponse.json({ message: "Forbidden" }, { status: 403 });
+        }
+        if (e instanceof Error && e.message === "NOT_FOUND") {
+          return NextResponse.json({ message: "Quotation not found" }, { status: 404 });
+        }
+        throw e;
+      }
+    }
     const existing = await QuotationModel.findById(quotationId).lean();
     if (!existing) {
       return NextResponse.json({ message: "Quotation not found" }, { status: 404 });
@@ -137,6 +164,16 @@ export async function PATCH(req: Request, ctx: RouteCtx) {
     const nextProjectId = String(
       body.projectId !== undefined ? body.projectId : existing.projectId
     ).trim();
+    if (session.user.role === "employee") {
+      try {
+        await assertEmployeeCanAccessProject(session.user.id, nextProjectId);
+      } catch (e) {
+        if (e instanceof Error && e.message === "FORBIDDEN") {
+          return NextResponse.json({ message: "Forbidden" }, { status: 403 });
+        }
+        throw e;
+      }
+    }
     const shouldRefreshSnapshots =
       Boolean(body.refreshSnapshots) ||
       (body.projectId !== undefined &&
@@ -330,9 +367,23 @@ export async function PATCH(req: Request, ctx: RouteCtx) {
 
 export async function DELETE(_req: Request, ctx: RouteCtx) {
   try {
-    const session = await requireRole(["admin"]);
+    const session = await requireRole(["admin", "employee"]);
     await connectDB();
     const { quotationId } = await ctx.params;
+
+    if (session.user.role === "employee") {
+      try {
+        await assertEmployeeCanAccessQuotation(session.user.id, quotationId);
+      } catch (e) {
+        if (e instanceof Error && e.message === "FORBIDDEN") {
+          return NextResponse.json({ message: "Forbidden" }, { status: 403 });
+        }
+        if (e instanceof Error && e.message === "NOT_FOUND") {
+          return NextResponse.json({ message: "Quotation not found" }, { status: 404 });
+        }
+        throw e;
+      }
+    }
 
     const poCount = await PurchaseOrderModel.countDocuments({
       quotationId: new mongoose.Types.ObjectId(quotationId),

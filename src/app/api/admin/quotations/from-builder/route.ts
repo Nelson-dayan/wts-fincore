@@ -13,6 +13,10 @@ import {
 } from "@/lib/services/business/quotation.service";
 import { pagesFromGeneratorData } from "@/lib/quotation/map-builder-to-quotation";
 import { normalizeQuotationData, type QuotationData } from "@/types/quotation-generator";
+import {
+  assertEmployeeCanAccessProject,
+  assertEmployeeCanAccessQuotation,
+} from "@/lib/auth/employee-resource-access";
 
 function pdfBuilderPayload(data: QuotationData) {
   return JSON.parse(JSON.stringify(normalizeQuotationData(data))) as Record<string, unknown>;
@@ -90,7 +94,7 @@ function mergeSnapshotsWithForm(
  */
 export async function POST(req: Request) {
   try {
-    const session = await requireRole(["admin"]);
+    const session = await requireRole(["admin", "employee"]);
     await connectDB();
     const body = (await req.json()) as {
       projectId?: string;
@@ -155,6 +159,21 @@ export async function POST(req: Request) {
       }
       projectId = bodyPid;
       snapshotBase = await buildQuotationSnapshots(projectId);
+    }
+
+    if (session.user.role === "employee") {
+      try {
+        if (quotationOid) {
+          await assertEmployeeCanAccessQuotation(session.user.id, quotationOid);
+        } else {
+          await assertEmployeeCanAccessProject(session.user.id, projectId);
+        }
+      } catch (e) {
+        if (e instanceof Error && e.message === "FORBIDDEN") {
+          return NextResponse.json({ message: "Forbidden" }, { status: 403 });
+        }
+        throw e;
+      }
     }
 
     const { clientSnapshot, companySnapshot } = mergeSnapshotsWithForm(snapshotBase, data);

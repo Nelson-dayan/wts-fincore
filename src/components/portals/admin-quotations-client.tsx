@@ -14,12 +14,14 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { QuotationStatusEditor } from "@/components/portals/admin-quotation-details/quotation-status-card";
 import { cn } from "@/lib/utils/cn";
 import type { QuotationData } from "@/types/quotation-generator";
 import { readResponseJson } from "@/lib/http/read-response-json";
 import type { QuotationPayload } from "@/components/portals/admin-quotation-details/types";
+import { usePortalConfig } from "@/components/portals/portal-config-context";
 
 function normalizeQuotationStatus(s: string | undefined): QuotationPayload["status"] {
   if (s === "draft" || s === "sent" || s === "approved" || s === "rejected") return s;
@@ -47,6 +49,7 @@ export function AdminQuotationsClient({
 }: {
   initialProjectId?: string;
 }) {
+  const { apiPrefix, pathPrefix } = usePortalConfig();
   const [rows, setRows] = useState<QuotationRow[]>([]);
   const [total, setTotal] = useState(0);
   const [listLoading, setListLoading] = useState(true);
@@ -68,7 +71,7 @@ export function AdminQuotationsClient({
       const q = initialProjectId
         ? `?limit=200&projectId=${encodeURIComponent(initialProjectId)}`
         : "?limit=200";
-      const res = await fetch(`/api/admin/quotations${q}`, {
+      const res = await fetch(`${apiPrefix}/quotations${q}`, {
         credentials: "include",
         cache: "no-store",
       });
@@ -93,7 +96,7 @@ export function AdminQuotationsClient({
     } finally {
       setListLoading(false);
     }
-  }, [initialProjectId]);
+  }, [apiPrefix, initialProjectId]);
 
   useEffect(() => {
     fetchList().catch(() => {});
@@ -117,7 +120,7 @@ export function AdminQuotationsClient({
   const loadQuotation = useCallback(async (id: string) => {
     setRowBusyId(id);
     try {
-      const res = await fetch(`/api/admin/quotations/${id}`, {
+      const res = await fetch(`${apiPrefix}/quotations/${id}`, {
         credentials: "include",
         cache: "no-store",
       });
@@ -148,14 +151,14 @@ export function AdminQuotationsClient({
     } finally {
       setRowBusyId("");
     }
-  }, []);
+  }, [apiPrefix]);
 
   const performDelete = useCallback(async () => {
     if (!deleteTargetId) return;
     setDeleteLoading(true);
     setListError("");
     try {
-      const res = await fetch(`/api/admin/quotations/${deleteTargetId}`, {
+      const res = await fetch(`${apiPrefix}/quotations/${deleteTargetId}`, {
         method: "DELETE",
         credentials: "include",
       });
@@ -175,7 +178,7 @@ export function AdminQuotationsClient({
     } finally {
       setDeleteLoading(false);
     }
-  }, [deleteTargetId, fetchList]);
+  }, [apiPrefix, deleteTargetId, fetchList]);
 
   const closeBuilder = useCallback(() => {
     setBuilderOpen(false);
@@ -220,7 +223,7 @@ export function AdminQuotationsClient({
 
       {initialProjectId ? (
         <Link
-          href={`/admin/projects/${initialProjectId}`}
+          href={`${pathPrefix}/projects/${initialProjectId}`}
           className="group mb-6 inline-flex items-center gap-2 rounded-lg text-[0.8125rem] font-medium text-muted-foreground transition-[color,background-color] duration-200 hover:bg-accent/60 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/70 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
         >
           <ArrowLeft
@@ -280,9 +283,51 @@ export function AdminQuotationsClient({
             </div>
           ) : null}
           {listLoading && rows.length === 0 ? (
-            <div className="flex flex-col items-center justify-center gap-3 py-20 text-muted-foreground">
-              <Loader2 className="size-8 animate-spin text-primary" aria-hidden />
-              <p className="text-sm font-medium">Loading quotations…</p>
+            <div className="overflow-x-auto" aria-busy="true">
+              <table className="w-full min-w-[72rem] text-left text-sm">
+                <thead>
+                  <tr className="border-b border-border/80 bg-muted/30 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground dark:bg-muted/15">
+                    <th className="px-5 py-3.5 pr-3">Quotation #</th>
+                    <th className="px-0 py-3.5 pr-3">Project</th>
+                    <th className="px-0 py-3.5 pr-3">Total</th>
+                    <th className="px-0 py-3.5 pr-3">PO links</th>
+                    <th className="px-0 py-3.5 pr-3">Status</th>
+                    <th className="px-0 py-3.5 pr-3">Created</th>
+                    <th className="px-0 py-3.5 pr-5 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border/60">
+                  {Array.from({ length: 8 }).map((_, ri) => (
+                    <tr key={ri} className="bg-card">
+                      <td className="px-5 py-3.5 pr-3">
+                        <Skeleton className="h-4 w-28" />
+                      </td>
+                      <td className="px-0 py-3.5 pr-3">
+                        <Skeleton className="h-4 w-full max-w-[12rem]" />
+                      </td>
+                      <td className="px-0 py-3.5 pr-3">
+                        <Skeleton className="h-4 w-24" />
+                      </td>
+                      <td className="px-0 py-3.5 pr-3">
+                        <Skeleton className="h-6 w-20 rounded-full" />
+                      </td>
+                      <td className="px-0 py-3.5 pr-3">
+                        <Skeleton className="h-8 w-24 rounded-md" />
+                      </td>
+                      <td className="px-0 py-3.5 pr-3">
+                        <Skeleton className="h-4 w-36" />
+                      </td>
+                      <td className="px-0 py-3.5 pr-5 text-right">
+                        <div className="ml-auto flex justify-end gap-2">
+                          <Skeleton className="h-8 w-[4.5rem] rounded-lg" />
+                          <Skeleton className="h-8 w-14 rounded-lg" />
+                          <Skeleton className="h-8 w-14 rounded-lg" />
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           ) : !listLoading && rows.length === 0 ? (
             <div className="flex flex-col items-center justify-center gap-3 px-6 py-16 text-center">
@@ -371,7 +416,7 @@ export function AdminQuotationsClient({
                               className="rounded-lg"
                               asChild
                             >
-                              <Link href={`/admin/quotations/${row._id}`}>
+                              <Link href={`${pathPrefix}/quotations/${row._id}`}>
                                 <Eye className="size-4" aria-hidden />
                                 View
                               </Link>

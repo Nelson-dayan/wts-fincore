@@ -1,0 +1,10 @@
+{
+  "version": 1.1,
+  "atDirectives": [
+    {
+      "name": "@theme",
+      "description": "Tailwind CSS v4 theme block, e.g. `@theme` or `@theme inline` (https://tailwindcss.com/docs/theme).",
+      "status": "experimental"
+    }
+  ]
+}

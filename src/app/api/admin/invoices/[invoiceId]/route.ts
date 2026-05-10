@@ -8,6 +8,7 @@ import { logActivity } from "@/lib/services/activity/log-activity.service";
 import { formatInvoiceForApi } from "@/lib/services/business/invoice.service";
 import { computeInvoiceTotals } from "@/lib/invoice/invoice-totals";
 import { aedAmountInWords } from "@/lib/invoice/aed-amount-words";
+import { assertEmployeeCanAccessInvoice } from "@/lib/auth/employee-resource-access";
 
 type Ctx = { params: Promise<{ invoiceId: string }> };
 
@@ -18,11 +19,24 @@ function toDecimal128(value: number): mongoose.Types.Decimal128 {
 
 export async function GET(_req: Request, ctx: Ctx) {
   try {
-    await requireRole(["admin"]);
+    const session = await requireRole(["admin", "employee"]);
     await connectDB();
     const { invoiceId } = await ctx.params;
     if (!mongoose.Types.ObjectId.isValid(invoiceId)) {
       return NextResponse.json({ message: "Invalid invoice id" }, { status: 400 });
+    }
+    if (session.user.role === "employee") {
+      try {
+        await assertEmployeeCanAccessInvoice(session.user.id, invoiceId);
+      } catch (e) {
+        if (e instanceof Error && e.message === "FORBIDDEN") {
+          return NextResponse.json({ message: "Forbidden" }, { status: 403 });
+        }
+        if (e instanceof Error && e.message === "NOT_FOUND") {
+          return NextResponse.json({ message: "Invoice not found" }, { status: 404 });
+        }
+        throw e;
+      }
     }
     const raw = await InvoiceModel.findById(invoiceId).lean();
     if (!raw) {
@@ -38,11 +52,25 @@ export async function GET(_req: Request, ctx: Ctx) {
 
 export async function PATCH(req: Request, ctx: Ctx) {
   try {
-    const session = await requireRole(["admin"]);
+    const session = await requireRole(["admin", "employee"]);
     await connectDB();
     const { invoiceId } = await ctx.params;
     if (!mongoose.Types.ObjectId.isValid(invoiceId)) {
       return NextResponse.json({ message: "Invalid invoice id" }, { status: 400 });
+    }
+
+    if (session.user.role === "employee") {
+      try {
+        await assertEmployeeCanAccessInvoice(session.user.id, invoiceId);
+      } catch (e) {
+        if (e instanceof Error && e.message === "FORBIDDEN") {
+          return NextResponse.json({ message: "Forbidden" }, { status: 403 });
+        }
+        if (e instanceof Error && e.message === "NOT_FOUND") {
+          return NextResponse.json({ message: "Invoice not found" }, { status: 404 });
+        }
+        throw e;
+      }
     }
 
     const inv = await InvoiceModel.findById(invoiceId);

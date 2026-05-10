@@ -7,7 +7,7 @@ import { logActivity } from "@/lib/services/activity/log-activity.service";
 
 export async function GET() {
   try {
-    await requireRole(["admin"]);
+    await requireRole(["admin", "employee"]);
     await connectDB();
     const item = await CompanyModel.findOne({ isPrimary: true })
       .sort({ updatedAt: -1 })

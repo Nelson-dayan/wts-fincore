@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { readResponseJson } from "@/lib/http/read-response-json";
 import { cn } from "@/lib/utils/cn";
+import { usePortalConfig } from "@/components/portals/portal-config-context";
 
 type ProjectRow = { _id: string; name: string; status?: string };
 
@@ -22,6 +23,7 @@ export function ProjectSearchPicker({
   disabled?: boolean;
   helperText?: string;
 }) {
+  const { apiPrefix } = usePortalConfig();
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<ProjectRow[]>([]);
   const [loading, setLoading] = useState(false);
@@ -38,7 +40,7 @@ export function ProjectSearchPicker({
     setError(null);
     try {
       const qs = new URLSearchParams({ page: "1", limit: "20", q });
-      const res = await fetch(`/api/admin/projects?${qs.toString()}`, {
+      const res = await fetch(`${apiPrefix}/projects?${qs.toString()}`, {
         cache: "no-store",
       });
       const payload = await readResponseJson<{
@@ -59,7 +61,7 @@ export function ProjectSearchPicker({
     } finally {
       setLoading(false);
     }
-  }, [query]);
+  }, [apiPrefix, query]);
 
   function pick(p: ProjectRow) {
     onChange(p._id);

@@ -2,16 +2,20 @@ import { NextResponse } from "next/server";
 import mongoose from "mongoose";
 import { requireRole } from "@/lib/auth/require-role";
 import { connectDB } from "@/lib/db/connect";
-import { InvoiceModel } from "@/lib/db/models";
+import { InvoiceModel, PurchaseOrderModel } from "@/lib/db/models";
 import { authErrorResponse } from "@/lib/api/route-auth";
 import { parsePagination, parseSearch } from "@/lib/api/pagination";
 import { logActivity } from "@/lib/services/activity/log-activity.service";
 import { createInvoiceForPurchaseOrder } from "@/lib/services/business/invoice.service";
 import { decimalToNumber } from "@/lib/services/business/money";
+import {
+  assertEmployeeCanAccessPurchaseOrder,
+  getEmployeeAssignedProjectIdStrings,
+} from "@/lib/auth/employee-resource-access";
 
 export async function GET(req: Request) {
   try {
-    await requireRole(["admin"]);
+    const session = await requireRole(["admin", "employee"]);
     await connectDB();
     const url = new URL(req.url);
     const { page, limit, skip } = parsePagination(url.searchParams);
@@ -20,12 +24,38 @@ export async function GET(req: Request) {
     const poId = String(url.searchParams.get("poId") ?? "").trim();
     const filter: Record<string, unknown> = { "extras._hiddenUntilSaved": { $ne: true } };
     if (q) filter.invoiceNumber = { $regex: q, $options: "i" };
-    if (projectId) filter.projectId = projectId;
-    if (poId) {
-      if (!mongoose.Types.ObjectId.isValid(poId)) {
-        return NextResponse.json({ message: "Invalid poId" }, { status: 400 });
+
+    if (session.user.role === "employee") {
+      const employeeProjectIds = await getEmployeeAssignedProjectIdStrings(session.user.id);
+      if (poId) {
+        if (!mongoose.Types.ObjectId.isValid(poId)) {
+          return NextResponse.json({ message: "Invalid poId" }, { status: 400 });
+        }
+        const po = await PurchaseOrderModel.findById(poId).select("projectId").lean();
+        const pPid = po?.projectId ? String(po.projectId) : "";
+        if (!pPid || !employeeProjectIds.includes(pPid)) {
+          return NextResponse.json({ items: [], page, limit, total: 0, hasMore: false });
+        }
+        filter.poId = new mongoose.Types.ObjectId(poId);
+      } else if (projectId) {
+        if (!employeeProjectIds.includes(projectId)) {
+          return NextResponse.json({ items: [], page, limit, total: 0, hasMore: false });
+        }
+        filter.projectId = projectId;
+      } else {
+        if (employeeProjectIds.length === 0) {
+          return NextResponse.json({ items: [], page, limit, total: 0, hasMore: false });
+        }
+        filter.projectId = { $in: employeeProjectIds };
       }
-      filter.poId = new mongoose.Types.ObjectId(poId);
+    } else {
+      if (projectId) filter.projectId = projectId;
+      if (poId) {
+        if (!mongoose.Types.ObjectId.isValid(poId)) {
+          return NextResponse.json({ message: "Invalid poId" }, { status: 400 });
+        }
+        filter.poId = new mongoose.Types.ObjectId(poId);
+      }
     }
     const [rawItems, total] = await Promise.all([
       InvoiceModel.find(filter)
@@ -64,13 +94,27 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   try {
-    const session = await requireRole(["admin"]);
+    const session = await requireRole(["admin", "employee"]);
     await connectDB();
     const body = (await req.json()) as { poId?: string; invoiceType?: "aed" | "usd" };
     const poId = String(body.poId ?? "").trim();
     const invoiceType = body.invoiceType === "usd" ? "usd" : "aed";
     if (!poId) {
       return NextResponse.json({ message: "poId is required" }, { status: 400 });
+    }
+
+    if (session.user.role === "employee") {
+      try {
+        await assertEmployeeCanAccessPurchaseOrder(session.user.id, poId);
+      } catch (e) {
+        if (e instanceof Error && e.message === "FORBIDDEN") {
+          return NextResponse.json({ message: "Forbidden" }, { status: 403 });
+        }
+        if (e instanceof Error && e.message === "NOT_FOUND") {
+          return NextResponse.json({ message: "Purchase order not found" }, { status: 404 });
+        }
+        throw e;
+      }
     }
 
     const { id, invoiceNumber, projectId } = await createInvoiceForPurchaseOrder({
