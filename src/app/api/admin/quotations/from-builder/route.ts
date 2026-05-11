@@ -3,8 +3,9 @@ import mongoose from "mongoose";
 import { requireRole } from "@/lib/auth/require-role";
 import { connectDB } from "@/lib/db/connect";
 import { ProjectModel, QuotationModel } from "@/lib/db/models";
-import { authErrorResponse } from "@/lib/api/route-auth";
+import { apiSuccess, apiError } from "@/lib/api/response";
 import { logActivity } from "@/lib/services/activity/log-activity.service";
+
 import {
   buildQuotationSnapshots,
   computeQuotationTotals,
@@ -125,7 +126,7 @@ export async function POST(req: Request) {
     if (quotationOid) {
       const existing = await QuotationModel.findById(quotationOid).lean();
       if (!existing) {
-        return NextResponse.json({ message: "Quotation not found" }, { status: 404 });
+        return apiError("Quotation not found", 404);
       }
       existingForUpdate = existing as Record<string, unknown>;
       projectId = String(existing.projectId);
@@ -136,10 +137,7 @@ export async function POST(req: Request) {
         mongoose.Types.ObjectId.isValid(bodyPid) &&
         bodyPid !== projectId
       ) {
-        return NextResponse.json(
-          { message: "Project connection does not match this quotation." },
-          { status: 400 }
-        );
+        return apiError("Project connection does not match this quotation.", 400);
       }
 
       const fromDoc = snapshotsFromExistingDoc(existingForUpdate);
@@ -148,14 +146,11 @@ export async function POST(req: Request) {
     } else {
       const bodyPid = String(body.projectId ?? "").trim();
       if (!bodyPid || !mongoose.Types.ObjectId.isValid(bodyPid)) {
-        return NextResponse.json(
-          { message: "Connect a project before saving (projectId required)." },
-          { status: 400 }
-        );
+        return apiError("Connect a project before saving (projectId required).", 400);
       }
       const projExists = await ProjectModel.exists({ _id: bodyPid });
       if (!projExists) {
-        return NextResponse.json({ message: "Project not found" }, { status: 404 });
+        return apiError("Project not found", 404);
       }
       projectId = bodyPid;
       snapshotBase = await buildQuotationSnapshots(projectId);
@@ -170,7 +165,7 @@ export async function POST(req: Request) {
         }
       } catch (e) {
         if (e instanceof Error && e.message === "FORBIDDEN") {
-          return NextResponse.json({ message: "Forbidden" }, { status: 403 });
+          return apiError("Forbidden", 403);
         }
         throw e;
       }
@@ -252,28 +247,26 @@ export async function POST(req: Request) {
       ).lean();
 
       if (!updated) {
-        return NextResponse.json({ message: "Quotation not found" }, { status: 404 });
+        return apiError("Quotation not found", 404);
       }
 
       await logActivity({
         userId: session.user.id,
-        action: "updated_quotation",
-        entityType: "quotation",
+        action: "QUOTATION_UPDATED",
+        entityType: "Quotation",
         entityId: String(updated._id),
         message: `Updated quotation ${updated.quotationNumber} (from PDF builder)`,
         projectId: String(updated.projectId),
       });
 
-      return NextResponse.json(
-        {
-          item: {
-            _id: String(updated._id),
-            quotationNumber: updated.quotationNumber,
-            projectId: String(updated.projectId),
-          },
+      return apiSuccess({
+        item: {
+          _id: String(updated._id),
+          quotationNumber: updated.quotationNumber,
+          projectId: String(updated.projectId),
         },
-        { status: 200 }
-      );
+      });
+
     }
 
     const quotationNumber = await generateQuotationNumber();
@@ -287,37 +280,35 @@ export async function POST(req: Request) {
 
     await logActivity({
       userId: session.user.id,
-      action: "created_quotation",
-      entityType: "quotation",
+      action: "QUOTATION_CREATED",
+      entityType: "Quotation",
       entityId: String(created._id),
       message: `Created quotation ${quotationNumber} (from PDF builder)`,
       projectId,
     });
 
-    return NextResponse.json(
-      {
-        item: {
-          _id: String(created._id),
-          quotationNumber: created.quotationNumber,
-          projectId: String(created.projectId),
-        },
+    return apiSuccess({
+      item: {
+        _id: String(created._id),
+        quotationNumber: created.quotationNumber,
+        projectId: String(created.projectId),
       },
-      { status: 201 }
-    );
+    }, 201);
   } catch (error) {
+    console.error("POST Quotation Builder Error:", error);
     if (error instanceof Error) {
       const msg = error.message;
       if (msg === "UNAUTHORIZED" || msg === "FORBIDDEN") {
-        return authErrorResponse(error, "Forbidden");
+        return apiError("Forbidden", 403);
       }
       if (
         msg.startsWith("Project not found") ||
         msg.startsWith("Client not found") ||
         msg.startsWith("Primary company")
       ) {
-        return NextResponse.json({ message: msg }, { status: 400 });
+        return apiError(msg, 400);
       }
     }
-    return authErrorResponse(error, "Failed to save quotation");
+    return apiError("Failed to save quotation", 500);
   }
 }

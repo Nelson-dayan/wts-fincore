@@ -1,4 +1,6 @@
 import { MoneyInput, FinanceTotals } from "@/lib/types";
+import { DEFAULT_CURRENCY } from "@/lib/constants/finance";
+
 
 /**
  * Robustly rounds a monetary value to 2 decimal places to avoid floating point drift.
@@ -12,8 +14,9 @@ export function roundMoney(value: number): number {
 /**
  * Formats a number to a currency string using Intl.NumberFormat
  */
-export function formatCurrency(value: number, currency = "AED"): string {
-  return new Intl.NumberFormat("en-AE", {
+export function formatCurrency(value: number, currency = DEFAULT_CURRENCY): string {
+  const locale = currency === "INR" ? "en-IN" : "en-AE";
+  return new Intl.NumberFormat(locale, {
     style: "currency",
     currency: currency,
     minimumFractionDigits: 2,

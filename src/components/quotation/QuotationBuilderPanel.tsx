@@ -81,7 +81,9 @@ export type QuotationBuilderPanelProps = {
   }) => void;
   /** Embedded: closes the builder / clears edit mode. */
   onCancelEdit?: () => void;
+  isCurrencyLocked?: boolean;
 };
+
 
 export function QuotationBuilderPanel({
   variant = "standalone",
@@ -92,7 +94,9 @@ export function QuotationBuilderPanel({
   initialSnapshot = null,
   onDbSaveSuccess,
   onCancelEdit,
+  isCurrencyLocked: initialIsCurrencyLocked = false,
 }: QuotationBuilderPanelProps) {
+
   const { apiPrefix } = usePortalConfig();
   const [data, setData] = useState<QuotationData>(() =>
     initialSnapshot ? normalizeQuotationData(initialSnapshot) : defaultQuotationData()
@@ -105,6 +109,9 @@ export function QuotationBuilderPanel({
   );
   const [projectDefaultsLoading, setProjectDefaultsLoading] = useState(false);
   const [projectDefaultsError, setProjectDefaultsError] = useState<string | null>(null);
+  const [isCurrencyLocked, setIsCurrencyLocked] = useState<boolean>(initialIsCurrencyLocked);
+
+
   const [storageReady, setStorageReady] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [saveNotice, setSaveNotice] = useState<string | null>(null);
@@ -135,20 +142,25 @@ export function QuotationBuilderPanel({
           cache: "no-store",
         });
         const payload = await readResponseJson<{
-          project?: { name?: string };
+          project?: { name?: string; currency?: string; fixCurrency?: boolean };
           client?: { name?: string; company?: string };
           message?: string;
         }>(res);
+
 
         if (!res.ok) {
           throw new Error(payload.message ?? "Failed to load project defaults");
         }
 
         const projectName = String(payload.project?.name ?? "").trim();
+        const projectCurrency = String(payload.project?.currency ?? "").trim().toUpperCase();
+        const projectFixCurrency = Boolean(payload.project?.fixCurrency);
         const clientName = String(payload.client?.name ?? "").trim();
         const clientCompany = String(payload.client?.company ?? "").trim();
 
         setConnectedProjectName(projectName || pid);
+        setIsCurrencyLocked(projectFixCurrency);
+
 
         if (force) {
           setData((prev) => ({
@@ -165,10 +177,12 @@ export function QuotationBuilderPanel({
               next.clientName = clientCompany || clientName;
             }
             if (!next.contactName.trim() && clientName) next.contactName = clientName;
+            if (projectFixCurrency && projectCurrency) next.currency = projectCurrency;
             return next;
           });
         }
       } catch (e) {
+
         setProjectDefaultsError(e instanceof Error ? e.message : "Failed to load project defaults");
       } finally {
         setProjectDefaultsLoading(false);
@@ -193,6 +207,11 @@ export function QuotationBuilderPanel({
     }
     setStorageReady(true);
   }, [initialSnapshot]);
+
+  useEffect(() => {
+    setIsCurrencyLocked(initialIsCurrencyLocked);
+  }, [initialIsCurrencyLocked]);
+
 
   useEffect(() => {
     if (!storageReady) return;
@@ -538,6 +557,7 @@ export function QuotationBuilderPanel({
                 setConnectedProjectId("");
                 setConnectedProjectName("");
                 setProjectDefaultsError(null);
+                setIsCurrencyLocked(false);
               }}
             />
           </div>
@@ -553,7 +573,9 @@ export function QuotationBuilderPanel({
             pdfError={pdfError}
             formTitle={formTitle}
             onCancelEdit={onCancelEdit}
+            isCurrencyLocked={isCurrencyLocked}
           />
+
 
           <div className="flex w-full flex-col items-stretch rounded-xl border border-border/50 bg-muted/15 p-4 sm:p-5 dark:bg-muted/10">
             <p className="text-muted-foreground mb-3 text-center text-[11px] font-semibold uppercase tracking-wider">

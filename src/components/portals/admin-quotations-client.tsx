@@ -61,6 +61,7 @@ export function AdminQuotationsClient({
   const [builderLinkedProjectId, setBuilderLinkedProjectId] = useState("");
   const [builderLinkedProjectName, setBuilderLinkedProjectName] = useState("");
   const [rowBusyId, setRowBusyId] = useState("");
+  const [isCurrencyLocked, setIsCurrencyLocked] = useState(false);
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
 
@@ -132,10 +133,13 @@ export function AdminQuotationsClient({
       const item = payload.item as {
         projectId?: string;
         projectName?: string;
+        projectFixCurrency?: boolean;
+        projectCurrency?: string;
       } & Parameters<typeof quotationItemToGeneratorData>[0];
       const data = quotationItemToGeneratorData(item);
       setBuilderLinkedProjectId(String(item.projectId ?? "").trim());
       setBuilderLinkedProjectName(String(item.projectName ?? "").trim());
+      setIsCurrencyLocked(Boolean(item.projectFixCurrency));
       setEditingQuotationId(id);
       setInitialSnapshot(data);
       setBuilderKey((k) => k + 1);
@@ -473,6 +477,7 @@ export function AdminQuotationsClient({
             initialSnapshot={initialSnapshot}
             onDbSaveSuccess={onDbSaveSuccess}
             onCancelEdit={closeBuilder}
+            isCurrencyLocked={isCurrencyLocked}
           />
         </section>
       ) : null}

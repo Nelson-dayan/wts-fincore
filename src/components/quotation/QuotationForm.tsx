@@ -23,7 +23,9 @@ export type QuotationFormProps = {
   formTitle?: string;
   /** Admin embedded: close builder without navigating away. */
   onCancelEdit?: () => void;
+  isCurrencyLocked?: boolean;
 };
+
 
 export function QuotationForm({
   data,
@@ -36,7 +38,9 @@ export function QuotationForm({
   pdfError = null,
   formTitle = "Quotation",
   onCancelEdit,
+  isCurrencyLocked = false,
 }: QuotationFormProps) {
+
   const patch = (partial: Partial<QuotationData>) => {
     onChange({ ...data, ...partial });
   };
@@ -251,13 +255,22 @@ export function QuotationForm({
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="qg-currency">Currency Code</Label>
-                <Input
+                <Dropdown
                   id="qg-currency"
                   value={data.currency}
                   onChange={(e) => patch({ currency: e.target.value.toUpperCase() })}
-                  placeholder="AED"
+                  disabled={isCurrencyLocked}
+                  className={cn(isCurrencyLocked && "bg-muted cursor-not-allowed")}
+                  options={[
+                    { value: "AED", label: "AED" },
+                    { value: "INR", label: "INR" },
+                    { value: "USD", label: "USD" },
+                    { value: "EUR", label: "EUR" },
+                    { value: "GBP", label: "GBP" },
+                  ]}
                 />
               </div>
+
               <div className="grid gap-2">
                 <Label htmlFor="qg-taxrate">Tax Rate (%)</Label>
                 <Input

@@ -12,6 +12,8 @@ import { MAX_INVOICES_PER_PURCHASE_ORDER } from "@/lib/invoice/invoice-limits";
 import * as invoiceTotals from "@/lib/invoice/invoice-totals";
 import { decimalToNumber } from "@/lib/services/business/money";
 import { logActivity } from "@/lib/services/activity/log-activity.service";
+import { DEFAULT_CURRENCY } from "@/lib/constants/finance";
+
 
 export { MAX_INVOICES_PER_PURCHASE_ORDER };
 
@@ -212,7 +214,7 @@ export async function createInvoiceForPurchaseOrder(
   const created = await InvoiceModel.create({
     invoiceNumber,
     invoiceType,
-    currency: quotation.currency ?? "AED",
+    currency: quotation.currency ?? DEFAULT_CURRENCY,
     exchangeRate: toDecimal128(
       invoiceType === "usd" 
         ? (primaryCompany?.defaultExchangeRates?.usdToInr || 83.5)
@@ -275,11 +277,11 @@ export async function createInvoiceForPurchaseOrder(
       bankAed: {},
       bankUsd: {},
       footerTerms: "TERM:",
-      footerCurrencyLine: invoiceType === "usd" ? "CURRENCY IN USD" : "CURRENCY IN AED",
+      footerCurrencyLine: invoiceType === "usd" ? "CURRENCY IN USD" : `CURRENCY IN ${DEFAULT_CURRENCY}`,
       disclaimer:
         "This is an electronically generated invoice, hence does not require signature.",
       amountInWords:
-        invoiceType === "usd" ? `${total.toFixed(2)} US Dollars Only.` : aedAmountInWords(total),
+        invoiceType === "usd" ? `${total.toFixed(2)} US Dollars Only.` : `INR ${total.toFixed(2)} Only.`,
       _hiddenUntilSaved: true,
     },
   });

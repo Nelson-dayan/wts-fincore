@@ -82,7 +82,7 @@ export async function GET(_req: Request, ctx: RouteCtx) {
       }
     }
     const raw = await QuotationModel.findById(quotationId)
-      .populate("projectId", "name")
+      .populate("projectId", "name fixCurrency currency")
       .lean();
     if (!raw) {
       return apiError("Quotation not found", 404);
@@ -97,8 +97,17 @@ export async function GET(_req: Request, ctx: RouteCtx) {
       proj && typeof proj === "object" && "name" in proj
         ? String((proj as { name?: string }).name ?? "")
         : "";
+    const projectFixCurrency =
+      proj && typeof proj === "object" && "fixCurrency" in proj
+        ? Boolean((proj as { fixCurrency?: boolean }).fixCurrency)
+        : false;
+    const projectCurrency =
+      proj && typeof proj === "object" && "currency" in proj
+        ? String((proj as { currency?: string }).currency ?? "").trim().toUpperCase()
+        : "";
+
     const formatted = formatQuotation({ ...row, projectId: projectIdStr });
-    return apiSuccess({ item: { ...formatted, projectName } });
+    return apiSuccess({ item: { ...formatted, projectName, projectFixCurrency, projectCurrency } });
   } catch (error) {
     console.error("GET Quotation Error:", error);
     return apiError("Failed to load quotation", 500);

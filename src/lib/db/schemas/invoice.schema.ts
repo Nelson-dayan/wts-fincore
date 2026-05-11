@@ -7,6 +7,8 @@ import {
   schemaOptions,
   totalsSchema,
 } from "@/lib/db/schemas/shared.schema";
+import { DEFAULT_CURRENCY } from "@/lib/constants/finance";
+
 
 const bankDetailSchema = new Schema(
   {
@@ -31,7 +33,7 @@ const invoiceExtrasSchema = new Schema(
     bankAed: { type: bankDetailSchema, default: () => ({}) },
     bankUsd: { type: bankDetailSchema, default: () => ({}) },
     footerTerms: { type: String, default: "" },
-    footerCurrencyLine: { type: String, default: "CURRENCY IN AED" },
+    footerCurrencyLine: { type: String, default: `CURRENCY IN ${DEFAULT_CURRENCY}` },
     disclaimer: {
       type: String,
       default:
@@ -66,8 +68,8 @@ export const invoiceSchema = new Schema(
     invoiceNumber: { type: String, required: true, unique: true, index: true },
     companyId: { type: Types.ObjectId, ref: "Company", index: true },
     invoiceType: { type: String, enum: ["aed", "usd"], default: "aed", index: true },
-    currency: { type: String, default: "AED" },
-    baseCurrency: { type: String, default: "INR" },
+    currency: { type: String, default: DEFAULT_CURRENCY },
+    baseCurrency: { type: String, default: DEFAULT_CURRENCY },
     exchangeRate: decimalField,
     projectId: { type: Types.ObjectId, ref: "Project", required: true, index: true },
     poId: { type: Types.ObjectId, ref: "PurchaseOrder", index: true },

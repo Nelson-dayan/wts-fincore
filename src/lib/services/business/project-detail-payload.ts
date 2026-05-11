@@ -14,7 +14,7 @@ import { decimalToNumber } from "@/lib/services/business/money";
 export async function buildProjectDetailPayload(projectId: string) {
   const project = await ProjectModel.findById(projectId)
     .select(
-      "name description status priority budget currency category clientReference notes startDate targetEndDate actualEndDate clientId assignedTo createdAt updatedAt"
+      "name description status priority budget currency category clientReference notes startDate targetEndDate actualEndDate clientId assignedTo createdAt updatedAt fixCurrency"
     )
     .lean();
   if (!project) {
