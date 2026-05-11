@@ -5,10 +5,14 @@ import Link from "next/link";
 import { DashboardPageHeader } from "@/components/dashboard/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { readResponseJson } from "@/lib/http/read-response-json";
+import { apiFetch } from "@/lib/api/client";
+import { ApiResponse } from "@/lib/types/api.types";
+
 
 type Row = Record<string, unknown> & { _id?: string };
-type ApiPayload = {
+
+/** The specific shape of the data property returned by the API */
+type ResourceData = {
   items?: Row[];
   users?: Row[];
   item?: Row | null;
@@ -16,8 +20,8 @@ type ApiPayload = {
   limit?: number;
   total?: number;
   hasMore?: boolean;
-  message?: string;
 };
+
 
 interface ResourceTableClientProps {
   title: string;
@@ -116,23 +120,18 @@ export function ResourceTableClient({
           q: query,
         });
         const separator = endpoint.includes("?") ? "&" : "?";
-        const response = await fetch(`${endpoint}${separator}${qs.toString()}`, {
-          cache: "no-store",
-        });
-        const payload = await readResponseJson<ApiPayload>(response);
-        if (!response.ok) {
-          throw new Error(payload.message ?? "Request failed");
-        }
+        const data = await apiFetch<ResourceData>(`${endpoint}${separator}${qs.toString()}`);
 
         const loadedRows = singleItem
-          ? payload.item
-            ? [payload.item]
+          ? data.item
+            ? [data.item]
             : []
-          : payload.items ?? payload.users ?? [];
+          : data.items ?? data.users ?? [];
+
 
         if (alive) {
           setRows(loadedRows);
-          setTotal(payload.total ?? loadedRows.length);
+          setTotal(data.total ?? loadedRows.length);
         }
       } catch (e) {
         if (alive) {

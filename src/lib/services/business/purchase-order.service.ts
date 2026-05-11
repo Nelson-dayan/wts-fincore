@@ -2,6 +2,7 @@ import { randomBytes } from "node:crypto";
 import type { ClientSession, Types } from "mongoose";
 import { connectDB } from "@/lib/db/connect";
 import { PurchaseOrderModel, QuotationModel } from "@/lib/db/models";
+import { applyExchangeRate } from "@/lib/finance/engine";
 
 type POType = "client" | "internal";
 
@@ -64,11 +65,10 @@ export async function createPurchaseOrder(
       const quotation = await assertQuotationRules(input, session);
 
       let totalAmountBase: number | undefined;
-      // Default to 1 if we decide to implement exchange rates later
       const defaultExchangeRate = 1;
       
       if (input.totalAmount != null) {
-        totalAmountBase = input.totalAmount * defaultExchangeRate;
+        totalAmountBase = applyExchangeRate(input.totalAmount, defaultExchangeRate);
       }
 
       const created = await PurchaseOrderModel.create(

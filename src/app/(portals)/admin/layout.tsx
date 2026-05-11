@@ -89,6 +89,20 @@ export default async function AdminPortalLayout({
               </PortalNavLink>
             </div>
           </details>
+
+          <details className="group rounded-xl border border-border/60 bg-muted/25 p-2.5 open:bg-muted/35">
+            <summary className="flex cursor-pointer list-none items-center justify-between rounded-lg px-2 py-1.5 text-[11px] font-semibold uppercase tracking-[0.2em] text-primary/90 transition-colors hover:bg-primary/10">
+              Developer
+              <span className="text-sm leading-none transition-transform duration-200 group-open:rotate-180">
+                ▾
+              </span>
+            </summary>
+            <div className="mt-2 grid gap-1.5">
+              <PortalNavLink href="/admin/style-guide" match="prefix" className="w-full justify-start">
+                Style Guide
+              </PortalNavLink>
+            </div>
+          </details>
         </nav>
       </PortalMobileDrawer>
 
@@ -147,6 +161,20 @@ export default async function AdminPortalLayout({
                 </PortalNavLink>
                 <PortalNavLink href="/admin/activity" match="prefix" className="w-full justify-start">
                   Activity Log
+                </PortalNavLink>
+              </div>
+            </details>
+
+            <details className="group rounded-xl border border-border/60 bg-muted/25 p-2.5 open:bg-muted/35">
+              <summary className="flex cursor-pointer list-none items-center justify-between rounded-lg px-2 py-1.5 text-[11px] font-semibold uppercase tracking-[0.2em] text-primary/90 transition-colors hover:bg-primary/10">
+                Developer
+                <span className="text-sm leading-none transition-transform duration-200 group-open:rotate-180">
+                  ▾
+                </span>
+              </summary>
+              <div className="mt-2 grid gap-1.5">
+                <PortalNavLink href="/admin/style-guide" match="prefix" className="w-full justify-start">
+                  Style Guide
                 </PortalNavLink>
               </div>
             </details>

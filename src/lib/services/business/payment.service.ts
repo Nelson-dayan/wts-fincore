@@ -2,7 +2,9 @@ import type { ClientSession, Types } from "mongoose";
 import { connectDB } from "@/lib/db/connect";
 import { CompanyModel, InvoiceModel, PaymentModel } from "@/lib/db/models";
 import { decimalToNumber } from "@/lib/services/business/money";
+import { logActivity } from "@/lib/services/activity/log-activity.service";
 import { getInvoiceSummary, PaymentInput, InvoiceInput } from "@/lib/invoice/finance-calculations";
+import { applyExchangeRate } from "@/lib/finance/engine";
 
 export interface RecordPaymentInput {
   invoiceId: Types.ObjectId | string;
@@ -116,12 +118,12 @@ export async function recordPayment(input: RecordPaymentInput) {
 
       // 2. Strict Backend Currency Conversion
       const baseCurrency = "INR"; // Enforced system default
-      const intendedAmountBase = input.intendedAmount * input.exchangeRate;
-      const receivedAmountBase = input.receivedAmount * input.exchangeRate;
+      const intendedAmountBase = applyExchangeRate(input.intendedAmount, input.exchangeRate);
+      const receivedAmountBase = applyExchangeRate(input.receivedAmount, input.exchangeRate);
 
       const feesWithBase = (input.fees || []).map(f => ({
         ...f,
-        baseAmount: (f.amount || 0) * input.exchangeRate
+        baseAmount: applyExchangeRate(f.amount || 0, input.exchangeRate)
       }));
 
       // 3. Create Payment
@@ -150,11 +152,27 @@ export async function recordPayment(input: RecordPaymentInput) {
         { session }
       );
 
-      // 4. Update Invoice Cache Atomically
       const { status } = await updateInvoiceCache(input.invoiceId, session);
 
+      const paymentId = String(payment[0]?._id ?? "");
+
+      // Log activity
+      await logActivity({
+        userId: String(input.createdBy),
+        action: "PAYMENT_RECORDED",
+        entityType: "Payment",
+        entityId: paymentId,
+        message: `Payment of ${input.currency} ${input.receivedAmount} recorded via ${input.method}`,
+        metadata: {
+          invoiceId: String(input.invoiceId),
+          amount: input.receivedAmount,
+          method: input.method,
+          statusChange: invoice ? invoice.status !== status : false
+        }
+      });
+
       result = {
-        paymentId: String(payment[0]?._id ?? ""),
+        paymentId,
         invoiceStatus: status,
       };
     });

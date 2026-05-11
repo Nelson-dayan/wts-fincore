@@ -23,8 +23,9 @@ import dynamic from "next/dynamic";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { DashboardPageHeader } from "@/components/dashboard/page-header";
-import { readResponseJson } from "@/lib/http/read-response-json";
+import { apiFetch } from "@/lib/api/client";
 import { cn } from "@/lib/utils/cn";
+
 
 type Notification = {
   type: string;
@@ -116,10 +117,8 @@ export function AdminOverviewClient() {
     const timer = setTimeout(() => setMounted(true), 100);
     async function load() {
       try {
-        const response = await fetch("/api/admin/overview", { cache: "no-store" });
-        const payload = await readResponseJson<AdminOverview | { message?: string }>(response);
-        if (!response.ok) throw new Error("message" in payload ? payload.message : "Request failed");
-        setData(payload as AdminOverview);
+        const payload = await apiFetch<AdminOverview>("/api/admin/overview");
+        setData(payload);
       } catch (e) {
         setError(e instanceof Error ? e.message : "Failed to load");
       } finally {

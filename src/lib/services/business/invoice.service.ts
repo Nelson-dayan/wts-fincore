@@ -11,6 +11,7 @@ import { aedAmountInWords } from "@/lib/invoice/aed-amount-words";
 import { MAX_INVOICES_PER_PURCHASE_ORDER } from "@/lib/invoice/invoice-limits";
 import * as invoiceTotals from "@/lib/invoice/invoice-totals";
 import { decimalToNumber } from "@/lib/services/business/money";
+import { logActivity } from "@/lib/services/activity/log-activity.service";
 
 export { MAX_INVOICES_PER_PURCHASE_ORDER };
 
@@ -281,6 +282,20 @@ export async function createInvoiceForPurchaseOrder(
         invoiceType === "usd" ? `${total.toFixed(2)} US Dollars Only.` : aedAmountInWords(total),
       _hiddenUntilSaved: true,
     },
+  });
+
+  await logActivity({
+    userId: input.createdBy,
+    action: "INVOICE_CREATED",
+    entityType: "Invoice",
+    entityId: String(created._id),
+    message: `Created invoice ${invoiceNumber} for PO ${po.poNumber}`,
+    projectId: String(po.projectId),
+    metadata: {
+      poId: String(po._id),
+      invoiceNumber,
+      totalAmount: total
+    }
   });
 
   return {

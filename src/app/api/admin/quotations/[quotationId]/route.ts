@@ -1,9 +1,8 @@
-import { NextResponse } from "next/server";
 import mongoose from "mongoose";
 import { requireRole } from "@/lib/auth/require-role";
 import { connectDB } from "@/lib/db/connect";
 import { PurchaseOrderModel, QuotationModel } from "@/lib/db/models";
-import { authErrorResponse } from "@/lib/api/route-auth";
+import { apiSuccess, apiError } from "@/lib/api/response";
 import { logActivity } from "@/lib/services/activity/log-activity.service";
 import { decimalToNumber } from "@/lib/services/business/money";
 import {
@@ -74,10 +73,10 @@ export async function GET(_req: Request, ctx: RouteCtx) {
         await assertEmployeeCanAccessQuotation(session.user.id, quotationId);
       } catch (e) {
         if (e instanceof Error && e.message === "FORBIDDEN") {
-          return NextResponse.json({ message: "Forbidden" }, { status: 403 });
+          return apiError("Forbidden", 403);
         }
         if (e instanceof Error && e.message === "NOT_FOUND") {
-          return NextResponse.json({ message: "Quotation not found" }, { status: 404 });
+          return apiError("Quotation not found", 404);
         }
         throw e;
       }
@@ -86,7 +85,7 @@ export async function GET(_req: Request, ctx: RouteCtx) {
       .populate("projectId", "name")
       .lean();
     if (!raw) {
-      return NextResponse.json({ message: "Quotation not found" }, { status: 404 });
+      return apiError("Quotation not found", 404);
     }
     const row = raw as Record<string, unknown>;
     const proj = row.projectId as unknown;
@@ -99,9 +98,10 @@ export async function GET(_req: Request, ctx: RouteCtx) {
         ? String((proj as { name?: string }).name ?? "")
         : "";
     const formatted = formatQuotation({ ...row, projectId: projectIdStr });
-    return NextResponse.json({ item: { ...formatted, projectName } });
+    return apiSuccess({ item: { ...formatted, projectName } });
   } catch (error) {
-    return authErrorResponse(error, "Failed to load quotation");
+    console.error("GET Quotation Error:", error);
+    return apiError("Failed to load quotation", 500);
   }
 }
 
@@ -115,17 +115,17 @@ export async function PATCH(req: Request, ctx: RouteCtx) {
         await assertEmployeeCanAccessQuotation(session.user.id, quotationId);
       } catch (e) {
         if (e instanceof Error && e.message === "FORBIDDEN") {
-          return NextResponse.json({ message: "Forbidden" }, { status: 403 });
+          return apiError("Forbidden", 403);
         }
         if (e instanceof Error && e.message === "NOT_FOUND") {
-          return NextResponse.json({ message: "Quotation not found" }, { status: 404 });
+          return apiError("Quotation not found", 404);
         }
         throw e;
       }
     }
     const existing = await QuotationModel.findById(quotationId).lean();
     if (!existing) {
-      return NextResponse.json({ message: "Quotation not found" }, { status: 404 });
+      return apiError("Quotation not found", 404);
     }
 
     const body = (await req.json()) as {
@@ -169,7 +169,7 @@ export async function PATCH(req: Request, ctx: RouteCtx) {
         await assertEmployeeCanAccessProject(session.user.id, nextProjectId);
       } catch (e) {
         if (e instanceof Error && e.message === "FORBIDDEN") {
-          return NextResponse.json({ message: "Forbidden" }, { status: 403 });
+          return apiError("Forbidden", 403);
         }
         throw e;
       }
@@ -223,7 +223,7 @@ export async function PATCH(req: Request, ctx: RouteCtx) {
     };
 
     if (Number.isNaN(nextDocInfo.date.getTime())) {
-      return NextResponse.json({ message: "Invalid document date" }, { status: 400 });
+      return apiError("Invalid document date", 400);
     }
 
     const pagesSource =
@@ -330,24 +330,32 @@ export async function PATCH(req: Request, ctx: RouteCtx) {
     ).lean();
 
     if (!updated) {
-      return NextResponse.json({ message: "Quotation not found" }, { status: 404 });
+      return apiError("Quotation not found", 404);
     }
 
     await logActivity({
       userId: session.user.id,
-      action: "updated_quotation",
-      entityType: "quotation",
+      action: existing.status !== body.status && body.status ? "INVOICE_STATUS_CHANGED" : "QUOTATION_UPDATED",
+      entityType: "Quotation",
       entityId: String(updated._id),
-      message: `Updated quotation ${updated.quotationNumber}`,
+      message: existing.status !== body.status && body.status
+        ? `Quotation ${updated.quotationNumber} status changed from ${existing.status} to ${body.status}`
+        : `Updated quotation ${updated.quotationNumber}`,
       projectId: String(updated.projectId),
+      metadata: {
+        previous: { status: existing.status },
+        current: { status: updated.status },
+        changedFields: Object.keys(body)
+      }
     });
 
-    return NextResponse.json({ item: formatQuotation(updated as Record<string, unknown>) });
+    return apiSuccess({ item: formatQuotation(updated as Record<string, unknown>) });
   } catch (error) {
+    console.error("PATCH Quotation Error:", error);
     if (error instanceof Error) {
       const msg = error.message;
       if (msg === "UNAUTHORIZED" || msg === "FORBIDDEN") {
-        return authErrorResponse(error, "Failed to update quotation");
+        return apiError("Forbidden", 403);
       }
       if (
         msg.startsWith("At least one page") ||
@@ -358,10 +366,10 @@ export async function PATCH(req: Request, ctx: RouteCtx) {
         msg.startsWith("Client not found") ||
         msg.startsWith("Primary company")
       ) {
-        return NextResponse.json({ message: msg }, { status: 400 });
+        return apiError(msg, 400);
       }
     }
-    return authErrorResponse(error, "Failed to update quotation");
+    return apiError("Failed to update quotation", 500);
   }
 }
 
@@ -376,10 +384,10 @@ export async function DELETE(_req: Request, ctx: RouteCtx) {
         await assertEmployeeCanAccessQuotation(session.user.id, quotationId);
       } catch (e) {
         if (e instanceof Error && e.message === "FORBIDDEN") {
-          return NextResponse.json({ message: "Forbidden" }, { status: 403 });
+          return apiError("Forbidden", 403);
         }
         if (e instanceof Error && e.message === "NOT_FOUND") {
-          return NextResponse.json({ message: "Quotation not found" }, { status: 404 });
+          return apiError("Quotation not found", 404);
         }
         throw e;
       }
@@ -389,31 +397,29 @@ export async function DELETE(_req: Request, ctx: RouteCtx) {
       quotationId: new mongoose.Types.ObjectId(quotationId),
     });
     if (poCount > 0) {
-      return NextResponse.json(
-        {
-          message:
-            "This quotation cannot be deleted because purchase orders are linked to it.",
-        },
-        { status: 400 }
+      return apiError(
+        "This quotation cannot be deleted because purchase orders are linked to it.",
+        400
       );
     }
 
     const deleted = await QuotationModel.findByIdAndDelete(quotationId).lean();
     if (!deleted) {
-      return NextResponse.json({ message: "Quotation not found" }, { status: 404 });
+      return apiError("Quotation not found", 404);
     }
 
     await logActivity({
       userId: session.user.id,
-      action: "deleted_quotation",
-      entityType: "quotation",
+      action: "QUOTATION_DELETED",
+      entityType: "Quotation",
       entityId: String(deleted._id),
       message: `Deleted quotation ${deleted.quotationNumber}`,
       projectId: String(deleted.projectId),
     });
 
-    return NextResponse.json({ ok: true });
+    return apiSuccess({ ok: true });
   } catch (error) {
-    return authErrorResponse(error, "Failed to delete quotation");
+    console.error("DELETE Quotation Error:", error);
+    return apiError("Failed to delete quotation", 500);
   }
 }

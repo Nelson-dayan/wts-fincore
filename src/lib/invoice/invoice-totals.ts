@@ -1,4 +1,6 @@
 /** Pure totals helper — safe for Client Components (no Mongoose / Node-only APIs). */
+import { computeTotals } from "@/lib/finance/engine";
+
 
 export type InvoiceTotalsLine = {
   number: number;
@@ -15,16 +17,10 @@ export function computeInvoiceTotals(
   taxRatePercent: number,
   taxEnabled: boolean
 ): { subtotal: number; tax: number; total: number } {
-  let subtotal = 0;
-  for (const p of pages) {
-    for (const row of p.items) {
-      const qty = Number(row.quantity) || 0;
-      const rate = Number(row.price) || 0;
-      subtotal += qty * rate;
-    }
-  }
-  const rate = Math.max(0, taxRatePercent);
-  const tax = taxEnabled ? Math.round(subtotal * (rate / 100) * 100) / 100 : 0;
-  const total = Math.round((subtotal + tax) * 100) / 100;
-  return { subtotal, tax, total };
+  const items = pages.flatMap(p => p.items).map(item => ({
+    quantity: Number(item.quantity) || 0,
+    unitPrice: Number(item.price) || 0
+  }));
+
+  return computeTotals(items, 0, taxEnabled ? taxRatePercent : 0);
 }

@@ -13,6 +13,8 @@ import {
 } from "@/lib/db/models";
 import { requireRole } from "@/lib/auth/require-role";
 import { decimalToNumber } from "@/lib/services/business/money";
+import { apiSuccess, apiError } from "@/lib/api/response";
+
 
 function monthKey(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
@@ -117,7 +119,7 @@ export async function GET() {
       severity: inv.status === "OVERDUE" ? "high" : "medium"
     }));
 
-    return NextResponse.json({
+    return apiSuccess({
       users,
       clients,
       projects,
@@ -140,9 +142,6 @@ export async function GET() {
     });
   } catch (error) {
     console.error("Overview error:", error);
-    return NextResponse.json(
-      { message: "Failed to load admin overview" },
-      { status: 500 }
-    );
+    return apiError("Failed to load admin overview", 500);
   }
 }
