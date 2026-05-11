@@ -33,5 +33,3 @@ export const expenseSchema = new Schema(
 );
 
 expenseSchema.index({ projectId: 1, category: 1, createdAt: -1 });
-expenseSchema.index({ companyId: 1 });
-expenseSchema.index({ isDeleted: 1 });

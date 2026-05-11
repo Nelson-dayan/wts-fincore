@@ -11,19 +11,8 @@ import {
   ArrowUpRight,
   ArrowDownRight
 } from "lucide-react";
-import { 
-  AreaChart, 
-  Area, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
-  ResponsiveContainer,
-  BarChart,
-  Bar,
-  Cell
-} from "recharts";
 import { motion, AnimatePresence } from "framer-motion";
+import dynamic from "next/dynamic";
 import { DashboardPageHeader } from "@/components/dashboard/page-header";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -58,12 +47,24 @@ type ReportData = {
   timeSeries: TimeSeriesItem[];
 };
 
+const RevenueAreaChart = dynamic(() => import("@/components/charts/revenue-area-chart"), { 
+  ssr: false,
+  loading: () => <div className="h-[300px] w-full flex items-center justify-center text-muted-foreground text-xs uppercase font-bold tracking-widest">Loading Revenue Trends...</div>
+});
+
+const ProjectsBarChart = dynamic(() => import("@/components/charts/projects-bar-chart"), { 
+  ssr: false,
+  loading: () => <div className="h-[300px] w-full flex items-center justify-center text-muted-foreground text-xs uppercase font-bold tracking-widest">Loading Projects...</div>
+});
+
 export function AdminProfitabilityClient() {
   const [data, setData] = useState<ReportData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    const timer = setTimeout(() => setMounted(true), 100);
     async function load() {
       setLoading(true);
       try {
@@ -78,6 +79,7 @@ export function AdminProfitabilityClient() {
       }
     }
     load();
+    return () => clearTimeout(timer);
   }, []);
 
   const formatBase = (n: number) => {
@@ -184,7 +186,7 @@ export function AdminProfitabilityClient() {
       {/* Charts Area */}
       <div className="grid gap-6 lg:grid-cols-3">
         {/* Revenue Area Chart */}
-        <Card className="lg:col-span-2 border-border/60 shadow-xl overflow-hidden">
+        <Card className="lg:col-span-2 border-border/60 shadow-xl overflow-hidden min-w-0">
           <CardHeader className="flex flex-row items-center justify-between pb-8">
             <div>
               <CardTitle className="text-base font-bold">Revenue vs Expenses</CardTitle>
@@ -195,111 +197,26 @@ export function AdminProfitabilityClient() {
               <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-red-500" /> Expenses</div>
             </div>
           </CardHeader>
-          <CardContent className="h-[300px] w-full pr-4">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={data?.timeSeries || []} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="colorRev" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0}/>
-                  </linearGradient>
-                  <linearGradient id="colorExp" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#ef4444" stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor="#ef4444" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
-                <XAxis 
-                  dataKey="month" 
-                  axisLine={false} 
-                  tickLine={false} 
-                  tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))", fontWeight: 600 }}
-                />
-                <YAxis 
-                  axisLine={false} 
-                  tickLine={false} 
-                  tickFormatter={(val) => formatCompact(val)}
-                  tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))", fontWeight: 600 }}
-                />
-                <Tooltip 
-                  content={({ active, payload }) => {
-                    if (active && payload && payload.length) {
-                      return (
-                        <div className="bg-background border border-border/60 p-3 rounded-xl shadow-2xl backdrop-blur-md">
-                          <p className="text-[10px] font-bold uppercase tracking-widest mb-2">{payload[0].payload.month}</p>
-                          <div className="space-y-1">
-                            <p className="text-xs font-bold text-primary flex justify-between gap-4">
-                              <span>Revenue:</span> <span>{formatBase(payload[0].value as number)}</span>
-                            </p>
-                            <p className="text-xs font-bold text-red-500 flex justify-between gap-4">
-                              <span>Expenses:</span> <span>{formatBase(payload[1].value as number)}</span>
-                            </p>
-                          </div>
-                        </div>
-                      );
-                    }
-                    return null;
-                  }}
-                />
-                <Area 
-                  type="monotone" 
-                  dataKey="revenue" 
-                  stroke="hsl(var(--primary))" 
-                  strokeWidth={3}
-                  fillOpacity={1} 
-                  fill="url(#colorRev)" 
-                />
-                <Area 
-                  type="monotone" 
-                  dataKey="expenses" 
-                  stroke="#ef4444" 
-                  strokeWidth={3}
-                  fillOpacity={1} 
-                  fill="url(#colorExp)" 
-                />
-              </AreaChart>
-            </ResponsiveContainer>
+          <CardContent className="h-[300px] w-full relative">
+            <RevenueAreaChart 
+              data={data?.timeSeries || []} 
+              formatCurrency={formatBase}
+              xAxisKey="month"
+            />
           </CardContent>
         </Card>
 
         {/* Top Projects Bar Chart */}
-        <Card className="border-border/60 shadow-xl overflow-hidden">
+        <Card className="border-border/60 shadow-xl overflow-hidden min-w-0">
           <CardHeader>
             <CardTitle className="text-base font-bold">Top Performing Projects</CardTitle>
             <CardDescription>By net profit contribution</CardDescription>
           </CardHeader>
-          <CardContent className="h-[300px] w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={topProfitItems} layout="vertical" margin={{ top: 0, right: 30, left: 40, bottom: 0 }}>
-                <XAxis type="number" hide />
-                <YAxis 
-                  dataKey="name" 
-                  type="category" 
-                  axisLine={false} 
-                  tickLine={false}
-                  tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))", fontWeight: 600 }}
-                  width={80}
-                />
-                <Tooltip 
-                  cursor={{ fill: 'hsl(var(--muted)/0.3)' }}
-                  content={({ active, payload }) => {
-                    if (active && payload && payload.length) {
-                      return (
-                        <div className="bg-background border border-border/60 p-2 rounded-lg shadow-xl text-xs font-bold">
-                          {formatBase(payload[0].value as number)}
-                        </div>
-                      );
-                    }
-                    return null;
-                  }}
-                />
-                <Bar dataKey="profit" radius={[0, 4, 4, 0]}>
-                  {topProfitItems.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={index === 0 ? "hsl(var(--primary))" : "hsl(var(--primary)/0.6)"} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
+          <CardContent className="h-[300px] w-full relative">
+            <ProjectsBarChart 
+              data={topProfitItems} 
+              formatCurrency={formatBase}
+            />
           </CardContent>
         </Card>
       </div>

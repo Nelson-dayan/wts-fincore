@@ -20,7 +20,7 @@ export const companySchema = new Schema(
       aedToInr: { type: Number, default: 22.7 },
       isLocked: { type: Boolean, default: false },
     },
-    isPrimary: { type: Boolean, default: false, index: true },
+    isPrimary: { type: Boolean, default: false },
   },
   schemaOptions
 );

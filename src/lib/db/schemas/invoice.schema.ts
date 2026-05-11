@@ -107,4 +107,3 @@ export const invoiceSchema = new Schema(
 invoiceSchema.index({ companyId: 1, invoiceNumber: 1 }, { unique: true });
 invoiceSchema.index({ companyId: 1, projectId: 1, status: 1, dueDate: 1 });
 invoiceSchema.index({ poId: 1, createdAt: -1 });
-invoiceSchema.index({ isDeleted: 1 });

@@ -18,16 +18,8 @@ import {
   TrendingUp,
   ArrowRight
 } from "lucide-react";
-import { 
-  AreaChart, 
-  Area, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
-  ResponsiveContainer 
-} from "recharts";
 import { motion, AnimatePresence } from "framer-motion";
+import dynamic from "next/dynamic";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { DashboardPageHeader } from "@/components/dashboard/page-header";
@@ -105,6 +97,11 @@ const quickLinks: Array<{ href: string; label: string }> = [
   { href: "/admin/expenses", label: "Expenses" },
 ];
 
+const RevenueAreaChart = dynamic(() => import("@/components/charts/revenue-area-chart"), { 
+  ssr: false,
+  loading: () => <div className="h-[280px] w-full flex items-center justify-center text-muted-foreground text-xs uppercase font-bold tracking-widest">Loading Analytics...</div>
+});
+
 function formatCount(n: number): string {
   return n.toLocaleString();
 }
@@ -113,8 +110,10 @@ export function AdminOverviewClient() {
   const [data, setData] = useState<AdminOverview | null>(null);
   const [error, setError] = useState<string>("");
   const [loading, setLoading] = useState(true);
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    const timer = setTimeout(() => setMounted(true), 100);
     async function load() {
       try {
         const response = await fetch("/api/admin/overview", { cache: "no-store" });
@@ -128,6 +127,7 @@ export function AdminOverviewClient() {
       }
     }
     load();
+    return () => clearTimeout(timer);
   }, []);
 
   const formatBase = (n: number) => {
@@ -234,7 +234,7 @@ export function AdminOverviewClient() {
           <p className="mt-1 text-sm text-muted-foreground">Real-time revenue vs expense tracking.</p>
         </div>
         <div className="grid gap-6 lg:grid-cols-3">
-          <Card className="lg:col-span-2 border-border/60 shadow-xl overflow-hidden bg-background">
+          <Card className="lg:col-span-2 border-border/60 shadow-xl overflow-hidden bg-background min-w-0">
             <CardHeader className="pb-8">
               <div className="flex items-center justify-between">
                 <div>
@@ -247,46 +247,12 @@ export function AdminOverviewClient() {
                 </div>
               </div>
             </CardHeader>
-            <CardContent className="h-[280px] w-full pr-4">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={data?.timeSeries || []} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="colorRev" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3}/>
-                      <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0}/>
-                    </linearGradient>
-                    <linearGradient id="colorExp" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#ef4444" stopOpacity={0.3}/>
-                      <stop offset="95%" stopColor="#ef4444" stopOpacity={0}/>
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
-                  <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} />
-                  <YAxis axisLine={false} tickLine={false} tickFormatter={(val) => `₹${(val / 1000).toFixed(0)}k`} tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} />
-                  <Tooltip 
-                    content={({ active, payload }) => {
-                      if (active && payload && payload.length) {
-                        return (
-                          <div className="bg-background border border-border/60 p-3 rounded-xl shadow-2xl">
-                            <p className="text-[10px] font-bold uppercase tracking-widest mb-2">{payload[0].payload.label}</p>
-                            <div className="space-y-1">
-                              <p className="text-xs font-bold text-primary flex justify-between gap-4">
-                                <span>Revenue:</span> <span>{formatBase(payload[0].value as number)}</span>
-                              </p>
-                              <p className="text-xs font-bold text-red-500 flex justify-between gap-4">
-                                <span>Expenses:</span> <span>{formatBase(payload[1].value as number)}</span>
-                              </p>
-                            </div>
-                          </div>
-                        );
-                      }
-                      return null;
-                    }}
-                  />
-                  <Area type="monotone" dataKey="revenue" stroke="hsl(var(--primary))" strokeWidth={3} fillOpacity={1} fill="url(#colorRev)" />
-                  <Area type="monotone" dataKey="expenses" stroke="#ef4444" strokeWidth={3} fillOpacity={1} fill="url(#colorExp)" />
-                </AreaChart>
-              </ResponsiveContainer>
+            <CardContent className="h-[280px] w-full relative">
+              <RevenueAreaChart 
+                data={data?.timeSeries || []} 
+                formatCurrency={formatBase}
+                xAxisKey="label"
+              />
             </CardContent>
           </Card>
 
