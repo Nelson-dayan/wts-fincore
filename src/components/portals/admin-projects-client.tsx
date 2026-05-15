@@ -16,7 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import { readResponseJson } from "@/lib/http/read-response-json";
+import { apiFetch } from "@/lib/api/client";
 import { cn } from "@/lib/utils/cn";
 
 type ProjectRow = {
@@ -79,9 +79,11 @@ export function AdminProjectsClient({ initialClientId = "" }: { initialClientId?
         q: nextQuery,
       });
       if (initialClientId) qs.set("clientId", initialClientId);
-      const response = await fetch(`/api/admin/projects?${qs.toString()}`, { cache: "no-store" });
-      const payload = await readResponseJson<{ items?: ProjectRow[]; total?: number; message?: string }>(response);
-      if (!response.ok) throw new Error(payload.message ?? "Failed to load projects");
+      const payload = await apiFetch<{ 
+        items?: ProjectRow[]; 
+        total?: number;
+      }>(`/api/admin/projects?${qs.toString()}`);
+      
       setItems(payload.items ?? []);
       setTotal(payload.total ?? 0);
     } catch (e) {

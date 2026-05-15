@@ -12,7 +12,7 @@ import { InvoiceSecDocument, type InvoiceDocData } from "@/components/invoices/i
 import { aedAmountInWords } from "@/lib/invoice/aed-amount-words";
 import { computeInvoiceTotals } from "@/lib/invoice/invoice-totals";
 import { exportInvoicePdf } from "@/utils/exportPdf";
-import { readResponseJson } from "@/lib/http/read-response-json";
+import { apiFetch } from "@/lib/api/client";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SaveSuccessToast } from "@/components/ui/save-success-toast";
 import { usePortalConfig } from "@/components/portals/portal-config-context";
@@ -73,9 +73,7 @@ export function AdminInvoiceDetailClient({
         : `${apiPrefix}/invoices/template?poId=${encodeURIComponent(
             String(poId ?? "")
           )}&invoiceType=${encodeURIComponent(invoiceType)}`;
-      const res = await fetch(endpoint, { cache: "no-store" });
-      const data = await readResponseJson<{ item?: Item; message?: string }>(res);
-      if (!res.ok) throw new Error(data.message ?? "Failed to load");
+      const data = await apiFetch<{ item?: Item }>(endpoint);
       if (!data.item) throw new Error("Missing invoice");
       setItem(data.item as Item);
     } catch (e) {
@@ -170,34 +168,30 @@ export function AdminInvoiceDetailClient({
           branding: item.branding,
         };
       if (!invoiceId) {
-        const createRes = await fetch(`${apiPrefix}/invoices`, {
+        const createJson = await apiFetch<{ id?: string }>("/api/admin/invoices", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ poId: item.poId, invoiceType: item.invoiceType ?? invoiceType }),
         });
-        const createJson = await readResponseJson<{ id?: string; message?: string }>(createRes);
-        if (!createRes.ok) throw new Error(createJson.message ?? "Create failed");
         const createdId = String(createJson.id ?? "").trim();
         if (!createdId) throw new Error("Missing invoice id");
-        const patchRes = await fetch(`${apiPrefix}/invoices/${createdId}`, {
+
+        await apiFetch(`/api/admin/invoices/${createdId}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
         });
-        const patchJson = await readResponseJson<{ message?: string }>(patchRes);
-        if (!patchRes.ok) throw new Error(patchJson.message ?? "Save failed");
+
         setMsg("Saved.");
         router.replace(`${pathPrefix}/invoices/${createdId}`);
         return true;
       }
 
-      const res = await fetch(`${apiPrefix}/invoices/${invoiceId}`, {
+      await apiFetch(`${apiPrefix}/invoices/${invoiceId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      const data = await readResponseJson<{ message?: string }>(res);
-      if (!res.ok) throw new Error(data.message ?? "Save failed");
       showSaveSuccess();
       await load();
       return true;

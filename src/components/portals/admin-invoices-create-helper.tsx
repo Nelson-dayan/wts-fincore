@@ -15,7 +15,7 @@ import {
   invoiceCountAtOrOverCap,
   MAX_INVOICES_PER_PURCHASE_ORDER,
 } from "@/lib/invoice/invoice-limits";
-import { readResponseJson } from "@/lib/http/read-response-json";
+import { apiFetch } from "@/lib/api/client";
 import { usePortalConfig } from "@/components/portals/portal-config-context";
 import { cn } from "@/lib/utils/cn";
 
@@ -50,23 +50,18 @@ export function AdminInvoicesCreateHelper({
     }
     const startedAt = Date.now();
     try {
-      const qs = new URLSearchParams({ page: "1", limit: "25", q: "" });
-      qs.set("projectId", selectedProjectId);
-      const res = await fetch(`${apiPrefix}/purchase-orders?${qs}`, { cache: "no-store" });
-      const data = await readResponseJson<{ items?: PoRow[]; message?: string }>(res);
-      if (!res.ok) throw new Error(data.message ?? "Could not load POs");
-      const list = data.items ?? [];
+      const qs = new URLSearchParams({ page: "1", limit: "50", projectId: selectedProjectId });
+      const payload = await apiFetch<{ items?: PoRow[] }>(`${apiPrefix}/purchase-orders?${qs.toString()}`);
+      const list = payload.items ?? [];
       setPos(list);
 
       const counts: Record<string, number> = {};
       for (const p of list) {
         try {
-          const ir = await fetch(
-            `${apiPrefix}/invoices?poId=${encodeURIComponent(p._id)}&page=1&limit=10&q=`,
-            { cache: "no-store" }
+          const ij = await apiFetch<{ total?: number }>(
+            `${apiPrefix}/invoices?poId=${encodeURIComponent(p._id)}&page=1&limit=10&q=`
           );
-          const ij = await readResponseJson<{ total?: number }>(ir);
-          counts[p._id] = ir.ok && typeof ij.total === "number" ? ij.total : 0;
+          counts[p._id] = typeof ij.total === "number" ? ij.total : 0;
         } catch {
           counts[p._id] = 0;
         }
@@ -266,9 +261,10 @@ export function AdminInvoicesCreateHelper({
                   setReminding(true);
                   setReminderMsg("");
                   try {
-                    const res = await fetch(`${apiPrefix}/jobs/invoice-reminders`, { method: "POST" });
-                    const data = await res.json();
-                    if (!res.ok) throw new Error(data.message || "Failed to trigger reminders");
+                    const data = await apiFetch<{ details?: { remindersSent?: number } }>(
+                      `${apiPrefix}/jobs/invoice-reminders`,
+                      { method: "POST" }
+                    );
                     setReminderMsg(`Success: ${data.details?.remindersSent || 0} reminders processed.`);
                     router.refresh();
                   } catch (e) {

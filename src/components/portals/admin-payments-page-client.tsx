@@ -10,6 +10,7 @@ import { Select } from "@/components/ui/select";
 import { ProjectSearchPicker } from "@/components/portals/project-search-picker";
 import { InvoiceRow, InvoiceSearchPicker } from "@/components/portals/invoice-search-picker";
 
+import { apiFetch } from "@/lib/api/client";
 import { DashboardPageHeader } from "@/components/dashboard/page-header";
 import { usePortalConfig } from "@/components/portals/portal-config-context";
 import { PaymentDetailModal } from "@/components/portals/payment-detail-modal";
@@ -80,12 +81,9 @@ export function AdminPaymentsPageClient({ apiPrefix }: { apiPrefix: string }) {
 
     setInvoicesLoading(true);
     try {
-      const qs = new URLSearchParams({ page: "1", limit: "50", projectId });
-      const res = await fetch(`${apiPrefix}/invoices?${qs.toString()}`, {
-        cache: "no-store",
-      });
-      const data = await res.json();
-      if (res.ok && data.items) {
+      const qs = new URLSearchParams({ page: "1", limit: "100", projectId });
+      const data = await apiFetch<{ items?: InvoiceRow[] }>(`${apiPrefix}/invoices?${qs.toString()}`);
+      if (data.items) {
         setProjectInvoices(data.items);
       }
     } catch (err) {
@@ -308,21 +306,48 @@ export function AdminPaymentsPageClient({ apiPrefix }: { apiPrefix: string }) {
                   </div>
                 )}
 
-                <div className="space-y-4">
+                <div className="space-y-5">
                   <div className="space-y-2.5">
                     <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                      Search & Select Invoice
+                      1. Search Project
                     </Label>
-                    <InvoiceSearchPicker
-                      id="invoice-search"
-                      value={selectedInvoice?._id || ""}
-                      onChange={(inv) => {
-                        if (inv) handleInvoiceSelect(inv._id);
-                        else setSelectedInvoice(null);
-                      }}
-                      helperText="Type the invoice number (e.g. INV-001) to find it instantly."
+                    <ProjectSearchPicker
+                      id="project-search"
+                      value={selectedProjectId}
+                      onChange={handleProjectSelect}
+                      helperText="Find the project this payment belongs to."
                     />
                   </div>
+
+                  {selectedProjectId && (
+                    <div className="space-y-2.5 animate-in fade-in slide-in-from-top-2 duration-300">
+                      <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                        2. Select Invoice
+                      </Label>
+                      {invoicesLoading ? (
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground py-2">
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          <span>Loading invoices...</span>
+                        </div>
+                      ) : projectInvoices.length === 0 ? (
+                        <div className="p-3 rounded-lg border border-dashed text-sm text-muted-foreground">
+                          No invoices found for this project.
+                        </div>
+                      ) : (
+                        <Select
+                          value={selectedInvoice?._id || ""}
+                          onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleInvoiceSelect(e.target.value)}
+                          options={[
+                            { value: "", label: "Choose invoice..." },
+                            ...projectInvoices.map(inv => ({
+                              value: inv._id,
+                              label: `${inv.invoiceNumber} (${inv.invoiceType === "usd" ? "USD" : "AED"} ${inv.total?.toLocaleString()}) · ${inv.status}`
+                            }))
+                          ]}
+                        />
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 {selectedInvoice && (

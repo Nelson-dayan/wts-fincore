@@ -10,11 +10,20 @@ export async function apiFetch<T>(
     throw new Error(`HTTP error ${response.status}`);
   }
 
-  const json: ApiResponse<T> = await response.json();
+  const json = await response.json();
 
-  if (!json.success) {
-    throw new Error(json.error?.message || "Request failed");
+  // If the response follows the { success: boolean, data: T, error: ... } pattern
+  if (json && typeof json === "object" && "success" in json) {
+    if (!json.success) {
+      throw new Error(json.error?.message || json.message || "Request failed");
+    }
+    return json.data as T;
   }
 
-  return json.data;
+  // Otherwise, if it's a successful raw response, return it as T
+  if (response.ok) {
+    return json as T;
+  }
+
+  throw new Error(json.message || json.error?.message || "Request failed");
 }

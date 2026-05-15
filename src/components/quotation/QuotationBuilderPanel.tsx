@@ -377,16 +377,19 @@ export function QuotationBuilderPanel({
         }),
       });
       const json = await readResponseJson<{
-        message?: string;
-        item?: { _id?: string; quotationNumber?: string };
+        success?: boolean;
+        data?: { item?: { _id?: string; quotationNumber?: string } };
+        error?: { message?: string };
       }>(res);
+
       if (!res.ok) {
+        const errorMsg = json.error?.message || "save failed";
         if (res.status === 401 || res.status === 403) {
           setSaveNotice(
             `${localMsg} You don't have permission to save this quotation to the database.`
           );
         } else {
-          setSaveNotice(`${localMsg} Database: ${json.message ?? "save failed"}.`);
+          setSaveNotice(`${localMsg} Database: ${errorMsg}.`);
         }
         saveNoticeTimerRef.current = setTimeout(() => {
           setSaveNotice(null);
@@ -402,8 +405,8 @@ export function QuotationBuilderPanel({
       }
       skipNextLocalPersistRef.current = true;
 
-      const qid = String(json.item?._id ?? "");
-      const qn = String(json.item?.quotationNumber ?? "");
+      const qid = String(json.data?.item?._id ?? "");
+      const qn = String(json.data?.item?.quotationNumber ?? "");
       const created = res.status === 201;
       onDbSaveSuccess?.({
         quotationId: qid,

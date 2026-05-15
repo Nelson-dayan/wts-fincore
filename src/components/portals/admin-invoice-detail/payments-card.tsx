@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { decimalToNumber } from "@/lib/services/business/money";
-import { readResponseJson } from "@/lib/http/read-response-json";
+import { apiFetch } from "@/lib/api/client";
 import { usePortalConfig } from "@/components/portals/portal-config-context";
 
 interface PaymentRow {
@@ -81,12 +81,11 @@ export function PaymentsCard({
     if (!invoiceId) return;
     setLoading(true);
     try {
-      const res = await fetch(`${apiPrefix}/payments?invoiceId=${invoiceId}&page=${currentPage}&limit=${limit}`);
-      const data = await res.json();
-      if (res.ok) {
-        setPayments(data.items || []);
-        setHasMore(data.hasMore);
-      }
+      const data = await apiFetch<{ items?: PaymentRow[]; hasMore?: boolean }>(
+        `${apiPrefix}/payments?invoiceId=${invoiceId}&page=${currentPage}&limit=${limit}`
+      );
+      setPayments(data.items || []);
+      setHasMore(data.hasMore ?? false);
     } catch (e) {
       console.error(e);
     } finally {
@@ -188,19 +187,11 @@ export function PaymentsCard({
         fees: optimisticPayment.fees
       };
 
-      const res = await fetch(`${apiPrefix}/payments`, {
+      const data = await apiFetch<{ item: { _id: string } }>(`${apiPrefix}/payments`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
       });
-      const data = await readResponseJson(res);
-      
-      if (!res.ok) {
-        throw new Error(
-          (typeof data === "object" && data !== null ? (data as ApiMessage).message : undefined) ||
-            "Failed to record payment"
-        );
-      }
       
       // Replace temp ID with real ID from server
       const typedData = data as { item: { _id: string } };

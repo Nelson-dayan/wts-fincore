@@ -4,7 +4,7 @@ import { useCallback, useState } from "react";
 import { Loader2, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { readResponseJson } from "@/lib/http/read-response-json";
+import { apiFetch } from "@/lib/api/client";
 import { cn } from "@/lib/utils/cn";
 import { usePortalConfig } from "@/components/portals/portal-config-context";
 
@@ -53,16 +53,14 @@ export function InvoiceSearchPicker({
     setError(null);
     try {
       const qs = new URLSearchParams({ page: "1", limit: "20", q });
-      const res = await fetch(`${apiPrefix}/invoices?${qs.toString()}`, {
-        cache: "no-store",
-      });
-      const payload = await readResponseJson<{
+      const payload = await apiFetch<{
         items?: InvoiceRow[];
-        message?: string;
-      }>(res);
-      if (!res.ok) throw new Error(payload.message ?? "Search failed");
+        total?: number;
+      }>(`${apiPrefix}/invoices?${qs.toString()}`);
+
+      const items = payload.items ?? [];
       setResults(
-        (payload.items ?? []).map((p) => ({
+        items.map((p) => ({
           _id: String(p._id),
           invoiceNumber: String(p.invoiceNumber ?? ""),
           status: p.status,
