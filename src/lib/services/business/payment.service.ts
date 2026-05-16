@@ -152,7 +152,7 @@ export async function recordPayment(input: RecordPaymentInput) {
         { session }
       );
 
-      const { status } = await updateInvoiceCache(input.invoiceId, session);
+      const { status, summary } = await updateInvoiceCache(input.invoiceId, session);
 
       const paymentId = String(payment[0]?._id ?? "");
 
@@ -174,6 +174,7 @@ export async function recordPayment(input: RecordPaymentInput) {
       result = {
         paymentId,
         invoiceStatus: status,
+        summary
       };
     });
 

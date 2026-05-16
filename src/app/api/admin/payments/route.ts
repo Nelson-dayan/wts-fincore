@@ -86,7 +86,12 @@ export async function POST(req: Request) {
     body.createdBy = session.user.id;
     
     const result = await recordPayment(body);
-    return NextResponse.json(result, { status: 201 });
+    return NextResponse.json({ 
+      item: { 
+        ...result, 
+        _id: result.paymentId 
+      } 
+    }, { status: 201 });
   } catch (error) {
     return authErrorResponse(error, "Failed to record payment");
   }

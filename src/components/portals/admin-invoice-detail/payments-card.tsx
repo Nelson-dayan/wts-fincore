@@ -194,10 +194,12 @@ export function PaymentsCard({
       });
       
       // Replace temp ID with real ID from server
-      const typedData = data as { item: { _id: string } };
-      setPayments(prev => 
-        prev.map(p => p._id === tempId ? { ...p, _id: typedData.item._id } : p)
-      );
+      const typedData = data as { item?: { _id: string } };
+      if (typedData.item?._id) {
+        setPayments(prev => 
+          prev.map(p => p._id === tempId ? { ...p, _id: typedData.item!._id } : p)
+        );
+      }
       
       // Reset form
       setIntendedAmount(0);
