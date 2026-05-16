@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Dropdown } from "@/components/ui/select";
 import { cn } from "@/lib/utils/cn";
 import { UploadCard } from "@/components/ui/upload-card";
+import { SUPPORTED_CURRENCIES } from "@/lib/constants/finance";
 import type { QuotationData, QuotationItem, QuotationPage } from "@/types/quotation-generator";
 
 export type QuotationFormProps = {
@@ -261,13 +262,7 @@ export function QuotationForm({
                   onChange={(e) => patch({ currency: e.target.value.toUpperCase() })}
                   disabled={isCurrencyLocked}
                   className={cn(isCurrencyLocked && "bg-muted cursor-not-allowed")}
-                  options={[
-                    { value: "AED", label: "AED" },
-                    { value: "INR", label: "INR" },
-                    { value: "USD", label: "USD" },
-                    { value: "EUR", label: "EUR" },
-                    { value: "GBP", label: "GBP" },
-                  ]}
+                  options={[...SUPPORTED_CURRENCIES]}
                 />
               </div>
 

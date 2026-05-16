@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { format } from "date-fns";
 import { Plus, CreditCard, RotateCcw, X, ChevronLeft, ChevronRight, Lock, Unlock, Calculator } from "lucide-react";
+import { SUPPORTED_CURRENCIES } from "@/lib/constants/finance";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
@@ -315,10 +316,7 @@ export function PaymentsCard({
                       value={currency} 
                       onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleCurrencyChange(e.target.value)}
                       disabled={fixCurrency}
-                      options={[
-                        {value: "AED", label: "AED"},
-                        {value: "USD", label: "USD"}
-                      ]}
+                      options={[...SUPPORTED_CURRENCIES]}
                     />
                   </div>
                   <div className="space-y-2.5">

@@ -11,6 +11,7 @@ import { ProjectSearchPicker } from "@/components/portals/project-search-picker"
 import { InvoiceRow, InvoiceSearchPicker } from "@/components/portals/invoice-search-picker";
 
 import { apiFetch } from "@/lib/api/client";
+import { SUPPORTED_CURRENCIES } from "@/lib/constants/finance";
 import { DashboardPageHeader } from "@/components/dashboard/page-header";
 import { usePortalConfig } from "@/components/portals/portal-config-context";
 import { PaymentDetailModal } from "@/components/portals/payment-detail-modal";
@@ -413,10 +414,7 @@ export function AdminPaymentsPageClient({ apiPrefix }: { apiPrefix: string }) {
                           value={currency}
                           onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleCurrencyChange(e.target.value)}
                           disabled={!!selectedInvoice?.fixCurrency}
-                          options={[
-                            { value: "AED", label: "AED" },
-                            { value: "USD", label: "USD" },
-                          ]}
+                          options={[...SUPPORTED_CURRENCIES]}
                         />
                       </div>
                       <div className="space-y-2.5">

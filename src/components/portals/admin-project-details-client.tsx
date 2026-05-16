@@ -12,6 +12,7 @@ import { readResponseJson } from "@/lib/http/read-response-json";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { SaveSuccessToast } from "@/components/ui/save-success-toast";
 import { AdminInvoicesCreateHelper } from "@/components/portals/admin-invoices-create-helper";
+import { SUPPORTED_CURRENCIES } from "@/lib/constants/finance";
 import { usePortalConfig } from "@/components/portals/portal-config-context";
 import { useSaveFeedback } from "@/lib/hooks/use-save-feedback";
 
@@ -364,10 +365,7 @@ export function AdminProjectDetailsClient({
                     <Select
                       value={form.currency}
                       onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setForm((f) => ({ ...f, currency: e.target.value }))}
-                      options={[
-                        { value: "AED", label: "AED" },
-                        { value: "USD", label: "USD" },
-                      ]}
+                      options={[...SUPPORTED_CURRENCIES]}
                     />
                   </div>
                   <div className="flex items-center gap-1.5 ml-2 shrink-0">
