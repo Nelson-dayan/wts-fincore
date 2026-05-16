@@ -3,7 +3,7 @@ import mongoose from "mongoose";
 import { requireRole } from "@/lib/auth/require-role";
 import { connectDB } from "@/lib/db/connect";
 import { InvoiceModel } from "@/lib/db/models";
-import { authErrorResponse } from "@/lib/api/route-auth";
+import { apiSuccess, apiError } from "@/lib/api/response";
 import { logActivity } from "@/lib/services/activity/log-activity.service";
 import { formatInvoiceForApi } from "@/lib/services/business/invoice.service";
 import { computeInvoiceTotals } from "@/lib/invoice/invoice-totals";
@@ -23,7 +23,7 @@ export async function GET(_req: Request, ctx: Ctx) {
     await connectDB();
     const { invoiceId } = await ctx.params;
     if (!mongoose.Types.ObjectId.isValid(invoiceId)) {
-      return NextResponse.json({ message: "Invalid invoice id" }, { status: 400 });
+      return apiError("Invalid invoice id", 400);
     }
     if (session.user.role === "employee") {
       try {
@@ -38,15 +38,16 @@ export async function GET(_req: Request, ctx: Ctx) {
         throw e;
       }
     }
-    const raw = await InvoiceModel.findById(invoiceId).lean();
+    const raw = await InvoiceModel.findById(invoiceId).populate("projectId", "fixCurrency").lean();
     if (!raw) {
-      return NextResponse.json({ message: "Invoice not found" }, { status: 404 });
+      return apiError("Invoice not found", 404);
     }
     const row = raw as unknown as Record<string, unknown>;
     const formatted = formatInvoiceForApi(row);
-    return NextResponse.json({ item: formatted });
+    return apiSuccess({ item: formatted });
   } catch (error) {
-    return authErrorResponse(error, "Failed to load invoice");
+    console.error("GET Invoice Error:", error);
+    return apiError("Failed to load invoice", 500);
   }
 }
 
@@ -56,7 +57,7 @@ export async function PATCH(req: Request, ctx: Ctx) {
     await connectDB();
     const { invoiceId } = await ctx.params;
     if (!mongoose.Types.ObjectId.isValid(invoiceId)) {
-      return NextResponse.json({ message: "Invalid invoice id" }, { status: 400 });
+      return apiError("Invalid invoice id", 400);
     }
 
     if (session.user.role === "employee") {
@@ -75,8 +76,10 @@ export async function PATCH(req: Request, ctx: Ctx) {
 
     const inv = await InvoiceModel.findById(invoiceId);
     if (!inv) {
-      return NextResponse.json({ message: "Invoice not found" }, { status: 404 });
+      return apiError("Invoice not found", 404);
     }
+
+    const previousStatus = inv.status;
 
     const body = (await req.json()) as {
       invoiceNumber?: string;
@@ -107,7 +110,7 @@ export async function PATCH(req: Request, ctx: Ctx) {
           _id: { $ne: inv._id },
         }).lean();
         if (clash) {
-          return NextResponse.json({ message: "Invoice number already in use" }, { status: 400 });
+          return apiError("Invoice number already in use", 400);
         }
         inv.invoiceNumber = next;
       }
@@ -234,25 +237,33 @@ export async function PATCH(req: Request, ctx: Ctx) {
     } catch (err) {
       if (err instanceof mongoose.Error.ValidationError) {
         const first = Object.values(err.errors)[0]?.message ?? err.message;
-        return NextResponse.json({ message: first || "Validation failed" }, { status: 400 });
+        return apiError(first || "Validation failed", 400);
       }
       throw err;
     }
 
     await logActivity({
       userId: session.user.id,
-      action: "updated_invoice",
-      entityType: "invoice",
+      action: previousStatus !== inv.status ? "INVOICE_STATUS_CHANGED" : "INVOICE_UPDATED",
+      entityType: "Invoice",
       entityId: String(inv._id),
-      message: `Updated invoice ${inv.invoiceNumber}`,
+      message: previousStatus !== inv.status 
+        ? `Invoice ${inv.invoiceNumber} status changed from ${previousStatus} to ${inv.status}`
+        : `Updated invoice ${inv.invoiceNumber}`,
       projectId: String(inv.projectId),
+      metadata: {
+        previous: { status: previousStatus },
+        current: { status: inv.status },
+        changedFields: Object.keys(body)
+      }
     });
 
-    return NextResponse.json({ ok: true });
+    return apiSuccess({ ok: true });
   } catch (error) {
+    console.error("PATCH Invoice Error:", error);
     if (error instanceof Error && (error.message === "UNAUTHORIZED" || error.message === "FORBIDDEN")) {
-      return authErrorResponse(error, "Forbidden");
+      return apiError("Forbidden", 403);
     }
-    return authErrorResponse(error, "Failed to update invoice");
+    return apiError("Failed to update invoice", 500);
   }
 }

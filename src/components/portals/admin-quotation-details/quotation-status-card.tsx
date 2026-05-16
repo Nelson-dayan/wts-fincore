@@ -50,8 +50,8 @@ export function QuotationStatusEditor({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: value }),
       });
-      const data = await readResponseJson<{ message?: string }>(res);
-      if (!res.ok) throw new Error(data.message ?? "Could not update status");
+      const json = await readResponseJson<{ success?: boolean; error?: { message?: string } }>(res);
+      if (!res.ok) throw new Error(json.error?.message ?? "Could not update status");
       setMsg("Status updated.");
       await onUpdated();
     } catch (e) {

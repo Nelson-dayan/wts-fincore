@@ -8,6 +8,8 @@ import { PortalNavLink } from "@/components/layout/portal-nav-link";
 import { PortalShell } from "@/components/layout/portal-shell";
 import { SignOutButton } from "@/components/portals/sign-out-button";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
+import { CommandPalette } from "@/components/portals/command-palette";
+import { CommandPaletteTrigger } from "@/components/portals/command-palette-trigger";
 
 export default async function AdminPortalLayout({
   children,
@@ -87,6 +89,20 @@ export default async function AdminPortalLayout({
               </PortalNavLink>
             </div>
           </details>
+
+          <details className="group rounded-xl border border-border/60 bg-muted/25 p-2.5 open:bg-muted/35">
+            <summary className="flex cursor-pointer list-none items-center justify-between rounded-lg px-2 py-1.5 text-[11px] font-semibold uppercase tracking-[0.2em] text-primary/90 transition-colors hover:bg-primary/10">
+              Developer
+              <span className="text-sm leading-none transition-transform duration-200 group-open:rotate-180">
+                ▾
+              </span>
+            </summary>
+            <div className="mt-2 grid gap-1.5">
+              <PortalNavLink href="/admin/style-guide" match="prefix" className="w-full justify-start">
+                Style Guide
+              </PortalNavLink>
+            </div>
+          </details>
         </nav>
       </PortalMobileDrawer>
 
@@ -148,6 +164,20 @@ export default async function AdminPortalLayout({
                 </PortalNavLink>
               </div>
             </details>
+
+            <details className="group rounded-xl border border-border/60 bg-muted/25 p-2.5 open:bg-muted/35">
+              <summary className="flex cursor-pointer list-none items-center justify-between rounded-lg px-2 py-1.5 text-[11px] font-semibold uppercase tracking-[0.2em] text-primary/90 transition-colors hover:bg-primary/10">
+                Developer
+                <span className="text-sm leading-none transition-transform duration-200 group-open:rotate-180">
+                  ▾
+                </span>
+              </summary>
+              <div className="mt-2 grid gap-1.5">
+                <PortalNavLink href="/admin/style-guide" match="prefix" className="w-full justify-start">
+                  Style Guide
+                </PortalNavLink>
+              </div>
+            </details>
           </nav>
 
           <div className="mt-auto border-t border-border/60 pt-4" />
@@ -156,15 +186,21 @@ export default async function AdminPortalLayout({
 
       <PortalShell>
         <header className="sticky top-0 z-30 hidden border-b border-border/60 bg-card/70 backdrop-blur md:block">
-          <div className="mx-auto flex w-full max-w-6xl items-center justify-end gap-2 px-4 py-3 sm:px-6">
-            <ThemeToggle />
-            <SignOutButton className="border-0 bg-transparent hover:bg-destructive/12" />
+          <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-4 px-4 py-3 sm:px-6">
+            <div className="flex-1 max-w-md">
+              <CommandPaletteTrigger />
+            </div>
+            <div className="flex items-center gap-2">
+              <ThemeToggle />
+              <SignOutButton className="border-0 bg-transparent hover:bg-destructive/12" />
+            </div>
           </div>
         </header>
         <div className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
           {children}
         </div>
       </PortalShell>
+      <CommandPalette />
     </div>
   );
 }

@@ -5,10 +5,14 @@ import Link from "next/link";
 import { DashboardPageHeader } from "@/components/dashboard/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { readResponseJson } from "@/lib/http/read-response-json";
+import { apiFetch } from "@/lib/api/client";
+import { ApiResponse } from "@/lib/types/api.types";
+
 
 type Row = Record<string, unknown> & { _id?: string };
-type ApiPayload = {
+
+/** The specific shape of the data property returned by the API */
+type ResourceData = {
   items?: Row[];
   users?: Row[];
   item?: Row | null;
@@ -16,8 +20,8 @@ type ApiPayload = {
   limit?: number;
   total?: number;
   hasMore?: boolean;
-  message?: string;
 };
+
 
 interface ResourceTableClientProps {
   title: string;
@@ -44,6 +48,10 @@ interface ResourceTableClientProps {
   showPageHeader?: boolean;
   /** Increment to refetch the list with the same endpoint (e.g. after creating a row elsewhere on the page). */
   refreshKey?: number;
+  /** Optional callback to handle row deletion. If provided, a Delete button is shown. */
+  onDelete?: (id: string) => Promise<void>;
+  /** Optional callback to handle row viewing. If provided, a View button is shown. */
+  onView?: (id: string) => void;
 }
 
 function formatCell(value: unknown): string {
@@ -57,6 +65,11 @@ function formatCell(value: unknown): string {
     return value;
   }
   if (typeof value === "object" && value !== null) {
+    const obj = value as Record<string, any>;
+    if (obj.invoiceNumber) return String(obj.invoiceNumber);
+    if (obj.name) return String(obj.name);
+    if (obj.email) return String(obj.email);
+    
     const decimalLike = value as { $numberDecimal?: string; toString?: () => string };
     if (decimalLike.$numberDecimal) return decimalLike.$numberDecimal;
     if (typeof decimalLike.toString === "function") {
@@ -81,12 +94,15 @@ export function ResourceTableClient({
     "No records match yet. Adjust search or add new data — the table updates after the list loads.",
   showPageHeader = true,
   refreshKey = 0,
+  onDelete,
+  onView,
 }: ResourceTableClientProps) {
   const detailPrefix = rowDetailPathPrefix?.replace(/\/$/, "") ?? "";
-  const hasActionsCol = Boolean(detailPrefix || (extraRowLinks && extraRowLinks.length > 0));
+  const hasActionsCol = Boolean(detailPrefix || (extraRowLinks && extraRowLinks.length > 0) || onDelete || onView);
   const [rows, setRows] = useState<Row[]>([]);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
@@ -104,23 +120,18 @@ export function ResourceTableClient({
           q: query,
         });
         const separator = endpoint.includes("?") ? "&" : "?";
-        const response = await fetch(`${endpoint}${separator}${qs.toString()}`, {
-          cache: "no-store",
-        });
-        const payload = await readResponseJson<ApiPayload>(response);
-        if (!response.ok) {
-          throw new Error(payload.message ?? "Request failed");
-        }
+        const data = await apiFetch<ResourceData>(`${endpoint}${separator}${qs.toString()}`);
 
         const loadedRows = singleItem
-          ? payload.item
-            ? [payload.item]
+          ? data.item
+            ? [data.item]
             : []
-          : payload.items ?? payload.users ?? [];
+          : data.items ?? data.users ?? [];
+
 
         if (alive) {
           setRows(loadedRows);
-          setTotal(payload.total ?? loadedRows.length);
+          setTotal(data.total ?? loadedRows.length);
         }
       } catch (e) {
         if (alive) {
@@ -251,18 +262,62 @@ export function ResourceTableClient({
                                     Open
                                   </Link>
                                 ) : null}
-                                {(extraRowLinks ?? []).map((link) => (
-                                  <Link
-                                    key={link.label}
-                                    href={link.hrefPattern.replace(
-                                      "{id}",
-                                      encodeURIComponent(String(row._id))
-                                    )}
+                                {(extraRowLinks ?? []).map((link) => {
+                                  let href = link.hrefPattern;
+                                  // Replace {id} with _id
+                                  href = href.replace("{id}", encodeURIComponent(String(row._id || "")));
+                                  
+                                  // Replace other {field} placeholders
+                                  const matches = href.match(/\{([^}]+)\}/g);
+                                  if (matches) {
+                                    matches.forEach(match => {
+                                      const field = match.slice(1, -1);
+                                      if (field !== "id" && row[field]) {
+                                        const val = typeof row[field] === 'object' && row[field] !== null 
+                                          ? (row[field] as any)._id || row[field]
+                                          : row[field];
+                                        href = href.replace(match, encodeURIComponent(String(val || "")));
+                                      }
+                                    });
+                                  }
+
+                                  return (
+                                    <Link
+                                      key={link.label}
+                                      href={href}
+                                      className="text-primary text-sm font-medium underline-offset-4 hover:underline"
+                                    >
+                                      {link.label}
+                                    </Link>
+                                  );
+                                })}
+                                {onView ? (
+                                  <button
+                                    onClick={() => onView(String(row._id))}
                                     className="text-primary text-sm font-medium underline-offset-4 hover:underline"
                                   >
-                                    {link.label}
-                                  </Link>
-                                ))}
+                                    View
+                                  </button>
+                                ) : null}
+                                {onDelete ? (
+                                  <button
+                                    disabled={deletingId === String(row._id)}
+                                    onClick={async () => {
+                                      if (!window.confirm("Are you sure you want to delete this?")) return;
+                                      setDeletingId(String(row._id));
+                                      try {
+                                        await onDelete(String(row._id));
+                                      } catch (err) {
+                                        alert(err instanceof Error ? err.message : "Delete failed");
+                                      } finally {
+                                        setDeletingId(null);
+                                      }
+                                    }}
+                                    className="text-destructive text-sm font-medium underline-offset-4 hover:underline disabled:opacity-50"
+                                  >
+                                    {deletingId === String(row._id) ? "..." : "Delete"}
+                                  </button>
+                                ) : null}
                               </span>
                             ) : (
                               "—"

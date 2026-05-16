@@ -37,14 +37,23 @@ export async function GET(req: Request) {
 
     const [items, total] = await Promise.all([
       PaymentModel.find(filter)
-      .sort({ createdAt: 1 })
+      .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit)
       .populate("createdBy", "name email")
+      .populate("invoiceId", "invoiceNumber")
       .lean(),
       PaymentModel.countDocuments(filter),
     ]);
-    return NextResponse.json({ items, page, limit, total, hasMore: skip + items.length < total });
+    // Convert Mongoose Decimal128 to numbers for React rendering
+    const sanitizedItems = JSON.parse(JSON.stringify(items), (key, value) => {
+      if (value && typeof value === 'object' && value.$numberDecimal) {
+        return parseFloat(value.$numberDecimal);
+      }
+      return value;
+    });
+
+    return NextResponse.json({ items: sanitizedItems, page, limit, total, hasMore: skip + items.length < total });
   } catch (error) {
     return authErrorResponse(error, "Failed to load payments");
   }
@@ -77,7 +86,12 @@ export async function POST(req: Request) {
     body.createdBy = session.user.id;
     
     const result = await recordPayment(body);
-    return NextResponse.json(result, { status: 201 });
+    return NextResponse.json({ 
+      item: { 
+        ...result, 
+        _id: result.paymentId 
+      } 
+    }, { status: 201 });
   } catch (error) {
     return authErrorResponse(error, "Failed to record payment");
   }

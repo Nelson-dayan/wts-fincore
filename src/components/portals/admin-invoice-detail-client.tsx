@@ -12,11 +12,12 @@ import { InvoiceSecDocument, type InvoiceDocData } from "@/components/invoices/i
 import { aedAmountInWords } from "@/lib/invoice/aed-amount-words";
 import { computeInvoiceTotals } from "@/lib/invoice/invoice-totals";
 import { exportInvoicePdf } from "@/utils/exportPdf";
-import { readResponseJson } from "@/lib/http/read-response-json";
+import { apiFetch } from "@/lib/api/client";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SaveSuccessToast } from "@/components/ui/save-success-toast";
 import { usePortalConfig } from "@/components/portals/portal-config-context";
 import { useSaveFeedback } from "@/lib/hooks/use-save-feedback";
+import { InvoiceLedgerModal } from "@/components/portals/invoice-ledger-modal";
 
 
 function toDocData(item: Item): InvoiceDocData {
@@ -24,6 +25,7 @@ function toDocData(item: Item): InvoiceDocData {
   return {
     invoiceNumber: item.invoiceNumber,
     invoiceType: item.invoiceType ?? "aed",
+    currency: item.currency,
     documentInfo: item.documentInfo,
     clientSnapshot: item.clientSnapshot,
     companySnapshot: item.companySnapshot,
@@ -56,6 +58,12 @@ export function AdminInvoiceDetailClient({
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState("");
   const [pdfExporting, setPdfExporting] = useState(false);
+  const [ledgerOpen, setLedgerOpen] = useState(false);
+  const [companyRates, setCompanyRates] = useState<{ usdToInr: number; aedToInr: number; isLocked: boolean }>({
+    usdToInr: 83.5,
+    aedToInr: 22.7,
+    isLocked: false,
+  });
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -66,9 +74,7 @@ export function AdminInvoiceDetailClient({
         : `${apiPrefix}/invoices/template?poId=${encodeURIComponent(
             String(poId ?? "")
           )}&invoiceType=${encodeURIComponent(invoiceType)}`;
-      const res = await fetch(endpoint, { cache: "no-store" });
-      const data = await readResponseJson<{ item?: Item; message?: string }>(res);
-      if (!res.ok) throw new Error(data.message ?? "Failed to load");
+      const data = await apiFetch<{ item?: Item }>(endpoint);
       if (!data.item) throw new Error("Missing invoice");
       setItem(data.item as Item);
     } catch (e) {
@@ -82,6 +88,21 @@ export function AdminInvoiceDetailClient({
   useEffect(() => {
     load().catch(() => {});
   }, [load]);
+
+  useEffect(() => {
+    fetch(`${apiPrefix}/company`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (data?.item?.defaultExchangeRates) {
+          setCompanyRates({
+            usdToInr: data.item.defaultExchangeRates.usdToInr ?? 83.5,
+            aedToInr: data.item.defaultExchangeRates.aedToInr ?? 22.7,
+            isLocked: !!data.item.defaultExchangeRates.isLocked,
+          });
+        }
+      })
+      .catch(console.error);
+  }, [apiPrefix]);
 
   const liveTotals = useMemo(() => {
     if (!item) return { subtotal: 0, tax: 0, total: 0 };
@@ -98,14 +119,15 @@ export function AdminInvoiceDetailClient({
     const manualWords = String((item.extras as Record<string, unknown>).amountInWords ?? "").trim();
     return {
       ...base,
+      currency: item.currency,
       totals: liveTotals,
       extras: {
         ...base.extras,
         amountInWords:
           manualWords ||
-          (item.invoiceType === "usd"
-            ? `${liveTotals.total.toFixed(2)} US Dollars Only.`
-            : aedAmountInWords(liveTotals.total)),
+          (item.currency === "AED"
+            ? aedAmountInWords(liveTotals.total)
+            : `${liveTotals.total.toFixed(2)} ${item.currency || "USD"} Only.`),
       },
     };
   }, [item, liveTotals]);
@@ -138,6 +160,7 @@ export function AdminInvoiceDetailClient({
         const payload = {
           invoiceNumber: item.invoiceNumber,
           invoiceType: item.invoiceType,
+          currency: item.currency,
           status: item.status,
           dueDate: item.dueDate,
           documentInfo: item.documentInfo,
@@ -148,34 +171,30 @@ export function AdminInvoiceDetailClient({
           branding: item.branding,
         };
       if (!invoiceId) {
-        const createRes = await fetch(`${apiPrefix}/invoices`, {
+        const createJson = await apiFetch<{ id?: string }>("/api/admin/invoices", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ poId: item.poId, invoiceType: item.invoiceType ?? invoiceType }),
         });
-        const createJson = await readResponseJson<{ id?: string; message?: string }>(createRes);
-        if (!createRes.ok) throw new Error(createJson.message ?? "Create failed");
         const createdId = String(createJson.id ?? "").trim();
         if (!createdId) throw new Error("Missing invoice id");
-        const patchRes = await fetch(`${apiPrefix}/invoices/${createdId}`, {
+
+        await apiFetch(`/api/admin/invoices/${createdId}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
         });
-        const patchJson = await readResponseJson<{ message?: string }>(patchRes);
-        if (!patchRes.ok) throw new Error(patchJson.message ?? "Save failed");
+
         setMsg("Saved.");
         router.replace(`${pathPrefix}/invoices/${createdId}`);
         return true;
       }
 
-      const res = await fetch(`${apiPrefix}/invoices/${invoiceId}`, {
+      await apiFetch(`${apiPrefix}/invoices/${invoiceId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      const data = await readResponseJson<{ message?: string }>(res);
-      if (!res.ok) throw new Error(data.message ?? "Save failed");
       showSaveSuccess();
       await load();
       return true;
@@ -338,6 +357,8 @@ export function AdminInvoiceDetailClient({
             onCopyBillToShip={copyBillToShip}
             onSave={() => void save()}
             onDownloadPdf={() => void downloadPdf()}
+            onOpenLedger={() => setLedgerOpen(true)}
+            companyRates={companyRates}
           />
 
           <div className="flex flex-col gap-8 print:col-span-full">
@@ -351,8 +372,11 @@ export function AdminInvoiceDetailClient({
                 <PaymentsCard 
                   invoiceId={item._id} 
                   companyId={String(item.companyId || "")} 
-                  invoiceCurrency={item.currency || (item.invoiceType === "usd" ? "USD" : "AED")}
+                  invoiceCurrency={item.currency || String(item.invoiceType ?? "AED").toUpperCase()}
                   invoiceExchangeRate={item.exchangeRate || 1}
+                  invoiceTotalAmount={liveTotals.total}
+                  invoiceTotalsCache={item.totalsCache}
+                  fixCurrency={item.fixCurrency}
                 />
               </div>
             )}
@@ -361,6 +385,13 @@ export function AdminInvoiceDetailClient({
       ) : null}
 
       <InvoicePrintStyle />
+      {ledgerOpen && item?._id && (
+        <InvoiceLedgerModal 
+          invoiceId={item._id} 
+          apiPrefix={apiPrefix} 
+          onClose={() => setLedgerOpen(false)} 
+        />
+      )}
     </div>
   );
 }

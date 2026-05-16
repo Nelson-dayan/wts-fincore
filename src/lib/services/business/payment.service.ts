@@ -1,8 +1,10 @@
 import type { ClientSession, Types } from "mongoose";
 import { connectDB } from "@/lib/db/connect";
-import { InvoiceModel, PaymentModel } from "@/lib/db/models";
+import { CompanyModel, InvoiceModel, PaymentModel } from "@/lib/db/models";
 import { decimalToNumber } from "@/lib/services/business/money";
+import { logActivity } from "@/lib/services/activity/log-activity.service";
 import { getInvoiceSummary, PaymentInput, InvoiceInput } from "@/lib/invoice/finance-calculations";
+import { applyExchangeRate } from "@/lib/finance/engine";
 
 export interface RecordPaymentInput {
   invoiceId: Types.ObjectId | string;
@@ -92,23 +94,36 @@ export async function recordPayment(input: RecordPaymentInput) {
 
     await session.withTransaction(async () => {
       // 1. Validations
+      if (!input.invoiceId) throw new Error("invoiceId is required");
+      
+      const invoice = await InvoiceModel.findById(input.invoiceId).select("companyId exchangeRate totals").session(session);
+      if (!invoice) throw new Error("Invoice not found.");
+
+      let companyId = input.companyId || invoice.companyId;
+      if (!companyId) {
+        const primary = await CompanyModel.findOne({ isPrimary: true }).select("_id").session(session);
+        if (primary) companyId = primary._id;
+      }
+      
+      if (!companyId) throw new Error("companyId is required and could not be found on the invoice or primary company.");
+
       if (input.type === "REFUND" && !input.originalPaymentId) {
         throw new Error("Refunds must link to an originalPaymentId.");
       }
       
-      const totalFees = input.fees.reduce((sum, f) => sum + f.amount, 0);
+      const totalFees = (input.fees || []).reduce((sum, f) => sum + f.amount, 0);
       if (totalFees > input.intendedAmount) {
         throw new Error("Fees cannot exceed the intended amount.");
       }
 
       // 2. Strict Backend Currency Conversion
       const baseCurrency = "INR"; // Enforced system default
-      const intendedAmountBase = input.intendedAmount * input.exchangeRate;
-      const receivedAmountBase = input.receivedAmount * input.exchangeRate;
+      const intendedAmountBase = applyExchangeRate(input.intendedAmount, input.exchangeRate);
+      const receivedAmountBase = applyExchangeRate(input.receivedAmount, input.exchangeRate);
 
-      const feesWithBase = input.fees.map(f => ({
+      const feesWithBase = (input.fees || []).map(f => ({
         ...f,
-        baseAmount: f.amount * input.exchangeRate
+        baseAmount: applyExchangeRate(f.amount || 0, input.exchangeRate)
       }));
 
       // 3. Create Payment
@@ -116,7 +131,7 @@ export async function recordPayment(input: RecordPaymentInput) {
         [
           {
             invoiceId: input.invoiceId,
-            companyId: input.companyId,
+            companyId: companyId,
             type: input.type,
             method: input.method,
             currency: input.currency,
@@ -137,16 +152,59 @@ export async function recordPayment(input: RecordPaymentInput) {
         { session }
       );
 
-      // 4. Update Invoice Cache Atomically
-      const { status } = await updateInvoiceCache(input.invoiceId, session);
+      const { status, summary } = await updateInvoiceCache(input.invoiceId, session);
+
+      const paymentId = String(payment[0]?._id ?? "");
+
+      // Log activity
+      await logActivity({
+        userId: String(input.createdBy),
+        action: "PAYMENT_RECORDED",
+        entityType: "Payment",
+        entityId: paymentId,
+        message: `Payment of ${input.currency} ${input.receivedAmount} recorded via ${input.method}`,
+        metadata: {
+          invoiceId: String(input.invoiceId),
+          amount: input.receivedAmount,
+          method: input.method,
+          statusChange: invoice ? invoice.status !== status : false
+        }
+      });
 
       result = {
-        paymentId: String(payment[0]?._id ?? ""),
+        paymentId,
         invoiceStatus: status,
+        summary
       };
     });
 
     return result;
+  } finally {
+    await session.endSession();
+  }
+}
+
+export async function deletePayment(paymentId: string) {
+  const db = await connectDB();
+  const session = await db.startSession();
+  try {
+    let invoiceStatus = "SENT";
+
+    await session.withTransaction(async () => {
+      const payment = await PaymentModel.findById(paymentId).session(session);
+      if (!payment) throw new Error("Payment not found");
+
+      await PaymentModel.updateOne(
+        { _id: paymentId },
+        { $set: { isDeleted: true, deletedAt: new Date() } },
+        { session }
+      );
+
+      const { status } = await updateInvoiceCache(payment.invoiceId, session);
+      invoiceStatus = status;
+    });
+
+    return { success: true, invoiceStatus };
   } finally {
     await session.endSession();
   }

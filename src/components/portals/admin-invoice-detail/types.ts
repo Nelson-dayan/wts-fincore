@@ -16,6 +16,7 @@ export type Item = {
   projectId: string;
   poId: string;
   status: string;
+  fixCurrency?: boolean;
   documentInfo: {
     date?: string;
     title?: string;
@@ -40,4 +41,10 @@ export type Item = {
   dueDate: string;
   createdAt?: string;
   branding?: Record<string, unknown>;
+  totalsCache?: {
+    totalReceivedBase: number;
+    totalFeesBase: number;
+    totalIntendedBase: number;
+    overpaidAmountBase: number;
+  };
 };

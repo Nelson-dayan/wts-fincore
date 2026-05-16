@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dropdown } from "@/components/ui/select";
+import { SUPPORTED_CURRENCIES } from "@/lib/constants/finance";
 import type { Item } from "./types";
 
 type HeadingCardProps = {
@@ -11,9 +12,10 @@ type HeadingCardProps = {
   extras: Record<string, unknown>;
   onItemChange: (next: Item) => void;
   onPatchExtra: (key: string, value: string) => void;
+  companyRates: { usdToInr: number; aedToInr: number; isLocked: boolean };
 };
 
-export function HeadingCard({ item, extras, onItemChange, onPatchExtra }: HeadingCardProps) {
+export function HeadingCard({ item, extras, onItemChange, onPatchExtra, companyRates }: HeadingCardProps) {
   const taxOn = item.documentInfo.taxEnabled !== false;
   const rateRaw = item.documentInfo.taxRate;
   const taxRate = typeof rateRaw === "number" && Number.isFinite(rateRaw) ? rateRaw : 5;
@@ -25,33 +27,54 @@ export function HeadingCard({ item, extras, onItemChange, onPatchExtra }: Headin
       </CardHeader>
       <CardContent className="space-y-6">
         <div className="grid gap-3 sm:grid-cols-2">
-          <div className="space-y-1.5 sm:col-span-2">
-            <Label htmlFor="inv-type">Invoice type</Label>
-            <Dropdown
-              id="inv-type"
-              className="h-10 rounded-lg border-input/90 bg-background text-sm focus-visible:ring-1 focus-visible:ring-primary"
-              value={item.invoiceType ?? "aed"}
-              onChange={(e) => {
-                const val = e.target.value === "usd" ? "usd" : "aed";
-                // When switching, we also update tax defaults and footer labels to help the user
-                const isUsd = val === "usd";
-                onItemChange({
-                  ...item,
-                  invoiceType: val,
-                  documentInfo: {
-                    ...item.documentInfo,
-                    // Typically export/USD invoices have 0% tax
-                    taxRate: isUsd ? 0 : (item.documentInfo.taxRate ?? 5),
-                    taxEnabled: isUsd ? false : (item.documentInfo.taxEnabled ?? true),
-                  },
-                });
-                onPatchExtra("footerCurrencyLine", isUsd ? "CURRENCY IN USD" : "CURRENCY IN AED");
-              }}
-              options={[
-                { value: "aed", label: "AED Invoice (Local)" },
-                { value: "usd", label: "USD Invoice (International)" },
-              ]}
-            />
+          <div className="grid gap-3 sm:grid-cols-2 sm:col-span-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="inv-type">Invoice formatting (Type)</Label>
+              <Dropdown
+                id="inv-type"
+                className="h-10 rounded-lg border-input/90 bg-background text-sm focus-visible:ring-1 focus-visible:ring-primary"
+                value={item.invoiceType ?? "aed"}
+                onChange={(e) => {
+                  const val = e.target.value as "aed" | "usd";
+                  onItemChange({ ...item, invoiceType: val });
+                }}
+                options={[
+                  { value: "aed", label: "AED Style (Local)" },
+                  { value: "usd", label: "USD Style (International)" },
+                ]}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="inv-currency">Transaction Currency</Label>
+              <Dropdown
+                id="inv-currency"
+                className="h-10 rounded-lg border-input/90 bg-background text-sm focus-visible:ring-1 focus-visible:ring-primary font-bold"
+                value={item.currency ?? "AED"}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  const isUsd = val === "USD";
+                  const isAed = val === "AED";
+                  
+                  let newExRate = 1;
+                  if (isUsd) newExRate = companyRates.usdToInr;
+                  else if (isAed) newExRate = companyRates.aedToInr;
+                  
+                  onItemChange({
+                    ...item,
+                    currency: val,
+                    exchangeRate: newExRate,
+                    documentInfo: {
+                      ...item.documentInfo,
+                      // Auto-suggest tax based on currency as a hint
+                      taxRate: isUsd ? 0 : (item.documentInfo.taxRate ?? 5),
+                      taxEnabled: isUsd ? false : (item.documentInfo.taxEnabled ?? true),
+                    },
+                  });
+                  onPatchExtra("footerCurrencyLine", `CURRENCY IN ${val}`);
+                }}
+                options={[...SUPPORTED_CURRENCIES]}
+              />
+            </div>
           </div>
           <div className="space-y-1.5 sm:col-span-2">
             <Label htmlFor="inv-doc-title">Document title</Label>
@@ -133,6 +156,21 @@ export function HeadingCard({ item, extras, onItemChange, onPatchExtra }: Headin
               value={String(extras.poNumberRef ?? "")}
               placeholder="Purchase order reference"
               onChange={(e) => onPatchExtra("poNumberRef", e.target.value)}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="inv-ex-rate">Exchange Rate (1 {item.currency || "AED"} to INR)</Label>
+            <Input
+              id="inv-ex-rate"
+              type="number"
+              step="0.0001"
+              value={item.exchangeRate ?? 1}
+              placeholder="e.g. 22.7"
+              disabled={companyRates.isLocked}
+              onChange={(e) => {
+                const val = parseFloat(e.target.value) || 0;
+                onItemChange({ ...item, exchangeRate: val });
+              }}
             />
           </div>
         </div>

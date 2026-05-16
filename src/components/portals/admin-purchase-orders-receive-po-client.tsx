@@ -8,7 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dropdown } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { readResponseJson } from "@/lib/http/read-response-json";
+import { ProjectSearchPicker } from "@/components/portals/project-search-picker";
+import { apiFetch } from "@/lib/api/client";
 import { usePortalConfig } from "@/components/portals/portal-config-context";
 
 type QRow = {
@@ -34,8 +35,9 @@ export function AdminPurchaseOrdersReceivePoClient({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [fileKey, setFileKey] = useState(0);
   const [quotations, setQuotations] = useState<QRow[]>([]);
-  const [loadingQ, setLoadingQ] = useState(true);
+  const [loadingQ, setLoadingQ] = useState(false);
   const [qError, setQError] = useState("");
+  const [selectedProjectId, setSelectedProjectId] = useState(projectId || "");
   const [quotationId, setQuotationId] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -43,15 +45,18 @@ export function AdminPurchaseOrdersReceivePoClient({
   const [err, setErr] = useState("");
 
   const loadQuotations = useCallback(async () => {
-    setLoadingQ(true);
     setQError("");
+    if (!selectedProjectId) {
+      setQuotations([]);
+      setLoadingQ(false);
+      return;
+    }
+    setLoadingQ(true);
     try {
       const qs = new URLSearchParams({ page: "1", limit: "60", q: "" });
-      if (projectId) qs.set("projectId", projectId);
-      const res = await fetch(`${apiPrefix}/quotations?${qs}`, { cache: "no-store" });
-      const data = await readResponseJson<{ items?: QRow[]; message?: string }>(res);
-      if (!res.ok) throw new Error(data.message ?? "Quotations load failed");
-      const list = data.items ?? [];
+      qs.set("projectId", selectedProjectId);
+      const payload = await apiFetch<{ items?: QRow[] }>(`${apiPrefix}/quotations?${qs}`);
+      const list = payload.items ?? [];
       setQuotations(list);
       setQuotationId((prev) => {
         if (prev && list.some((q) => q._id === prev)) return prev;
@@ -64,7 +69,7 @@ export function AdminPurchaseOrdersReceivePoClient({
     } finally {
       setLoadingQ(false);
     }
-  }, [apiPrefix, projectId]);
+  }, [apiPrefix, selectedProjectId]);
 
   useEffect(() => {
     loadQuotations().catch(() => {});
@@ -87,7 +92,7 @@ export function AdminPurchaseOrdersReceivePoClient({
     }
     setSubmitting(true);
     try {
-      const res = await fetch(`${apiPrefix}/purchase-orders`, {
+      const data = await apiFetch<{ poNumber?: string }>(`${apiPrefix}/purchase-orders`, {
         method: "POST",
         body: (() => {
           const fd = new FormData();
@@ -97,17 +102,6 @@ export function AdminPurchaseOrdersReceivePoClient({
           return fd;
         })(),
       });
-      let data: { message?: string; id?: string; poNumber?: string };
-      try {
-        data = await readResponseJson<typeof data>(res);
-      } catch {
-        throw new Error(
-          res.status === 413
-            ? "File exceeds server limit — try a smaller PDF (~4–8 MB)."
-            : `Could not read server response (${res.status}). Try again.`
-        );
-      }
-      if (!res.ok) throw new Error(data.message ?? "Could not save PO");
       setMsg(`Saved: ${data.poNumber ?? ""}`);
       setFile(null);
       setFileKey((k) => k + 1);
@@ -133,6 +127,20 @@ export function AdminPurchaseOrdersReceivePoClient({
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
+        {!projectId && (
+          <div className="space-y-2 max-w-md pb-2 border-b border-border/40 mb-2">
+            <label className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+              1. Find Project / Client
+            </label>
+            <ProjectSearchPicker 
+              id="po-project-search" 
+              value={selectedProjectId} 
+              onChange={(id) => setSelectedProjectId(id)} 
+              helperText="Search project or client name to find related Quotations."
+            />
+          </div>
+        )}
+
         {loadingQ ? (
           <div className="space-y-2.5">
             <Skeleton className="h-10 w-full" />
@@ -140,6 +148,10 @@ export function AdminPurchaseOrdersReceivePoClient({
           </div>
         ) : qError ? (
           <p className="text-destructive text-sm">{qError}</p>
+        ) : !selectedProjectId ? (
+          <p className="text-muted-foreground text-sm flex items-center gap-2 bg-muted/20 p-3 rounded-lg border border-dashed">
+            Please select a project above to see its quotations.
+          </p>
         ) : quotations.length === 0 ? (
           <p className="text-muted-foreground text-sm">
             No quotations.{" "}

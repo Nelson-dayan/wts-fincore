@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select } from "@/components/ui/select";
 import { readResponseJson } from "@/lib/http/read-response-json";
+import { SUPPORTED_CURRENCIES } from "@/lib/constants/finance";
 
 interface ClientOption {
   _id: string;
@@ -133,12 +134,12 @@ export function CreateProjectForm() {
           <div className="space-y-1">
             <Label htmlFor="project-budget">Budget</Label>
             <div className="flex gap-2">
-              <Input
+              <Select
                 id="project-currency"
                 value={currency}
                 onChange={(e) => setCurrency(e.target.value)}
-                placeholder="AED"
                 className="w-24"
+                options={[...SUPPORTED_CURRENCIES]}
               />
               <Input
                 id="project-budget"

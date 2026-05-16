@@ -3,19 +3,21 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { FilePlus2, Package } from "lucide-react";
+import { FilePlus2, Package, TrendingUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dropdown } from "@/components/ui/select";
+import { ProjectSearchPicker } from "@/components/portals/project-search-picker";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   invoiceCountAtOrOverCap,
   MAX_INVOICES_PER_PURCHASE_ORDER,
 } from "@/lib/invoice/invoice-limits";
-import { readResponseJson } from "@/lib/http/read-response-json";
+import { apiFetch } from "@/lib/api/client";
 import { usePortalConfig } from "@/components/portals/portal-config-context";
+import { cn } from "@/lib/utils/cn";
 
 type PoRow = { _id: string; poNumber: string; quotationNumber?: string };
 
@@ -30,34 +32,36 @@ export function AdminInvoicesCreateHelper({
   const router = useRouter();
   const { apiPrefix, pathPrefix } = usePortalConfig();
   const [pos, setPos] = useState<PoRow[]>([]);
-  const [loadingPo, setLoadingPo] = useState(true);
+  const [loadingPo, setLoadingPo] = useState(false);
   const [poError, setPoError] = useState("");
+  const [selectedProjectId, setSelectedProjectId] = useState(projectId || "");
   const [selectedPoId, setSelectedPoId] = useState("");
   const [manualPoId, setManualPoId] = useState("");
   const [invoiceCounts, setInvoiceCounts] = useState<Record<string, number>>({});
+  const [reminding, setReminding] = useState(false);
+  const [reminderMsg, setReminderMsg] = useState("");
 
   const loadPos = useCallback(async () => {
-    setLoadingPo(true);
     setPoError("");
+    if (!selectedProjectId) {
+      setPos([]);
+      setLoadingPo(false);
+      return;
+    }
     const startedAt = Date.now();
     try {
-      const qs = new URLSearchParams({ page: "1", limit: "25", q: "" });
-      if (projectId) qs.set("projectId", projectId);
-      const res = await fetch(`${apiPrefix}/purchase-orders?${qs}`, { cache: "no-store" });
-      const data = await readResponseJson<{ items?: PoRow[]; message?: string }>(res);
-      if (!res.ok) throw new Error(data.message ?? "Could not load POs");
-      const list = data.items ?? [];
+      const qs = new URLSearchParams({ page: "1", limit: "50", projectId: selectedProjectId });
+      const payload = await apiFetch<{ items?: PoRow[] }>(`${apiPrefix}/purchase-orders?${qs.toString()}`);
+      const list = payload.items ?? [];
       setPos(list);
 
       const counts: Record<string, number> = {};
       for (const p of list) {
         try {
-          const ir = await fetch(
-            `${apiPrefix}/invoices?poId=${encodeURIComponent(p._id)}&page=1&limit=10&q=`,
-            { cache: "no-store" }
+          const ij = await apiFetch<{ total?: number }>(
+            `${apiPrefix}/invoices?poId=${encodeURIComponent(p._id)}&page=1&limit=10&q=`
           );
-          const ij = await readResponseJson<{ total?: number }>(ir);
-          counts[p._id] = ir.ok && typeof ij.total === "number" ? ij.total : 0;
+          counts[p._id] = typeof ij.total === "number" ? ij.total : 0;
         } catch {
           counts[p._id] = 0;
         }
@@ -79,7 +83,7 @@ export function AdminInvoicesCreateHelper({
       }
       setLoadingPo(false);
     }
-  }, [apiPrefix, projectId]);
+  }, [apiPrefix, selectedProjectId]);
 
   useEffect(() => {
     loadPos().catch(() => {});
@@ -98,6 +102,7 @@ export function AdminInvoicesCreateHelper({
     Boolean(selectedPoId) && invoiceCountAtOrOverCap(selectedCount);
 
   return (
+    <>
     <Card className="mb-6 border-primary/25 bg-primary/4 dark:border-primary/35 dark:bg-primary/8">
       <CardHeader className="pb-2">
         <CardTitle className="text-base inline-flex items-center gap-2">
@@ -120,6 +125,18 @@ export function AdminInvoicesCreateHelper({
           ) : null}
         </div>
 
+        {!projectId && (
+          <div className="space-y-2 max-w-md">
+            <Label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">1. Find Project / Client</Label>
+            <ProjectSearchPicker 
+              id="inv-project-search" 
+              value={selectedProjectId} 
+              onChange={(id) => setSelectedProjectId(id)} 
+              helperText="Search project or client name to find related POs."
+            />
+          </div>
+        )}
+
         {poError ? (
           <p className="text-destructive text-sm" role="alert">
             {poError}
@@ -135,9 +152,13 @@ export function AdminInvoicesCreateHelper({
             </div>
             <Skeleton className="h-3 w-44" />
           </div>
+        ) : !selectedProjectId ? (
+          <p className="text-muted-foreground text-sm flex items-center gap-2 bg-muted/20 p-3 rounded-lg border border-dashed">
+            Please select a project above to see its purchase orders.
+          </p>
         ) : pos.length === 0 ? (
           <p className="text-muted-foreground text-sm">
-            No purchase orders yet. Open a{" "}
+            No purchase orders yet for this project. Open a{" "}
             <Link href={`${pathPrefix}/quotations`} className="text-primary underline-offset-4 hover:underline">
               quotation
             </Link>{" "}
@@ -145,6 +166,7 @@ export function AdminInvoicesCreateHelper({
           </p>
         ) : (
           <div className="space-y-1.5">
+            <Label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">2. Select Purchase Order</Label>
             <div className="flex flex-col gap-2.5 sm:flex-row sm:items-end">
               <div className="w-full max-w-full sm:max-w-md sm:flex-1">
                 <Label htmlFor="inv-po-pick">Purchase order</Label>
@@ -213,5 +235,70 @@ export function AdminInvoicesCreateHelper({
         </div>
       </CardContent>
     </Card>
+
+    {!projectId && !embedded && (
+      <Card className="mb-6 border-amber-500/20 bg-amber-500/5 dark:border-amber-500/30 dark:bg-amber-500/10 overflow-hidden relative">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base inline-flex items-center gap-2">
+            <TrendingUp className="size-4 text-amber-600" aria-hidden />
+            Automated workflow
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <p className="text-sm font-bold text-amber-700 dark:text-amber-400">Overdue Invoice Reminders</p>
+              <p className="text-xs text-muted-foreground mt-1">Checks for invoices past their due date and logs automated reminders.</p>
+            </div>
+            
+            <div className="flex flex-col items-end gap-2">
+              <Button 
+                size="sm" 
+                variant="outline" 
+                disabled={reminding}
+                className="border-amber-500/30 hover:bg-amber-500/10 text-amber-700 dark:text-amber-400 font-bold px-6"
+                onClick={async () => {
+                  setReminding(true);
+                  setReminderMsg("");
+                  try {
+                    const data = await apiFetch<{ details?: { remindersSent?: number } }>(
+                      `${apiPrefix}/jobs/invoice-reminders`,
+                      { method: "POST" }
+                    );
+                    setReminderMsg(`Success: ${data.details?.remindersSent || 0} reminders processed.`);
+                    router.refresh();
+                  } catch (e) {
+                    setReminderMsg(e instanceof Error ? e.message : "Error triggering reminders");
+                  } finally {
+                    setReminding(false);
+                  }
+                }}
+              >
+                {reminding ? "Processing..." : "Trigger Reminders"}
+              </Button>
+              {reminderMsg && (
+                <p className={cn(
+                  "text-[10px] font-bold uppercase tracking-wider animate-in fade-in slide-in-from-top-1",
+                  reminderMsg.startsWith("Success") ? "text-emerald-600" : "text-destructive"
+                )}>
+                  {reminderMsg}
+                </p>
+              )}
+            </div>
+          </div>
+        </CardContent>
+        {reminding && (
+          <div className="absolute inset-0 bg-background/50 backdrop-blur-[1px] flex items-center justify-center animate-in fade-in duration-300">
+            <div className="flex items-center gap-2 px-4 py-2 bg-background border rounded-full shadow-lg">
+              <div className="size-2 bg-amber-500 rounded-full animate-bounce" />
+              <div className="size-2 bg-amber-500 rounded-full animate-bounce [animation-delay:-0.15s]" />
+              <div className="size-2 bg-amber-500 rounded-full animate-bounce [animation-delay:-0.3s]" />
+              <span className="text-xs font-bold text-amber-600">Scanning Invoices...</span>
+            </div>
+          </div>
+        )}
+      </Card>
+    )}
+    </>
   );
 }

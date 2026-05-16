@@ -20,6 +20,7 @@ export type QuotationPayload = {
   projectId: string;
   projectName?: string;
   status: "draft" | "sent" | "approved" | "rejected";
+  currency: string;
   documentInfo: {
     quotationCode?: string;
     geCode?: string;

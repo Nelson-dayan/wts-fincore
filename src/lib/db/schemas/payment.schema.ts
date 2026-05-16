@@ -26,7 +26,7 @@ export const paymentSchema = new Schema(
     type: { type: String, enum: ["PAYMENT", "REFUND"], default: "PAYMENT", index: true },
     status: { type: String, enum: ["PENDING", "COMPLETED", "FAILED", "REFUNDED"], default: "COMPLETED", index: true },
     
-    transactionId: { type: String, sparse: true, index: true },
+    transactionId: { type: String },
     method: {
       type: String,
       enum: ["UPI", "BANK_TRANSFER", "PAYPAL", "STRIPE", "WISE", "CASH"],
@@ -66,5 +66,3 @@ export const paymentSchema = new Schema(
 
 paymentSchema.index({ invoiceId: 1, createdAt: 1 });
 paymentSchema.index({ transactionId: 1 }, { unique: true, sparse: true });
-paymentSchema.index({ companyId: 1 });
-paymentSchema.index({ isDeleted: 1 });

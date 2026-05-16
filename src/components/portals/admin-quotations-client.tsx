@@ -19,7 +19,7 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { QuotationStatusEditor } from "@/components/portals/admin-quotation-details/quotation-status-card";
 import { cn } from "@/lib/utils/cn";
 import type { QuotationData } from "@/types/quotation-generator";
-import { readResponseJson } from "@/lib/http/read-response-json";
+import { apiFetch } from "@/lib/api/client";
 import type { QuotationPayload } from "@/components/portals/admin-quotation-details/types";
 import { usePortalConfig } from "@/components/portals/portal-config-context";
 
@@ -61,6 +61,7 @@ export function AdminQuotationsClient({
   const [builderLinkedProjectId, setBuilderLinkedProjectId] = useState("");
   const [builderLinkedProjectName, setBuilderLinkedProjectName] = useState("");
   const [rowBusyId, setRowBusyId] = useState("");
+  const [isCurrencyLocked, setIsCurrencyLocked] = useState(false);
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
 
@@ -71,16 +72,9 @@ export function AdminQuotationsClient({
       const q = initialProjectId
         ? `?limit=200&projectId=${encodeURIComponent(initialProjectId)}`
         : "?limit=200";
-      const res = await fetch(`${apiPrefix}/quotations${q}`, {
-        credentials: "include",
-        cache: "no-store",
-      });
-      const payload = await readResponseJson<{
-        items?: QuotationRow[];
-        total?: number;
-        message?: string;
-      }>(res);
-      if (!res.ok) throw new Error(payload.message ?? "Failed to load quotations");
+      const payload = await apiFetch<{ items?: QuotationRow[]; total?: number }>(
+        `${apiPrefix}/quotations${q}`
+      );
       const items = payload.items ?? [];
       setRows(
         items.map((r) => ({
@@ -120,22 +114,18 @@ export function AdminQuotationsClient({
   const loadQuotation = useCallback(async (id: string) => {
     setRowBusyId(id);
     try {
-      const res = await fetch(`${apiPrefix}/quotations/${id}`, {
-        credentials: "include",
-        cache: "no-store",
-      });
-      const payload = await readResponseJson<{ item?: Record<string, unknown>; message?: string }>(
-        res
-      );
-      if (!res.ok) throw new Error(payload.message ?? "Failed to load quotation");
-      if (!payload.item) throw new Error("Missing quotation");
-      const item = payload.item as {
+      const json = await apiFetch<{ item?: Record<string, unknown> }>(`${apiPrefix}/quotations/${id}`);
+      if (!json?.item) throw new Error("Missing quotation");
+      const item = json.item as {
         projectId?: string;
         projectName?: string;
+        projectFixCurrency?: boolean;
+        projectCurrency?: string;
       } & Parameters<typeof quotationItemToGeneratorData>[0];
       const data = quotationItemToGeneratorData(item);
       setBuilderLinkedProjectId(String(item.projectId ?? "").trim());
       setBuilderLinkedProjectName(String(item.projectName ?? "").trim());
+      setIsCurrencyLocked(Boolean(item.projectFixCurrency));
       setEditingQuotationId(id);
       setInitialSnapshot(data);
       setBuilderKey((k) => k + 1);
@@ -158,19 +148,9 @@ export function AdminQuotationsClient({
     setDeleteLoading(true);
     setListError("");
     try {
-      const res = await fetch(`${apiPrefix}/quotations/${deleteTargetId}`, {
+      await apiFetch(`${apiPrefix}/quotations/${deleteTargetId}`, {
         method: "DELETE",
-        credentials: "include",
       });
-      const payload = await readResponseJson<{ message?: string }>(res);
-      if (!res.ok) {
-        throw new Error(
-          payload.message ??
-            (res.status === 400
-              ? "This quotation cannot be deleted."
-              : "Delete failed")
-        );
-      }
       setDeleteTargetId(null);
       await fetchList();
     } catch (e) {
@@ -473,6 +453,7 @@ export function AdminQuotationsClient({
             initialSnapshot={initialSnapshot}
             onDbSaveSuccess={onDbSaveSuccess}
             onCancelEdit={closeBuilder}
+            isCurrencyLocked={isCurrencyLocked}
           />
         </section>
       ) : null}

@@ -21,6 +21,7 @@ export type InvoiceDocBank = {
 export type InvoiceDocData = {
   invoiceNumber: string;
   invoiceType?: "aed" | "usd";
+  currency?: string;
   documentInfo: {
     date?: string;
     title?: string;
@@ -60,19 +61,16 @@ export type InvoiceDocData = {
   poId?: string;
 };
 
-function formatAed(n: number): string {
-  const num = new Intl.NumberFormat("en-IN", {
+function formatCurrency(n: number, formatting: "aed" | "usd", currency: string): string {
+  const isUsdStyle = formatting === "usd";
+  const locale = isUsdStyle ? "en-US" : "en-IN";
+  const num = new Intl.NumberFormat(locale, {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(n);
-  return `AED ${num}`;
-}
-
-function formatUsd(n: number): string {
-  return new Intl.NumberFormat("en-US", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(n);
+  
+  if (isUsdStyle) return num;
+  return `${currency} ${num}`;
 }
 
 function formatDate(iso?: string): string {
@@ -150,7 +148,8 @@ export function InvoiceSecDocument({
 
   const lines = pages.flatMap((p) => p.items);
   const balanceDue = totals.total ?? 0;
-  const fmt = isUsd ? formatUsd : formatAed;
+  const currency = data.currency || (isUsd ? "USD" : "AED");
+  const fmt = (n: number) => formatCurrency(n, invoiceType, currency);
 
   const shell =
     mode === "print"
@@ -251,10 +250,10 @@ export function InvoiceSecDocument({
                 <th className="border-r border-black px-1 py-1.5">Rate</th>
                 <th className="border-r border-black px-1 py-1.5">Gross Amount</th>
                 <th className="border-r border-black px-1 py-1.5">Disc.</th>
-                <th className="border-r border-black px-1 py-1.5">Taxable Amount (USD)</th>
+                <th className="border-r border-black px-1 py-1.5">Taxable Amount ({currency})</th>
                 <th className="border-r border-black px-1 py-1.5">VAT %</th>
                 <th className="border-r border-black px-1 py-1.5">VAT Amount</th>
-                <th className="px-1 py-1.5">Net Amount (USD)</th>
+                <th className="px-1 py-1.5">Net Amount ({currency})</th>
               </tr>
             </thead>
             <tbody>
@@ -268,13 +267,13 @@ export function InvoiceSecDocument({
                     <td className="border-r border-black px-1 py-1.5 text-center font-semibold">{row.name || "—"}</td>
                     <td className="border-r border-black px-1 py-1.5 text-center">1</td>
                     <td className="border-r border-black px-1 py-1.5 text-center">{qty}</td>
-                    <td className="border-r border-black px-1 py-1.5 text-right">{formatUsd(rate)}</td>
-                    <td className="border-r border-black px-1 py-1.5 text-right">{formatUsd(gross)}</td>
+                    <td className="border-r border-black px-1 py-1.5 text-right">{fmt(rate)}</td>
+                    <td className="border-r border-black px-1 py-1.5 text-right">{fmt(gross)}</td>
                     <td className="border-r border-black px-1 py-1.5 text-center">-</td>
-                    <td className="border-r border-black px-1 py-1.5 text-right">{formatUsd(gross)}</td>
+                    <td className="border-r border-black px-1 py-1.5 text-right">{fmt(gross)}</td>
                     <td className="border-r border-black px-1 py-1.5 text-center">-</td>
                     <td className="border-r border-black px-1 py-1.5 text-right">-</td>
-                    <td className="px-1 py-1.5 text-right">{formatUsd(gross)}</td>
+                    <td className="px-1 py-1.5 text-right">{fmt(gross)}</td>
                   </tr>
                 );
               })}
@@ -282,12 +281,12 @@ export function InvoiceSecDocument({
                 <td className="border-r border-black px-1 py-1 text-right" colSpan={5}>
                   Total
                 </td>
-                <td className="border-r border-black px-1 py-1 text-right">{formatUsd(totals.subtotal)}</td>
+                <td className="border-r border-black px-1 py-1 text-right">{fmt(totals.subtotal)}</td>
                 <td className="border-r border-black px-1 py-1 text-center">-</td>
-                <td className="border-r border-black px-1 py-1 text-right">{formatUsd(totals.subtotal)}</td>
+                <td className="border-r border-black px-1 py-1 text-right">{fmt(totals.subtotal)}</td>
                 <td className="border-r border-black px-1 py-1 text-center">-</td>
                 <td className="border-r border-black px-1 py-1 text-right">-</td>
-                <td className="px-1 py-1 text-right">{formatUsd(totals.total)}</td>
+                <td className="px-1 py-1 text-right">{fmt(totals.total)}</td>
               </tr>
             </tbody>
           </table>
@@ -297,7 +296,7 @@ export function InvoiceSecDocument({
             <div className="border-l border-black text-[10px]">
               <div className="grid grid-cols-[1fr_auto] border-b border-black">
                 <div className="border-r border-black px-2 py-1 font-bold">Taxable Amount</div>
-                <div className="min-w-28 px-2 py-1 text-right font-bold">{formatUsd(totals.subtotal)}</div>
+                <div className="min-w-28 px-2 py-1 text-right font-bold">{fmt(totals.subtotal)}</div>
               </div>
               <div className="grid grid-cols-[1fr_auto] border-b border-black">
                 <div className="border-r border-black px-2 py-1 font-bold">Vat Total</div>
@@ -309,7 +308,7 @@ export function InvoiceSecDocument({
               </div>
               <div className="grid grid-cols-[1fr_auto]">
                 <div className="border-r border-black px-2 py-1 text-[16px] font-bold">Total</div>
-                <div className="px-2 py-1 text-right text-[16px] font-bold">{formatUsd(totals.total)}</div>
+                <div className="px-2 py-1 text-right text-[16px] font-bold">{fmt(totals.total)}</div>
               </div>
             </div>
           </div>
@@ -348,8 +347,7 @@ export function InvoiceSecDocument({
             </table>
           </div>
           <p className="mt-1 font-bold">{extras.footerTerms || "Terms:"}</p>
-          <p className="mt-1">1 USD = 3.67 AED TOTAL AMOUNT = {(totals.total * 3.67).toFixed(2)} AED</p>
-          <p className="mt-1 uppercase">{extras.footerCurrencyLine || "CURRENCY IN USD"}</p>
+          <p className="mt-1 uppercase">{extras.footerCurrencyLine || `CURRENCY IN ${currency}`}</p>
         </div>
 
         <footer className="pt-1 text-[10px] text-neutral-700">

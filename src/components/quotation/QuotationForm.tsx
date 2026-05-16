@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Dropdown } from "@/components/ui/select";
 import { cn } from "@/lib/utils/cn";
 import { UploadCard } from "@/components/ui/upload-card";
+import { SUPPORTED_CURRENCIES } from "@/lib/constants/finance";
 import type { QuotationData, QuotationItem, QuotationPage } from "@/types/quotation-generator";
 
 export type QuotationFormProps = {
@@ -23,7 +24,9 @@ export type QuotationFormProps = {
   formTitle?: string;
   /** Admin embedded: close builder without navigating away. */
   onCancelEdit?: () => void;
+  isCurrencyLocked?: boolean;
 };
+
 
 export function QuotationForm({
   data,
@@ -36,7 +39,9 @@ export function QuotationForm({
   pdfError = null,
   formTitle = "Quotation",
   onCancelEdit,
+  isCurrencyLocked = false,
 }: QuotationFormProps) {
+
   const patch = (partial: Partial<QuotationData>) => {
     onChange({ ...data, ...partial });
   };
@@ -251,13 +256,16 @@ export function QuotationForm({
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="qg-currency">Currency Code</Label>
-                <Input
+                <Dropdown
                   id="qg-currency"
                   value={data.currency}
                   onChange={(e) => patch({ currency: e.target.value.toUpperCase() })}
-                  placeholder="AED"
+                  disabled={isCurrencyLocked}
+                  className={cn(isCurrencyLocked && "bg-muted cursor-not-allowed")}
+                  options={[...SUPPORTED_CURRENCIES]}
                 />
               </div>
+
               <div className="grid gap-2">
                 <Label htmlFor="qg-taxrate">Tax Rate (%)</Label>
                 <Input

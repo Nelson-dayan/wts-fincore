@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select } from "@/components/ui/select";
+import { SUPPORTED_CURRENCIES } from "@/lib/constants/finance";
 import { cn } from "@/lib/utils/cn";
 import { UploadCard } from "@/components/ui/upload-card";
 import type { ClientDetailsPayload, ClientProfileForm } from "./types";
@@ -170,7 +172,11 @@ export function ClientProfileCard({
                 </div>
                 <div className="space-y-2">
                   <Label>Preferred Currency</Label>
-                  <Input value={form.currency} onChange={(e) => onFormChange({ currency: e.target.value })} placeholder="AED" />
+                  <Select 
+                    value={form.currency} 
+                    onChange={(e: React.ChangeEvent<HTMLSelectElement>) => onFormChange({ currency: e.target.value })}
+                    options={[...SUPPORTED_CURRENCIES]}
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label>Payment Terms</Label>

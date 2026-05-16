@@ -5,7 +5,7 @@ import { DashboardPageHeader } from "@/components/dashboard/page-header";
 import { AddUserForm } from "@/components/portals/admin-users/add-user-form";
 import { UsersTable } from "@/components/portals/admin-users/users-table";
 import type { AdminUser, NewUserForm } from "@/components/portals/admin-users/types";
-import { readResponseJson } from "@/lib/http/read-response-json";
+import { apiFetch } from "@/lib/api/client";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { normalizePhoneInput, parseRegisterPayload } from "@/lib/register/validate";
 
@@ -39,17 +39,11 @@ export function AdminUsersClient() {
         limit: String(limit),
         q: nextQuery,
       });
-      const response = await fetch(`/api/admin/users?${qs.toString()}`, {
-        cache: "no-store",
-      });
-      const payload = await readResponseJson<{
+      const payload = await apiFetch<{
         users?: AdminUser[];
         total?: number;
-        message?: string;
-      }>(response);
-      if (!response.ok) {
-        throw new Error(payload.message ?? "Request failed");
-      }
+      }>(`/api/admin/users?${qs.toString()}`);
+      
       setUsers(payload.users ?? []);
       setTotal(payload.total ?? 0);
     } catch (e) {
@@ -80,13 +74,11 @@ export function AdminUsersClient() {
         throw new Error(validation.message);
       }
 
-      const response = await fetch("/api/admin/users", {
+      await apiFetch<{ message?: string }>("/api/admin/users", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(validation.data),
       });
-      const payload = await readResponseJson<{ message?: string }>(response);
-      if (!response.ok) throw new Error(payload.message ?? "Failed to create user");
       setForm({ name: "", email: "", password: "", phoneNumber: "", role: "employee" });
       await loadUsers(1, query);
       setPage(1);
@@ -103,7 +95,7 @@ export function AdminUsersClient() {
     setSavingId(userId);
     setError("");
     try {
-      const response = await fetch(`/api/admin/users/${userId}`, {
+      await apiFetch<{ message?: string }>(`/api/admin/users/${userId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -113,8 +105,6 @@ export function AdminUsersClient() {
           isActive: draft.isActive,
         }),
       });
-      const payload = await readResponseJson<{ message?: string }>(response);
-      if (!response.ok) throw new Error(payload.message ?? "Failed to update user");
       setEditingId(null);
       setDrafts((prev) => {
         const copy = { ...prev };
@@ -135,11 +125,9 @@ export function AdminUsersClient() {
     setSavingId(userId);
     setError("");
     try {
-      const response = await fetch(`/api/admin/users/${userId}`, {
+      await apiFetch<{ message?: string }>(`/api/admin/users/${userId}`, {
         method: "DELETE",
       });
-      const payload = await readResponseJson<{ message?: string }>(response);
-      if (!response.ok) throw new Error(payload.message ?? "Failed to delete user");
       await loadUsers(page, query);
       return true;
     } catch (e) {

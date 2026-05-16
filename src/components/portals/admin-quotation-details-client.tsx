@@ -36,6 +36,7 @@ export function AdminQuotationDetailsClient({ quotationId }: { quotationId: stri
   const [refreshSnapshots, setRefreshSnapshots] = useState(false);
 
   const [status, setStatus] = useState<QuotationPayload["status"]>("draft");
+  const [currency, setCurrency] = useState("AED");
   const [quotationCode, setQuotationCode] = useState("");
   const [internalNotes, setInternalNotes] = useState("");
   const [docDate, setDocDate] = useState("");
@@ -60,14 +61,17 @@ export function AdminQuotationDetailsClient({ quotationId }: { quotationId: stri
     const response = await fetch(`${apiPrefix}/quotations/${quotationId}`, {
       cache: "no-store",
     });
-    const payload = await readResponseJson<{ item?: QuotationPayload; message?: string }>(
-      response
-    );
-    if (!response.ok) throw new Error(payload.message ?? "Failed to load quotation");
-    const q = payload.item;
+    const json = await readResponseJson<{
+      success?: boolean;
+      data?: { item?: QuotationPayload };
+      error?: { message?: string };
+    }>(response);
+    if (!response.ok) throw new Error(json.error?.message ?? "Failed to load quotation");
+    const q = json.data?.item;
     if (!q) throw new Error("Missing quotation");
     setItem(q);
     setStatus(q.status);
+    setCurrency(q.currency || "AED");
     setQuotationCode(
       String(q.documentInfo.quotationCode ?? q.documentInfo.geCode ?? "").trim()
     );
@@ -202,12 +206,13 @@ export function AdminQuotationDetailsClient({ quotationId }: { quotationId: stri
             confirmDate: confirmDate === "" ? undefined : confirmDate,
           },
           status,
+          currency,
           internalNotes,
         }),
       });
-      const result = await readResponseJson<{ message?: string }>(response);
+      const json = await readResponseJson<{ success?: boolean; error?: { message?: string } }>(response);
       if (!response.ok) {
-        throw new Error(result.message ?? `Failed to save (HTTP ${response.status}).`);
+        throw new Error(json.error?.message ?? `Failed to save (HTTP ${response.status}).`);
       }
       setEditing(false);
       setRefreshSnapshots(false);
@@ -229,8 +234,8 @@ export function AdminQuotationDetailsClient({ quotationId }: { quotationId: stri
       const response = await fetch(`${apiPrefix}/quotations/${quotationId}`, {
         method: "DELETE",
       });
-      const result = await readResponseJson<{ message?: string }>(response);
-      if (!response.ok) throw new Error(result.message ?? "Failed to delete");
+      const json = await readResponseJson<{ success?: boolean; error?: { message?: string } }>(response);
+      if (!response.ok) throw new Error(json.error?.message ?? "Failed to delete");
       if (!item) throw new Error("Missing quotation");
       const pid = item.projectId?.trim();
       router.replace(
@@ -380,6 +385,7 @@ export function AdminQuotationDetailsClient({ quotationId }: { quotationId: stri
             description={description}
             taxRate={taxRate}
             taxEnabled={taxEnabled}
+            currency={currency}
             onStatusChange={setStatus}
             onDocDateChange={setDocDate}
             onQuotationCodeChange={setQuotationCode}
@@ -388,6 +394,7 @@ export function AdminQuotationDetailsClient({ quotationId }: { quotationId: stri
             onDescriptionChange={setDescription}
             onTaxRateChange={setTaxRate}
             onTaxEnabledChange={setTaxEnabled}
+            onCurrencyChange={setCurrency}
           />
 
           <LineItemsCard
