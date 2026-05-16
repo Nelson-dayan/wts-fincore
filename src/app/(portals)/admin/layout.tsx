@@ -81,6 +81,9 @@ export default async function AdminPortalLayout({
               <PortalNavLink href="/admin/payments" match="prefix" className="w-full justify-start">
                 Payments
               </PortalNavLink>
+              <PortalNavLink href="/admin/accounts" match="prefix" className="w-full justify-start">
+                Accounts
+              </PortalNavLink>
               <PortalNavLink href="/admin/expenses" match="prefix" className="w-full justify-start">
                 Expenses
               </PortalNavLink>
@@ -155,6 +158,9 @@ export default async function AdminPortalLayout({
                 </PortalNavLink>
                 <PortalNavLink href="/admin/payments" match="prefix" className="w-full justify-start">
                   Payments
+                </PortalNavLink>
+                <PortalNavLink href="/admin/accounts" match="prefix" className="w-full justify-start">
+                  Accounts
                 </PortalNavLink>
                 <PortalNavLink href="/admin/expenses" match="prefix" className="w-full justify-start">
                   Expenses

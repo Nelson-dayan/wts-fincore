@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
 import { requireRole } from "@/lib/auth/require-role";
 import { connectDB } from "@/lib/db/connect";
-import { PaymentModel } from "@/lib/db/models";
+import { PaymentModel, PaymentAllocationModel } from "@/lib/db/models";
 import { authErrorResponse } from "@/lib/api/route-auth";
 import { parsePagination, parseSearch } from "@/lib/api/pagination";
 import { recordPayment } from "@/lib/services/business/payment.service";
-import { assertEmployeeCanAccessInvoice } from "@/lib/auth/employee-resource-access";
+import { assertEmployeeCanAccessInvoice, assertEmployeeCanAccessProject } from "@/lib/auth/employee-resource-access";
 
 export async function GET(req: Request) {
   try {
@@ -13,38 +13,52 @@ export async function GET(req: Request) {
     await connectDB();
     const url = new URL(req.url);
     const { page, limit, skip } = parsePagination(url.searchParams);
+    
     const invoiceId = url.searchParams.get("invoiceId");
+    const projectId = url.searchParams.get("projectId");
+    const accountId = url.searchParams.get("accountId");
 
     const filter: Record<string, any> = { isDeleted: { $ne: true } };
+
     if (invoiceId) {
       if (session.user.role === "employee") {
         try {
           await assertEmployeeCanAccessInvoice(session.user.id, invoiceId);
         } catch (e) {
-          if (e instanceof Error && e.message === "FORBIDDEN") {
-            return NextResponse.json({ message: "Forbidden" }, { status: 403 });
-          }
-          if (e instanceof Error && e.message === "NOT_FOUND") {
-            return NextResponse.json({ items: [], page, limit, total: 0, hasMore: false });
-          }
-          throw e;
+          return NextResponse.json({ message: "Forbidden" }, { status: 403 });
         }
       }
-      filter.invoiceId = invoiceId;
+      const allocations = await PaymentAllocationModel.find({ invoiceId, isDeleted: { $ne: true } }).select("paymentId").lean();
+      filter._id = { $in: allocations.map(a => a.paymentId) };
+    } else if (projectId) {
+      if (session.user.role === "employee") {
+        try {
+          await assertEmployeeCanAccessProject(session.user.id, projectId);
+        } catch (e) {
+          return NextResponse.json({ message: "Forbidden" }, { status: 403 });
+        }
+      }
+      filter.projectId = projectId;
     } else if (session.user.role === "employee") {
-      return NextResponse.json({ message: "invoiceId is required" }, { status: 400 });
+      return NextResponse.json({ message: "Filter required" }, { status: 400 });
+    }
+
+    if (accountId && session.user.role === "admin") {
+      filter.accountId = accountId;
     }
 
     const [items, total] = await Promise.all([
       PaymentModel.find(filter)
-      .sort({ createdAt: -1 })
+      .sort({ receivedAt: -1, createdAt: -1 })
       .skip(skip)
       .limit(limit)
       .populate("createdBy", "name email")
-      .populate("invoiceId", "invoiceNumber")
+      .populate("accountId", "name currency")
+      .populate("projectId", "name")
       .lean(),
       PaymentModel.countDocuments(filter),
     ]);
+
     // Convert Mongoose Decimal128 to numbers for React rendering
     const sanitizedItems = JSON.parse(JSON.stringify(items), (key, value) => {
       if (value && typeof value === 'object' && value.$numberDecimal) {
@@ -64,21 +78,16 @@ export async function POST(req: Request) {
     const session = await requireRole(["admin", "employee"]);
     const body = await req.json();
 
+    const pId = String(body?.projectId ?? "").trim();
+    if (!pId) {
+      return NextResponse.json({ message: "projectId is required" }, { status: 400 });
+    }
+
     if (session.user.role === "employee") {
-      const invId = String(body?.invoiceId ?? "").trim();
-      if (!invId) {
-        return NextResponse.json({ message: "invoiceId is required" }, { status: 400 });
-      }
       try {
-        await assertEmployeeCanAccessInvoice(session.user.id, invId);
+        await assertEmployeeCanAccessProject(session.user.id, pId);
       } catch (e) {
-        if (e instanceof Error && e.message === "FORBIDDEN") {
-          return NextResponse.json({ message: "Forbidden" }, { status: 403 });
-        }
-        if (e instanceof Error && e.message === "NOT_FOUND") {
-          return NextResponse.json({ message: "Invoice not found" }, { status: 404 });
-        }
-        throw e;
+        return NextResponse.json({ message: "Forbidden" }, { status: 403 });
       }
     }
 

@@ -20,13 +20,18 @@ const paymentFeeSchema = new Schema(
 
 export const paymentSchema = new Schema(
   {
-    invoiceId: { type: Types.ObjectId, ref: "Invoice", required: true, index: true },
+    projectId: { type: Types.ObjectId, ref: "Project", required: true, index: true },
+    clientId: { type: Types.ObjectId, ref: "Client", required: true, index: true },
     companyId: { type: Types.ObjectId, ref: "Company", required: true, index: true },
+    accountId: { type: Types.ObjectId, ref: "Account", required: true, index: true },
     
-    type: { type: String, enum: ["PAYMENT", "REFUND"], default: "PAYMENT", index: true },
+    // Kept temporarily for backward compatibility during migration
+    invoiceId: { type: Types.ObjectId, ref: "Invoice", index: true },
+    
+    direction: { type: String, enum: ["INCOMING", "OUTGOING"], default: "INCOMING", index: true },
+    type: { type: String, enum: ["PAYMENT", "REFUND", "ADJUSTMENT"], default: "PAYMENT", index: true },
     status: { type: String, enum: ["PENDING", "COMPLETED", "FAILED", "REFUNDED"], default: "COMPLETED", index: true },
     
-    transactionId: { type: String },
     method: {
       type: String,
       enum: ["UPI", "BANK_TRANSFER", "PAYPAL", "STRIPE", "WISE", "CASH"],
@@ -34,24 +39,23 @@ export const paymentSchema = new Schema(
       index: true,
     },
     
-    sourceDetails: {
-      platform: { type: String, default: "" },
-      accountId: { type: String, default: "" }
-    },
-    
-    originalPaymentId: { type: Types.ObjectId, ref: "Payment" }, // Required if type === "REFUND"
+    referenceNumber: { type: String, trim: true },
+    /** @deprecated Use referenceNumber */
+    transactionId: { type: String },
     
     currency: { type: String, required: true },
-    baseCurrency: { type: String, default: "INR" },
-    exchangeRate: decimalField,
+    amount: decimalField, // Net amount received in account
     
-    intendedAmount: decimalField,
-    receivedAmount: decimalField,
-    intendedAmountBase: decimalField,
-    receivedAmountBase: decimalField,
+    // Optional: if we want to track the total sent vs net received
+    totalSentAmount: optionalDecimalField,
+    feeAmount: { ...optionalDecimalField, default: "0" },
+    feeAmountBase: { ...optionalDecimalField, default: "0" },
     
-    fees: { type: [paymentFeeSchema], default: [] },
-    percentageOfInvoice: optionalDecimalField,
+    // Base Currency (e.g. INR) conversion for reporting
+    exchangeRateToBase: decimalField,
+    amountBase: decimalField,
+    
+    receivedAt: { type: Date, default: Date.now, index: true },
     
     note: { type: String, default: "" },
     
@@ -64,5 +68,6 @@ export const paymentSchema = new Schema(
   schemaOptions
 );
 
-paymentSchema.index({ invoiceId: 1, createdAt: 1 });
-paymentSchema.index({ transactionId: 1 }, { unique: true, sparse: true });
+paymentSchema.index({ projectId: 1, createdAt: -1 });
+paymentSchema.index({ accountId: 1, createdAt: -1 });
+paymentSchema.index({ referenceNumber: 1 }, { unique: true, sparse: true });

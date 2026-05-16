@@ -1,4 +1,5 @@
 export const DEFAULT_CURRENCY = "INR";
+export const SYSTEM_BASE_CURRENCY = "INR";
 export const DECIMAL_PRECISION = 2;
 
 export const SUPPORTED_CURRENCIES = [

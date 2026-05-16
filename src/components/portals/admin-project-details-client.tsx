@@ -45,6 +45,16 @@ type ProjectDetailsPayload = {
   quotations?: Array<{ _id: string; quotationNumber: string; status: string; createdAt: string }>;
   purchaseOrders?: Array<{ _id: string; poNumber: string; type: string; status: string; createdAt: string }>;
   invoices?: Array<{ _id: string; invoiceNumber: string; status: string; dueDate?: string; createdAt: string }>;
+  payments?: Array<{
+    _id: string;
+    amount: number;
+    currency: string;
+    method: string;
+    referenceNumber?: string;
+    receivedAt: string;
+    accountId?: { name: string; currency: string };
+    createdAt: string;
+  }>;
   expenses?: Array<{
     _id: string;
     title: string;
@@ -61,6 +71,8 @@ type ProjectDetailsPayload = {
   };
   message?: string;
 };
+
+import { RecordPaymentModal } from "@/components/portals/record-payment-modal";
 
 function normalizeBudget(value: unknown): string {
   if (value == null) return "";
@@ -158,6 +170,7 @@ export function AdminProjectDetailsClient({
     fixCurrency: false,
   });
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [paymentModalOpen, setPaymentModalOpen] = useState(false);
 
   const load = useCallback(async () => {
     const response = await fetch(`${apiPrefix}/projects/${encodeURIComponent(projectId)}`, {
@@ -482,20 +495,23 @@ export function AdminProjectDetailsClient({
       </Card>
 
       <div className="mb-2 flex flex-wrap justify-end gap-2">
+        <Button size="sm" className="bg-brand hover:bg-brand/90" onClick={() => setPaymentModalOpen(true)}>
+          Record Payment
+        </Button>
         <Link href={`${pathPrefix}/quotations?projectId=${projectId}#quotation-builder`}>
           <Button size="sm">Create quotation</Button>
         </Link>
         <Link href={`${pathPrefix}/quotations?projectId=${projectId}`}>
-          <Button size="sm" variant="outline">View All Quotations for Project</Button>
+          <Button size="sm" variant="outline">Quotations</Button>
         </Link>
         <Link href={`${pathPrefix}/purchase-orders?projectId=${projectId}`}>
-          <Button size="sm" variant="outline">View All POs for Project</Button>
+          <Button size="sm" variant="outline">POs</Button>
         </Link>
         <Link href={`${pathPrefix}/invoices?projectId=${projectId}`}>
-          <Button size="sm" variant="outline">View All Invoices for Project</Button>
+          <Button size="sm" variant="outline">Invoices</Button>
         </Link>
         <Link href={`${pathPrefix}/expenses`}>
-          <Button size="sm" variant="outline">All expenses</Button>
+          <Button size="sm" variant="outline">Expenses</Button>
         </Link>
       </div>
 
@@ -533,6 +549,24 @@ export function AdminProjectDetailsClient({
           </CardContent>
         </Card>
       </div>
+
+      <SectionTable
+        title="Payments Ledger"
+        columns={[
+          { key: "receivedAt", label: "Date" },
+          { key: "amountDisplay", label: "Amount" },
+          { key: "accountDisplay", label: "Account" },
+          { key: "method", label: "Method" },
+          { key: "referenceNumber", label: "Reference" },
+        ]}
+        rows={(data.payments ?? []).map((p) => ({
+          ...p,
+          receivedAt: new Date(String(p.receivedAt)).toLocaleDateString(),
+          amountDisplay: `${p.currency} ${formatAed(p.amount)}`,
+          accountDisplay: (p.accountId as any)?.name || "-",
+        }))}
+      />
+
       <SectionTable
         title="Quotations"
         columns={[
@@ -586,6 +620,14 @@ export function AdminProjectDetailsClient({
           amount: formatAed(ex.amount),
           createdAt: new Date(String(ex.createdAt)).toLocaleString(),
         }))}
+      />
+
+      <RecordPaymentModal
+        isOpen={paymentModalOpen}
+        onClose={() => setPaymentModalOpen(false)}
+        onSuccess={load}
+        apiPrefix={apiPrefix}
+        initialProjectId={projectId}
       />
     </div>
   );
