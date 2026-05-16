@@ -98,7 +98,7 @@ export function AdminPaymentsPageClient({ apiPrefix }: { apiPrefix: string }) {
     const inv = projectInvoices.find((i) => String(i._id) === invId) || null;
     setSelectedInvoice(inv);
     if (inv) {
-      const invCurrency = inv.invoiceType === "usd" ? "USD" : "AED";
+      const invCurrency = String(inv.currency || inv.invoiceType || "AED").toUpperCase();
       setCurrency(invCurrency);
       
       // Load default rate for the new currency
@@ -342,7 +342,7 @@ export function AdminPaymentsPageClient({ apiPrefix }: { apiPrefix: string }) {
                             { value: "", label: "Choose invoice..." },
                             ...projectInvoices.map(inv => ({
                               value: inv._id,
-                              label: `${inv.invoiceNumber} (${inv.invoiceType === "usd" ? "USD" : "AED"} ${inv.total?.toLocaleString()}) · ${inv.status}`
+                               label: `${inv.invoiceNumber} (${String(inv.currency || inv.invoiceType || "AED").toUpperCase()} ${inv.total?.toLocaleString()}) · ${inv.status}`
                             }))
                           ]}
                         />
@@ -362,7 +362,7 @@ export function AdminPaymentsPageClient({ apiPrefix }: { apiPrefix: string }) {
                       <div className="text-right">
                         <p className="text-xs text-muted-foreground">Total</p>
                         <p className="font-mono text-sm">
-                          {selectedInvoice.invoiceType === "usd" ? "USD" : "AED"}{" "}
+                           {String(selectedInvoice.currency || selectedInvoice.invoiceType || "AED").toUpperCase()}{" "}
                           {selectedInvoice.total?.toLocaleString()}
                         </p>
                       </div>

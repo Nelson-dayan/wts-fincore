@@ -1,6 +1,6 @@
 import { Schema, Types } from "mongoose";
 import { optionalDecimalField, schemaOptions } from "@/lib/db/schemas/shared.schema";
-import { DEFAULT_CURRENCY } from "@/lib/constants/finance";
+import { DEFAULT_CURRENCY, SUPPORTED_CURRENCY_VALUES } from "@/lib/constants/finance";
 
 
 export const projectSchema = new Schema(
@@ -24,7 +24,7 @@ export const projectSchema = new Schema(
     },
     
     // New Advanced B2B Fields
-    currency: { type: String, default: DEFAULT_CURRENCY, trim: true },
+    currency: { type: String, enum: SUPPORTED_CURRENCY_VALUES, default: DEFAULT_CURRENCY, trim: true },
     category: { type: String, default: "", trim: true },
     clientReference: { type: String, default: "", trim: true },
     notes: { type: String, default: "" },

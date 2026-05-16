@@ -15,6 +15,7 @@ export type InvoiceRow = {
   total?: number;
   companyId?: string;
   invoiceType?: "aed" | "usd";
+  currency?: string;
   totalsCache?: {
     totalIntendedBase: number;
     totalReceivedBase: number;
@@ -67,6 +68,7 @@ export function InvoiceSearchPicker({
           total: p.total,
           companyId: p.companyId,
           invoiceType: p.invoiceType,
+          currency: p.currency,
           totalsCache: p.totalsCache,
           fixCurrency: p.fixCurrency,
           exchangeRate: p.exchangeRate,
@@ -174,7 +176,7 @@ export function InvoiceSearchPicker({
                   >
                     <span className="min-w-0 flex-1 font-medium text-foreground">{p.invoiceNumber}</span>
                     <span className="shrink-0 text-xs text-muted-foreground font-mono">
-                      {p.invoiceType === "usd" ? "USD" : "AED"} {p.total?.toLocaleString()}
+                      {String(p.currency || p.invoiceType || "AED").toUpperCase()} {p.total?.toLocaleString()}
                     </span>
                     {p.status ? (
                       <span className="shrink-0 rounded-md bg-muted px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground ml-2">

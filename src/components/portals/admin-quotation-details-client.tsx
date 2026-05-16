@@ -36,6 +36,7 @@ export function AdminQuotationDetailsClient({ quotationId }: { quotationId: stri
   const [refreshSnapshots, setRefreshSnapshots] = useState(false);
 
   const [status, setStatus] = useState<QuotationPayload["status"]>("draft");
+  const [currency, setCurrency] = useState("AED");
   const [quotationCode, setQuotationCode] = useState("");
   const [internalNotes, setInternalNotes] = useState("");
   const [docDate, setDocDate] = useState("");
@@ -70,6 +71,7 @@ export function AdminQuotationDetailsClient({ quotationId }: { quotationId: stri
     if (!q) throw new Error("Missing quotation");
     setItem(q);
     setStatus(q.status);
+    setCurrency(q.currency || "AED");
     setQuotationCode(
       String(q.documentInfo.quotationCode ?? q.documentInfo.geCode ?? "").trim()
     );
@@ -204,6 +206,7 @@ export function AdminQuotationDetailsClient({ quotationId }: { quotationId: stri
             confirmDate: confirmDate === "" ? undefined : confirmDate,
           },
           status,
+          currency,
           internalNotes,
         }),
       });
@@ -382,6 +385,7 @@ export function AdminQuotationDetailsClient({ quotationId }: { quotationId: stri
             description={description}
             taxRate={taxRate}
             taxEnabled={taxEnabled}
+            currency={currency}
             onStatusChange={setStatus}
             onDocDateChange={setDocDate}
             onQuotationCodeChange={setQuotationCode}
@@ -390,6 +394,7 @@ export function AdminQuotationDetailsClient({ quotationId }: { quotationId: stri
             onDescriptionChange={setDescription}
             onTaxRateChange={setTaxRate}
             onTaxEnabledChange={setTaxEnabled}
+            onCurrencyChange={setCurrency}
           />
 
           <LineItemsCard

@@ -1,5 +1,6 @@
 import { Schema, Types } from "mongoose";
 import { schemaOptions } from "@/lib/db/schemas/shared.schema";
+import { DEFAULT_CURRENCY, SUPPORTED_CURRENCY_VALUES } from "@/lib/constants/finance";
 
 export const clientSchema = new Schema(
   {
@@ -9,7 +10,7 @@ export const clientSchema = new Schema(
     
     // New Advanced B2B Fields
     taxId: { type: String, default: "", trim: true },
-    currency: { type: String, default: "AED", trim: true },
+    currency: { type: String, enum: SUPPORTED_CURRENCY_VALUES, default: DEFAULT_CURRENCY, trim: true },
     paymentTerms: { type: String, default: "", trim: true },
     notes: { type: String, default: "" },
 

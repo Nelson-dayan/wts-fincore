@@ -1,6 +1,6 @@
 import { Schema, Types } from "mongoose";
 import { optionalDecimalField, schemaOptions } from "@/lib/db/schemas/shared.schema";
-import { DEFAULT_CURRENCY } from "@/lib/constants/finance";
+import { DEFAULT_CURRENCY, SUPPORTED_CURRENCY_VALUES } from "@/lib/constants/finance";
 
 
 export const purchaseOrderSchema = new Schema(
@@ -12,7 +12,7 @@ export const purchaseOrderSchema = new Schema(
     fileUrl: { type: String, default: "" },
     externalPoNumber: { type: String, default: "" },
     generatedFromQuotation: { type: Boolean, default: false },
-    currency: { type: String, default: DEFAULT_CURRENCY },
+    currency: { type: String, enum: SUPPORTED_CURRENCY_VALUES, default: DEFAULT_CURRENCY },
     exchangeRate: optionalDecimalField,
     totalAmount: optionalDecimalField,
     totalAmountBase: optionalDecimalField,

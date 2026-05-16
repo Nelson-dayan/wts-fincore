@@ -25,6 +25,7 @@ function toDocData(item: Item): InvoiceDocData {
   return {
     invoiceNumber: item.invoiceNumber,
     invoiceType: item.invoiceType ?? "aed",
+    currency: item.currency,
     documentInfo: item.documentInfo,
     clientSnapshot: item.clientSnapshot,
     companySnapshot: item.companySnapshot,
@@ -118,14 +119,15 @@ export function AdminInvoiceDetailClient({
     const manualWords = String((item.extras as Record<string, unknown>).amountInWords ?? "").trim();
     return {
       ...base,
+      currency: item.currency,
       totals: liveTotals,
       extras: {
         ...base.extras,
         amountInWords:
           manualWords ||
-          (item.invoiceType === "usd"
-            ? `${liveTotals.total.toFixed(2)} US Dollars Only.`
-            : aedAmountInWords(liveTotals.total)),
+          (item.currency === "AED"
+            ? aedAmountInWords(liveTotals.total)
+            : `${liveTotals.total.toFixed(2)} ${item.currency || "USD"} Only.`),
       },
     };
   }, [item, liveTotals]);
@@ -158,6 +160,7 @@ export function AdminInvoiceDetailClient({
         const payload = {
           invoiceNumber: item.invoiceNumber,
           invoiceType: item.invoiceType,
+          currency: item.currency,
           status: item.status,
           dueDate: item.dueDate,
           documentInfo: item.documentInfo,
@@ -369,7 +372,7 @@ export function AdminInvoiceDetailClient({
                 <PaymentsCard 
                   invoiceId={item._id} 
                   companyId={String(item.companyId || "")} 
-                  invoiceCurrency={item.currency || (item.invoiceType === "usd" ? "USD" : "AED")}
+                  invoiceCurrency={item.currency || String(item.invoiceType ?? "AED").toUpperCase()}
                   invoiceExchangeRate={item.exchangeRate || 1}
                   invoiceTotalAmount={liveTotals.total}
                   invoiceTotalsCache={item.totalsCache}

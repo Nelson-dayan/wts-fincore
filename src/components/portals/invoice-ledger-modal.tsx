@@ -59,7 +59,7 @@ export function InvoiceLedgerModal({ invoiceId, apiPrefix, onClose }: InvoiceLed
   const totalReceived = cache.totalReceivedBase || 0;
   const balance = totalIntended - totalReceived;
   const isPaid = invoice.status === "PAID";
-  const currency = invoice.invoiceType === "usd" ? "USD" : "AED";
+  const currency = String(invoice.currency || invoice.invoiceType || "AED").toUpperCase();
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-in fade-in duration-200">
