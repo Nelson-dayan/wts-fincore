@@ -9,7 +9,8 @@ export const ACTIVITY_ACTIONS = [
   "QUOTATION_UPDATED",
   "QUOTATION_DELETED",
   "EXPENSE_CREATED",
-  "PAYMENT_DELETED"
+  "PAYMENT_DELETED",
+  "TRANSFER_CREATED"
 ] as const;
 
 export type ActivityAction = typeof ACTIVITY_ACTIONS[number];

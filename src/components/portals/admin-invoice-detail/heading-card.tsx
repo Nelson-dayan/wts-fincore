@@ -27,7 +27,7 @@ export function HeadingCard({ item, extras, onItemChange, onPatchExtra, companyR
       </CardHeader>
       <CardContent className="space-y-6">
         <div className="grid gap-3 sm:grid-cols-2">
-          <div className="grid gap-3 sm:grid-cols-2 sm:col-span-2">
+          <div className="grid gap-3 sm:grid-cols-3 sm:col-span-2">
             <div className="space-y-1.5">
               <Label htmlFor="inv-type">Invoice formatting (Type)</Label>
               <Dropdown
@@ -73,6 +73,24 @@ export function HeadingCard({ item, extras, onItemChange, onPatchExtra, companyR
                   onPatchExtra("footerCurrencyLine", `CURRENCY IN ${val}`);
                 }}
                 options={[...SUPPORTED_CURRENCIES]}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="inv-status">Invoice Status</Label>
+              <Dropdown
+                id="inv-status"
+                className="h-10 rounded-lg border-input/90 bg-background text-sm focus-visible:ring-1 focus-visible:ring-primary font-semibold text-primary"
+                value={item.status || "DRAFT"}
+                onChange={(e) => {
+                  onItemChange({ ...item, status: e.target.value });
+                }}
+                options={[
+                  { value: "DRAFT", label: "DRAFT" },
+                  { value: "SENT", label: "SENT" },
+                  { value: "PAID", label: "PAID" },
+                  { value: "PARTIAL", label: "PARTIAL" },
+                  { value: "OVERDUE", label: "OVERDUE" },
+                ]}
               />
             </div>
           </div>

@@ -24,7 +24,6 @@ export function CreateProjectForm() {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [budget, setBudget] = useState("");
-  const [currency, setCurrency] = useState("AED");
   const [category, setCategory] = useState("");
   const [clientReference, setClientReference] = useState("");
   const [notes, setNotes] = useState("");
@@ -95,7 +94,7 @@ export function CreateProjectForm() {
           clientId,
           status,
           priority,
-          currency,
+          currency: "INR",
           category,
           clientReference,
           notes,
@@ -133,22 +132,13 @@ export function CreateProjectForm() {
           </div>
           <div className="space-y-1">
             <Label htmlFor="project-budget">Budget</Label>
-            <div className="flex gap-2">
-              <Select
-                id="project-currency"
-                value={currency}
-                onChange={(e) => setCurrency(e.target.value)}
-                className="w-24"
-                options={[...SUPPORTED_CURRENCIES]}
-              />
-              <Input
-                id="project-budget"
-                type="number"
-                value={budget}
-                onChange={(e) => setBudget(e.target.value)}
-                className="flex-1"
-              />
-            </div>
+            <Input
+              id="project-budget"
+              type="number"
+              value={budget}
+              onChange={(e) => setBudget(e.target.value)}
+              placeholder="e.g. 50000"
+            />
           </div>
           <div className="space-y-1">
             <Label htmlFor="project-category">Category</Label>

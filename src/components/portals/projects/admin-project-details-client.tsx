@@ -372,28 +372,6 @@ export function AdminProjectDetailsClient({
                 <Input type="number" value={form.budget} onChange={(e) => setForm((f) => ({ ...f, budget: e.target.value }))} />
               </div>
               <div className="space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">Currency</label>
-                <div className="flex gap-2 items-center">
-                  <div className="flex-1">
-                    <Select
-                      value={form.currency}
-                      onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setForm((f) => ({ ...f, currency: e.target.value }))}
-                      options={[...SUPPORTED_CURRENCIES]}
-                    />
-                  </div>
-                  <div className="flex items-center gap-1.5 ml-2 shrink-0">
-                    <input 
-                      type="checkbox" 
-                      id="fixCurrency"
-                      checked={form.fixCurrency} 
-                      onChange={(e) => setForm((f) => ({ ...f, fixCurrency: e.target.checked }))}
-                      className="size-4 rounded border-border bg-background"
-                    />
-                    <label htmlFor="fixCurrency" className="text-xs font-medium cursor-pointer">Fix Currency</label>
-                  </div>
-                </div>
-              </div>
-              <div className="space-y-1">
                 <label className="text-xs font-medium text-muted-foreground">Priority</label>
                 <Select
                   value={form.priority}
@@ -455,10 +433,9 @@ export function AdminProjectDetailsClient({
                 <p className="font-medium text-sm">{data.project?.category || "-"}</p>
               </div>
               <div className="space-y-1 border p-3 rounded-lg bg-muted/10">
-                <p className="text-[10px] uppercase font-semibold text-muted-foreground">Budget & Currency</p>
+                <p className="text-[10px] uppercase font-semibold text-muted-foreground">Budget</p>
                 <p className="font-medium text-sm">
-                  {data.project?.currency || "AED"} {normalizeBudget(data.project?.budget) || "-"} 
-                  {data.project?.fixCurrency && <span className="ml-2 text-[10px] bg-brand/10 text-brand px-1.5 py-0.5 rounded-full uppercase tracking-wider font-bold">Locked</span>}
+                  {data.project?.currency || "INR"} {normalizeBudget(data.project?.budget) || "-"} 
                 </p>
               </div>
               <div className="space-y-1 border p-3 rounded-lg bg-muted/10">
@@ -592,7 +569,7 @@ export function AdminProjectDetailsClient({
           createdAt: new Date(String(po.createdAt)).toLocaleString(),
         }))}
       />
-      <AdminInvoicesCreateHelper projectId={projectId} embedded />
+    {/* <AdminInvoicesCreateHelper projectId={projectId} embedded /> */}
       <SectionTable
         title="Invoices"
         columns={[

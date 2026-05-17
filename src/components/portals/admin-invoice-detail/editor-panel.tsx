@@ -60,14 +60,6 @@ export function EditorPanel(props: EditorPanelProps) {
         >
           {pdfExporting ? "PDF…" : "Download PDF"}
         </Button>
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={onOpenLedger}
-          className="border-primary/50 text-primary hover:bg-primary/5 font-bold"
-        >
-          Financial Statement
-        </Button>
       </div>
       <HeadingCard item={item} extras={extras} onItemChange={onItemChange} onPatchExtra={onPatchExtra} companyRates={companyRates} />
       <CompanyCard item={item} onItemChange={onItemChange} onPatchExtra={onPatchExtra} />

@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { EditorPanel } from "@/components/portals/admin-invoice-detail/editor-panel";
-import { PaymentsCard } from "@/components/portals/admin-invoice-detail/payments-card";
 import { InvoicePrintStyle } from "@/components/portals/admin-invoice-detail/print-style";
 import type { Bank, Item } from "@/components/portals/admin-invoice-detail/types";
 import { readImageFileAsDataUrl } from "@/components/portals/admin-invoice-detail/utils";
@@ -17,7 +16,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { SaveSuccessToast } from "@/components/ui/save-success-toast";
 import { usePortalConfig } from "@/components/portals/portal-config-context";
 import { useSaveFeedback } from "@/lib/hooks/use-save-feedback";
-import { InvoiceLedgerModal } from "@/components/portals/invoice-ledger-modal";
 
 
 function toDocData(item: Item): InvoiceDocData {
@@ -366,32 +364,11 @@ export function AdminInvoiceDetailClient({
               <p className="text-muted-foreground mb-2 text-xs print:hidden">Live preview</p>
               <InvoiceSecDocument data={previewDocData} />
             </div>
-
-            {invoiceId && item._id && (
-              <div className="print:hidden">
-                <PaymentsCard 
-                  invoiceId={item._id} 
-                  companyId={String(item.companyId || "")} 
-                  invoiceCurrency={item.currency || String(item.invoiceType ?? "AED").toUpperCase()}
-                  invoiceExchangeRate={item.exchangeRate || 1}
-                  invoiceTotalAmount={liveTotals.total}
-                  invoiceTotalsCache={item.totalsCache}
-                  fixCurrency={item.fixCurrency}
-                />
-              </div>
-            )}
           </div>
         </div>
       ) : null}
 
       <InvoicePrintStyle />
-      {ledgerOpen && item?._id && (
-        <InvoiceLedgerModal 
-          invoiceId={item._id} 
-          apiPrefix={apiPrefix} 
-          onClose={() => setLedgerOpen(false)} 
-        />
-      )}
     </div>
   );
 }

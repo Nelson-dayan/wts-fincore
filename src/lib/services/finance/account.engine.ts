@@ -10,7 +10,8 @@ export async function deposit(
   paymentId: string | Types.ObjectId | undefined,
   createdBy: string | Types.ObjectId,
   session: ClientSession,
-  note: string = ""
+  note: string = "",
+  transferId?: string | Types.ObjectId
 ) {
   const account = await AccountModel.findById(accountId).session(session);
   if (!account) throw new Error("Account not found");
@@ -36,6 +37,7 @@ export async function deposit(
     {
       accountId,
       paymentId,
+      transferId,
       type: "CREDIT",
       amount,
       currency: account.currency,
@@ -58,7 +60,8 @@ export async function withdraw(
   paymentId: string | Types.ObjectId | undefined,
   createdBy: string | Types.ObjectId,
   session: ClientSession,
-  note: string = ""
+  note: string = "",
+  transferId?: string | Types.ObjectId
 ) {
   const account = await AccountModel.findById(accountId).session(session);
   if (!account) throw new Error("Account not found");
@@ -84,6 +87,7 @@ export async function withdraw(
     {
       accountId,
       paymentId,
+      transferId,
       type: "DEBIT",
       amount,
       currency: account.currency,
