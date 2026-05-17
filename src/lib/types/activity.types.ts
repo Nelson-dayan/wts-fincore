@@ -8,7 +8,8 @@ export const ACTIVITY_ACTIONS = [
   "QUOTATION_CREATED",
   "QUOTATION_UPDATED",
   "QUOTATION_DELETED",
-  "EXPENSE_CREATED"
+  "EXPENSE_CREATED",
+  "PAYMENT_DELETED"
 ] as const;
 
 export type ActivityAction = typeof ACTIVITY_ACTIONS[number];
