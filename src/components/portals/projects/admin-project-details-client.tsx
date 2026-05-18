@@ -22,7 +22,7 @@ type ProjectDetailsPayload = {
     _id: string;
     name: string;
     description?: string;
-    status: "lead" | "in_progress" | "completed" | "on_hold";
+    status: "active" | "completed" | "on_hold";
     priority: "low" | "medium" | "high";
     budget?: unknown;
     clientId: string;
@@ -157,11 +157,11 @@ export function AdminProjectDetailsClient({
   const [form, setForm] = useState({
     name: "",
     description: "",
-    status: "lead" as "lead" | "in_progress" | "completed" | "on_hold",
+    status: "active" as "active" | "completed" | "on_hold",
     priority: "medium" as "low" | "medium" | "high",
     budget: "",
     currency: "AED",
-    category: "",
+    category: "Fixed Price",
     clientReference: "",
     notes: "",
     startDate: "",
@@ -194,11 +194,11 @@ export function AdminProjectDetailsClient({
       setForm({
         name: payload.project.name ?? "",
         description: payload.project.description ?? "",
-        status: payload.project.status ?? "lead",
+        status: payload.project.status ?? "active",
         priority: payload.project.priority ?? "medium",
         budget: normalizedBudget,
         currency: payload.project.currency ?? "AED",
-        category: payload.project.category ?? "",
+        category: payload.project.category ?? "Fixed Price",
         clientReference: payload.project.clientReference ?? "",
         notes: payload.project.notes ?? "",
         startDate: payload.project.startDate ? new Date(payload.project.startDate).toISOString().split('T')[0] : "",
@@ -352,8 +352,7 @@ export function AdminProjectDetailsClient({
                     setForm((f) => ({ ...f, status: e.target.value as typeof f.status }))
                   }
                   options={[
-                    { value: "lead", label: "Lead" },
-                    { value: "in_progress", label: "In Progress" },
+                    { value: "active", label: "Active" },
                     { value: "completed", label: "Completed" },
                     { value: "on_hold", label: "On Hold" },
                   ]}
@@ -361,7 +360,16 @@ export function AdminProjectDetailsClient({
               </div>
               <div className="space-y-1">
                 <label className="text-xs font-medium text-muted-foreground">Category</label>
-                <Input value={form.category} onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))} placeholder="e.g. Retainer, Fixed Price" />
+                <Select
+                  value={form.category}
+                  onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))}
+                  options={[
+                    { value: "Fixed Price", label: "Fixed Price" },
+                    { value: "Retainer", label: "Retainer" },
+                    { value: "Time & Materials", label: "Time & Materials" },
+                    { value: "Other", label: "Other" },
+                  ]}
+                />
               </div>
 
               <div className="space-y-2 sm:col-span-2 mt-2 pt-2 border-t">

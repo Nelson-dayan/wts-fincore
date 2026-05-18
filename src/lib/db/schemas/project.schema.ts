@@ -25,7 +25,12 @@ export const projectSchema = new Schema(
     
     // New Advanced B2B Fields
     currency: { type: String, enum: SUPPORTED_CURRENCY_VALUES, default: DEFAULT_CURRENCY, trim: true },
-    category: { type: String, default: "", trim: true },
+    category: {
+      type: String,
+      enum: ["Fixed Price", "Retainer", "Time & Materials", "Other"],
+      default: "Fixed Price",
+      trim: true,
+    },
     clientReference: { type: String, default: "", trim: true },
     notes: { type: String, default: "" },
     
