@@ -223,10 +223,9 @@ export async function PATCH(req: Request, ctx: Ctx) {
         tax: toDecimal128(tax),
         total: toDecimal128(total),
       };
-      const exRate = inv.exchangeRate ? Number(inv.exchangeRate) : 1;
-      inv.totalAmountBase = toDecimal128(total * exRate);
+      inv.totalAmountBase = toDecimal128(total);
       if (inv.totalsCache) {
-        inv.totalsCache.totalIntendedBase = toDecimal128(total * exRate);
+        inv.totalsCache.totalIntendedBase = toDecimal128(total);
       }
       if (inv.extras == null) {
         inv.set("extras", {});

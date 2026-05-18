@@ -98,8 +98,7 @@ export async function recordPayment(input: RecordPaymentInput) {
       if (input.allocations && input.allocations.length > 0) {
         for (const alloc of input.allocations) {
           if (alloc.invoiceId && alloc.amount > 0) {
-            const invoice = await InvoiceModel.findById(alloc.invoiceId).session(session);
-            const rateToBase = invoice?.exchangeRate ? Number(invoice.exchangeRate) : 1;
+            const rateToBase = 1;
 
             await allocationEngine.allocate(
               paymentId,

@@ -101,7 +101,7 @@ export function InvoiceLedgerModal({ invoiceId, apiPrefix, onClose }: InvoiceLed
               <p className="text-[10px] uppercase font-black tracking-[0.2em] text-muted-foreground mb-2">Invoice Amount</p>
               <p className="text-2xl font-black">{currency} {invoice.totals?.total?.toLocaleString()}</p>
               <p className="text-xs font-medium text-muted-foreground mt-1 flex items-center gap-1">
-                <IndianRupee className="w-3 h-3" /> {totalIntended.toLocaleString()} (Base @ {invoice.exchangeRate})
+                <IndianRupee className="w-3 h-3" /> {totalIntended.toLocaleString()}
               </p>
             </div>
 

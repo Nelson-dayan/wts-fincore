@@ -71,7 +71,6 @@ export const invoiceSchema = new Schema(
     invoiceType: { type: String, enum: ["aed", "usd"], default: "aed", index: true },
     currency: { type: String, enum: SUPPORTED_CURRENCY_VALUES, default: DEFAULT_CURRENCY },
     baseCurrency: { type: String, default: DEFAULT_CURRENCY },
-    exchangeRate: decimalField,
     projectId: { type: Types.ObjectId, ref: "Project", required: true, index: true },
     poId: { type: Types.ObjectId, ref: "PurchaseOrder", index: true },
     createdBy: { type: Types.ObjectId, ref: "User", required: true, index: true },

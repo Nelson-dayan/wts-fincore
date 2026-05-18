@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
 import { readResponseJson } from "@/lib/http/read-response-json";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { SaveSuccessToast } from "@/components/ui/save-success-toast";
@@ -301,186 +302,236 @@ export function AdminProjectDetailsClient({
           {error}
         </div>
       ) : null}
-      <Card className="mb-4">
-        <CardHeader>
-          <div className="flex items-center justify-between gap-2">
-            <CardTitle className="text-base">Project Profile</CardTitle>
-            <div className="flex gap-2">
-              {allowProjectMutations ? (
-                editing ? (
-                <>
-                  <Button size="sm" onClick={() => void saveProject()} disabled={saving}>
-                    Save
-                  </Button>
-                  <Button size="sm" variant="outline" onClick={() => setEditing(false)}>
-                    Cancel
-                  </Button>
-                </>
-              ) : (
-                <>
-                  <Button size="sm" variant="outline" onClick={() => setEditing(true)}>
-                    Edit
-                  </Button>
-                  <Button size="sm" variant="destructive" onClick={() => setDeleteConfirmOpen(true)} disabled={saving}>
-                    Delete
-                  </Button>
-                </>
-              )
-              ) : null}
+      <Card className="overflow-hidden border-border/50 bg-background/80 shadow-xl backdrop-blur">
+        {/* Header */}
+        <div className="relative border-b border-border/50 bg-gradient-to-r from-primary/10 via-background to-background px-6 py-5">
+
+          <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+
+            {/* Left */}
+            <div className="flex items-center gap-4">
+
+              <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10 text-2xl font-bold text-primary shadow-inner">
+                {data.project?.name?.charAt(0) || "P"}
+              </div>
+
+              <div className="space-y-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h2 className="text-2xl font-semibold tracking-tight">
+                    {data.project?.name || "Untitled Project"}
+                  </h2>
+
+                  <Badge
+                    variant="outline"
+                    className="rounded-full border-primary/20 bg-primary/5 text-primary"
+                  >
+                    {data.project?.status?.replace("_", " ")}
+                  </Badge>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+                  <span>
+                    {data.client
+                      ? `${data.client.name} • ${data.client.company}`
+                      : "No client assigned"}
+                  </span>
+
+                  <span className="h-1 w-1 rounded-full bg-muted-foreground/40" />
+
+                  <span>{data.project?.category || "Uncategorized"}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Actions */}
+            {allowProjectMutations && (
+              <div className="flex items-center gap-2">
+                {editing ? (
+                  <>
+                    <Button
+                      size="sm"
+                      className="rounded-xl shadow-sm"
+                      onClick={() => void saveProject()}
+                      disabled={saving}
+                    >
+                      Save Changes
+                    </Button>
+
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="rounded-xl"
+                      onClick={() => setEditing(false)}
+                    >
+                      Cancel
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="rounded-xl"
+                      onClick={() => setEditing(true)}
+                    >
+                      Edit Project
+                    </Button>
+
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      className="rounded-xl"
+                      onClick={() => setDeleteConfirmOpen(true)}
+                      disabled={saving}
+                    >
+                      Delete
+                    </Button>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+
+        <CardContent className="space-y-8 p-6">
+
+          {/* Quick Stats */}
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+
+            <div className="rounded-2xl border border-border/50 bg-muted/30 p-5">
+              <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                Budget
+              </p>
+
+              <p className="mt-2 text-2xl font-semibold tracking-tight">
+                {data.project?.currency || "INR"}{" "}
+                {normalizeBudget(data.project?.budget) || "-"}
+              </p>
+            </div>
+
+            <div className="rounded-2xl border border-border/50 bg-muted/30 p-5">
+              <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                Priority
+              </p>
+
+              <p className="mt-2 text-2xl font-semibold capitalize tracking-tight">
+                {data.project?.priority || "-"}
+              </p>
+            </div>
+
+            <div className="rounded-2xl border border-border/50 bg-muted/30 p-5">
+              <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                Start Date
+              </p>
+
+              <p className="mt-2 text-lg font-medium">
+                {data.project?.startDate
+                  ? new Date(data.project.startDate).toLocaleDateString()
+                  : "-"}
+              </p>
+            </div>
+
+            <div className="rounded-2xl border border-border/50 bg-muted/30 p-5">
+              <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                Target End
+              </p>
+
+              <p className="mt-2 text-lg font-medium">
+                {data.project?.targetEndDate
+                  ? new Date(data.project.targetEndDate).toLocaleDateString()
+                  : "-"}
+              </p>
             </div>
           </div>
-        </CardHeader>
-        <CardContent className="grid gap-4 sm:grid-cols-2">
-          {editing ? (
-            <>
-              <div className="space-y-2 sm:col-span-2">
-                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Core Info</p>
+
+          {/* Main Grid */}
+          <div className="grid gap-6 lg:grid-cols-3">
+
+            {/* Left */}
+            <div className="space-y-6 lg:col-span-2">
+
+              {/* Overview */}
+              <div className="rounded-2xl border border-border/50 bg-background p-6 shadow-sm">
+
+                <div className="mb-5 flex items-center gap-2">
+                  <div className="h-2 w-2 rounded-full bg-primary" />
+
+                  <h3 className="text-lg font-semibold">
+                    Project Overview
+                  </h3>
+                </div>
+
+                <div className="space-y-5">
+
+                  <div>
+                    <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                      Description
+                    </p>
+
+                    <p className="leading-7 text-muted-foreground">
+                      {data.project?.description || "No description provided."}
+                    </p>
+                  </div>
+
+                  <div>
+                    <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                      Internal Notes
+                    </p>
+
+                    <div className="rounded-xl bg-muted/40 p-4 text-sm leading-6 text-muted-foreground">
+                      {data.project?.notes || "No internal notes available."}
+                    </div>
+                  </div>
+                </div>
               </div>
-              <div className="space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">Project Name</label>
-                <Input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} />
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">Client Reference / PO</label>
-                <Input value={form.clientReference} onChange={(e) => setForm((f) => ({ ...f, clientReference: e.target.value }))} />
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">Status</label>
-                <Select
-                  value={form.status}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, status: e.target.value as typeof f.status }))
-                  }
-                  options={[
-                    { value: "active", label: "Active" },
-                    { value: "completed", label: "Completed" },
-                    { value: "on_hold", label: "On Hold" },
-                  ]}
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">Category</label>
-                <Select
-                  value={form.category}
-                  onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))}
-                  options={[
-                    { value: "Fixed Price", label: "Fixed Price" },
-                    { value: "Retainer", label: "Retainer" },
-                    { value: "Time & Materials", label: "Time & Materials" },
-                    { value: "Other", label: "Other" },
-                  ]}
-                />
+            </div>
+
+            {/* Right Sidebar */}
+            <div className="space-y-6">
+
+              {/* Client */}
+              <div className="rounded-2xl border border-border/50 bg-background p-5 shadow-sm">
+
+                <h3 className="mb-4 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                  Client
+                </h3>
+
+                <div className="flex items-center gap-3">
+
+                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 font-semibold text-primary">
+                    {data.client?.name?.charAt(0) || "C"}
+                  </div>
+
+                  <div>
+                    <p className="font-medium">
+                      {data.client?.name || "-"}
+                    </p>
+
+                    <p className="text-sm text-muted-foreground">
+                      {data.client?.company || "-"}
+                    </p>
+                  </div>
+                </div>
               </div>
 
-              <div className="space-y-2 sm:col-span-2 mt-2 pt-2 border-t">
-                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Financial & Priority</p>
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">Budget</label>
-                <Input type="number" value={form.budget} onChange={(e) => setForm((f) => ({ ...f, budget: e.target.value }))} />
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">Priority</label>
-                <Select
-                  value={form.priority}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, priority: e.target.value as typeof f.priority }))
-                  }
-                  options={[
-                    { value: "low", label: "Low" },
-                    { value: "medium", label: "Medium" },
-                    { value: "high", label: "High" },
-                  ]}
-                />
-              </div>
+              {/* Reference */}
+              <div className="rounded-2xl border border-border/50 bg-background p-5 shadow-sm">
 
-              <div className="space-y-2 sm:col-span-2 mt-2 pt-2 border-t">
-                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Timeline</p>
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">Start Date</label>
-                <Input type="date" value={form.startDate} onChange={(e) => setForm((f) => ({ ...f, startDate: e.target.value }))} />
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">Target End Date</label>
-                <Input type="date" value={form.targetEndDate} onChange={(e) => setForm((f) => ({ ...f, targetEndDate: e.target.value }))} />
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">Actual End Date</label>
-                <Input type="date" value={form.actualEndDate} onChange={(e) => setForm((f) => ({ ...f, actualEndDate: e.target.value }))} />
-              </div>
+                <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                  Client Reference
+                </h3>
 
-              <div className="space-y-2 sm:col-span-2 mt-2 pt-2 border-t">
-                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Additional Details</p>
-              </div>
-              <div className="space-y-1 sm:col-span-2">
-                <label className="text-xs font-medium text-muted-foreground">Description</label>
-                <Input value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} />
-              </div>
-              <div className="space-y-1 sm:col-span-2">
-                <label className="text-xs font-medium text-muted-foreground">Internal Notes</label>
-                <Input value={form.notes} onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))} placeholder="Private notes..." />
-              </div>
-            </>
-          ) : (
-            <>
-              <div className="space-y-1 border p-3 rounded-lg bg-muted/10">
-                <p className="text-[10px] uppercase font-semibold text-muted-foreground">Name</p>
-                <p className="font-medium text-sm">{data.project?.name ?? "-"}</p>
-              </div>
-              <div className="space-y-1 border p-3 rounded-lg bg-muted/10">
-                <p className="text-[10px] uppercase font-semibold text-muted-foreground">Client</p>
-                <p className="font-medium text-sm">{data.client ? `${data.client.name} (${data.client.company})` : "-"}</p>
-              </div>
-              <div className="space-y-1 border p-3 rounded-lg bg-muted/10">
-                <p className="text-[10px] uppercase font-semibold text-muted-foreground">Status & Priority</p>
-                <p className="font-medium text-sm capitalize">{data.project?.status?.replace('_', ' ') ?? "-"} • {data.project?.priority ?? "-"}</p>
-              </div>
-              <div className="space-y-1 border p-3 rounded-lg bg-muted/10">
-                <p className="text-[10px] uppercase font-semibold text-muted-foreground">Category</p>
-                <p className="font-medium text-sm">{data.project?.category || "-"}</p>
-              </div>
-              <div className="space-y-1 border p-3 rounded-lg bg-muted/10">
-                <p className="text-[10px] uppercase font-semibold text-muted-foreground">Budget</p>
-                <p className="font-medium text-sm">
-                  {data.project?.currency || "INR"} {normalizeBudget(data.project?.budget) || "-"} 
+                <p className="font-mono text-sm">
+                  {data.project?.clientReference || "N/A"}
                 </p>
               </div>
-              <div className="space-y-1 border p-3 rounded-lg bg-muted/10">
-                <p className="text-[10px] uppercase font-semibold text-muted-foreground">Client Reference</p>
-                <p className="font-medium text-sm">{data.project?.clientReference || "-"}</p>
-              </div>
-              
-              <div className="sm:col-span-2 grid grid-cols-1 sm:grid-cols-3 gap-4 border p-3 rounded-lg bg-muted/10">
-                <div>
-                  <p className="text-[10px] uppercase font-semibold text-muted-foreground">Start Date</p>
-                  <p className="font-medium text-sm">{data.project?.startDate ? new Date(data.project.startDate).toLocaleDateString() : "-"}</p>
-                </div>
-                <div>
-                  <p className="text-[10px] uppercase font-semibold text-muted-foreground">Target End Date</p>
-                  <p className="font-medium text-sm">{data.project?.targetEndDate ? new Date(data.project.targetEndDate).toLocaleDateString() : "-"}</p>
-                </div>
-                <div>
-                  <p className="text-[10px] uppercase font-semibold text-muted-foreground">Actual End Date</p>
-                  <p className="font-medium text-sm">{data.project?.actualEndDate ? new Date(data.project.actualEndDate).toLocaleDateString() : "-"}</p>
-                </div>
-              </div>
-
-              <div className="sm:col-span-2 space-y-1 border p-3 rounded-lg bg-muted/10">
-                <p className="text-[10px] uppercase font-semibold text-muted-foreground">Description</p>
-                <p className="text-sm">{data.project?.description || "-"}</p>
-              </div>
-              <div className="sm:col-span-2 space-y-1 border p-3 rounded-lg bg-muted/10">
-                <p className="text-[10px] uppercase font-semibold text-muted-foreground">Internal Notes</p>
-                <p className="text-sm">{data.project?.notes || "-"}</p>
-              </div>
-            </>
-          )}
+            </div>
+          </div>
         </CardContent>
       </Card>
 
       <div className="mb-2 flex flex-wrap justify-end gap-2">
-        <Button size="sm" className="bg-brand hover:bg-brand/90" onClick={() => setPaymentModalOpen(true)}>
+        <Button size="sm" className="" onClick={() => setPaymentModalOpen(true)}>
           Record Payment
         </Button>
         <Link href={`${pathPrefix}/quotations?projectId=${projectId}#quotation-builder`}>

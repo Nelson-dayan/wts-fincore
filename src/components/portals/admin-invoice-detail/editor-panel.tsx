@@ -29,11 +29,10 @@ type EditorPanelProps = {
   onSave: () => void;
   onDownloadPdf: () => void;
   onOpenLedger: () => void;
-  companyRates: { usdToInr: number; aedToInr: number; isLocked: boolean };
 };
 
 export function EditorPanel(props: EditorPanelProps) {
-  const { item, extras, bankAed, bankUsd, taxLabelPreview, liveTotals, saving, pdfExporting, msg, onItemChange, onPatchExtra, onPatchBank, onPatchLine, onAddLine, onRemoveLine, onCopyBillToShip, onSave, onDownloadPdf, onOpenLedger, companyRates } = props;
+  const { item, extras, bankAed, bankUsd, taxLabelPreview, liveTotals, saving, pdfExporting, msg, onItemChange, onPatchExtra, onPatchBank, onPatchLine, onAddLine, onRemoveLine, onCopyBillToShip, onSave, onDownloadPdf, onOpenLedger } = props;
 
   return (
     <div className="print:hidden space-y-4">
@@ -61,7 +60,7 @@ export function EditorPanel(props: EditorPanelProps) {
           {pdfExporting ? "PDF…" : "Download PDF"}
         </Button>
       </div>
-      <HeadingCard item={item} extras={extras} onItemChange={onItemChange} onPatchExtra={onPatchExtra} companyRates={companyRates} />
+      <HeadingCard item={item} extras={extras} onItemChange={onItemChange} onPatchExtra={onPatchExtra} />
       <CompanyCard item={item} onItemChange={onItemChange} onPatchExtra={onPatchExtra} />
       <BillShipCard item={item} extras={extras} onItemChange={onItemChange} onPatchExtra={onPatchExtra} onCopyBillToShip={onCopyBillToShip} />
       <LineItemsCard

@@ -48,7 +48,6 @@ type CompanyDocLean = {
   logoText?: string;
   signatureText?: string;
   defaultTax?: { taxRate?: number; taxEnabled?: boolean };
-  defaultExchangeRates?: { usdToInr?: number; aedToInr?: number; isLocked?: boolean };
 };
 
 /** Primary company row for invoice defaults (logo lives in `logoText` as data URL). */
@@ -66,7 +65,6 @@ async function getPrimaryCompanyForInvoice(): Promise<CompanyDocLean | null> {
     logoText: row.logoText,
     signatureText: row.signatureText,
     defaultTax: row.defaultTax,
-    defaultExchangeRates: row.defaultExchangeRates,
   };
 }
 
@@ -167,9 +165,6 @@ export async function createInvoiceForPurchaseOrder(
     docInfo && typeof docInfo.taxRate === "number" ? docInfo.taxRate : 5;
   let taxEnabled =
     docInfo && typeof docInfo.taxEnabled === "boolean" ? docInfo.taxEnabled : true;
-  const pt = primaryCompany?.defaultTax;
-  if (pt && typeof pt.taxRate === "number") taxRate = pt.taxRate;
-  if (pt && typeof pt.taxEnabled === "boolean") taxEnabled = pt.taxEnabled;
   if (invoiceType === "usd") {
     taxRate = 0;
     taxEnabled = false;
@@ -213,11 +208,6 @@ export async function createInvoiceForPurchaseOrder(
     lifecycleStatus: "DRAFT_HIDDEN",
     paymentStatus: "UNPAID",
     currency: quotation.currency ?? DEFAULT_CURRENCY,
-    exchangeRate: toDecimal128(
-      invoiceType === "usd" 
-        ? (primaryCompany?.defaultExchangeRates?.usdToInr || 83.5)
-        : (primaryCompany?.defaultExchangeRates?.aedToInr || 22.7)
-    ),
     companyId: (primaryCompany as any)?._id,
     projectId: po.projectId,
     poId: po._id,

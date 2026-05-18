@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Building2, Landmark, Loader2, Percent, Save } from "lucide-react";
+import { Building2, Landmark, Loader2, Save } from "lucide-react";
 import { DashboardPageHeader } from "@/components/dashboard/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -22,8 +22,6 @@ type CompanyData = {
   logoText?: string;
   signatureText?: string;
   isPrimary?: boolean;
-  defaultTax?: { taxRate?: number; taxEnabled?: boolean };
-  defaultExchangeRates?: { usdToInr?: number; aedToInr?: number; isLocked?: boolean };
 };
 
 function s(v: string | undefined | null): string {
@@ -40,8 +38,6 @@ export function AdminCompanyClient() {
     website: "",
     logoText: "",
     signatureText: "",
-    defaultTax: { taxRate: 0, taxEnabled: false },
-    defaultExchangeRates: { usdToInr: 83.5, aedToInr: 22.7, isLocked: false },
   });
   const [message, setMessage] = useState("");
   const [messageOk, setMessageOk] = useState(true);
@@ -63,7 +59,6 @@ export function AdminCompanyClient() {
       if (primaryPayload.item) {
         setPrimaryForm({
           ...primaryPayload.item,
-          defaultExchangeRates: primaryPayload.item.defaultExchangeRates ?? { usdToInr: 83.5, aedToInr: 22.7, isLocked: false }
         });
       }
       if (!opts?.quiet) setBootError("");
@@ -237,122 +232,7 @@ export function AdminCompanyClient() {
                     </div>
                   </div>
 
-              <div>
-                <h3 className="mb-4 flex items-center gap-2 text-sm font-semibold text-foreground">
-                  <Percent className="size-4 text-primary" aria-hidden />
-                  Quotation defaults
-                </h3>
-                <div className="grid gap-5 sm:grid-cols-2">
-                  <div className="space-y-1.5">
-                    <Label className="text-foreground/90">Default tax rate (%)</Label>
-                    <Input
-                      type="number"
-                      min={0}
-                      className="h-11 border-border/80 bg-background/60"
-                      value={String(primaryForm.defaultTax?.taxRate ?? 0)}
-                      onChange={(e) => {
-                        const n = e.target.value === "" ? 0 : Number(e.target.value);
-                        setPrimaryForm((f) => ({
-                          ...f,
-                          defaultTax: {
-                            taxRate: Number.isFinite(n) ? n : 0,
-                            taxEnabled: f.defaultTax?.taxEnabled ?? false,
-                          },
-                        }));
-                      }}
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-foreground/90">Tax on by default</Label>
-                    <Select
-                      className="h-11"
-                      value={String(primaryForm.defaultTax?.taxEnabled ?? false)}
-                      onChange={(e) =>
-                        setPrimaryForm((f) => ({
-                          ...f,
-                          defaultTax: {
-                            taxRate: f.defaultTax?.taxRate ?? 0,
-                            taxEnabled: e.target.value === "true",
-                          },
-                        }))
-                      }
-                      options={[
-                        { value: "false", label: "Off — manual per quote" },
-                        { value: "true", label: "On — apply rate above" },
-                      ]}
-                    />
-                  </div>
-                </div>
-              </div>
 
-              <div>
-                <h3 className="mb-4 flex items-center gap-2 text-sm font-semibold text-foreground">
-                  <Landmark className="size-4 text-primary" aria-hidden />
-                  Exchange Rates (Base to INR)
-                </h3>
-                <div className="grid gap-5 sm:grid-cols-3">
-                  <div className="space-y-1.5">
-                    <Label className="text-foreground/90">USD to INR</Label>
-                    <Input
-                      type="number"
-                      min={0}
-                      step={0.0001}
-                      className="h-11 border-border/80 bg-background/60"
-                      value={String(primaryForm.defaultExchangeRates?.usdToInr ?? 83.5)}
-                      onChange={(e) => {
-                        const n = e.target.value === "" ? 83.5 : Number(e.target.value);
-                        setPrimaryForm((f) => ({
-                          ...f,
-                          defaultExchangeRates: {
-                            ...f.defaultExchangeRates,
-                            usdToInr: Number.isFinite(n) ? n : 83.5,
-                          },
-                        }));
-                      }}
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-foreground/90">AED to INR</Label>
-                    <Input
-                      type="number"
-                      min={0}
-                      step={0.0001}
-                      className="h-11 border-border/80 bg-background/60"
-                      value={String(primaryForm.defaultExchangeRates?.aedToInr ?? 22.7)}
-                      onChange={(e) => {
-                        const n = e.target.value === "" ? 22.7 : Number(e.target.value);
-                        setPrimaryForm((f) => ({
-                          ...f,
-                          defaultExchangeRates: {
-                            ...f.defaultExchangeRates,
-                            aedToInr: Number.isFinite(n) ? n : 22.7,
-                          },
-                        }));
-                      }}
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-foreground/90">Lock Rates</Label>
-                    <Select
-                      className="h-11"
-                      value={String(primaryForm.defaultExchangeRates?.isLocked ?? false)}
-                      onChange={(e) =>
-                        setPrimaryForm((f) => ({
-                          ...f,
-                          defaultExchangeRates: {
-                            ...f.defaultExchangeRates,
-                            isLocked: e.target.value === "true",
-                          },
-                        }))
-                      }
-                      options={[
-                        { value: "false", label: "Unlocked — Edit per payment" },
-                        { value: "true", label: "Locked — Enforce defaults" },
-                      ]}
-                    />
-                  </div>
-                </div>
-              </div>
 
               <div className="flex flex-col gap-3 border-t border-border/60 pt-6 sm:flex-row sm:items-center">
                 <Button
