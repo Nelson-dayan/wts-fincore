@@ -253,10 +253,17 @@ export function AdminClientDetailsClient({ clientId }: { clientId: string }) {
           { key: "projectId", label: "Project" },
           { key: "createdAt", label: "Created At" },
         ]}
-        rows={(data.quotations ?? []).map((quotation) => ({
-          ...quotation,
-          createdAt: new Date(quotation.createdAt).toLocaleString(),
-        }))}
+        rows={(data.quotations ?? []).map((quotation) => {
+          const pId = typeof quotation.projectId === "object" && quotation.projectId !== null 
+            ? String((quotation.projectId as any)._id ?? "") 
+            : String(quotation.projectId ?? "");
+          const projName = data.projects?.find(p => String(p._id) === pId)?.name || "—";
+          return {
+            ...quotation,
+            projectId: projName,
+            createdAt: new Date(quotation.createdAt).toLocaleString(),
+          };
+        })}
       />
 
       <SectionTable
@@ -269,10 +276,17 @@ export function AdminClientDetailsClient({ clientId }: { clientId: string }) {
           { key: "projectId", label: "Project" },
           { key: "createdAt", label: "Created At" },
         ]}
-        rows={(data.purchaseOrders ?? []).map((po) => ({
-          ...po,
-          createdAt: new Date(po.createdAt).toLocaleString(),
-        }))}
+        rows={(data.purchaseOrders ?? []).map((po) => {
+          const pId = typeof po.projectId === "object" && po.projectId !== null 
+            ? String((po.projectId as any)._id ?? "") 
+            : String(po.projectId ?? "");
+          const projName = data.projects?.find(p => String(p._id) === pId)?.name || "—";
+          return {
+            ...po,
+            projectId: projName,
+            createdAt: new Date(po.createdAt).toLocaleString(),
+          };
+        })}
       />
 
       <SectionTable
@@ -285,11 +299,18 @@ export function AdminClientDetailsClient({ clientId }: { clientId: string }) {
           { key: "projectId", label: "Project" },
           { key: "createdAt", label: "Created At" },
         ]}
-        rows={(data.invoices ?? []).map((invoice) => ({
-          ...invoice,
-          dueDate: invoice.dueDate ? new Date(invoice.dueDate).toLocaleDateString() : "—",
-          createdAt: new Date(invoice.createdAt).toLocaleString(),
-        }))}
+        rows={(data.invoices ?? []).map((invoice) => {
+          const pId = typeof invoice.projectId === "object" && invoice.projectId !== null 
+            ? String((invoice.projectId as any)._id ?? "") 
+            : String(invoice.projectId ?? "");
+          const projName = data.projects?.find(p => String(p._id) === pId)?.name || "—";
+          return {
+            ...invoice,
+            projectId: projName,
+            dueDate: invoice.dueDate ? new Date(invoice.dueDate).toLocaleDateString() : "—",
+            createdAt: new Date(invoice.createdAt).toLocaleString(),
+          };
+        })}
       />
 
       <SectionTable

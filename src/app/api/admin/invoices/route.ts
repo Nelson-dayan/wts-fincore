@@ -63,7 +63,7 @@ export async function GET(req: Request) {
         .select(
           "invoiceNumber invoiceType status dueDate projectId poId companyId createdAt totals extras.poNumberRef totalsCache"
         )
-        .populate("projectId", "fixCurrency")
+        .populate("projectId", "name fixCurrency")
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
@@ -80,7 +80,10 @@ export async function GET(req: Request) {
         invoiceType: row.invoiceType === "usd" ? "usd" : "aed",
         status: row.status,
         dueDate: dd instanceof Date ? dd.toISOString() : dd,
-        projectId: String(row.projectId ?? ""),
+        projectId: row.projectId && typeof row.projectId === "object" ? {
+          _id: String((row.projectId as any)._id),
+          name: String((row.projectId as any).name || "Unnamed Project"),
+        } : null,
         poId: row.poId ? String(row.poId) : "",
         companyId: String(row.companyId ?? ""),
         poNumberRef: String(extras?.poNumberRef ?? ""),
