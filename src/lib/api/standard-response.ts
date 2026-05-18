@@ -46,6 +46,9 @@ export function standardAuthError(error: unknown, fallbackMessage = "Unauthorize
     if (error.message.includes("is required")) {
       return apiError(error.message, 400);
     }
+    if (error.message.includes("closed accounting period") || error.message.includes("locked")) {
+      return apiError(error.message, 400);
+    }
   }
   
   console.error(`[API ERROR]: ${fallbackMessage}`, error);

@@ -34,9 +34,8 @@ export const ledgerEntrySchema = new Schema(
 );
 
 // Enforce double-entry ledger entry immutability
-ledgerEntrySchema.pre("save", function (this: any, next: any) {
+ledgerEntrySchema.pre("save", async function (this: any) {
   if (!this.isNew) {
-    return next(new Error("Ledger entries are completely immutable and cannot be updated."));
+    throw new Error("Ledger entries are completely immutable and cannot be updated.");
   }
-  next();
 });

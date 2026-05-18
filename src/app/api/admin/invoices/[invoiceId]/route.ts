@@ -270,8 +270,13 @@ export async function PATCH(req: Request, ctx: Ctx) {
     return apiSuccess({ ok: true });
   } catch (error) {
     console.error("PATCH Invoice Error:", error);
-    if (error instanceof Error && (error.message === "UNAUTHORIZED" || error.message === "FORBIDDEN")) {
-      return apiError("Forbidden", 403);
+    if (error instanceof Error) {
+      if (error.message === "UNAUTHORIZED" || error.message === "FORBIDDEN") {
+        return apiError("Forbidden", 403);
+      }
+      if (error.message.includes("closed accounting period") || error.message.includes("locked")) {
+        return apiError(error.message, 400);
+      }
     }
     return apiError("Failed to update invoice", 500);
   }

@@ -198,7 +198,9 @@ export async function POST(req: Request) {
         msg.startsWith("Purchase order") ||
         msg.startsWith("Quotation") ||
         msg.startsWith("Invalid") ||
-        msg.startsWith("Could not generate")
+        msg.startsWith("Could not generate") ||
+        msg.includes("closed accounting period") ||
+        msg.includes("locked")
       ) {
         return NextResponse.json({ message: msg }, { status: 400 });
       }

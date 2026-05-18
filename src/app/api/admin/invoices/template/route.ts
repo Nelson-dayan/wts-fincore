@@ -63,7 +63,7 @@ export async function GET(req: Request) {
       signatureText: s(primary?.signatureText) || s(qCompany.signatureText),
     };
 
-    const invoiceNumber = await generateUniqueInvoiceNumber();
+    const { invoiceNumber } = await generateUniqueInvoiceNumber(session.user.id);
     const invDate = new Date();
     const due = new Date(invDate);
     due.setUTCDate(due.getUTCDate() + 30);

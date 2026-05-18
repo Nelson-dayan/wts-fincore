@@ -15,6 +15,7 @@ import {
 import mongoose from "mongoose";
 import { decimalToNumber } from "@/lib/services/business/money";
 import { getEmployeeAssignedProjectIdStrings } from "@/lib/auth/employee-resource-access";
+import { updateSequenceReservationEntity } from "@/lib/services/business/counter.service";
 
 
 export async function GET(req: Request) {
@@ -200,7 +201,7 @@ export async function POST(req: Request) {
       ...(co.logoText !== undefined ? { logoText: String(co.logoText) } : {}),
       ...(co.signatureText !== undefined ? { signatureText: String(co.signatureText) } : {}),
     };
-    const quotationNumber = await generateQuotationNumber();
+    const { quotationNumber, seqValue, year } = await generateQuotationNumber(session.user.id);
 
     const pagesForDb = pages.map((p) => ({
       pageNumber: p.pageNumber,
@@ -278,6 +279,8 @@ export async function POST(req: Request) {
       message: `Created quotation ${quotationNumber}`,
       projectId,
     });
+
+    await updateSequenceReservationEntity("quotation_number", year, seqValue, String(created._id));
 
     return apiSuccess({ item: created }, 201);
   } catch (error) {

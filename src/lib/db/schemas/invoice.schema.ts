@@ -119,7 +119,7 @@ export const invoiceSchema = new Schema(
   schemaOptions
 );
 
-invoiceSchema.pre("save", function (next) {
+invoiceSchema.pre("save", async function (this: any) {
   // If isNew, initialize dual-status based on _hiddenUntilSaved or legacy status
   if (this.isNew) {
     if (this.extras?._hiddenUntilSaved === true) {
@@ -180,8 +180,6 @@ invoiceSchema.pre("save", function (next) {
   } else {
     this.extras._hiddenUntilSaved = false;
   }
-
-  next();
 });
 
 invoiceSchema.index({ companyId: 1, invoiceNumber: 1 }, { unique: true });
