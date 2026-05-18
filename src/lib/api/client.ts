@@ -1,10 +1,33 @@
 import { ApiResponse } from "@/lib/types/api.types";
 
+function generateClientUUID(): string {
+  if (typeof window !== "undefined" && window.crypto?.randomUUID) {
+    return window.crypto.randomUUID();
+  }
+  // Math.random fallback for non-crypto secure contexts
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === "x" ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+
 export async function apiFetch<T>(
   input: RequestInfo | URL,
   init?: RequestInit
 ): Promise<T> {
-  const response = await fetch(input, init);
+  const method = init?.method?.toUpperCase() ?? "GET";
+  const updatedInit = { ...init };
+
+  if (["POST", "PUT", "PATCH", "DELETE"].includes(method)) {
+    const headers = new Headers(updatedInit.headers);
+    if (!headers.has("Idempotency-Key")) {
+      headers.set("Idempotency-Key", generateClientUUID());
+    }
+    updatedInit.headers = headers;
+  }
+
+  const response = await fetch(input, updatedInit);
   
   if (!response.ok && response.headers.get("content-type")?.includes("application/json") === false) {
     throw new Error(`HTTP error ${response.status}`);

@@ -40,6 +40,7 @@ const invoiceExtrasSchema = new Schema(
         "This is an electronically generated invoice, hence does not require signature.",
     },
     amountInWords: { type: String, default: "" },
+    _hiddenUntilSaved: { type: Boolean, default: false },
   },
   { _id: false }
 );

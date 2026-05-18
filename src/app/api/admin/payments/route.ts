@@ -7,6 +7,8 @@ import { parsePagination, parseSearch } from "@/lib/api/pagination";
 import { recordPayment } from "@/lib/services/business/payment.service";
 import { assertEmployeeCanAccessInvoice, assertEmployeeCanAccessProject } from "@/lib/auth/employee-resource-access";
 
+import { checkOrCreateIdempotency, saveIdempotencySuccess, saveIdempotencyFailed } from "@/lib/services/business/idempotency.service";
+
 export async function GET(req: Request) {
   try {
     const session = await requireRole(["admin", "employee"]);
@@ -74,12 +76,48 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
+  let idempotencyKey: string | null = null;
+  let userId: string = "";
+  let isIdempotencyEnabled = false;
+
   try {
     const session = await requireRole(["admin", "employee"]);
+    userId = session.user.id;
+    await connectDB();
+
     const body = await req.json();
+
+    idempotencyKey = req.headers.get("Idempotency-Key")?.trim() ?? null;
+    if (idempotencyKey) {
+      try {
+        const check = await checkOrCreateIdempotency(
+          idempotencyKey,
+          userId,
+          "/api/admin/payments",
+          body
+        );
+
+        if (check.status === "CACHED") {
+          return NextResponse.json(check.responseBody, { status: check.responseStatus });
+        }
+        if (check.status === "IN_PROGRESS") {
+          return NextResponse.json({ message: "Request already in progress" }, { status: 409 });
+        }
+        isIdempotencyEnabled = true;
+      } catch (e: any) {
+        if (e.message === "IDEMPOTENCY_PAYLOAD_MISMATCH") {
+          return NextResponse.json(
+            { message: "Idempotency key reused with a different body payload" },
+            { status: 409 }
+          );
+        }
+        throw e;
+      }
+    }
 
     const pId = String(body?.projectId ?? "").trim();
     if (!pId) {
+      if (isIdempotencyEnabled) await saveIdempotencyFailed(idempotencyKey!, userId);
       return NextResponse.json({ message: "projectId is required" }, { status: 400 });
     }
 
@@ -87,6 +125,7 @@ export async function POST(req: Request) {
       try {
         await assertEmployeeCanAccessProject(session.user.id, pId);
       } catch (e) {
+        if (isIdempotencyEnabled) await saveIdempotencyFailed(idempotencyKey!, userId);
         return NextResponse.json({ message: "Forbidden" }, { status: 403 });
       }
     }
@@ -95,13 +134,22 @@ export async function POST(req: Request) {
     body.createdBy = session.user.id;
     
     const result = await recordPayment(body);
-    return NextResponse.json({ 
+    const resData = { 
       item: { 
         ...result, 
         _id: result.paymentId 
       } 
-    }, { status: 201 });
+    };
+
+    if (isIdempotencyEnabled) {
+      await saveIdempotencySuccess(idempotencyKey!, userId, resData, 201);
+    }
+
+    return NextResponse.json(resData, { status: 201 });
   } catch (error) {
+    if (isIdempotencyEnabled && idempotencyKey) {
+      await saveIdempotencyFailed(idempotencyKey, userId);
+    }
     return authErrorResponse(error, "Failed to record payment");
   }
 }

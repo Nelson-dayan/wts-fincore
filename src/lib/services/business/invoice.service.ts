@@ -13,22 +13,16 @@ import * as invoiceTotals from "@/lib/invoice/invoice-totals";
 import { decimalToNumber } from "@/lib/services/business/money";
 import { logActivity } from "@/lib/services/activity/log-activity.service";
 import { DEFAULT_CURRENCY } from "@/lib/constants/finance";
+import { getNextFiscalSequence, updateSequenceReservationEntity } from "@/lib/services/business/counter.service";
 
 
 export { MAX_INVOICES_PER_PURCHASE_ORDER };
 
-export async function generateUniqueInvoiceNumber(): Promise<string> {
-  for (let attempt = 0; attempt < 8; attempt += 1) {
-    const suffix = randomBytes(3).toString("hex").toUpperCase();
-    const d = new Date();
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, "0");
-    const day = String(d.getDate()).padStart(2, "0");
-    const num = `# SLMEC/INV/${y}/${m}${day}/${suffix}`;
-    const exists = await InvoiceModel.exists({ invoiceNumber: num });
-    if (!exists) return num;
-  }
-  throw new Error("Could not generate a unique invoice number");
+export async function generateUniqueInvoiceNumber(userId: string): Promise<{ invoiceNumber: string; seqValue: number; year: string }> {
+  const currentYear = new Date().getFullYear().toString();
+  const seqValue = await getNextFiscalSequence("invoice_number", currentYear, "Invoice", userId);
+  const invoiceNumber = `# SLMEC/INV/${currentYear}/${String(seqValue).padStart(5, "0")}`;
+  return { invoiceNumber, seqValue, year: currentYear };
 }
 
 function toDecimal128(value: number): mongoose.Types.Decimal128 {
@@ -161,7 +155,7 @@ export async function createInvoiceForPurchaseOrder(
     primaryCompany
   );
 
-  const invoiceNumber = await generateUniqueInvoiceNumber();
+  const { invoiceNumber, seqValue, year } = await generateUniqueInvoiceNumber(input.createdBy);
   const invDate = new Date();
   const due = new Date(invDate);
   due.setUTCDate(due.getUTCDate() + 30);
@@ -299,6 +293,8 @@ export async function createInvoiceForPurchaseOrder(
       totalAmount: total
     }
   });
+
+  await updateSequenceReservationEntity("invoice_number", year, seqValue, String(created._id));
 
   return {
     id: String(created._id),

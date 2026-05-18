@@ -8,6 +8,7 @@ import { parsePagination, parseSearch } from "@/lib/api/pagination";
 import { logActivity } from "@/lib/services/activity/log-activity.service";
 import { createInvoiceForPurchaseOrder } from "@/lib/services/business/invoice.service";
 import { decimalToNumber } from "@/lib/services/business/money";
+import { checkOrCreateIdempotency, saveIdempotencySuccess, saveIdempotencyFailed } from "@/lib/services/business/idempotency.service";
 import {
   assertEmployeeCanAccessPurchaseOrder,
   getEmployeeAssignedProjectIdStrings,
@@ -101,13 +102,49 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
+  let idempotencyKey: string | null = null;
+  let userId: string = "";
+  let isIdempotencyEnabled = false;
+
   try {
     const session = await requireRole(["admin", "employee"]);
+    userId = session.user.id;
     await connectDB();
+
     const body = (await req.json()) as { poId?: string; invoiceType?: "aed" | "usd" };
     const poId = String(body.poId ?? "").trim();
     const invoiceType = body.invoiceType === "usd" ? "usd" : "aed";
+
+    idempotencyKey = req.headers.get("Idempotency-Key")?.trim() ?? null;
+    if (idempotencyKey) {
+      try {
+        const check = await checkOrCreateIdempotency(
+          idempotencyKey,
+          userId,
+          "/api/admin/invoices",
+          body
+        );
+
+        if (check.status === "CACHED") {
+          return NextResponse.json(check.responseBody, { status: check.responseStatus });
+        }
+        if (check.status === "IN_PROGRESS") {
+          return NextResponse.json({ message: "Request already in progress" }, { status: 409 });
+        }
+        isIdempotencyEnabled = true;
+      } catch (e: any) {
+        if (e.message === "IDEMPOTENCY_PAYLOAD_MISMATCH") {
+          return NextResponse.json(
+            { message: "Idempotency key reused with a different body payload" },
+            { status: 409 }
+          );
+        }
+        throw e;
+      }
+    }
+
     if (!poId) {
+      if (isIdempotencyEnabled) await saveIdempotencyFailed(idempotencyKey!, userId);
       return NextResponse.json({ message: "poId is required" }, { status: 400 });
     }
 
@@ -115,6 +152,7 @@ export async function POST(req: Request) {
       try {
         await assertEmployeeCanAccessPurchaseOrder(session.user.id, poId);
       } catch (e) {
+        if (isIdempotencyEnabled) await saveIdempotencyFailed(idempotencyKey!, userId);
         if (e instanceof Error && e.message === "FORBIDDEN") {
           return NextResponse.json({ message: "Forbidden" }, { status: 403 });
         }
@@ -140,8 +178,16 @@ export async function POST(req: Request) {
       projectId,
     });
 
-    return NextResponse.json({ id, invoiceNumber, projectId }, { status: 201 });
+    const resData = { id, invoiceNumber, projectId };
+    if (isIdempotencyEnabled) {
+      await saveIdempotencySuccess(idempotencyKey!, userId, resData, 201);
+    }
+
+    return NextResponse.json(resData, { status: 201 });
   } catch (error) {
+    if (isIdempotencyEnabled && idempotencyKey) {
+      await saveIdempotencyFailed(idempotencyKey, userId);
+    }
     if (error instanceof Error) {
       const msg = error.message;
       if (msg === "UNAUTHORIZED" || msg === "FORBIDDEN") {
