@@ -39,11 +39,29 @@ export function AdminCompanyClient() {
     logoText: "",
     signatureText: "",
   });
+  const [initialForm, setInitialForm] = useState<CompanyData>({
+    name: "",
+    address: "",
+    contactName: "",
+    email: "",
+    website: "",
+    logoText: "",
+    signatureText: "",
+  });
   const [message, setMessage] = useState("");
   const [messageOk, setMessageOk] = useState(true);
   const [pending, setPending] = useState(false);
   const [loadingInitial, setLoadingInitial] = useState(true);
   const [bootError, setBootError] = useState("");
+
+  const isChanged = 
+    s(primaryForm.name) !== s(initialForm.name) ||
+    s(primaryForm.address) !== s(initialForm.address) ||
+    s(primaryForm.contactName) !== s(initialForm.contactName) ||
+    s(primaryForm.email) !== s(initialForm.email) ||
+    s(primaryForm.website) !== s(initialForm.website) ||
+    s(primaryForm.logoText) !== s(initialForm.logoText) ||
+    s(primaryForm.signatureText) !== s(initialForm.signatureText);
 
   async function loadPrimary(opts?: { quiet?: boolean }) {
     if (!opts?.quiet) {
@@ -57,9 +75,17 @@ export function AdminCompanyClient() {
       );
       if (!primaryRes.ok) throw new Error(primaryPayload.message ?? "Failed to load company");
       if (primaryPayload.item) {
-        setPrimaryForm({
-          ...primaryPayload.item,
-        });
+        const data = {
+          name: primaryPayload.item.name ?? "",
+          address: primaryPayload.item.address ?? "",
+          contactName: primaryPayload.item.contactName ?? "",
+          email: primaryPayload.item.email ?? "",
+          website: primaryPayload.item.website ?? "",
+          logoText: primaryPayload.item.logoText ?? "",
+          signatureText: primaryPayload.item.signatureText ?? "",
+        };
+        setPrimaryForm(data);
+        setInitialForm(data);
       }
       if (!opts?.quiet) setBootError("");
     } catch (e) {
@@ -104,170 +130,305 @@ export function AdminCompanyClient() {
   }
 
   return (
-    <div className="animate-fade-in">
+    <div className="animate-fade-in space-y-8">
+
       <DashboardPageHeader
-        title="Company"
-        description="Your canonical business profile—what clients see on quotations, exports, and team defaults like tax."
+        title="Company Workspace"
+        description="Manage your organization identity, branding, and operational defaults."
       />
 
       {loadingInitial ? (
-        <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-border/80 bg-card/50 py-24 text-muted-foreground">
-          <Loader2 className="size-8 animate-spin text-primary" aria-hidden />
-          <p className="text-sm font-medium">Loading company profile…</p>
+        <div className="flex min-h-[500px] items-center justify-center rounded-[32px] border border-border/50 bg-background/70 backdrop-blur">
+          <div className="flex flex-col items-center gap-4">
+            <Loader2 className="h-10 w-10 animate-spin text-primary" />
+            <div className="text-center">
+              <h3 className="text-lg font-semibold">
+                Loading Workspace
+              </h3>
+              <p className="text-sm text-muted-foreground">
+                Preparing company profile...
+              </p>
+            </div>
+          </div>
         </div>
-      ) : bootError ? (
-        <Card className="border-destructive/30 bg-destructive/5 p-8">
-          <p className="text-sm font-medium text-destructive">{bootError}</p>
-          <Button className="mt-4" variant="outline" onClick={() => loadPrimary()}>
-            Retry
-          </Button>
-        </Card>
       ) : (
-        <Card className="overflow-hidden border-border/80 shadow-[0_24px_48px_-24px_rgba(0,0,0,0.18)] dark:shadow-[0_24px_56px_-24px_rgba(0,0,0,0.5)]">
-          <div className="h-1 bg-linear-to-r from-primary/80 via-primary to-primary/40" />
-          <CardHeader className="border-b border-border/50 bg-muted/10 pb-5 dark:bg-muted/5">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-              <div className="flex items-start gap-3">
-                <span className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-primary/12 text-primary ring-1 ring-primary/20">
-                  <Building2 className="size-5" aria-hidden />
-                </span>
-                <div>
-                  <CardTitle className="text-[1.15rem] sm:text-xl">Primary company</CardTitle>
-                  <CardDescription className="mt-1.5 max-w-2xl">
-                    Legal and contact info, brand marks for documents, and optional default tax for new quotations.
-                  </CardDescription>
+        <form onSubmit={onSubmit} className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
+
+          {/* LEFT SIDE */}
+          <div className="space-y-6">
+
+            {/* Workspace Hero */}
+            <div className="relative overflow-hidden rounded-[32px] border border-border/50 bg-background p-8 shadow-2xl">
+
+              {/* Background Glow */}
+              <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-transparent to-transparent" />
+
+              <div className="relative flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between">
+
+                {/* Company Identity */}
+                <div className="flex items-center gap-6">
+
+                  {/* Logo */}
+                  <div className="flex h-28 w-28 shrink-0 items-center justify-center rounded-[28px] border border-border/50 bg-muted/30 shadow-inner">
+                    {primaryForm.logoText ? (
+                      <img
+                        src={primaryForm.logoText}
+                        alt="Company Logo"
+                        className="h-20 w-20 object-contain"
+                      />
+                    ) : (
+                      <Building2 className="h-12 w-12 text-primary" />
+                    )}
+                  </div>
+
+                  {/* Info */}
+                  <div className="space-y-3">
+
+                    <div>
+                      <p className="text-xs uppercase tracking-[0.25em] text-muted-foreground">
+                        Organization
+                      </p>
+
+                      <h1 className="mt-2 text-4xl font-bold tracking-tight">
+                        {primaryForm.name || "Your Company"}
+                      </h1>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+
+                      {primaryForm.email && (
+                        <span>{primaryForm.email}</span>
+                      )}
+
+                      {primaryForm.website && (
+                        <>
+                          <span className="h-1 w-1 rounded-full bg-muted-foreground/30" />
+                          <span>{primaryForm.website}</span>
+                        </>
+                      )}
+                    </div>
+
+                    <div className="inline-flex items-center rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
+                      Primary Workspace
+                    </div>
+                  </div>
+                </div>
+
+                {/* Save */}
+                <div className="flex items-center gap-3">
+
+                  <Button
+                    type="submit"
+                    disabled={pending || !isChanged}
+                    size="lg"
+                    className="h-14 rounded-2xl px-7 text-sm font-semibold shadow-xl shadow-primary/20"
+                  >
+                    {pending ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Saving
+                      </>
+                    ) : (
+                      <>
+                        <Save className="mr-2 h-4 w-4" />
+                        Save
+                      </>
+                    )}
+                  </Button>
                 </div>
               </div>
             </div>
-          </CardHeader>
-          <CardContent className="pt-6">
-            <form onSubmit={onSubmit} className="space-y-10">
-              <div>
-                <h3 className="mb-4 flex items-center gap-2 text-sm font-semibold text-foreground">
-                  <Landmark className="size-4 text-primary" aria-hidden />
-                  Identity & contact
-                </h3>
-                <div className="grid gap-5 sm:grid-cols-2">
-                  <div className="space-y-1.5">
-                    <Label className="text-foreground/90">Company name</Label>
+
+            {/* Main Form */}
+            <div className="grid gap-6 lg:grid-cols-2">
+
+              {/* Identity */}
+              <div className="rounded-[28px] border border-border/50 bg-background p-6 shadow-sm">
+
+                <div className="mb-6">
+                  <h3 className="text-lg font-semibold">
+                    Identity
+                  </h3>
+
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Legal and public organization details.
+                  </p>
+                </div>
+
+                <div className="space-y-5">
+
+                  <div className="space-y-2">
+                    <Label>Company Name</Label>
+
                     <Input
-                      className="h-11 border-border/80 bg-background/60"
-                      placeholder="Seclance Ltd."
+                      className="h-12 rounded-2xl border-border/70 bg-muted/20"
                       value={s(primaryForm.name)}
-                      onChange={(e) => setPrimaryForm((f) => ({ ...f, name: e.target.value }))}
+                      onChange={(e) =>
+                        setPrimaryForm((f) => ({
+                          ...f,
+                          name: e.target.value,
+                        }))
+                      }
                     />
                   </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-foreground/90">Contact name</Label>
+
+                  <div className="space-y-2">
+                    <Label>Contact Name</Label>
+
                     <Input
-                      className="h-11 border-border/80 bg-background/60"
-                      placeholder="Operations lead"
+                      className="h-12 rounded-2xl border-border/70 bg-muted/20"
                       value={s(primaryForm.contactName)}
-                      onChange={(e) => setPrimaryForm((f) => ({ ...f, contactName: e.target.value }))}
+                      onChange={(e) =>
+                        setPrimaryForm((f) => ({
+                          ...f,
+                          contactName: e.target.value,
+                        }))
+                      }
                     />
                   </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-foreground/90">Email</Label>
+
+                  <div className="space-y-2">
+                    <Label>Email Address</Label>
+
                     <Input
                       type="email"
-                      autoComplete="email"
-                      className="h-11 border-border/80 bg-background/60"
-                      placeholder="hello@company.com"
+                      className="h-12 rounded-2xl border-border/70 bg-muted/20"
                       value={s(primaryForm.email)}
-                      onChange={(e) => setPrimaryForm((f) => ({ ...f, email: e.target.value }))}
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-foreground/90">Website</Label>
-                    <Input
-                      type="text"
-                      className="h-11 border-border/80 bg-background/60"
-                      placeholder="seclance.com"
-                      value={s(primaryForm.website)}
-                      onChange={(e) => setPrimaryForm((f) => ({ ...f, website: e.target.value }))}
-                    />
-                  </div>
-                  <div className="space-y-1.5 sm:col-span-2">
-                    <Label className="text-foreground/90">Address</Label>
-                    <Input
-                      className="h-11 border-border/80 bg-background/60"
-                      placeholder="Street, city, postal code"
-                      value={s(primaryForm.address)}
-                      onChange={(e) => setPrimaryForm((f) => ({ ...f, address: e.target.value }))}
+                      onChange={(e) =>
+                        setPrimaryForm((f) => ({
+                          ...f,
+                          email: e.target.value,
+                        }))
+                      }
                     />
                   </div>
                 </div>
               </div>
 
-                  <div className="space-y-6">
-                    {/* Section Header */}
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <h3 className="text-base font-semibold tracking-tight text-foreground">
-                          Brand Assets
-                        </h3>
-                        <p className="text-xs text-muted-foreground">
-                          These will appear on generated PDFs and documents
-                        </p>
-                      </div>
-                    </div>
+              {/* Business Details */}
+              <div className="rounded-[28px] border border-border/50 bg-background p-6 shadow-sm">
 
-                    {/* Card Container */}
-                    <div className="grid gap-5 sm:grid-cols-2">
+                <div className="mb-6">
+                  <h3 className="text-lg font-semibold">
+                    Business Details
+                  </h3>
 
-                      <UploadCard
-                        label="Logo"
-                        value={primaryForm.logoText}
-                        onChange={(val) => setPrimaryForm((f) => ({ ...f, logoText: val }))}
-                        placeholder="Upload Logo (PNG, JPG max 2MB)"
-                      />
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Workspace links and address information.
+                  </p>
+                </div>
 
-                      <UploadCard
-                        label="Signature"
-                        value={primaryForm.signatureText}
-                        onChange={(val) => setPrimaryForm((f) => ({ ...f, signatureText: val }))}
-                        placeholder="Upload Signature"
-                      />
+                <div className="space-y-5">
 
-                    </div>
+                  <div className="space-y-2">
+                    <Label>Website</Label>
+
+                    <Input
+                      className="h-12 rounded-2xl border-border/70 bg-muted/20"
+                      value={s(primaryForm.website)}
+                      onChange={(e) =>
+                        setPrimaryForm((f) => ({
+                          ...f,
+                          website: e.target.value,
+                        }))
+                      }
+                    />
                   </div>
 
+                  <div className="space-y-2">
+                    <Label>Address</Label>
 
-
-              <div className="flex flex-col gap-3 border-t border-border/60 pt-6 sm:flex-row sm:items-center">
-                <Button
-                  type="submit"
-                  disabled={pending}
-                  size="lg"
-                  className="h-11 rounded-xl font-semibold shadow-md shadow-primary/15"
-                >
-                  {pending ? (
-                    <>
-                      <Loader2 className="mr-2 size-4 animate-spin" aria-hidden />
-                      Saving…
-                    </>
-                  ) : (
-                    <>
-                      <Save className="mr-2 size-4" aria-hidden />
-                      Save settings
-                    </>
-                  )}
-                </Button>
-                {message ? (
-                  <p
-                    className={
-                      messageOk
-                        ? "text-sm text-emerald-600 dark:text-emerald-400"
-                        : "text-sm text-destructive"
-                    }
-                  >
-                    {message}
-                  </p>
-                ) : null}
+                    <textarea
+                      className="min-h-[140px] w-full rounded-2xl border border-border/70 bg-muted/20 px-4 py-3 text-sm outline-none transition focus:border-primary"
+                      value={s(primaryForm.address)}
+                      onChange={(e) =>
+                        setPrimaryForm((f) => ({
+                          ...f,
+                          address: e.target.value,
+                        }))
+                      }
+                    />
+                  </div>
+                </div>
               </div>
-            </form>
-          </CardContent>
-        </Card>
+            </div>
+          </div>
+
+          {/* RIGHT SIDEBAR */}
+          <div className="space-y-6">
+
+            {/* Assets */}
+            <div className="rounded-[32px] border border-border/50 bg-background p-6 shadow-xl">
+
+              <div className="mb-6">
+                <h3 className="text-lg font-semibold">
+                  Brand Assets
+                </h3>
+
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Branding used on invoices and exports.
+                </p>
+              </div>
+
+              <div className="space-y-5">
+
+                <UploadCard
+                  label="Company Logo"
+                  value={primaryForm.logoText}
+                  onChange={(val) =>
+                    setPrimaryForm((f) => ({
+                      ...f,
+                      logoText: val,
+                    }))
+                  }
+                  placeholder="Upload logo"
+                />
+
+                <UploadCard
+                  label="Signature"
+                  value={primaryForm.signatureText}
+                  onChange={(val) =>
+                    setPrimaryForm((f) => ({
+                      ...f,
+                      signatureText: val,
+                    }))
+                  }
+                  placeholder="Upload signature"
+                />
+              </div>
+            </div>
+
+            {/* Status */}
+            <div className="rounded-[32px] border border-border/50 bg-background p-6 shadow-sm">
+
+              <div className="flex items-center gap-3">
+
+                <div className="h-3 w-3 rounded-full bg-emerald-500 animate-pulse" />
+
+                <div>
+                  <h4 className="font-medium">
+                    Workspace Active
+                  </h4>
+
+                  <p className="text-sm text-muted-foreground">
+                    All systems operational
+                  </p>
+                </div>
+              </div>
+
+              {message && (
+                <div
+                  className={`mt-5 rounded-2xl border p-4 text-sm ${messageOk
+                    ? "border-emerald-500/20 bg-emerald-500/5 text-emerald-600 dark:text-emerald-400"
+                    : "border-destructive/20 bg-destructive/5 text-destructive"
+                    }`}
+                >
+                  {message}
+                </div>
+              )}
+            </div>
+          </div>
+        </form>
       )}
     </div>
   );

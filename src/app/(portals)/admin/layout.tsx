@@ -51,8 +51,8 @@ export default async function AdminPortalLayout({
               <PortalNavLink href="/admin/projects" match="prefix" className="w-full justify-start">
                 Projects
               </PortalNavLink>
-              <PortalNavLink href="/admin/company" match="prefix" className="w-full justify-start">
-                Company
+              <PortalNavLink href="/admin/settings/company" match="prefix" className="w-full justify-start">
+                Settings
               </PortalNavLink>
             </div>
           </div>
@@ -133,8 +133,8 @@ export default async function AdminPortalLayout({
                 <PortalNavLink href="/admin/projects" match="prefix" className="w-full justify-start">
                   Projects
                 </PortalNavLink>
-                <PortalNavLink href="/admin/company" match="prefix" className="w-full justify-start">
-                  Company
+                <PortalNavLink href="/admin/settings/company" match="prefix" className="w-full justify-start">
+                  Settings
                 </PortalNavLink>
               </div>
             </div>
