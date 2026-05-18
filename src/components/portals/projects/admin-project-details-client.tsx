@@ -12,7 +12,7 @@ import { readResponseJson } from "@/lib/http/read-response-json";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { SaveSuccessToast } from "@/components/ui/save-success-toast";
 import { AdminInvoicesCreateHelper } from "@/components/portals/admin-invoices-create-helper";
-import { SUPPORTED_CURRENCIES } from "@/lib/constants/finance";
+import { SUPPORTED_CURRENCIES, DEFAULT_CURRENCY } from "@/lib/constants/finance";
 import { usePortalConfig } from "@/components/portals/portal-config-context";
 import { useSaveFeedback } from "@/lib/hooks/use-save-feedback";
 
@@ -89,7 +89,7 @@ function normalizeBudget(value: unknown): string {
   return "";
 }
 
-function formatAed(n: number) {
+function formatCurrency(n: number) {
   return n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
@@ -499,7 +499,7 @@ export function AdminProjectDetailsClient({
               Revenue (Base)
             </p>
             <p className="text-2xl font-bold text-foreground">
-              ₹{formatAed(data.financials?.totalReceivedBase ?? 0)}
+              ₹{formatCurrency(data.financials?.totalReceivedBase ?? 0)}
             </p>
           </CardContent>
         </Card>
@@ -510,7 +510,7 @@ export function AdminProjectDetailsClient({
               Expenses & Fees (Base)
             </p>
             <p className="text-2xl font-bold text-red-600">
-              ₹{formatAed((data.financials?.totalExpensesBase ?? 0) + (data.financials?.totalFeesBase ?? 0))}
+              ₹{formatCurrency((data.financials?.totalExpensesBase ?? 0) + (data.financials?.totalFeesBase ?? 0))}
             </p>
           </CardContent>
         </Card>
@@ -521,7 +521,7 @@ export function AdminProjectDetailsClient({
               Net Profit (Base)
             </p>
             <p className="text-3xl font-bold text-green-700 dark:text-green-400">
-              ₹{formatAed(data.financials?.profitBase ?? 0)}
+              ₹{formatCurrency(data.financials?.profitBase ?? 0)}
             </p>
           </CardContent>
         </Card>
@@ -539,7 +539,7 @@ export function AdminProjectDetailsClient({
         rows={(data.payments ?? []).map((p) => ({
           ...p,
           receivedAt: new Date(String(p.receivedAt)).toLocaleDateString(),
-          amountDisplay: `${p.currency} ${formatAed(p.amount)}`,
+          amountDisplay: `${p.currency} ${formatCurrency(p.amount)}`,
           accountDisplay: (p.accountId as any)?.name || "-",
         }))}
       />
@@ -588,13 +588,13 @@ export function AdminProjectDetailsClient({
         title="Expenses"
         columns={[
           { key: "title", label: "Title" },
-          { key: "amount", label: "Amount (AED)" },
+          { key: "amount", label: `Amount (${DEFAULT_CURRENCY})` },
           { key: "category", label: "Category" },
           { key: "createdAt", label: "Created At" },
         ]}
         rows={(data.expenses ?? []).map((ex) => ({
           ...ex,
-          amount: formatAed(ex.amount),
+          amount: formatCurrency(ex.amount),
           createdAt: new Date(String(ex.createdAt)).toLocaleString(),
         }))}
       />

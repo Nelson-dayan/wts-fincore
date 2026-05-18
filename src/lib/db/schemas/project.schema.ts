@@ -11,8 +11,8 @@ export const projectSchema = new Schema(
     assignedTo: [{ type: Types.ObjectId, ref: "User", index: true }],
     status: {
       type: String,
-      enum: ["lead", "in_progress", "completed", "on_hold"],
-      default: "lead",
+      enum: ["active", "completed", "on_hold"],
+      default: "active",
       index: true,
     },
     budget: optionalDecimalField,

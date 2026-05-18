@@ -127,7 +127,7 @@ export function AdminProjectsClient({ initialClientId = "" }: { initialClientId?
                 <FolderKanban className="size-6" />
               </div>
               <div>
-                <CardTitle className="text-xl font-black tracking-tight">Active Portfolio</CardTitle>
+                <CardTitle className="text-xl font-black tracking-tight">Active Projects</CardTitle>
                 <CardDescription className="text-xs font-medium uppercase tracking-wider opacity-70">
                   {total} Active Workstreams
                 </CardDescription>

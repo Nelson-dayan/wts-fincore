@@ -3,8 +3,9 @@
 import Link from "next/link";
 import { FolderKanban, TrendingUp, Wallet } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { DEFAULT_CURRENCY } from "@/lib/constants/finance";
 
-function formatAed(n: number) {
+function formatCurrency(n: number) {
   return n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
@@ -25,7 +26,7 @@ function BarRow({
       <div className="flex items-baseline justify-between gap-2 text-xs">
         <span className="min-w-0 truncate font-medium text-foreground">{label}</span>
         <span className="shrink-0 tabular-nums text-muted-foreground">
-          {formatAed(value)} <span className="text-[10px]">AED</span>
+          {formatCurrency(value)} <span className="text-[10px]">{DEFAULT_CURRENCY}</span>
         </span>
       </div>
       <div className="h-2 overflow-hidden rounded-full bg-muted/80">
@@ -67,11 +68,11 @@ export function AdminOverviewCharts(data: OverviewChartPayload) {
                 <Wallet className="size-4" strokeWidth={1.75} aria-hidden />
               </span>
             </div>
-            <CardDescription>All recorded expenses (AED)</CardDescription>
+            <CardDescription>All recorded expenses ({DEFAULT_CURRENCY})</CardDescription>
           </CardHeader>
           <CardContent>
             <p className="text-3xl font-semibold tabular-nums tracking-tight text-foreground">
-              {formatAed(data.expenseTotalAmount)}
+              {formatCurrency(data.expenseTotalAmount)}
             </p>
             <p className="mt-2 text-xs text-muted-foreground">
               {data.expenses.toLocaleString()} line items ·{" "}
@@ -110,7 +111,7 @@ export function AdminOverviewCharts(data: OverviewChartPayload) {
                 <TrendingUp className="size-4" strokeWidth={1.75} aria-hidden />
               </span>
             </div>
-            <CardDescription>By expense total (AED)</CardDescription>
+            <CardDescription>By expense total ({DEFAULT_CURRENCY})</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             {data.topProjectsByExpense.length === 0 ? (
