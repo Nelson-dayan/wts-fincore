@@ -12,6 +12,7 @@ import {
   generateQuotationNumber,
   toDecimal128,
 } from "@/lib/services/business/quotation.service";
+import { updateSequenceReservationEntity } from "@/lib/services/business/counter.service";
 import { pagesFromGeneratorData } from "@/lib/quotation/map-builder-to-quotation";
 import { checkOrCreateIdempotency, saveIdempotencySuccess, saveIdempotencyFailed } from "@/lib/services/business/idempotency.service";
 import { normalizeQuotationData, type QuotationData } from "@/types/quotation-generator";
@@ -314,7 +315,7 @@ export async function POST(req: Request) {
       return apiSuccess(resData);
     }
 
-    const quotationNumber = await generateQuotationNumber();
+    const { quotationNumber, seqValue, year } = await generateQuotationNumber(session.user.id);
     const created = await QuotationModel.create({
       quotationNumber,
       projectId: new mongoose.Types.ObjectId(projectId),
@@ -331,6 +332,8 @@ export async function POST(req: Request) {
       message: `Created quotation ${quotationNumber} (from PDF builder)`,
       projectId,
     });
+
+    await updateSequenceReservationEntity("quotation_number", year, seqValue, String(created._id));
 
     const resData = {
       item: {

@@ -99,6 +99,18 @@ export const invoiceSchema = new Schema(
       default: "DRAFT",
       index: true,
     },
+    lifecycleStatus: {
+      type: String,
+      enum: ["DRAFT_HIDDEN", "DRAFT_VISIBLE", "FINALIZED", "ARCHIVED", "CANCELLED"],
+      default: "DRAFT_HIDDEN",
+      index: true,
+    },
+    paymentStatus: {
+      type: String,
+      enum: ["UNPAID", "PARTIAL", "PAID", "REFUNDED"],
+      default: "UNPAID",
+      index: true,
+    },
     dueDate: { type: Date, required: true, index: true },
     extras: { type: invoiceExtrasSchema, default: () => ({}) },
     isDeleted: { type: Boolean, default: false, index: true },
@@ -107,6 +119,72 @@ export const invoiceSchema = new Schema(
   schemaOptions
 );
 
+invoiceSchema.pre("save", function (next) {
+  // If isNew, initialize dual-status based on _hiddenUntilSaved or legacy status
+  if (this.isNew) {
+    if (this.extras?._hiddenUntilSaved === true) {
+      this.lifecycleStatus = "DRAFT_HIDDEN";
+      this.status = "DRAFT";
+    } else if (this.status === "DRAFT") {
+      this.lifecycleStatus = "DRAFT_VISIBLE";
+      this.paymentStatus = "UNPAID";
+    }
+  }
+
+  // If status is updated but lifecycle/payment are not, sync them
+  if (this.isModified("status")) {
+    const s = this.status;
+    if (s === "DRAFT") {
+      if (this.extras?._hiddenUntilSaved === true || this.lifecycleStatus === "DRAFT_HIDDEN") {
+        this.lifecycleStatus = "DRAFT_HIDDEN";
+      } else {
+        this.lifecycleStatus = "DRAFT_VISIBLE";
+      }
+      this.paymentStatus = "UNPAID";
+    } else if (s === "SENT") {
+      this.lifecycleStatus = "FINALIZED";
+      this.paymentStatus = "UNPAID";
+    } else if (s === "PARTIAL") {
+      this.lifecycleStatus = "FINALIZED";
+      this.paymentStatus = "PARTIAL";
+    } else if (s === "PAID") {
+      this.lifecycleStatus = "FINALIZED";
+      this.paymentStatus = "PAID";
+    } else if (s === "OVERDUE") {
+      this.lifecycleStatus = "FINALIZED";
+      this.paymentStatus = "UNPAID";
+    } else if (s === "CANCELLED") {
+      this.lifecycleStatus = "CANCELLED";
+      this.paymentStatus = "UNPAID";
+    }
+  } else if (this.isModified("lifecycleStatus") || this.isModified("paymentStatus")) {
+    // If lifecycleStatus/paymentStatus are updated, sync legacy status
+    const lc = this.lifecycleStatus;
+    const pm = this.paymentStatus;
+    if (lc === "CANCELLED") {
+      this.status = "CANCELLED";
+    } else if (lc === "DRAFT_HIDDEN") {
+      this.status = "DRAFT";
+    } else if (lc === "DRAFT_VISIBLE") {
+      this.status = "DRAFT";
+    } else if (lc === "FINALIZED") {
+      if (pm === "PAID") this.status = "PAID";
+      else if (pm === "PARTIAL") this.status = "PARTIAL";
+      else this.status = "SENT";
+    }
+  }
+
+  // Sync _hiddenUntilSaved with lifecycleStatus
+  if (this.lifecycleStatus === "DRAFT_HIDDEN") {
+    this.extras._hiddenUntilSaved = true;
+  } else {
+    this.extras._hiddenUntilSaved = false;
+  }
+
+  next();
+});
+
 invoiceSchema.index({ companyId: 1, invoiceNumber: 1 }, { unique: true });
 invoiceSchema.index({ companyId: 1, projectId: 1, status: 1, dueDate: 1 });
+invoiceSchema.index({ companyId: 1, projectId: 1, lifecycleStatus: 1, paymentStatus: 1, dueDate: 1 });
 invoiceSchema.index({ poId: 1, createdAt: -1 });

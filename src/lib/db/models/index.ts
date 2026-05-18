@@ -14,3 +14,5 @@ export { ExpenseModel } from "./expense.model";
 export { ActivityLogModel } from "./activity-log.model";
 export { IdempotencyModel } from "./idempotency.model";
 export { CounterModel, SequenceReservationModel } from "./counter.model";
+export { AccountingPeriodModel } from "./accounting-period.model";
+export { LedgerEntryModel } from "./ledger-entry.model";

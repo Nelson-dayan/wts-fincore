@@ -14,6 +14,7 @@ import { decimalToNumber } from "@/lib/services/business/money";
 import { logActivity } from "@/lib/services/activity/log-activity.service";
 import { DEFAULT_CURRENCY } from "@/lib/constants/finance";
 import { getNextFiscalSequence, updateSequenceReservationEntity } from "@/lib/services/business/counter.service";
+import { assertPeriodNotLocked } from "@/lib/services/business/period-lock.service";
 
 
 export { MAX_INVOICES_PER_PURCHASE_ORDER };
@@ -125,7 +126,7 @@ export async function createInvoiceForPurchaseOrder(
   const existingHidden = await InvoiceModel.findOne({
     poId: new mongoose.Types.ObjectId(input.poId),
     invoiceType,
-    "extras._hiddenUntilSaved": true,
+    lifecycleStatus: "DRAFT_HIDDEN",
   })
     .sort({ createdAt: -1 })
     .lean();
@@ -157,6 +158,7 @@ export async function createInvoiceForPurchaseOrder(
 
   const { invoiceNumber, seqValue, year } = await generateUniqueInvoiceNumber(input.createdBy);
   const invDate = new Date();
+  await assertPeriodNotLocked(invDate);
   const due = new Date(invDate);
   due.setUTCDate(due.getUTCDate() + 30);
 
@@ -208,6 +210,8 @@ export async function createInvoiceForPurchaseOrder(
   const created = await InvoiceModel.create({
     invoiceNumber,
     invoiceType,
+    lifecycleStatus: "DRAFT_HIDDEN",
+    paymentStatus: "UNPAID",
     currency: quotation.currency ?? DEFAULT_CURRENCY,
     exchangeRate: toDecimal128(
       invoiceType === "usd" 

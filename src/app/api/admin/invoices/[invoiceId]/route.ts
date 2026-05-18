@@ -9,6 +9,7 @@ import { formatInvoiceForApi } from "@/lib/services/business/invoice.service";
 import { computeInvoiceTotals } from "@/lib/invoice/invoice-totals";
 import { aedAmountInWords } from "@/lib/invoice/aed-amount-words";
 import { assertEmployeeCanAccessInvoice } from "@/lib/auth/employee-resource-access";
+import { assertPeriodNotLocked } from "@/lib/services/business/period-lock.service";
 
 type Ctx = { params: Promise<{ invoiceId: string }> };
 
@@ -79,6 +80,11 @@ export async function PATCH(req: Request, ctx: Ctx) {
       return apiError("Invoice not found", 404);
     }
 
+    const existingDate = (inv.documentInfo as any)?.date;
+    if (existingDate) {
+      await assertPeriodNotLocked(existingDate);
+    }
+
     const previousStatus = inv.status;
 
     const body = (await req.json()) as {
@@ -135,7 +141,10 @@ export async function PATCH(req: Request, ctx: Ctx) {
       if (b.quotationCode !== undefined) di.quotationCode = String(b.quotationCode ?? "");
       if (b.date !== undefined) {
         const dt = new Date(String(b.date));
-        if (!Number.isNaN(dt.getTime())) di.date = dt;
+        if (!Number.isNaN(dt.getTime())) {
+          await assertPeriodNotLocked(dt);
+          di.date = dt;
+        }
       }
       if (b.subject !== undefined) di.subject = String(b.subject ?? "");
       if (b.title !== undefined) di.title = String(b.title ?? "");

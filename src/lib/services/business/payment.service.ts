@@ -4,6 +4,7 @@ import { PaymentModel, PaymentAllocationModel, InvoiceModel } from "@/lib/db/mod
 import { logActivity } from "@/lib/services/activity/log-activity.service";
 import * as accountEngine from "@/lib/services/finance/account.engine";
 import * as allocationEngine from "@/lib/services/finance/allocation.engine";
+import { assertPeriodNotLocked } from "@/lib/services/business/period-lock.service";
 
 export interface RecordPaymentInput {
   projectId: string | Types.ObjectId;
@@ -50,6 +51,7 @@ export async function recordPayment(input: RecordPaymentInput) {
     let result: any = {};
 
     await session.withTransaction(async () => {
+      await assertPeriodNotLocked(input.receivedAt || new Date());
       const amountBase = input.amount * input.exchangeRateToBase;
       // For now, let's assume fees are handled in the input if we want them
       const feeAmount = (input as any).feeAmount || 0;
@@ -161,6 +163,8 @@ export async function deletePayment(paymentId: string, deletedBy: string) {
     await session.withTransaction(async () => {
       const payment = await PaymentModel.findById(paymentId).session(session);
       if (!payment) throw new Error("Payment not found");
+
+      await assertPeriodNotLocked(payment.receivedAt);
 
       // 1. Revert Account Balance
       await accountEngine.withdraw(

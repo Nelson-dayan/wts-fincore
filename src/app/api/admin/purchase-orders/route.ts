@@ -9,6 +9,7 @@ import {
   createPurchaseOrder,
   generatePONumber,
 } from "@/lib/services/business/purchase-order.service";
+import { updateSequenceReservationEntity } from "@/lib/services/business/counter.service";
 import mongoose from "mongoose";
 import {
   blobToPoDataUrl,
@@ -227,7 +228,7 @@ export async function POST(req: Request) {
       }
     }
 
-    const poNumber = await generatePONumber();
+    const { poNumber, seqValue, year } = await generatePONumber(session.user.id);
     const { id } = await createPurchaseOrder({
       poNumber,
       projectId,
@@ -247,6 +248,8 @@ export async function POST(req: Request) {
       message: `Created purchase order ${poNumber}`,
       projectId,
     });
+
+    await updateSequenceReservationEntity("purchase_order_number", year, seqValue, id);
 
     /** Client PO file save → mark quotation approved (deal confirmed), unless already rejected. */
     if (type === "client" && fileUrl.trim()) {
