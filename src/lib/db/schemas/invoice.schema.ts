@@ -131,6 +131,11 @@ invoiceSchema.pre("save", async function (this: any) {
     }
   }
 
+  // If extras._hiddenUntilSaved is explicitly set to false on a draft hidden invoice, transition it to visible draft
+  if (this.extras?._hiddenUntilSaved === false && this.lifecycleStatus === "DRAFT_HIDDEN") {
+    this.lifecycleStatus = "DRAFT_VISIBLE";
+  }
+
   // If status is updated but lifecycle/payment are not, sync them
   if (this.isModified("status")) {
     const s = this.status;

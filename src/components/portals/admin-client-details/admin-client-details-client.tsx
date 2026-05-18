@@ -12,6 +12,7 @@ import {
   Wallet,
 } from "lucide-react";
 import { DashboardPageHeader } from "@/components/dashboard/page-header";
+import { DEFAULT_CURRENCY } from "@/lib/constants/finance";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ClientProfileCard } from "@/components/portals/admin-client-details/client-profile-card";
@@ -22,7 +23,7 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { SaveSuccessToast } from "@/components/ui/save-success-toast";
 import { useSaveFeedback } from "@/lib/hooks/use-save-feedback";
 
-function formatAed(n: number) {
+function formatCurrency(n: number) {
   return n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
@@ -213,13 +214,13 @@ export function AdminClientDetailsClient({ clientId }: { clientId: string }) {
             Expenses (all projects)
           </CardTitle>
           <CardDescription>
-            Total recorded expenses linked to this client’s projects (AED).
+            Total recorded expenses linked to this client’s projects ({DEFAULT_CURRENCY}).
           </CardDescription>
         </CardHeader>
         <CardContent>
           <p className="text-3xl font-semibold tabular-nums tracking-tight text-foreground">
-            {formatAed(data.expenseTotalAll ?? 0)}
-            <span className="ml-2 text-lg font-medium text-muted-foreground">AED</span>
+            {formatCurrency(data.expenseTotalAll ?? 0)}
+            <span className="ml-2 text-lg font-medium text-muted-foreground">{DEFAULT_CURRENCY}</span>
           </p>
         </CardContent>
       </Card>
@@ -231,12 +232,12 @@ export function AdminClientDetailsClient({ clientId }: { clientId: string }) {
           { key: "name", label: "Name" },
           { key: "status", label: "Status" },
           { key: "priority", label: "Priority" },
-          { key: "expenseTotal", label: "Expenses (AED)" },
+          { key: "expenseTotal", label: `Expenses (${DEFAULT_CURRENCY})` },
           { key: "createdAt", label: "Created At" },
         ]}
         rows={(data.projects ?? []).map((project) => ({
           ...project,
-          expenseTotal: formatAed(project.expenseTotal ?? 0),
+          expenseTotal: formatCurrency(project.expenseTotal ?? 0),
           createdAt: new Date(project.createdAt).toLocaleString(),
         }))}
         actionHref={`/admin/projects?clientId=${clientId}`}
@@ -296,14 +297,14 @@ export function AdminClientDetailsClient({ clientId }: { clientId: string }) {
         icon={Wallet}
         columns={[
           { key: "title", label: "Title" },
-          { key: "amount", label: "Amount (AED)" },
+          { key: "amount", label: `Amount (${DEFAULT_CURRENCY})` },
           { key: "category", label: "Category" },
           { key: "projectName", label: "Project" },
           { key: "createdAt", label: "Created At" },
         ]}
         rows={(data.expenses ?? []).map((row) => ({
           ...row,
-          amount: formatAed(row.amount),
+          amount: formatCurrency(row.amount),
           createdAt: new Date(String(row.createdAt)).toLocaleString(),
         }))}
         actionHref="/admin/expenses"

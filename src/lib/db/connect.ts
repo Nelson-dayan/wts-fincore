@@ -46,7 +46,8 @@ async function runLazyBackfill() {
     const unmigratedCount = await InvoiceModel.countDocuments({
       $or: [
         { lifecycleStatus: { $exists: false } },
-        { paymentStatus: { $exists: false } }
+        { paymentStatus: { $exists: false } },
+        { lifecycleStatus: "DRAFT_HIDDEN", "extras._hiddenUntilSaved": false }
       ]
     });
     if (unmigratedCount > 0) {
@@ -54,7 +55,8 @@ async function runLazyBackfill() {
       const invoices = await InvoiceModel.find({
         $or: [
           { lifecycleStatus: { $exists: false } },
-          { paymentStatus: { $exists: false } }
+          { paymentStatus: { $exists: false } },
+          { lifecycleStatus: "DRAFT_HIDDEN", "extras._hiddenUntilSaved": false }
         ]
       });
       for (const inv of invoices) {
