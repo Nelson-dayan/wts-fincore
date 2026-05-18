@@ -56,6 +56,8 @@ export type InvoiceDocData = {
     footerCurrencyLine?: string;
     disclaimer?: string;
     amountInWords?: string;
+    showBankAed?: boolean;
+    showBankUsd?: boolean;
   };
   dueDate?: string;
   poId?: string;
@@ -319,33 +321,41 @@ export function InvoiceSecDocument({
         </p>
 
         <div className="mb-2 text-[10px] leading-[1.4]">
-          <p className="font-bold">Notes:</p>
-          <div className="mb-2 border border-black">
-            <p className="border-b border-black px-2 py-1 text-[12px] font-bold">USD ACCOUNT DETAILS:</p>
-            <table className="w-full border-collapse text-[10px] leading-[1.45]">
-              <tbody>
-                {usdBankRows(extras.bankUsd).map(([k, v]) => (
-                  <tr key={`usd-${k}`} className="border-b border-black last:border-b-0">
-                    <td className="w-[43%] border-r border-black px-2 py-1">{k}</td>
-                    <td className="px-2 py-1">{v || "-"}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <div className="mb-2 border border-black">
-            <p className="border-b border-black px-2 py-1 text-[12px] font-bold">AED ACCOUNT DETAILS:</p>
-            <table className="w-full border-collapse text-[10px] leading-[1.45]">
-              <tbody>
-                {usdBankRows(extras.bankAed).map(([k, v]) => (
-                  <tr key={`aed-${k}`} className="border-b border-black last:border-b-0">
-                    <td className="w-[43%] border-r border-black px-2 py-1">{k}</td>
-                    <td className="px-2 py-1">{v || "-"}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          {(extras.showBankUsd !== false || extras.showBankAed !== false) && (
+            <>
+              <p className="font-bold">Notes:</p>
+              {extras.showBankUsd !== false && (
+                <div className="mb-2 border border-black">
+                  <p className="border-b border-black px-2 py-1 text-[12px] font-bold">USD ACCOUNT DETAILS:</p>
+                  <table className="w-full border-collapse text-[10px] leading-[1.45]">
+                    <tbody>
+                      {usdBankRows(extras.bankUsd).map(([k, v]) => (
+                        <tr key={`usd-${k}`} className="border-b border-black last:border-b-0">
+                          <td className="w-[43%] border-r border-black px-2 py-1">{k}</td>
+                          <td className="px-2 py-1">{v || "-"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+              {extras.showBankAed !== false && (
+                <div className="mb-2 border border-black">
+                  <p className="border-b border-black px-2 py-1 text-[12px] font-bold">AED ACCOUNT DETAILS:</p>
+                  <table className="w-full border-collapse text-[10px] leading-[1.45]">
+                    <tbody>
+                      {usdBankRows(extras.bankAed).map(([k, v]) => (
+                        <tr key={`aed-${k}`} className="border-b border-black last:border-b-0">
+                          <td className="w-[43%] border-r border-black px-2 py-1">{k}</td>
+                          <td className="px-2 py-1">{v || "-"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </>
+          )}
           <p className="mt-1 font-bold">{extras.footerTerms || "Terms:"}</p>
           <p className="mt-1 uppercase">{extras.footerCurrencyLine || `CURRENCY IN ${currency}`}</p>
         </div>
@@ -506,10 +516,12 @@ export function InvoiceSecDocument({
               <td className="py-1 pr-4 text-right text-neutral-500">Subtotal:</td>
               <td className="py-1 text-right font-medium tabular-nums">{fmt(totals.subtotal)}</td>
             </tr>
-            <tr>
-              <td className="py-1 pr-4 text-right text-neutral-500">{taxLabel}:</td>
-              <td className="py-1 text-right font-medium tabular-nums">{fmt(totals.tax)}</td>
-            </tr>
+            {documentInfo.taxEnabled !== false ? (
+              <tr>
+                <td className="py-1 pr-4 text-right text-neutral-500">{taxLabel}:</td>
+                <td className="py-1 text-right font-medium tabular-nums">{fmt(totals.tax)}</td>
+              </tr>
+            ) : null}
             <tr className="border-t border-neutral-300">
               <td className="py-2 pr-4 text-right font-bold text-neutral-900">Total:</td>
               <td className="py-2 text-right text-[18px] font-bold tabular-nums text-neutral-900">
@@ -526,10 +538,14 @@ export function InvoiceSecDocument({
         </p>
       ) : null}
 
-      <div className="grid gap-4 border-t border-neutral-200 pt-4 sm:grid-cols-2">
-        <BankBlock title="AED ACCOUNT DETAILS" b={extras.bankAed} />
-        <BankBlock title="USD ACCOUNT DETAILS" b={extras.bankUsd} />
-      </div>
+      {(extras.showBankAed !== false || extras.showBankUsd !== false) && (
+        <div className={`grid gap-4 border-t border-neutral-200 pt-4 ${
+          (extras.showBankAed !== false && extras.showBankUsd !== false) ? "sm:grid-cols-2" : "grid-cols-1"
+        }`}>
+          {extras.showBankAed !== false && <BankBlock title="AED ACCOUNT DETAILS" b={extras.bankAed} />}
+          {extras.showBankUsd !== false && <BankBlock title="USD ACCOUNT DETAILS" b={extras.bankUsd} />}
+        </div>
+      )}
 
       <footer className="mt-7 pt-2 text-[10px] text-neutral-600">
         <p className="font-medium text-neutral-800">{extras.footerTerms || "TERM:"}</p>

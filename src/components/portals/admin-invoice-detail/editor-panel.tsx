@@ -36,20 +36,17 @@ export function EditorPanel(props: EditorPanelProps) {
 
   return (
     <div className="print:hidden space-y-4">
-      <div className="mt-3 flex flex-wrap gap-2">
-        <Link href="/admin/invoices"><Button size="sm" variant="outline">All invoices</Button></Link>
+      <div className="py-2 flex top-14 z-50 sticky bg-secondary flex-wrap justify-center gap-2 rounded-md">
+        {/* <Link href="/admin/invoices"><Button size="sm" variant="outline">All invoices</Button></Link> */}
         {item.poId ? <Link href={`/admin/purchase-orders/${item.poId}`}><Button size="sm" variant="outline">Open PO</Button></Link> : null}
         <Link href={`/admin/projects/${item.projectId}`}><Button size="sm" variant="outline">Open project</Button></Link>
-        <Button size="sm" variant="secondary" onClick={() => window.print()}>
-          Print (A4)
-        </Button>
         <Button
           size="sm"
           variant="default"
           onClick={onSave}
           disabled={saving}
         >
-          {saving ? "Saving…" : "Save Invoice"}
+          {saving ? "Saving…" : "Save"}
         </Button>
         <Button
           size="sm"
@@ -73,7 +70,13 @@ export function EditorPanel(props: EditorPanelProps) {
         onRemoveLine={onRemoveLine}
         onPatchExtra={onPatchExtra}
       />
-      <AccountsFooterCard bankAed={bankAed} bankUsd={bankUsd} onPatchBank={onPatchBank} />
+      <AccountsFooterCard
+        bankAed={bankAed}
+        bankUsd={bankUsd}
+        extras={extras}
+        onPatchBank={onPatchBank}
+        onPatchExtra={onPatchExtra}
+      />
       <div className="h-10" />
     </div>
   );
