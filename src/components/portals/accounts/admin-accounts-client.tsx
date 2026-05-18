@@ -200,7 +200,7 @@ export function AdminAccountsClient({ apiPrefix }: { apiPrefix: string }) {
                         {currency}
                       </span>
                       <span className="text-sm font-bold text-foreground tabular-nums">
-                        {bal.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                        {(bal as number).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                       </span>
                     </div>
                   ))}

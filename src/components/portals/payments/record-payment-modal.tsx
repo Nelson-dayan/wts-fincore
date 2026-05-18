@@ -44,7 +44,6 @@ export function RecordPaymentModal({
   initialInvoiceId = ""
 }: RecordPaymentModalProps) {
   const [projectId, setProjectId] = useState(initialProjectId);
-  const [invoiceId, setInvoiceId] = useState(initialInvoiceId);
   const [accountId, setAccountId] = useState("");
   
   const [projectsInvoices, setProjectsInvoices] = useState<InvoiceRow[]>([]);
@@ -61,8 +60,12 @@ export function RecordPaymentModal({
   
   // Allocation state
   const [allocateToInvoice, setAllocateToInvoice] = useState(!!initialInvoiceId);
-  const [allocationAmount, setAllocationAmount] = useState(0); // In Invoice Currency
-  const [allocationRate, setAllocationRate] = useState(1); // Payment -> Invoice
+  const [allocations, setAllocations] = useState<Array<{ invoiceId: string; amount: number; rate: number }>>(() => {
+    if (initialInvoiceId) {
+      return [{ invoiceId: initialInvoiceId, amount: 0, rate: 1 }];
+    }
+    return [];
+  });
   
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -85,37 +88,91 @@ export function RecordPaymentModal({
     if (isOpen && projectId) {
       setLoadingInvoices(true);
       apiFetch<{ items: InvoiceRow[] }>(`${apiPrefix}/invoices?projectId=${projectId}`)
-        .then(res => setProjectsInvoices(res.items || []))
+        .then(res => {
+          setProjectsInvoices(res.items || []);
+          if (projectId !== initialProjectId) {
+            setAllocations([]);
+            setAllocateToInvoice(false);
+          }
+        })
         .finally(() => setLoadingInvoices(false));
     }
-  }, [isOpen, projectId, apiPrefix]);
+  }, [isOpen, projectId, apiPrefix, initialProjectId]);
+
+  const addAllocationRow = () => {
+    const unused = projectsInvoices.find(inv => !allocations.some(a => a.invoiceId === inv._id));
+    setAllocations(prev => [
+      ...prev,
+      {
+        invoiceId: unused?._id || (projectsInvoices[0]?._id ?? ""),
+        amount: 0,
+        rate: 1,
+      }
+    ]);
+  };
+
+  const removeAllocationRow = (index: number) => {
+    setAllocations(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const updateAllocationRow = (index: number, partial: Partial<{ invoiceId: string; amount: number; rate: number }>) => {
+    setAllocations(prev => prev.map((row, i) => i === index ? { ...row, ...partial } : row));
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!projectId) return setError("Please select a project.");
     if (!accountId) return setError("Please select an account.");
+
+    if (allocateToInvoice) {
+      if (allocations.length === 0) {
+        return setError("Please add at least one allocation or uncheck 'Allocate funds now?'.");
+      }
+      for (let i = 0; i < allocations.length; i++) {
+        if (!allocations[i].invoiceId) {
+          return setError(`Row ${i + 1}: Please select a valid invoice.`);
+        }
+        if (allocations[i].amount <= 0) {
+          return setError(`Row ${i + 1}: Allocation amount must be greater than 0.`);
+        }
+      }
+    }
     
     setSubmitting(true);
     setError("");
 
     try {
       const selectedAccount = accounts.find(a => a._id === accountId);
-      const selectedInvoice = projectsInvoices.find(i => i._id === invoiceId);
+      const mappedAllocations = allocateToInvoice
+        ? allocations
+            .filter(a => a.invoiceId && a.amount > 0)
+            .map(a => ({
+              invoiceId: a.invoiceId,
+              amount: Number(a.amount),
+              rate: Number(a.rate),
+            }))
+        : [];
+
+      let clientId = "";
+      if (mappedAllocations.length > 0) {
+        const matchingInvoice = projectsInvoices.find(inv => inv._id === mappedAllocations[0].invoiceId);
+        clientId = (matchingInvoice as any)?.clientId || "";
+      }
+      if (!clientId && projectsInvoices.length > 0) {
+        clientId = (projectsInvoices[0] as any)?.clientId || "";
+      }
 
       const payload = {
         projectId,
         accountId,
-        clientId: (selectedInvoice as any)?.clientId || (projectsInvoices[0] as any)?.clientId || "", // We should ideally have clientId in the search picker
+        clientId,
         amount: Number(amount),
         currency: selectedAccount?.currency || currency,
         exchangeRateToBase: Number(exchangeRateToBase),
         feeAmount: Number(feeAmount),
         method,
         type,
-        invoiceId: allocateToInvoice ? invoiceId : undefined,
-        allocationAmount: allocateToInvoice ? Number(allocationAmount) : undefined,
-        allocationRate: allocateToInvoice ? Number(allocationRate) : undefined,
-        allocationRateToBase: 1, // We'll simplify this for now or fetch from invoice
+        allocations: mappedAllocations,
       };
 
       await apiFetch(`${apiPrefix}/payments`, {
@@ -206,37 +263,109 @@ export function RecordPaymentModal({
                 </div>
               </div>
 
-              <div className="space-y-2 pt-2 border-t border-dashed">
+              <div className="space-y-3 pt-2 border-t border-dashed">
                 <div className="flex items-center justify-between">
                   <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">4. Invoice Allocation</Label>
                   <div className="flex items-center gap-2">
-                    <input type="checkbox" id="allocate" checked={allocateToInvoice} onChange={e => setAllocateToInvoice(e.target.checked)} />
-                    <Label htmlFor="allocate" className="text-xs cursor-pointer">Allocate funds now?</Label>
+                    <input 
+                      type="checkbox" 
+                      id="allocate" 
+                      checked={allocateToInvoice} 
+                      disabled={!projectId}
+                      onChange={e => {
+                        setAllocateToInvoice(e.target.checked);
+                        if (e.target.checked && allocations.length === 0 && projectsInvoices.length > 0) {
+                          setAllocations([{ invoiceId: projectsInvoices[0]._id, amount: 0, rate: 1 }]);
+                        }
+                      }} 
+                    />
+                    <Label htmlFor="allocate" className={`text-xs cursor-pointer ${!projectId ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                      Allocate funds now? {!projectId && <span className="text-[10px] text-destructive font-medium">(Select project first)</span>}
+                    </Label>
                   </div>
                 </div>
                 
-                {allocateToInvoice && (
-                  <div className="space-y-4 p-4 bg-muted/20 rounded-xl border animate-in slide-in-from-top-2">
-                    <div className="space-y-2">
-                      <Label className="text-xs">Select Invoice</Label>
-                      {loadingInvoices ? <Loader2 className="w-4 h-4 animate-spin" /> : (
-                        <Select 
-                          value={invoiceId} 
-                          onChange={e => setInvoiceId(e.target.value)}
-                          options={projectsInvoices.map(i => ({ value: i._id, label: `${i.invoiceNumber} (${i.currency} ${i.total})` }))}
-                        />
-                      )}
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label className="text-xs">Allocated Amount (Inv Curr)</Label>
-                        <Input type="number" step="0.01" value={allocationAmount} onChange={e => setAllocationAmount(Number(e.target.value))} />
+                {allocateToInvoice && projectId && (
+                  <div className="space-y-4">
+                    {loadingInvoices ? (
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground py-2 justify-center">
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading project invoices...
                       </div>
-                      <div className="space-y-2">
-                        <Label className="text-xs">Pay Rate (Acc &rarr; Inv)</Label>
-                        <Input type="number" step="0.0001" value={allocationRate} onChange={e => setAllocationRate(Number(e.target.value))} />
+                    ) : projectsInvoices.length === 0 ? (
+                      <p className="text-xs text-amber-500 font-semibold py-2 bg-amber-500/5 rounded-xl border border-amber-500/20 text-center">
+                        No invoices found for this project. Create an invoice first, or record this as an unallocated payment.
+                      </p>
+                    ) : (
+                      <div className="space-y-3.5">
+                        {allocations.map((row, idx) => {
+                          const matchingInvoice = projectsInvoices.find(inv => inv._id === row.invoiceId);
+                          const invoiceCurrency = matchingInvoice?.currency || "AED";
+                          return (
+                            <div key={idx} className="p-4 bg-muted/20 rounded-xl border border-border/80 space-y-3 relative animate-in slide-in-from-top-2">
+                              <div className="flex items-center justify-between">
+                                <Label className="text-xs font-bold text-primary">Allocation #{idx + 1}</Label>
+                                {allocations.length > 1 && (
+                                  <button 
+                                    type="button" 
+                                    onClick={() => removeAllocationRow(idx)}
+                                    className="text-xs text-destructive hover:underline font-semibold"
+                                  >
+                                    Remove
+                                  </button>
+                                )}
+                              </div>
+                              
+                              <div className="space-y-2">
+                                <Label className="text-xs">Select Invoice</Label>
+                                <Select 
+                                  value={row.invoiceId} 
+                                  onChange={e => updateAllocationRow(idx, { invoiceId: e.target.value })}
+                                  options={projectsInvoices.map(i => ({ 
+                                    value: i._id, 
+                                    label: `${i.invoiceNumber} (${i.currency} ${(i.total || 0).toFixed(2)}) - ${i.status}` 
+                                  }))}
+                                />
+                              </div>
+                              
+                              <div className="grid grid-cols-2 gap-3.5">
+                                <div className="space-y-2">
+                                  <Label className="text-xs">Amount ({invoiceCurrency})</Label>
+                                  <Input 
+                                    type="number" 
+                                    step="0.01" 
+                                    value={row.amount || ""} 
+                                    placeholder="0.00"
+                                    onChange={e => updateAllocationRow(idx, { amount: Number(e.target.value) })} 
+                                  />
+                                </div>
+                                <div className="space-y-2">
+                                  <Label className="text-xs">Pay Rate (Acc &rarr; Inv)</Label>
+                                  <Input 
+                                    type="number" 
+                                    step="0.0001" 
+                                    value={row.rate || ""} 
+                                    placeholder="1.00"
+                                    onChange={e => updateAllocationRow(idx, { rate: Number(e.target.value) })} 
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                        
+                        {allocations.length < projectsInvoices.length && (
+                          <Button 
+                            type="button" 
+                            size="sm" 
+                            variant="outline" 
+                            className="w-full border-dashed"
+                            onClick={addAllocationRow}
+                          >
+                            + Connect Another Invoice
+                          </Button>
+                        )}
                       </div>
-                    </div>
+                    )}
                   </div>
                 )}
               </div>

@@ -27,6 +27,14 @@ export interface RecordPaymentInput {
   allocationAmount?: number;
   allocationRate?: number;
   allocationRateToBase?: number;
+
+  // New: Multiple allocations
+  allocations?: Array<{
+    invoiceId: string | Types.ObjectId;
+    amount: number;
+    rate: number;
+    rateToBase?: number;
+  }>;
 }
 
 /**
@@ -85,7 +93,24 @@ export async function recordPayment(input: RecordPaymentInput) {
       );
 
       // 3. Handle Optional Allocation
-      if (input.invoiceId && input.allocationAmount) {
+      if (input.allocations && input.allocations.length > 0) {
+        for (const alloc of input.allocations) {
+          if (alloc.invoiceId && alloc.amount > 0) {
+            const invoice = await InvoiceModel.findById(alloc.invoiceId).session(session);
+            const rateToBase = invoice?.exchangeRate ? Number(invoice.exchangeRate) : 1;
+
+            await allocationEngine.allocate(
+              paymentId,
+              alloc.invoiceId,
+              alloc.amount,
+              alloc.rate || 1,
+              alloc.rateToBase || rateToBase,
+              input.createdBy,
+              session
+            );
+          }
+        }
+      } else if (input.invoiceId && input.allocationAmount) {
         await allocationEngine.allocate(
           paymentId,
           input.invoiceId,

@@ -42,14 +42,14 @@ export async function DELETE(
   { params }: { params: Promise<{ paymentId: string }> }
 ) {
   try {
-    await requireRole(["admin"]);
+    const session = await requireRole(["admin"]);
     const { paymentId } = await params;
     
     if (!paymentId) {
       return NextResponse.json({ message: "paymentId is required" }, { status: 400 });
     }
 
-    const result = await deletePayment(paymentId);
+    const result = await deletePayment(paymentId, session.user.id);
     return NextResponse.json(result);
   } catch (error) {
     return authErrorResponse(error, "Failed to delete payment");
