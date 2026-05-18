@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { FilePlus2, Package, TrendingUp } from "lucide-react";
+import { FilePlus2, Package } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -38,8 +38,6 @@ export function AdminInvoicesCreateHelper({
   const [selectedPoId, setSelectedPoId] = useState("");
   const [manualPoId, setManualPoId] = useState("");
   const [invoiceCounts, setInvoiceCounts] = useState<Record<string, number>>({});
-  const [reminding, setReminding] = useState(false);
-  const [reminderMsg, setReminderMsg] = useState("");
 
   const loadPos = useCallback(async () => {
     setPoError("");
@@ -235,70 +233,6 @@ export function AdminInvoicesCreateHelper({
         </div>
       </CardContent>
     </Card>
-
-    {!projectId && !embedded && (
-      <Card className="mb-6 border-amber-500/20 bg-amber-500/5 dark:border-amber-500/30 dark:bg-amber-500/10 overflow-hidden relative">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base inline-flex items-center gap-2">
-            <TrendingUp className="size-4 text-amber-600" aria-hidden />
-            Automated workflow
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div>
-              <p className="text-sm font-bold text-amber-700 dark:text-amber-400">Overdue Invoice Reminders</p>
-              <p className="text-xs text-muted-foreground mt-1">Checks for invoices past their due date and logs automated reminders.</p>
-            </div>
-            
-            <div className="flex flex-col items-end gap-2">
-              <Button 
-                size="sm" 
-                variant="outline" 
-                disabled={reminding}
-                className="border-amber-500/30 hover:bg-amber-500/10 text-amber-700 dark:text-amber-400 font-bold px-6"
-                onClick={async () => {
-                  setReminding(true);
-                  setReminderMsg("");
-                  try {
-                    const data = await apiFetch<{ details?: { remindersSent?: number } }>(
-                      `${apiPrefix}/jobs/invoice-reminders`,
-                      { method: "POST" }
-                    );
-                    setReminderMsg(`Success: ${data.details?.remindersSent || 0} reminders processed.`);
-                    router.refresh();
-                  } catch (e) {
-                    setReminderMsg(e instanceof Error ? e.message : "Error triggering reminders");
-                  } finally {
-                    setReminding(false);
-                  }
-                }}
-              >
-                {reminding ? "Processing..." : "Trigger Reminders"}
-              </Button>
-              {reminderMsg && (
-                <p className={cn(
-                  "text-[10px] font-bold uppercase tracking-wider animate-in fade-in slide-in-from-top-1",
-                  reminderMsg.startsWith("Success") ? "text-emerald-600" : "text-destructive"
-                )}>
-                  {reminderMsg}
-                </p>
-              )}
-            </div>
-          </div>
-        </CardContent>
-        {reminding && (
-          <div className="absolute inset-0 bg-background/50 backdrop-blur-[1px] flex items-center justify-center animate-in fade-in duration-300">
-            <div className="flex items-center gap-2 px-4 py-2 bg-background border rounded-full shadow-lg">
-              <div className="size-2 bg-amber-500 rounded-full animate-bounce" />
-              <div className="size-2 bg-amber-500 rounded-full animate-bounce [animation-delay:-0.15s]" />
-              <div className="size-2 bg-amber-500 rounded-full animate-bounce [animation-delay:-0.3s]" />
-              <span className="text-xs font-bold text-amber-600">Scanning Invoices...</span>
-            </div>
-          </div>
-        )}
-      </Card>
-    )}
     </>
   );
 }

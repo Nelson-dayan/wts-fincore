@@ -100,8 +100,8 @@ export function QuotationForm({
   };
 
   return (
-    <Card className="mx-auto w-full max-w-4xl shrink-0 border-border/80 shadow-md">
-      <CardHeader className="sticky top-0 z-50 flex flex-row items-center justify-between border-b border-border/80 bg-card/95 py-4 shadow-sm backdrop-blur supports-backdrop-filter:bg-card/80">
+    <Card className="mx-auto w-full border-border/80 shadow-md">
+      <CardHeader className="sticky top-10 z-50 flex flex-row items-center justify-between border-b border-border/80 bg-card/95 py-4 shadow-sm backdrop-blur supports-backdrop-filter:bg-card/80">
         <CardTitle>{formTitle}</CardTitle>
         <div className="flex items-center gap-2">
           {onCancelEdit ? (
