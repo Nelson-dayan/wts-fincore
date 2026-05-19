@@ -45,6 +45,10 @@ export async function POST(req: Request) {
 
     body.createdBy = session.user.id;
     
+    if (body.isPrimary) {
+      await AccountModel.updateMany({ isPrimary: true }, { isPrimary: false });
+    }
+    
     const item = await AccountModel.create(body);
     return NextResponse.json({ item }, { status: 201 });
   } catch (error) {

@@ -140,6 +140,7 @@ export function AdminAccountsClient({ apiPrefix }: { apiPrefix: string }) {
   };
 
   const selectedAccount = items.find(a => a._id === selectedAccountId);
+  const primaryAccount = items.find(a => a.isPrimary);
 
   // Financial aggregation
   const totalNetWorthInr = items.reduce((acc, account) => {
@@ -427,9 +428,29 @@ export function AdminAccountsClient({ apiPrefix }: { apiPrefix: string }) {
                 <Input type="number" step="0.01" value={form.openingBalance} onChange={e => setForm({...form, openingBalance: e.target.value})} />
               </div>
 
-              <div className="flex items-center gap-2 pt-2">
-                <input type="checkbox" id="isPrimary" checked={form.isPrimary} onChange={e => setForm({...form, isPrimary: e.target.checked})} className="rounded border-border" />
-                <Label htmlFor="isPrimary" className="cursor-pointer">Set as Primary Account</Label>
+              <div className="space-y-2 pt-2">
+                <div className="flex items-center gap-2">
+                  <input 
+                    type="checkbox" 
+                    id="isPrimary" 
+                    checked={form.isPrimary} 
+                    onChange={e => setForm({...form, isPrimary: e.target.checked})} 
+                    className="rounded border-border cursor-pointer size-4 text-primary focus:ring-primary" 
+                  />
+                  <Label htmlFor="isPrimary" className="cursor-pointer font-medium select-none text-sm">Set as Primary Account</Label>
+                </div>
+                {primaryAccount && (
+                  <div className="text-[11px] text-amber-600 bg-amber-500/5 p-2.5 border border-amber-500/20 rounded-xl space-y-1">
+                    <p className="font-semibold flex items-center gap-1">
+                      ⚠️ "{primaryAccount.name}" ({primaryAccount.currency}) is already the primary account.
+                    </p>
+                    {form.isPrimary && (
+                      <p className="font-normal text-amber-700 leading-normal">
+                        Saving this account as primary will automatically unset "{primaryAccount.name}" as the primary account.
+                      </p>
+                    )}
+                  </div>
+                )}
               </div>
 
               <div className="pt-4 flex gap-3">
