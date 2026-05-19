@@ -418,13 +418,14 @@ export function AdminQuotationsClient({
                             <Button
                               type="button"
                               variant="outline"
-                              size="sm"
-                              className="rounded-lg text-destructive hover:bg-destructive/10 hover:text-destructive"
+                              size="icon"
+                              className="h-8 w-8 shrink-0 rounded-lg text-destructive hover:bg-destructive/10 hover:text-destructive"
                               disabled={busy}
                               onClick={() => setDeleteTargetId(row._id)}
+                              title="Delete"
                             >
                               <Trash2 className="size-4" aria-hidden />
-                              <span className="sr-only sm:not-sr-only sm:ml-1">Delete</span>
+                              <span className="sr-only">Delete</span>
                             </Button>
                           </div>
                         </td>
