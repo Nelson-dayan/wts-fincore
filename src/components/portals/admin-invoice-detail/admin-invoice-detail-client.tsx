@@ -16,6 +16,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { SaveSuccessToast } from "@/components/ui/save-success-toast";
 import { usePortalConfig } from "@/components/portals/portal-config-context";
 import { useSaveFeedback } from "@/lib/hooks/use-save-feedback";
+import { SaveConfirmModal } from "@/components/ui/save-confirm-modal";
 
 
 function toDocData(item: Item): InvoiceDocData {
@@ -74,6 +75,7 @@ export function AdminInvoiceDetailClient({
   const [msg, setMsg] = useState("");
   const [pdfExporting, setPdfExporting] = useState(false);
   const [ledgerOpen, setLedgerOpen] = useState(false);
+  const [showSaveConfirm, setShowSaveConfirm] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -391,7 +393,7 @@ export function AdminInvoiceDetailClient({
             onAddLine={addLine}
             onRemoveLine={removeLine}
             onCopyBillToShip={copyBillToShip}
-            onSave={() => void save()}
+            onSave={() => setShowSaveConfirm(true)}
             onDownloadPdf={() => void downloadPdf()}
             onOpenLedger={() => setLedgerOpen(true)}
           />
@@ -406,6 +408,17 @@ export function AdminInvoiceDetailClient({
       ) : null}
 
       <InvoicePrintStyle />
+
+      <SaveConfirmModal
+        open={showSaveConfirm}
+        onClose={() => setShowSaveConfirm(false)}
+        onConfirm={async () => {
+          setShowSaveConfirm(false);
+          await save();
+        }}
+        loading={saving}
+        entityName="invoice"
+      />
     </div>
   );
 }

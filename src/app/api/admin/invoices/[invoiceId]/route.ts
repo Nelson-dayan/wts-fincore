@@ -282,3 +282,52 @@ export async function PATCH(req: Request, ctx: Ctx) {
     return apiError("Failed to update invoice", 500);
   }
 }
+
+export async function DELETE(_req: Request, ctx: Ctx) {
+  try {
+    const session = await requireRole(["admin"]);
+    await connectDB();
+    const { invoiceId } = await ctx.params;
+    if (!mongoose.Types.ObjectId.isValid(invoiceId)) {
+      return apiError("Invalid invoice id", 400);
+    }
+
+    const inv = await InvoiceModel.findById(invoiceId);
+    if (!inv) {
+      return apiError("Invoice not found", 404);
+    }
+
+    // Check if period is locked
+    const docDate = (inv.documentInfo as any)?.date || inv.dueDate;
+    if (docDate) {
+      await assertPeriodNotLocked(docDate);
+    }
+
+    // Soft delete
+    inv.set("isDeleted", true);
+    inv.set("deletedAt", new Date());
+    await inv.save();
+
+    await logActivity({
+      userId: session.user.id,
+      action: "INVOICE_DELETED",
+      entityType: "Invoice",
+      entityId: invoiceId,
+      message: `Deleted invoice ${inv.invoiceNumber}`,
+      projectId: String(inv.projectId),
+    });
+
+    return apiSuccess({ ok: true });
+  } catch (error) {
+    console.error("DELETE Invoice Error:", error);
+    if (error instanceof Error) {
+      if (error.message === "UNAUTHORIZED" || error.message === "FORBIDDEN") {
+        return apiError("Forbidden", 403);
+      }
+      if (error.message.includes("closed accounting period") || error.message.includes("locked")) {
+        return apiError(error.message, 400);
+      }
+    }
+    return apiError("Failed to delete invoice", 500);
+  }
+}

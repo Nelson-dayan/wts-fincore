@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { apiFetch } from "@/lib/api/client";
 import { ApiResponse } from "@/lib/types/api.types";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 
 type Row = Record<string, unknown> & { _id?: string };
@@ -103,6 +104,8 @@ export function ResourceTableClient({
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
@@ -301,21 +304,11 @@ export function ResourceTableClient({
                                 ) : null}
                                 {onDelete ? (
                                   <button
-                                    disabled={deletingId === String(row._id)}
-                                    onClick={async () => {
-                                      if (!window.confirm("Are you sure you want to delete this?")) return;
-                                      setDeletingId(String(row._id));
-                                      try {
-                                        await onDelete(String(row._id));
-                                      } catch (err) {
-                                        alert(err instanceof Error ? err.message : "Delete failed");
-                                      } finally {
-                                        setDeletingId(null);
-                                      }
-                                    }}
+                                    disabled={confirmDeleteId === String(row._id) && isDeleting}
+                                    onClick={() => setConfirmDeleteId(String(row._id))}
                                     className="text-destructive text-sm font-medium underline-offset-4 hover:underline disabled:opacity-50"
                                   >
-                                    {deletingId === String(row._id) ? "..." : "Delete"}
+                                    {confirmDeleteId === String(row._id) && isDeleting ? "..." : "Delete"}
                                   </button>
                                 ) : null}
                               </span>
@@ -356,6 +349,34 @@ export function ResourceTableClient({
           ) : null}
         </CardContent>
       </Card>
+
+      {confirmDeleteId && (
+        <ConfirmDialog
+          open={Boolean(confirmDeleteId)}
+          onOpenChange={(isOpen) => {
+            if (!isOpen) setConfirmDeleteId(null);
+          }}
+          title="Confirm Delete"
+          description="Are you sure you want to delete this record? This action cannot be undone."
+          confirmLabel="Delete"
+          cancelLabel="Cancel"
+          variant="destructive"
+          loading={isDeleting}
+          onConfirm={async () => {
+            setIsDeleting(true);
+            try {
+              if (onDelete) {
+                await onDelete(confirmDeleteId);
+              }
+            } catch (err) {
+              alert(err instanceof Error ? err.message : "Delete failed");
+            } finally {
+              setIsDeleting(false);
+              setConfirmDeleteId(null);
+            }
+          }}
+        />
+      )}
     </div>
   );
 }
