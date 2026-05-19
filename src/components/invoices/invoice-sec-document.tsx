@@ -58,6 +58,7 @@ export type InvoiceDocData = {
     amountInWords?: string;
     showBankAed?: boolean;
     showBankUsd?: boolean;
+    hideShipping?: boolean;
   };
   dueDate?: string;
   poId?: string;
@@ -200,37 +201,39 @@ export function InvoiceSecDocument({
           </div>
         </header>
 
-        <div className="mb-3 grid grid-cols-[1fr_1fr_1.25fr] gap-4 text-[12px]">
+        <div className={`mb-3 grid gap-4 text-[12px] ${extras.hideShipping === true ? "grid-cols-[1.75fr_1.25fr]" : "grid-cols-[1fr_1fr_1.25fr]"}`}>
           <div>
             <p className="mb-1 text-[15px] font-light text-[#666]">Bill To:</p>
             <p className="font-bold">{clientSnapshot.name || "—"}</p>
             <p className="font-bold">{clientSnapshot.company || ""}</p>
             <p className="whitespace-pre-wrap leading-tight">{clientSnapshot.address || ""}</p>
           </div>
-          <div>
-            <p className="mb-1 text-[15px] font-light text-[#666]">Ship To:</p>
-            <p className="font-bold">{extras.shipToCompany || clientSnapshot.company || "—"}</p>
-            <p className="whitespace-pre-wrap leading-tight">
-              {extras.shipToAddress || clientSnapshot.address || ""}
-            </p>
-          </div>
+          {extras.hideShipping !== true && (
+            <div>
+              <p className="mb-1 text-[15px] font-light text-[#666]">Ship To:</p>
+              <p className="font-bold">{extras.shipToCompany || clientSnapshot.company || "—"}</p>
+              <p className="whitespace-pre-wrap leading-tight">
+                {extras.shipToAddress || clientSnapshot.address || ""}
+              </p>
+            </div>
+          )}
           <div className="pt-2">
-            <table className="ml-auto w-full text-right text-[12px]">
+            <table className="w-full text-[12px]">
               <tbody>
                 <tr>
-                  <td className="pr-5 whitespace-nowrap text-[#6b6b6b]">Date:</td>
+                  <td className=" text-[#6b6b6b]">Date:</td>
                   <td className="whitespace-nowrap">{formatDate(documentInfo.date)}</td>
                 </tr>
                 <tr>
-                  <td className="pr-5 whitespace-nowrap text-[#6b6b6b]">Payment Terms:</td>
+                  <td className="text-[#6b6b6b]">Payment Terms:</td>
                   <td className="whitespace-nowrap">{extras.paymentTerms || "—"}</td>
                 </tr>
                 <tr>
-                  <td className="pr-5 whitespace-nowrap text-[#6b6b6b]">Due Date:</td>
+                  <td className="text-[#6b6b6b]">Due Date:</td>
                   <td className="whitespace-nowrap">{formatDate(data.dueDate)}</td>
                 </tr>
                 <tr>
-                  <td className="pr-5 whitespace-nowrap text-[#6b6b6b]">PO Number:</td>
+                  <td className="text-[#6b6b6b]">PO Number:</td>
                   <td className="whitespace-nowrap">{extras.poNumberRef || "—"}</td>
                 </tr>
               </tbody>
@@ -412,7 +415,7 @@ export function InvoiceSecDocument({
         </div>
       </header>
 
-      <div className="mb-5 grid gap-4 sm:grid-cols-[1fr_1fr_1.3fr]">
+      <div className={`mb-5 grid gap-4 ${extras.hideShipping === true ? "sm:grid-cols-[1.7fr_1.3fr]" : "sm:grid-cols-[1fr_1fr_1.3fr]"}`}>
         <div className="min-w-0">
           <p className="text-[11px] font-medium text-neutral-500">Bill To:</p>
           <p className="mt-0.5 text-[12px] font-bold text-neutral-900">{clientSnapshot.name || "—"}</p>
@@ -422,18 +425,20 @@ export function InvoiceSecDocument({
             <p className="mt-1 text-[12px] font-semibold">TRN: {extras.clientTrn}</p>
           ) : null}
         </div>
-        <div className="min-w-0">
-          <p className="text-[11px] font-medium text-neutral-500">Ship To:</p>
-          <p className="mt-0.5 text-[12px] font-bold text-neutral-900">
-            {extras.shipToCompany || clientSnapshot.company || "—"}
-          </p>
-          <p className="whitespace-pre-wrap text-[12px] font-semibold leading-tight text-neutral-900">
-            {extras.shipToAddress || clientSnapshot.address || ""}
-          </p>
-          {extras.shipToTrn ? (
-            <p className="mt-1 text-[12px] font-semibold">TRN: {extras.shipToTrn}</p>
-          ) : null}
-        </div>
+        {extras.hideShipping !== true && (
+          <div className="min-w-0">
+            <p className="text-[11px] font-medium text-neutral-500">Ship To:</p>
+            <p className="mt-0.5 text-[12px] font-bold text-neutral-900">
+              {extras.shipToCompany || clientSnapshot.company || "—"}
+            </p>
+            <p className="whitespace-pre-wrap text-[12px] font-semibold leading-tight text-neutral-900">
+              {extras.shipToAddress || clientSnapshot.address || ""}
+            </p>
+            {extras.shipToTrn ? (
+              <p className="mt-1 text-[12px] font-semibold">TRN: {extras.shipToTrn}</p>
+            ) : null}
+          </div>
+        )}
         <div className="min-w-0">
           <table className="ml-auto w-full text-right text-[12px]">
           <tbody>

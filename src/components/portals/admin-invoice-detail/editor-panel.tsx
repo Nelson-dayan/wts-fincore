@@ -20,7 +20,7 @@ type EditorPanelProps = {
   pdfExporting: boolean;
   msg: string;
   onItemChange: (next: Item) => void;
-  onPatchExtra: (key: string, value: string) => void;
+  onPatchExtra: (key: string, value: any) => void;
   onPatchBank: (which: "bankAed" | "bankUsd", field: keyof Bank, value: string) => void;
   onPatchLine: (idx: number, partial: Partial<Item["pages"][0]["items"][0]>) => void;
   onAddLine: () => void;
@@ -37,7 +37,7 @@ export function EditorPanel(props: EditorPanelProps) {
   return (
     <div className="print:hidden space-y-4">
       <div className="py-2 flex top-14 z-50 sticky bg-secondary flex-wrap justify-center gap-2 rounded-md">
-        {/* <Link href="/admin/invoices"><Button size="sm" variant="outline">All invoices</Button></Link> */}
+          {/* <Link href="/admin/invoices"><Button size="sm" variant="outline">All invoices</Button></Link> */}
         {item.poId ? <Link href={`/admin/purchase-orders/${item.poId}`}><Button size="sm" variant="outline">Open PO</Button></Link> : null}
         <Link href={`/admin/projects/${item.projectId}`}><Button size="sm" variant="outline">Open project</Button></Link>
         <Button

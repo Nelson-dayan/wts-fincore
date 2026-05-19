@@ -41,6 +41,9 @@ const invoiceExtrasSchema = new Schema(
     },
     amountInWords: { type: String, default: "" },
     _hiddenUntilSaved: { type: Boolean, default: false },
+    showBankAed: { type: Boolean, default: true },
+    showBankUsd: { type: Boolean, default: true },
+    hideShipping: { type: Boolean, default: false },
   },
   { _id: false }
 );

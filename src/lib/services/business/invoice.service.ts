@@ -270,6 +270,9 @@ export async function createInvoiceForPurchaseOrder(
         "This is an electronically generated invoice, hence does not require signature.",
       amountInWords:
         invoiceType === "usd" ? `${total.toFixed(2)} US Dollars Only.` : `INR ${total.toFixed(2)} Only.`,
+      showBankAed: true,
+      showBankUsd: true,
+      hideShipping: false,
       _hiddenUntilSaved: true,
     },
   });

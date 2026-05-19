@@ -35,6 +35,23 @@ function toDocData(item: Item): InvoiceDocData {
   };
 }
 
+function parsePaymentTermsDays(terms: string): number | null {
+  if (!terms) return null;
+  const normalized = terms.toLowerCase().trim();
+  if (normalized.includes("receipt") || normalized.includes("immediate")) {
+    return 0;
+  }
+  const match = normalized.match(/(\d+)\s*day/);
+  if (match) {
+    return parseInt(match[1], 10);
+  }
+  const rawNum = parseInt(normalized, 10);
+  if (!isNaN(rawNum) && String(rawNum) === normalized) {
+    return rawNum;
+  }
+  return null;
+}
+
 
 export function AdminInvoiceDetailClient({
   invoiceId,
@@ -63,9 +80,9 @@ export function AdminInvoiceDetailClient({
     setError("");
     try {
       const endpoint = invoiceId
-        ? `${apiPrefix}/invoices/${invoiceId}`
-        : `${apiPrefix}/invoices/template?poId=${encodeURIComponent(
-            String(poId ?? "")
+          ? `${apiPrefix}/invoices/${invoiceId}`
+          : `${apiPrefix}/invoices/template?poId=${encodeURIComponent(
+              String(poId ?? "")
           )}&invoiceType=${encodeURIComponent(invoiceType)}`;
       const data = await apiFetch<{ item?: Item }>(endpoint);
       if (!data.item) throw new Error("Missing invoice");
@@ -85,9 +102,9 @@ export function AdminInvoiceDetailClient({
   const liveTotals = useMemo(() => {
     if (!item) return { subtotal: 0, tax: 0, total: 0 };
     return computeInvoiceTotals(
-      item.pages,
-      item.documentInfo.taxRate ?? 5,
-      item.documentInfo.taxEnabled !== false
+        item.pages,
+        item.documentInfo.taxRate ?? 5,
+        item.documentInfo.taxEnabled !== false
     );
   }, [item]);
 
@@ -102,10 +119,10 @@ export function AdminInvoiceDetailClient({
       extras: {
         ...base.extras,
         amountInWords:
-          manualWords ||
-          (item.currency === "AED"
-            ? aedAmountInWords(liveTotals.total)
-            : `${liveTotals.total.toFixed(2)} ${item.currency || "USD"} Only.`),
+            manualWords ||
+            (item.currency === "AED"
+                ? aedAmountInWords(liveTotals.total)
+                : `${liveTotals.total.toFixed(2)} ${item.currency || "USD"} Only.`),
       },
     };
   }, [item, liveTotals]);
@@ -135,19 +152,19 @@ export function AdminInvoiceDetailClient({
     clearSaveFeedback();
     setMsg("");
     try {
-        const payload = {
-          invoiceNumber: item.invoiceNumber,
-          invoiceType: item.invoiceType,
-          currency: item.currency,
-          status: item.status,
-          dueDate: item.dueDate,
-          documentInfo: item.documentInfo,
-          clientSnapshot: item.clientSnapshot,
-          companySnapshot: item.companySnapshot,
-          pages: item.pages,
-          extras: { ...item.extras, _hiddenUntilSaved: false },
-          branding: item.branding,
-        };
+      const payload = {
+        invoiceNumber: item.invoiceNumber,
+        invoiceType: item.invoiceType,
+        currency: item.currency,
+        status: item.status,
+        dueDate: item.dueDate,
+        documentInfo: item.documentInfo,
+        clientSnapshot: item.clientSnapshot,
+        companySnapshot: item.companySnapshot,
+        pages: item.pages,
+        extras: { ...item.extras, _hiddenUntilSaved: false },
+        branding: item.branding,
+      };
       if (!invoiceId) {
         const createJson = await apiFetch<{ id?: string }>("/api/admin/invoices", {
           method: "POST",
@@ -184,15 +201,56 @@ export function AdminInvoiceDetailClient({
     }
   }
 
-  function patchExtra<K extends string>(key: K, value: string) {
-    setItem((prev) =>
-      prev
-        ? {
-            ...prev,
-            extras: { ...prev.extras, [key]: value },
+  const handleItemChange = useCallback((next: Item) => {
+    setItem((prev) => {
+      if (!prev) return next;
+      const prevDate = prev.documentInfo.date;
+      const nextDate = next.documentInfo.date;
+      let finalNext = next;
+
+      if (prevDate !== nextDate) {
+        const terms = String(next.extras?.paymentTerms ?? "");
+        const days = parsePaymentTermsDays(terms);
+        if (days !== null) {
+          const baseDate = nextDate ? new Date(nextDate) : new Date();
+          if (!isNaN(baseDate.getTime())) {
+            const due = new Date(baseDate.getTime());
+            due.setDate(due.getDate() + days);
+            finalNext = {
+              ...next,
+              dueDate: due.toISOString(),
+            };
           }
-        : null
-    );
+        }
+      }
+      return finalNext;
+    });
+  }, []);
+
+  function patchExtra<K extends string>(key: K, value: any) {
+    setItem((prev) => {
+      if (!prev) return null;
+      const nextExtras = { ...prev.extras, [key]: value };
+      let nextDueDate = prev.dueDate;
+
+      if (key === "paymentTerms") {
+        const days = parsePaymentTermsDays(String(value));
+        if (days !== null) {
+          const baseDate = prev.documentInfo.date ? new Date(prev.documentInfo.date) : new Date();
+          if (!isNaN(baseDate.getTime())) {
+            const due = new Date(baseDate.getTime());
+            due.setDate(due.getDate() + days);
+            nextDueDate = due.toISOString();
+          }
+        }
+      }
+
+      return {
+        ...prev,
+        extras: nextExtras,
+        dueDate: nextDueDate,
+      };
+    });
   }
 
   function patchBank(which: "bankAed" | "bankUsd", field: keyof Bank, value: string) {
@@ -326,7 +384,7 @@ export function AdminInvoiceDetailClient({
             saving={saving}
             pdfExporting={pdfExporting}
             msg={msg}
-            onItemChange={setItem}
+            onItemChange={handleItemChange}
             onPatchExtra={patchExtra}
             onPatchBank={patchBank}
             onPatchLine={patchLine}

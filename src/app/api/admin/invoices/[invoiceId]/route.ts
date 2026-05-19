@@ -231,10 +231,12 @@ export async function PATCH(req: Request, ctx: Ctx) {
         inv.set("extras", {});
       }
       const ex = inv.extras as { amountInWords?: string };
-      ex.amountInWords =
-        inv.invoiceType === "usd"
-          ? `${total.toFixed(2)} US Dollars Only.`
-          : aedAmountInWords(total);
+      if (!body.extras || body.extras.amountInWords === undefined) {
+        ex.amountInWords =
+          inv.invoiceType === "usd"
+            ? `${total.toFixed(2)} US Dollars Only.`
+            : aedAmountInWords(total);
+      }
       inv.markModified("extras");
       inv.markModified("pages");
       inv.markModified("totals");
