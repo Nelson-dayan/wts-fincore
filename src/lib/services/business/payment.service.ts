@@ -36,6 +36,17 @@ export interface RecordPaymentInput {
     rate: number;
     rateToBase?: number;
   }>;
+  paymentCurrency?: string;
+  paymentAmountGross?: number;
+  paymentAmountNet?: number;
+  fees?: Array<{
+    type: "GATEWAY_FEE" | "BANK_CHARGE" | "GST_ON_FEE" | "FOREX" | "TDS" | "OTHER";
+    label: string;
+    amount: number;
+    currency: string;
+    baseAmount?: number;
+    note?: string;
+  }>;
 }
 
 /**
@@ -77,6 +88,13 @@ export async function recordPayment(input: RecordPaymentInput) {
             note: input.note,
             createdBy: input.createdBy,
             invoiceId: input.invoiceId, // Backward compatibility link
+            paymentCurrency: input.paymentCurrency || input.currency,
+            paymentAmountGross: input.paymentAmountGross ?? input.amount,
+            paymentAmountNet: input.paymentAmountNet ?? input.amount,
+            fees: (input.fees || []).map(f => ({
+              ...f,
+              baseAmount: (f.baseAmount ?? f.amount) * (input.exchangeRateToBase || 1)
+            }))
           },
         ],
         { session }

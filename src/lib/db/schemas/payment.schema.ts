@@ -59,6 +59,11 @@ export const paymentSchema = new Schema(
     
     note: { type: String, default: "" },
     
+    paymentCurrency: { type: String },
+    paymentAmountGross: optionalDecimalField,
+    paymentAmountNet: optionalDecimalField,
+    fees: { type: [paymentFeeSchema], default: [] },
+    
     createdBy: { type: Types.ObjectId, ref: "User", required: true, index: true },
     updatedBy: { type: Types.ObjectId, ref: "User" },
     

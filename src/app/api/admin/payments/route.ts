@@ -130,6 +130,15 @@ export async function POST(req: Request) {
       }
     }
 
+    const { ProjectModel } = await import("@/lib/db/models");
+    const project = await ProjectModel.findById(pId).select("clientId companyId").lean();
+    if (!project) {
+      if (isIdempotencyEnabled) await saveIdempotencyFailed(idempotencyKey!, userId);
+      return NextResponse.json({ message: "Project not found" }, { status: 400 });
+    }
+    body.clientId = project.clientId;
+    body.companyId = project.companyId;
+
     // Ensure createdBy is set from the session user
     body.createdBy = session.user.id;
     
