@@ -12,7 +12,9 @@ import {
   generateQuotationNumber,
   toDecimal128,
 } from "@/lib/services/business/quotation.service";
+import { updateSequenceReservationEntity } from "@/lib/services/business/counter.service";
 import { pagesFromGeneratorData } from "@/lib/quotation/map-builder-to-quotation";
+import { checkOrCreateIdempotency, saveIdempotencySuccess, saveIdempotencyFailed } from "@/lib/services/business/idempotency.service";
 import { normalizeQuotationData, type QuotationData } from "@/types/quotation-generator";
 import {
   assertEmployeeCanAccessProject,
@@ -94,8 +96,13 @@ function mergeSnapshotsWithForm(
  * Optional `quotationId` updates the same document (edit mode).
  */
 export async function POST(req: Request) {
+  let idempotencyKey: string | null = null;
+  let userId: string = "";
+  let isIdempotencyEnabled = false;
+
   try {
     const session = await requireRole(["admin", "employee"]);
+    userId = session.user.id;
     await connectDB();
     const body = (await req.json()) as {
       projectId?: string;
@@ -105,6 +112,34 @@ export async function POST(req: Request) {
       taxRate?: number;
       taxEnabled?: boolean;
     };
+
+    idempotencyKey = req.headers.get("Idempotency-Key")?.trim() ?? null;
+    if (idempotencyKey) {
+      try {
+        const check = await checkOrCreateIdempotency(
+          idempotencyKey,
+          userId,
+          "/api/admin/quotations/from-builder",
+          body
+        );
+
+        if (check.status === "CACHED") {
+          return NextResponse.json(check.responseBody, { status: check.responseStatus });
+        }
+        if (check.status === "IN_PROGRESS") {
+          return NextResponse.json({ message: "Request already in progress" }, { status: 409 });
+        }
+        isIdempotencyEnabled = true;
+      } catch (e: any) {
+        if (e.message === "IDEMPOTENCY_PAYLOAD_MISMATCH") {
+          return NextResponse.json(
+            { message: "Idempotency key reused with a different body payload" },
+            { status: 409 }
+          );
+        }
+        throw e;
+      }
+    }
 
     const quotationIdRaw = String(body.quotationId ?? "").trim();
     const quotationOid =
@@ -126,6 +161,7 @@ export async function POST(req: Request) {
     if (quotationOid) {
       const existing = await QuotationModel.findById(quotationOid).lean();
       if (!existing) {
+        if (isIdempotencyEnabled) await saveIdempotencyFailed(idempotencyKey!, userId);
         return apiError("Quotation not found", 404);
       }
       existingForUpdate = existing as Record<string, unknown>;
@@ -137,6 +173,7 @@ export async function POST(req: Request) {
         mongoose.Types.ObjectId.isValid(bodyPid) &&
         bodyPid !== projectId
       ) {
+        if (isIdempotencyEnabled) await saveIdempotencyFailed(idempotencyKey!, userId);
         return apiError("Project connection does not match this quotation.", 400);
       }
 
@@ -146,10 +183,12 @@ export async function POST(req: Request) {
     } else {
       const bodyPid = String(body.projectId ?? "").trim();
       if (!bodyPid || !mongoose.Types.ObjectId.isValid(bodyPid)) {
+        if (isIdempotencyEnabled) await saveIdempotencyFailed(idempotencyKey!, userId);
         return apiError("Connect a project before saving (projectId required).", 400);
       }
       const projExists = await ProjectModel.exists({ _id: bodyPid });
       if (!projExists) {
+        if (isIdempotencyEnabled) await saveIdempotencyFailed(idempotencyKey!, userId);
         return apiError("Project not found", 404);
       }
       projectId = bodyPid;
@@ -164,6 +203,7 @@ export async function POST(req: Request) {
           await assertEmployeeCanAccessProject(session.user.id, projectId);
         }
       } catch (e) {
+        if (isIdempotencyEnabled) await saveIdempotencyFailed(idempotencyKey!, userId);
         if (e instanceof Error && e.message === "FORBIDDEN") {
           return apiError("Forbidden", 403);
         }
@@ -247,6 +287,7 @@ export async function POST(req: Request) {
       ).lean();
 
       if (!updated) {
+        if (isIdempotencyEnabled) await saveIdempotencyFailed(idempotencyKey!, userId);
         return apiError("Quotation not found", 404);
       }
 
@@ -259,17 +300,22 @@ export async function POST(req: Request) {
         projectId: String(updated.projectId),
       });
 
-      return apiSuccess({
+      const resData = {
         item: {
           _id: String(updated._id),
           quotationNumber: updated.quotationNumber,
           projectId: String(updated.projectId),
         },
-      });
+      };
 
+      if (isIdempotencyEnabled) {
+        await saveIdempotencySuccess(idempotencyKey!, userId, resData, 200);
+      }
+
+      return apiSuccess(resData);
     }
 
-    const quotationNumber = await generateQuotationNumber();
+    const { quotationNumber, seqValue, year } = await generateQuotationNumber(session.user.id);
     const created = await QuotationModel.create({
       quotationNumber,
       projectId: new mongoose.Types.ObjectId(projectId),
@@ -287,14 +333,25 @@ export async function POST(req: Request) {
       projectId,
     });
 
-    return apiSuccess({
+    await updateSequenceReservationEntity("quotation_number", year, seqValue, String(created._id));
+
+    const resData = {
       item: {
         _id: String(created._id),
         quotationNumber: created.quotationNumber,
         projectId: String(created.projectId),
       },
-    }, 201);
+    };
+
+    if (isIdempotencyEnabled) {
+      await saveIdempotencySuccess(idempotencyKey!, userId, resData, 201);
+    }
+
+    return apiSuccess(resData, 201);
   } catch (error) {
+    if (isIdempotencyEnabled && idempotencyKey) {
+      await saveIdempotencyFailed(idempotencyKey, userId);
+    }
     console.error("POST Quotation Builder Error:", error);
     if (error instanceof Error) {
       const msg = error.message;

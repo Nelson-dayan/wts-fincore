@@ -32,6 +32,8 @@ const invoiceExtrasSchema = new Schema(
     poNumberRef: { type: String, default: "" },
     bankAed: { type: bankDetailSchema, default: () => ({}) },
     bankUsd: { type: bankDetailSchema, default: () => ({}) },
+    bankAedTitle: { type: String, default: "AED ACCOUNT DETAILS" },
+    bankUsdTitle: { type: String, default: "USD ACCOUNT DETAILS" },
     footerTerms: { type: String, default: "" },
     footerCurrencyLine: { type: String, default: `CURRENCY IN ${DEFAULT_CURRENCY}` },
     disclaimer: {
@@ -40,6 +42,10 @@ const invoiceExtrasSchema = new Schema(
         "This is an electronically generated invoice, hence does not require signature.",
     },
     amountInWords: { type: String, default: "" },
+    _hiddenUntilSaved: { type: Boolean, default: false },
+    showBankAed: { type: Boolean, default: true },
+    showBankUsd: { type: Boolean, default: true },
+    hideShipping: { type: Boolean, default: false },
   },
   { _id: false }
 );
@@ -70,7 +76,6 @@ export const invoiceSchema = new Schema(
     invoiceType: { type: String, enum: ["aed", "usd"], default: "aed", index: true },
     currency: { type: String, enum: SUPPORTED_CURRENCY_VALUES, default: DEFAULT_CURRENCY },
     baseCurrency: { type: String, default: DEFAULT_CURRENCY },
-    exchangeRate: decimalField,
     projectId: { type: Types.ObjectId, ref: "Project", required: true, index: true },
     poId: { type: Types.ObjectId, ref: "PurchaseOrder", index: true },
     createdBy: { type: Types.ObjectId, ref: "User", required: true, index: true },
@@ -98,6 +103,18 @@ export const invoiceSchema = new Schema(
       default: "DRAFT",
       index: true,
     },
+    lifecycleStatus: {
+      type: String,
+      enum: ["DRAFT_HIDDEN", "DRAFT_VISIBLE", "FINALIZED", "ARCHIVED", "CANCELLED"],
+      default: "DRAFT_HIDDEN",
+      index: true,
+    },
+    paymentStatus: {
+      type: String,
+      enum: ["UNPAID", "PARTIAL", "PAID", "REFUNDED"],
+      default: "UNPAID",
+      index: true,
+    },
     dueDate: { type: Date, required: true, index: true },
     extras: { type: invoiceExtrasSchema, default: () => ({}) },
     isDeleted: { type: Boolean, default: false, index: true },
@@ -106,6 +123,75 @@ export const invoiceSchema = new Schema(
   schemaOptions
 );
 
+invoiceSchema.pre("save", async function (this: any) {
+  // If isNew, initialize dual-status based on _hiddenUntilSaved or legacy status
+  if (this.isNew) {
+    if (this.extras?._hiddenUntilSaved === true) {
+      this.lifecycleStatus = "DRAFT_HIDDEN";
+      this.status = "DRAFT";
+    } else if (this.status === "DRAFT") {
+      this.lifecycleStatus = "DRAFT_VISIBLE";
+      this.paymentStatus = "UNPAID";
+    }
+  }
+
+  // If extras._hiddenUntilSaved is explicitly set to false on a draft hidden invoice, transition it to visible draft
+  if (this.extras?._hiddenUntilSaved === false && this.lifecycleStatus === "DRAFT_HIDDEN") {
+    this.lifecycleStatus = "DRAFT_VISIBLE";
+  }
+
+  // If status is updated but lifecycle/payment are not, sync them
+  if (this.isModified("status")) {
+    const s = this.status;
+    if (s === "DRAFT") {
+      if (this.extras?._hiddenUntilSaved === true || this.lifecycleStatus === "DRAFT_HIDDEN") {
+        this.lifecycleStatus = "DRAFT_HIDDEN";
+      } else {
+        this.lifecycleStatus = "DRAFT_VISIBLE";
+      }
+      this.paymentStatus = "UNPAID";
+    } else if (s === "SENT") {
+      this.lifecycleStatus = "FINALIZED";
+      this.paymentStatus = "UNPAID";
+    } else if (s === "PARTIAL") {
+      this.lifecycleStatus = "FINALIZED";
+      this.paymentStatus = "PARTIAL";
+    } else if (s === "PAID") {
+      this.lifecycleStatus = "FINALIZED";
+      this.paymentStatus = "PAID";
+    } else if (s === "OVERDUE") {
+      this.lifecycleStatus = "FINALIZED";
+      this.paymentStatus = "UNPAID";
+    } else if (s === "CANCELLED") {
+      this.lifecycleStatus = "CANCELLED";
+      this.paymentStatus = "UNPAID";
+    }
+  } else if (this.isModified("lifecycleStatus") || this.isModified("paymentStatus")) {
+    // If lifecycleStatus/paymentStatus are updated, sync legacy status
+    const lc = this.lifecycleStatus;
+    const pm = this.paymentStatus;
+    if (lc === "CANCELLED") {
+      this.status = "CANCELLED";
+    } else if (lc === "DRAFT_HIDDEN") {
+      this.status = "DRAFT";
+    } else if (lc === "DRAFT_VISIBLE") {
+      this.status = "DRAFT";
+    } else if (lc === "FINALIZED") {
+      if (pm === "PAID") this.status = "PAID";
+      else if (pm === "PARTIAL") this.status = "PARTIAL";
+      else this.status = "SENT";
+    }
+  }
+
+  // Sync _hiddenUntilSaved with lifecycleStatus
+  if (this.lifecycleStatus === "DRAFT_HIDDEN") {
+    this.extras._hiddenUntilSaved = true;
+  } else {
+    this.extras._hiddenUntilSaved = false;
+  }
+});
+
 invoiceSchema.index({ companyId: 1, invoiceNumber: 1 }, { unique: true });
 invoiceSchema.index({ companyId: 1, projectId: 1, status: 1, dueDate: 1 });
+invoiceSchema.index({ companyId: 1, projectId: 1, lifecycleStatus: 1, paymentStatus: 1, dueDate: 1 });
 invoiceSchema.index({ poId: 1, createdAt: -1 });

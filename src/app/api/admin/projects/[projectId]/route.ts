@@ -49,7 +49,7 @@ export async function PATCH(req: Request, ctx: RouteCtx) {
     const body = (await req.json()) as {
       name?: string;
       description?: string;
-      status?: "lead" | "in_progress" | "completed" | "on_hold";
+      status?: "active" | "completed" | "on_hold";
       priority?: "low" | "medium" | "high";
       budget?: number;
       assignedTo?: string[];

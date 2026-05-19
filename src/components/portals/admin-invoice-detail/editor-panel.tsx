@@ -20,7 +20,7 @@ type EditorPanelProps = {
   pdfExporting: boolean;
   msg: string;
   onItemChange: (next: Item) => void;
-  onPatchExtra: (key: string, value: string) => void;
+  onPatchExtra: (key: string, value: any) => void;
   onPatchBank: (which: "bankAed" | "bankUsd", field: keyof Bank, value: string) => void;
   onPatchLine: (idx: number, partial: Partial<Item["pages"][0]["items"][0]>) => void;
   onAddLine: () => void;
@@ -29,28 +29,24 @@ type EditorPanelProps = {
   onSave: () => void;
   onDownloadPdf: () => void;
   onOpenLedger: () => void;
-  companyRates: { usdToInr: number; aedToInr: number; isLocked: boolean };
 };
 
 export function EditorPanel(props: EditorPanelProps) {
-  const { item, extras, bankAed, bankUsd, taxLabelPreview, liveTotals, saving, pdfExporting, msg, onItemChange, onPatchExtra, onPatchBank, onPatchLine, onAddLine, onRemoveLine, onCopyBillToShip, onSave, onDownloadPdf, onOpenLedger, companyRates } = props;
+  const { item, extras, bankAed, bankUsd, taxLabelPreview, liveTotals, saving, pdfExporting, msg, onItemChange, onPatchExtra, onPatchBank, onPatchLine, onAddLine, onRemoveLine, onCopyBillToShip, onSave, onDownloadPdf, onOpenLedger } = props;
 
   return (
     <div className="print:hidden space-y-4">
-      <div className="mt-3 flex flex-wrap gap-2">
-        <Link href="/admin/invoices"><Button size="sm" variant="outline">All invoices</Button></Link>
+      <div className="py-2 flex top-14 z-50 sticky bg-secondary flex-wrap justify-center gap-2 rounded-md">
+          {/* <Link href="/admin/invoices"><Button size="sm" variant="outline">All invoices</Button></Link> */}
         {item.poId ? <Link href={`/admin/purchase-orders/${item.poId}`}><Button size="sm" variant="outline">Open PO</Button></Link> : null}
         <Link href={`/admin/projects/${item.projectId}`}><Button size="sm" variant="outline">Open project</Button></Link>
-        <Button size="sm" variant="secondary" onClick={() => window.print()}>
-          Print (A4)
-        </Button>
         <Button
           size="sm"
           variant="default"
           onClick={onSave}
           disabled={saving}
         >
-          {saving ? "Saving…" : "Save Invoice"}
+          {saving ? "Saving…" : "Save"}
         </Button>
         <Button
           size="sm"
@@ -60,16 +56,8 @@ export function EditorPanel(props: EditorPanelProps) {
         >
           {pdfExporting ? "PDF…" : "Download PDF"}
         </Button>
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={onOpenLedger}
-          className="border-primary/50 text-primary hover:bg-primary/5 font-bold"
-        >
-          Financial Statement
-        </Button>
       </div>
-      <HeadingCard item={item} extras={extras} onItemChange={onItemChange} onPatchExtra={onPatchExtra} companyRates={companyRates} />
+      <HeadingCard item={item} extras={extras} onItemChange={onItemChange} onPatchExtra={onPatchExtra} />
       <CompanyCard item={item} onItemChange={onItemChange} onPatchExtra={onPatchExtra} />
       <BillShipCard item={item} extras={extras} onItemChange={onItemChange} onPatchExtra={onPatchExtra} onCopyBillToShip={onCopyBillToShip} />
       <LineItemsCard
@@ -82,7 +70,13 @@ export function EditorPanel(props: EditorPanelProps) {
         onRemoveLine={onRemoveLine}
         onPatchExtra={onPatchExtra}
       />
-      <AccountsFooterCard bankAed={bankAed} bankUsd={bankUsd} onPatchBank={onPatchBank} />
+      <AccountsFooterCard
+        bankAed={bankAed}
+        bankUsd={bankUsd}
+        extras={extras}
+        onPatchBank={onPatchBank}
+        onPatchExtra={onPatchExtra}
+      />
       <div className="h-10" />
     </div>
   );

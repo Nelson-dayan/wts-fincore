@@ -11,15 +11,6 @@ export const companySchema = new Schema(
     // Image text storage (base64 data string)
     logoText: { type: String, default: "" },
     signatureText: { type: String, default: "" },
-    defaultTax: {
-      taxRate: { type: Number, default: 0, min: 0 },
-      taxEnabled: { type: Boolean, default: false },
-    },
-    defaultExchangeRates: {
-      usdToInr: { type: Number, default: 83.5 },
-      aedToInr: { type: Number, default: 22.7 },
-      isLocked: { type: Boolean, default: false },
-    },
     isPrimary: { type: Boolean, default: false },
   },
   schemaOptions

@@ -9,6 +9,7 @@ import { formatInvoiceForApi } from "@/lib/services/business/invoice.service";
 import { computeInvoiceTotals } from "@/lib/invoice/invoice-totals";
 import { aedAmountInWords } from "@/lib/invoice/aed-amount-words";
 import { assertEmployeeCanAccessInvoice } from "@/lib/auth/employee-resource-access";
+import { assertPeriodNotLocked } from "@/lib/services/business/period-lock.service";
 
 type Ctx = { params: Promise<{ invoiceId: string }> };
 
@@ -79,6 +80,11 @@ export async function PATCH(req: Request, ctx: Ctx) {
       return apiError("Invoice not found", 404);
     }
 
+    const existingDate = (inv.documentInfo as any)?.date;
+    if (existingDate) {
+      await assertPeriodNotLocked(existingDate);
+    }
+
     const previousStatus = inv.status;
 
     const body = (await req.json()) as {
@@ -135,7 +141,10 @@ export async function PATCH(req: Request, ctx: Ctx) {
       if (b.quotationCode !== undefined) di.quotationCode = String(b.quotationCode ?? "");
       if (b.date !== undefined) {
         const dt = new Date(String(b.date));
-        if (!Number.isNaN(dt.getTime())) di.date = dt;
+        if (!Number.isNaN(dt.getTime())) {
+          await assertPeriodNotLocked(dt);
+          di.date = dt;
+        }
       }
       if (b.subject !== undefined) di.subject = String(b.subject ?? "");
       if (b.title !== undefined) di.title = String(b.title ?? "");
@@ -164,14 +173,22 @@ export async function PATCH(req: Request, ctx: Ctx) {
       if (inv.extras == null) {
         inv.set("extras", {});
       }
-      const ex = inv.extras as Record<string, unknown>;
+      const ex = inv.extras as any;
       for (const [k, v] of Object.entries(body.extras)) {
         if (k === "bankAed" || k === "bankUsd") {
           if (v && typeof v === "object") {
-            ex[k] = { ...(ex[k] as object), ...(v as object) };
+            const rawBank = ex[k] && typeof ex[k] === "object" ? JSON.parse(JSON.stringify(ex[k])) : {};
+            const merged = {
+              accountName: String((v as any).accountName ?? rawBank.accountName ?? ""),
+              accountNo: String((v as any).accountNo ?? rawBank.accountNo ?? ""),
+              iban: String((v as any).iban ?? rawBank.iban ?? ""),
+              bankName: String((v as any).bankName ?? rawBank.bankName ?? ""),
+              swift: String((v as any).swift ?? rawBank.swift ?? ""),
+            };
+            ex.set(k, merged);
           }
         } else if (v !== undefined) {
-          ex[k] = v;
+          ex.set(k, v);
         }
       }
       inv.markModified("extras");
@@ -214,19 +231,20 @@ export async function PATCH(req: Request, ctx: Ctx) {
         tax: toDecimal128(tax),
         total: toDecimal128(total),
       };
-      const exRate = inv.exchangeRate ? Number(inv.exchangeRate) : 1;
-      inv.totalAmountBase = toDecimal128(total * exRate);
+      inv.totalAmountBase = toDecimal128(total);
       if (inv.totalsCache) {
-        inv.totalsCache.totalIntendedBase = toDecimal128(total * exRate);
+        inv.totalsCache.totalIntendedBase = toDecimal128(total);
       }
       if (inv.extras == null) {
         inv.set("extras", {});
       }
       const ex = inv.extras as { amountInWords?: string };
-      ex.amountInWords =
-        inv.invoiceType === "usd"
-          ? `${total.toFixed(2)} US Dollars Only.`
-          : aedAmountInWords(total);
+      if (!body.extras || body.extras.amountInWords === undefined) {
+        ex.amountInWords =
+          inv.invoiceType === "usd"
+            ? `${total.toFixed(2)} US Dollars Only.`
+            : aedAmountInWords(total);
+      }
       inv.markModified("extras");
       inv.markModified("pages");
       inv.markModified("totals");
@@ -261,9 +279,63 @@ export async function PATCH(req: Request, ctx: Ctx) {
     return apiSuccess({ ok: true });
   } catch (error) {
     console.error("PATCH Invoice Error:", error);
-    if (error instanceof Error && (error.message === "UNAUTHORIZED" || error.message === "FORBIDDEN")) {
-      return apiError("Forbidden", 403);
+    if (error instanceof Error) {
+      if (error.message === "UNAUTHORIZED" || error.message === "FORBIDDEN") {
+        return apiError("Forbidden", 403);
+      }
+      if (error.message.includes("closed accounting period") || error.message.includes("locked")) {
+        return apiError(error.message, 400);
+      }
     }
     return apiError("Failed to update invoice", 500);
+  }
+}
+
+export async function DELETE(_req: Request, ctx: Ctx) {
+  try {
+    const session = await requireRole(["admin"]);
+    await connectDB();
+    const { invoiceId } = await ctx.params;
+    if (!mongoose.Types.ObjectId.isValid(invoiceId)) {
+      return apiError("Invalid invoice id", 400);
+    }
+
+    const inv = await InvoiceModel.findById(invoiceId);
+    if (!inv) {
+      return apiError("Invoice not found", 404);
+    }
+
+    // Check if period is locked
+    const docDate = (inv.documentInfo as any)?.date || inv.dueDate;
+    if (docDate) {
+      await assertPeriodNotLocked(docDate);
+    }
+
+    // Soft delete
+    inv.set("isDeleted", true);
+    inv.set("deletedAt", new Date());
+    await inv.save();
+
+    await logActivity({
+      userId: session.user.id,
+      action: "INVOICE_DELETED",
+      entityType: "Invoice",
+      entityId: invoiceId,
+      message: `Deleted invoice ${inv.invoiceNumber}`,
+      projectId: String(inv.projectId),
+    });
+
+    return apiSuccess({ ok: true });
+  } catch (error) {
+    console.error("DELETE Invoice Error:", error);
+    if (error instanceof Error) {
+      if (error.message === "UNAUTHORIZED" || error.message === "FORBIDDEN") {
+        return apiError("Forbidden", 403);
+      }
+      if (error.message.includes("closed accounting period") || error.message.includes("locked")) {
+        return apiError(error.message, 400);
+      }
+    }
+    return apiError("Failed to delete invoice", 500);
   }
 }

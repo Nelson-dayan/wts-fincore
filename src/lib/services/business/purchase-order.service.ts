@@ -1,19 +1,16 @@
-import { randomBytes } from "node:crypto";
 import type { ClientSession, Types } from "mongoose";
 import { connectDB } from "@/lib/db/connect";
 import { PurchaseOrderModel, QuotationModel } from "@/lib/db/models";
 import { applyExchangeRate } from "@/lib/finance/engine";
+import { getNextFiscalSequence } from "@/lib/services/business/counter.service";
 
 type POType = "client" | "internal";
 
-export async function generatePONumber(): Promise<string> {
-  for (let attempt = 0; attempt < 8; attempt += 1) {
-    const suffix = randomBytes(4).toString("hex").toUpperCase();
-    const num = `PO-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${suffix}`;
-    const exists = await PurchaseOrderModel.exists({ poNumber: num });
-    if (!exists) return num;
-  }
-  throw new Error("Could not generate a unique PO number");
+export async function generatePONumber(userId: string): Promise<{ poNumber: string; seqValue: number; year: string }> {
+  const currentYear = new Date().getFullYear().toString();
+  const seqValue = await getNextFiscalSequence("purchase_order_number", currentYear, "PurchaseOrder", userId);
+  const poNumber = `# SLMEC/PO/${currentYear}/${String(seqValue).padStart(5, "0")}`;
+  return { poNumber, seqValue, year: currentYear };
 }
 
 export interface CreatePurchaseOrderInput {

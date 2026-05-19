@@ -2,6 +2,7 @@ import {
   ClientModel,
   ExpenseModel,
   InvoiceModel,
+  PaymentModel,
   ProjectModel,
   PurchaseOrderModel,
   QuotationModel,
@@ -21,7 +22,7 @@ export async function buildProjectDetailPayload(projectId: string) {
     return { notFound: true as const };
   }
 
-  const [client, quotations, purchaseOrders, invoices, expensesRaw] = await Promise.all([
+  const [client, quotations, purchaseOrders, invoices, expensesRaw, paymentsRaw] = await Promise.all([
     ClientModel.findById(project.clientId)
       .select("_id name company email address website clientLogoText clientSignatureText")
       .lean(),
@@ -41,6 +42,11 @@ export async function buildProjectDetailPayload(projectId: string) {
       .select("_id title amount currency baseAmount category createdAt")
       .sort({ createdAt: -1 })
       .lean(),
+    PaymentModel.find({ projectId, isDeleted: { $ne: true } })
+      .select("_id amount currency amountBase feeAmount feeAmountBase method referenceNumber receivedAt createdAt accountId")
+      .populate("accountId", "name currency")
+      .sort({ receivedAt: -1 })
+      .lean(),
   ]);
 
   const expenseTotal = expensesRaw.reduce((sum, e) => sum + decimalToNumber(e.amount), 0);
@@ -59,17 +65,19 @@ export async function buildProjectDetailPayload(projectId: string) {
     createdAt: e.createdAt,
   }));
 
-  const totalReceivedBase = invoices.reduce((sum, inv) => {
-    const cache = inv.totalsCache as { totalReceivedBase?: unknown } | undefined;
-    return sum + (cache ? decimalToNumber(cache.totalReceivedBase) : 0);
-  }, 0);
+  const payments = paymentsRaw.map((p) => ({
+    ...p,
+    _id: String(p._id),
+    amount: decimalToNumber(p.amount),
+    amountBase: decimalToNumber(p.amountBase),
+    feeAmount: decimalToNumber(p.feeAmount),
+    feeAmountBase: decimalToNumber(p.feeAmountBase),
+  }));
 
-  const totalFeesBase = invoices.reduce((sum, inv) => {
-    const cache = inv.totalsCache as { totalFeesBase?: unknown } | undefined;
-    return sum + (cache ? decimalToNumber(cache.totalFeesBase) : 0);
-  }, 0);
+  const totalReceivedBase = payments.reduce((sum, p) => sum + p.amountBase, 0);
+  const totalFeesBase = payments.reduce((sum, p) => sum + p.feeAmountBase, 0);
 
-  const profitBase = totalReceivedBase - expenseTotalBase;
+  const profitBase = totalReceivedBase - expenseTotalBase - totalFeesBase;
 
   return {
     notFound: false as const,
@@ -79,6 +87,7 @@ export async function buildProjectDetailPayload(projectId: string) {
     purchaseOrders,
     invoices,
     expenses,
+    payments,
     expenseTotal,
     financials: {
       totalReceivedBase,

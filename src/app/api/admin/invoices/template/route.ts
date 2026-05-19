@@ -63,7 +63,7 @@ export async function GET(req: Request) {
       signatureText: s(primary?.signatureText) || s(qCompany.signatureText),
     };
 
-    const invoiceNumber = await generateUniqueInvoiceNumber();
+    const { invoiceNumber } = await generateUniqueInvoiceNumber(session.user.id);
     const invDate = new Date();
     const due = new Date(invDate);
     due.setUTCDate(due.getUTCDate() + 30);
@@ -71,9 +71,6 @@ export async function GET(req: Request) {
     const docInfo = quotation.documentInfo as Record<string, unknown> | undefined;
     let taxRate = docInfo && typeof docInfo.taxRate === "number" ? docInfo.taxRate : 5;
     let taxEnabled = docInfo && typeof docInfo.taxEnabled === "boolean" ? docInfo.taxEnabled : true;
-    const dt = primary?.defaultTax as { taxRate?: unknown; taxEnabled?: unknown } | undefined;
-    if (typeof dt?.taxRate === "number") taxRate = dt.taxRate;
-    if (typeof dt?.taxEnabled === "boolean") taxEnabled = dt.taxEnabled;
     if (invoiceType === "usd") {
       taxRate = 0;
       taxEnabled = false;
@@ -112,14 +109,10 @@ export async function GET(req: Request) {
     const clientCompany = s(clientSnap.company);
     const clientAddress = s(clientSnap.address);
 
-    const companyExRates = (primary as any)?.defaultExchangeRates || {};
-    const defaultExRate = invoiceType === "usd" ? (companyExRates.usdToInr || 83.5) : (companyExRates.aedToInr || 22.7);
-
     return NextResponse.json({
       item: {
         invoiceNumber,
         invoiceType,
-        exchangeRate: defaultExRate,
         currency: quotation.currency ?? (invoiceType === "usd" ? "USD" : "AED"),
         projectId: String(po.projectId ?? ""),
         poId: String(po._id),
@@ -153,6 +146,9 @@ export async function GET(req: Request) {
             invoiceType === "usd"
               ? `${totals.total.toFixed(2)} US Dollars Only.`
               : aedAmountInWords(totals.total),
+          showBankAed: invoiceType === "aed",
+          showBankUsd: invoiceType === "usd",
+          hideShipping: false,
         },
         branding: {
           customLogoUrl: "",

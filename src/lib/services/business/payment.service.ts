@@ -1,180 +1,163 @@
 import type { ClientSession, Types } from "mongoose";
 import { connectDB } from "@/lib/db/connect";
-import { CompanyModel, InvoiceModel, PaymentModel } from "@/lib/db/models";
-import { decimalToNumber } from "@/lib/services/business/money";
+import { PaymentModel, PaymentAllocationModel, InvoiceModel } from "@/lib/db/models";
 import { logActivity } from "@/lib/services/activity/log-activity.service";
-import { getInvoiceSummary, PaymentInput, InvoiceInput } from "@/lib/invoice/finance-calculations";
-import { applyExchangeRate } from "@/lib/finance/engine";
+import * as accountEngine from "@/lib/services/finance/account.engine";
+import * as allocationEngine from "@/lib/services/finance/allocation.engine";
+import { assertPeriodNotLocked } from "@/lib/services/business/period-lock.service";
 
 export interface RecordPaymentInput {
-  invoiceId: Types.ObjectId | string;
-  companyId: Types.ObjectId | string;
-  createdBy: Types.ObjectId | string;
-  type: "PAYMENT" | "REFUND";
-  method: "UPI" | "BANK_TRANSFER" | "PAYPAL" | "STRIPE" | "WISE" | "CASH";
+  projectId: string | Types.ObjectId;
+  clientId: string | Types.ObjectId;
+  companyId: string | Types.ObjectId;
+  accountId: string | Types.ObjectId;
+  
+  amount: number;
   currency: string;
-  exchangeRate: number;
-  intendedAmount: number;
-  receivedAmount: number;
-  fees: { type: string; amount: number; currency: string }[];
-  transactionId?: string;
+  exchangeRateToBase: number;
+  
+  method: "UPI" | "BANK_TRANSFER" | "PAYPAL" | "STRIPE" | "WISE" | "CASH";
+  referenceNumber?: string;
+  receivedAt?: Date;
   note?: string;
-  originalPaymentId?: Types.ObjectId | string;
-  sourceDetails?: { platform: string; accountId: string };
+  
+  createdBy: string | Types.ObjectId;
+  
+  // Optional immediate allocation
+  invoiceId?: string | Types.ObjectId;
+  allocationAmount?: number;
+  allocationRate?: number;
+  allocationRateToBase?: number;
+
+  // New: Multiple allocations
+  allocations?: Array<{
+    invoiceId: string | Types.ObjectId;
+    amount: number;
+    rate: number;
+    rateToBase?: number;
+  }>;
+  paymentCurrency?: string;
+  paymentAmountGross?: number;
+  paymentAmountNet?: number;
+  fees?: Array<{
+    type: "GATEWAY_FEE" | "BANK_CHARGE" | "GST_ON_FEE" | "FOREX" | "TDS" | "OTHER";
+    label: string;
+    amount: number;
+    currency: string;
+    baseAmount?: number;
+    note?: string;
+  }>;
 }
 
-export async function updateInvoiceCache(
-  invoiceId: Types.ObjectId | string,
-  session: ClientSession
-) {
-  const invoice = await InvoiceModel.findById(invoiceId)
-    .select("totals exchangeRate dueDate status")
-    .session(session);
-
-  if (!invoice) throw new Error("Invoice not found");
-
-  const payments = await PaymentModel.find({ 
-    invoiceId, 
-    isDeleted: { $ne: true } 
-  }).session(session);
-
-  const mappedPayments: PaymentInput[] = payments.map((p) => ({
-    type: p.type as "PAYMENT" | "REFUND",
-    exchangeRate: decimalToNumber(p.exchangeRate),
-    intendedAmount: decimalToNumber(p.intendedAmount),
-    receivedAmount: decimalToNumber(p.receivedAmount),
-    fees: p.fees.map((f: any) => ({ amount: decimalToNumber(f.amount) })),
-  }));
-
-  const invoiceInput: InvoiceInput = {
-    exchangeRate: decimalToNumber(invoice.exchangeRate) || 1,
-    totalAmount: decimalToNumber(invoice.totals?.total),
-  };
-
-  const summary = getInvoiceSummary(mappedPayments, invoiceInput);
-
-  let status = invoice.status;
-  const dueDate = invoice.dueDate ? new Date(invoice.dueDate) : new Date();
-
-  // Protect DRAFT status from being auto-updated unless paid
-  if (status !== "DRAFT" || summary.totalReceivedBase > 0) {
-    if (summary.totalReceivedBase >= summary.invoiceAmountBase && summary.invoiceAmountBase > 0) {
-      status = "PAID";
-    } else if (summary.totalReceivedBase > 0 && summary.totalReceivedBase < summary.invoiceAmountBase) {
-      status = "PARTIAL";
-    } else if (summary.totalReceivedBase <= 0) {
-      status = dueDate.getTime() < Date.now() ? "OVERDUE" : "SENT";
-    }
-  }
-
-  await InvoiceModel.updateOne(
-    { _id: invoiceId },
-    { 
-      $set: { 
-        status,
-        "totalsCache.totalReceivedBase": summary.totalReceivedBase,
-        "totalsCache.totalFeesBase": summary.totalFeesBase,
-        "totalsCache.totalIntendedBase": summary.totalIntendedBase,
-        "totalsCache.overpaidAmountBase": summary.overpaidAmountBase,
-        "totalsCache.lastCalculatedAt": new Date()
-      },
-      $inc: { "totalsCache.version": 1 }
-    },
-    { session }
-  );
-
-  return { summary, status };
-}
-
+/**
+ * Records a new payment event.
+ * 1. Creates Payment record.
+ * 2. Updates Account balance and records Transaction.
+ * 3. (Optional) Allocates funds to an invoice.
+ */
 export async function recordPayment(input: RecordPaymentInput) {
   const db = await connectDB();
   const session = await db.startSession();
   try {
-    let result = { paymentId: "", invoiceStatus: "SENT" };
+    let result: any = {};
 
     await session.withTransaction(async () => {
-      // 1. Validations
-      if (!input.invoiceId) throw new Error("invoiceId is required");
-      
-      const invoice = await InvoiceModel.findById(input.invoiceId).select("companyId exchangeRate totals").session(session);
-      if (!invoice) throw new Error("Invoice not found.");
+      await assertPeriodNotLocked(input.receivedAt || new Date());
+      const amountBase = input.amount * input.exchangeRateToBase;
+      // For now, let's assume fees are handled in the input if we want them
+      const feeAmount = (input as any).feeAmount || 0;
+      const feeAmountBase = feeAmount * input.exchangeRateToBase;
 
-      let companyId = input.companyId || invoice.companyId;
-      if (!companyId) {
-        const primary = await CompanyModel.findOne({ isPrimary: true }).select("_id").session(session);
-        if (primary) companyId = primary._id;
-      }
-      
-      if (!companyId) throw new Error("companyId is required and could not be found on the invoice or primary company.");
-
-      if (input.type === "REFUND" && !input.originalPaymentId) {
-        throw new Error("Refunds must link to an originalPaymentId.");
-      }
-      
-      const totalFees = (input.fees || []).reduce((sum, f) => sum + f.amount, 0);
-      if (totalFees > input.intendedAmount) {
-        throw new Error("Fees cannot exceed the intended amount.");
-      }
-
-      // 2. Strict Backend Currency Conversion
-      const baseCurrency = "INR"; // Enforced system default
-      const intendedAmountBase = applyExchangeRate(input.intendedAmount, input.exchangeRate);
-      const receivedAmountBase = applyExchangeRate(input.receivedAmount, input.exchangeRate);
-
-      const feesWithBase = (input.fees || []).map(f => ({
-        ...f,
-        baseAmount: applyExchangeRate(f.amount || 0, input.exchangeRate)
-      }));
-
-      // 3. Create Payment
+      // 1. Create Payment (Money Movement)
       const payment = await PaymentModel.create(
         [
           {
-            invoiceId: input.invoiceId,
-            companyId: companyId,
-            type: input.type,
-            method: input.method,
+            projectId: input.projectId,
+            clientId: input.clientId,
+            companyId: input.companyId,
+            accountId: input.accountId,
+            amount: input.amount,
+            amountBase,
+            feeAmount,
+            feeAmountBase,
             currency: input.currency,
-            baseCurrency,
-            exchangeRate: input.exchangeRate,
-            intendedAmount: input.intendedAmount,
-            receivedAmount: input.receivedAmount,
-            intendedAmountBase,
-            receivedAmountBase,
-            fees: feesWithBase,
-            transactionId: input.transactionId,
+            exchangeRateToBase: input.exchangeRateToBase,
+            method: input.method,
+            referenceNumber: input.referenceNumber,
+            receivedAt: input.receivedAt || new Date(),
             note: input.note,
-            originalPaymentId: input.originalPaymentId,
-            sourceDetails: input.sourceDetails,
             createdBy: input.createdBy,
+            invoiceId: input.invoiceId, // Backward compatibility link
+            paymentCurrency: input.paymentCurrency || input.currency,
+            paymentAmountGross: input.paymentAmountGross ?? input.amount,
+            paymentAmountNet: input.paymentAmountNet ?? input.amount,
+            fees: (input.fees || []).map(f => ({
+              ...f,
+              baseAmount: (f.baseAmount ?? f.amount) * (input.exchangeRateToBase || 1)
+            }))
           },
         ],
         { session }
       );
 
-      const { status, summary } = await updateInvoiceCache(input.invoiceId, session);
+      const paymentId = payment[0]._id;
 
-      const paymentId = String(payment[0]?._id ?? "");
+      // 2. Deposit into Account
+      await accountEngine.deposit(
+        input.accountId,
+        input.amount,
+        paymentId,
+        input.createdBy,
+        session,
+        `Payment ${input.referenceNumber || paymentId} received`
+      );
 
-      // Log activity
+      // 3. Handle Optional Allocation
+      if (input.allocations && input.allocations.length > 0) {
+        for (const alloc of input.allocations) {
+          if (alloc.invoiceId && alloc.amount > 0) {
+            const rateToBase = 1;
+
+            await allocationEngine.allocate(
+              paymentId,
+              alloc.invoiceId,
+              alloc.amount,
+              alloc.rate || 1,
+              alloc.rateToBase || rateToBase,
+              input.createdBy,
+              session
+            );
+          }
+        }
+      } else if (input.invoiceId && input.allocationAmount) {
+        await allocationEngine.allocate(
+          paymentId,
+          input.invoiceId,
+          input.allocationAmount,
+          input.allocationRate || 1,
+          input.allocationRateToBase || 1,
+          input.createdBy,
+          session
+        );
+      }
+
+      // 4. Log Activity
       await logActivity({
         userId: String(input.createdBy),
         action: "PAYMENT_RECORDED",
         entityType: "Payment",
-        entityId: paymentId,
-        message: `Payment of ${input.currency} ${input.receivedAmount} recorded via ${input.method}`,
+        entityId: String(paymentId),
+        message: `Payment of ${input.currency} ${input.amount} recorded for project`,
         metadata: {
-          invoiceId: String(input.invoiceId),
-          amount: input.receivedAmount,
-          method: input.method,
-          statusChange: invoice ? invoice.status !== status : false
+          projectId: String(input.projectId),
+          accountId: String(input.accountId),
+          invoiceId: input.invoiceId ? String(input.invoiceId) : undefined
         }
       });
 
       result = {
-        paymentId,
-        invoiceStatus: status,
-        summary
+        paymentId: String(paymentId),
+        success: true
       };
     });
 
@@ -184,32 +167,68 @@ export async function recordPayment(input: RecordPaymentInput) {
   }
 }
 
-export async function deletePayment(paymentId: string) {
+/**
+ * Deletes (voids) a payment.
+ * 1. Reverts account balance.
+ * 2. Deletes all associated allocations.
+ * 3. Syncs affected invoices.
+ */
+export async function deletePayment(paymentId: string, deletedBy: string) {
   const db = await connectDB();
   const session = await db.startSession();
   try {
-    let invoiceStatus = "SENT";
-
     await session.withTransaction(async () => {
       const payment = await PaymentModel.findById(paymentId).session(session);
       if (!payment) throw new Error("Payment not found");
 
+      await assertPeriodNotLocked(payment.receivedAt);
+
+      // 1. Revert Account Balance
+      await accountEngine.withdraw(
+        payment.accountId,
+        payment.amount,
+        paymentId,
+        deletedBy,
+        session,
+        `Reversal of payment ${payment.referenceNumber || paymentId}`
+      );
+
+      // 2. Remove Allocations & Sync Invoices
+      const allocations = await PaymentAllocationModel.find({ paymentId }).session(session);
+      const invoiceIds = allocations.map(a => a.invoiceId);
+
+      await PaymentAllocationModel.deleteMany({ paymentId }, { session });
+
+      for (const invId of invoiceIds) {
+        await allocationEngine.updateInvoiceFinancials(invId, session);
+      }
+
+      // 3. Mark Payment as deleted
       await PaymentModel.updateOne(
         { _id: paymentId },
         { $set: { isDeleted: true, deletedAt: new Date() } },
         { session }
       );
-
-      const { status } = await updateInvoiceCache(payment.invoiceId, session);
-      invoiceStatus = status;
+      
+      // 4. Log Activity
+      await logActivity({
+        userId: deletedBy,
+        action: "PAYMENT_DELETED",
+        entityType: "Payment",
+        entityId: paymentId,
+        message: `Deleted payment of ${payment.currency} ${payment.amount}`
+      });
     });
 
-    return { success: true, invoiceStatus };
+    return { success: true };
   } finally {
     await session.endSession();
   }
 }
 
+/**
+ * Background task to mark invoices as overdue if past due date.
+ */
 export async function markOverdueInvoices(): Promise<number> {
   await connectDB();
   const now = new Date();

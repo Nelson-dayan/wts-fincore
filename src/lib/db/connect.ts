@@ -30,5 +30,41 @@ export async function connectDB(): Promise<typeof mongoose> {
     });
   }
   cache.conn = await cache.promise;
+  // Run lazy background backfill for dual-status (non-blocking)
+  runLazyBackfill().catch((err) => {
+    console.error("Failed executing lazy backfill migration:", err);
+  });
   return cache.conn;
+}
+
+let migrated = false;
+async function runLazyBackfill() {
+  if (migrated) return;
+  migrated = true;
+  try {
+    const { InvoiceModel } = await import("@/lib/db/models/invoice.model");
+    const unmigratedCount = await InvoiceModel.countDocuments({
+      $or: [
+        { lifecycleStatus: { $exists: false } },
+        { paymentStatus: { $exists: false } },
+        { lifecycleStatus: "DRAFT_HIDDEN", "extras._hiddenUntilSaved": false }
+      ]
+    });
+    if (unmigratedCount > 0) {
+      console.log(`[Migration] Found ${unmigratedCount} unmigrated invoices. Running backfill...`);
+      const invoices = await InvoiceModel.find({
+        $or: [
+          { lifecycleStatus: { $exists: false } },
+          { paymentStatus: { $exists: false } },
+          { lifecycleStatus: "DRAFT_HIDDEN", "extras._hiddenUntilSaved": false }
+        ]
+      });
+      for (const inv of invoices) {
+        await inv.save();
+      }
+      console.log("[Migration] Dual-status backfill completed successfully.");
+    }
+  } catch (err) {
+    console.error("Lazy dual-status backfill error:", err);
+  }
 }

@@ -10,10 +10,6 @@ export const companySettingsSchema = new Schema(
     website: { type: String, default: "" },
     logoUrl: { type: String, default: "" },
     signatureUrl: { type: String, default: "" },
-    defaultTax: {
-      taxRate: { type: Number, default: 0, min: 0 },
-      taxEnabled: { type: Boolean, default: false },
-    },
   },
   schemaOptions
 );

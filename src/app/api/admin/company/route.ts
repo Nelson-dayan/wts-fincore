@@ -30,7 +30,6 @@ export async function PATCH(req: Request) {
       website?: string;
       logoText?: string;
       signatureText?: string;
-      defaultTax?: { taxRate?: number; taxEnabled?: boolean };
     };
 
     const current = await CompanyModel.findOne({ isPrimary: true }).lean();
@@ -44,15 +43,6 @@ export async function PATCH(req: Request) {
         website: String(body.website ?? ""),
         logoText: String(body.logoText ?? ""),
         signatureText: String(body.signatureText ?? ""),
-        defaultTax: {
-          taxRate: Number(body.defaultTax?.taxRate ?? 0),
-          taxEnabled: Boolean(body.defaultTax?.taxEnabled),
-        },
-        defaultExchangeRates: {
-          usdToInr: Number((body as any).defaultExchangeRates?.usdToInr ?? 83.5),
-          aedToInr: Number((body as any).defaultExchangeRates?.aedToInr ?? 22.7),
-          isLocked: Boolean((body as any).defaultExchangeRates?.isLocked ?? false),
-        },
         isPrimary: true,
       });
     } else {
@@ -71,22 +61,9 @@ export async function PATCH(req: Request) {
             signatureText: String(
               body.signatureText ?? current.signatureText ?? ""
             ),
-            defaultTax: {
-              taxRate: Number(
-                body.defaultTax?.taxRate ?? current.defaultTax?.taxRate ?? 0
-              ),
-              taxEnabled: Boolean(
-                body.defaultTax?.taxEnabled ?? current.defaultTax?.taxEnabled
-              ),
-            },
-            defaultExchangeRates: {
-              usdToInr: Number((body as any).defaultExchangeRates?.usdToInr ?? current.defaultExchangeRates?.usdToInr ?? 83.5),
-              aedToInr: Number((body as any).defaultExchangeRates?.aedToInr ?? current.defaultExchangeRates?.aedToInr ?? 22.7),
-              isLocked: Boolean((body as any).defaultExchangeRates?.isLocked ?? current.defaultExchangeRates?.isLocked ?? false),
-            },
           },
         },
-        { new: true }
+        { returnDocument: "after" }
       );
     }
 
