@@ -146,6 +146,9 @@ export async function GET(req: Request) {
             invoiceType === "usd"
               ? `${totals.total.toFixed(2)} US Dollars Only.`
               : aedAmountInWords(totals.total),
+          showBankAed: invoiceType === "aed",
+          showBankUsd: invoiceType === "usd",
+          hideShipping: false,
         },
         branding: {
           customLogoUrl: "",

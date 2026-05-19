@@ -173,14 +173,22 @@ export async function PATCH(req: Request, ctx: Ctx) {
       if (inv.extras == null) {
         inv.set("extras", {});
       }
-      const ex = inv.extras as Record<string, unknown>;
+      const ex = inv.extras as any;
       for (const [k, v] of Object.entries(body.extras)) {
         if (k === "bankAed" || k === "bankUsd") {
           if (v && typeof v === "object") {
-            ex[k] = { ...(ex[k] as object), ...(v as object) };
+            const rawBank = ex[k] && typeof ex[k] === "object" ? JSON.parse(JSON.stringify(ex[k])) : {};
+            const merged = {
+              accountName: String((v as any).accountName ?? rawBank.accountName ?? ""),
+              accountNo: String((v as any).accountNo ?? rawBank.accountNo ?? ""),
+              iban: String((v as any).iban ?? rawBank.iban ?? ""),
+              bankName: String((v as any).bankName ?? rawBank.bankName ?? ""),
+              swift: String((v as any).swift ?? rawBank.swift ?? ""),
+            };
+            ex.set(k, merged);
           }
         } else if (v !== undefined) {
-          ex[k] = v;
+          ex.set(k, v);
         }
       }
       inv.markModified("extras");

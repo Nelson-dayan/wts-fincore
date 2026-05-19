@@ -52,6 +52,8 @@ export type InvoiceDocData = {
     poNumberRef?: string;
     bankAed?: InvoiceDocBank;
     bankUsd?: InvoiceDocBank;
+    bankAedTitle?: string;
+    bankUsdTitle?: string;
     footerTerms?: string;
     footerCurrencyLine?: string;
     disclaimer?: string;
@@ -329,7 +331,9 @@ export function InvoiceSecDocument({
               <p className="font-bold">Notes:</p>
               {extras.showBankUsd !== false && (
                 <div className="mb-2 border border-black">
-                  <p className="border-b border-black px-2 py-1 text-[12px] font-bold">USD ACCOUNT DETAILS:</p>
+                  <p className="border-b border-black px-2 py-1 text-[12px] font-bold">
+                    {extras.bankUsdTitle || "USD ACCOUNT DETAILS"}:
+                  </p>
                   <table className="w-full border-collapse text-[10px] leading-[1.45]">
                     <tbody>
                       {usdBankRows(extras.bankUsd).map(([k, v]) => (
@@ -344,7 +348,9 @@ export function InvoiceSecDocument({
               )}
               {extras.showBankAed !== false && (
                 <div className="mb-2 border border-black">
-                  <p className="border-b border-black px-2 py-1 text-[12px] font-bold">AED ACCOUNT DETAILS:</p>
+                  <p className="border-b border-black px-2 py-1 text-[12px] font-bold">
+                    {extras.bankAedTitle || "AED ACCOUNT DETAILS"}:
+                  </p>
                   <table className="w-full border-collapse text-[10px] leading-[1.45]">
                     <tbody>
                       {usdBankRows(extras.bankAed).map(([k, v]) => (
@@ -547,8 +553,12 @@ export function InvoiceSecDocument({
         <div className={`grid gap-4 border-t border-neutral-200 pt-4 ${
           (extras.showBankAed !== false && extras.showBankUsd !== false) ? "sm:grid-cols-2" : "grid-cols-1"
         }`}>
-          {extras.showBankAed !== false && <BankBlock title="AED ACCOUNT DETAILS" b={extras.bankAed} />}
-          {extras.showBankUsd !== false && <BankBlock title="USD ACCOUNT DETAILS" b={extras.bankUsd} />}
+          {extras.showBankAed !== false && (
+            <BankBlock title={extras.bankAedTitle || "AED ACCOUNT DETAILS"} b={extras.bankAed} />
+          )}
+          {extras.showBankUsd !== false && (
+            <BankBlock title={extras.bankUsdTitle || "USD ACCOUNT DETAILS"} b={extras.bankUsd} />
+          )}
         </div>
       )}
 

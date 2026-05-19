@@ -270,8 +270,8 @@ export async function createInvoiceForPurchaseOrder(
         "This is an electronically generated invoice, hence does not require signature.",
       amountInWords:
         invoiceType === "usd" ? `${total.toFixed(2)} US Dollars Only.` : `INR ${total.toFixed(2)} Only.`,
-      showBankAed: true,
-      showBankUsd: true,
+      showBankAed: invoiceType === "aed",
+      showBankUsd: invoiceType === "usd",
       hideShipping: false,
       _hiddenUntilSaved: true,
     },
@@ -302,6 +302,9 @@ export async function createInvoiceForPurchaseOrder(
 
 /** Normalize stored invoice pages for API (Decimal128 → number). */
 export function formatInvoiceForApi(row: Record<string, unknown>): Record<string, unknown> {
+  const invoiceType = row.invoiceType === "usd" ? "usd" : "aed";
+  const defaultShowAed = invoiceType === "aed";
+  const defaultShowUsd = invoiceType === "usd";
   const totals = row.totals as Record<string, unknown> | undefined;
   const pages = row.pages as
     | Array<{
@@ -316,7 +319,7 @@ export function formatInvoiceForApi(row: Record<string, unknown>): Record<string
   return {
     _id: String(row._id),
     invoiceNumber: row.invoiceNumber,
-    invoiceType: row.invoiceType === "usd" ? "usd" : "aed",
+    invoiceType,
     createdBy: String(row.createdBy ?? ""),
     status: row.status,
     fixCurrency: !!(row.projectId as any)?.fixCurrency,
@@ -361,7 +364,18 @@ export function formatInvoiceForApi(row: Record<string, unknown>): Record<string
         price: decimalToNumber(item.price),
       })),
     })),
-    extras: extras ? JSON.parse(JSON.stringify(extras)) : {},
+    extras: extras
+      ? {
+          showBankAed: defaultShowAed,
+          showBankUsd: defaultShowUsd,
+          hideShipping: false,
+          ...JSON.parse(JSON.stringify(extras)),
+        }
+      : {
+          showBankAed: defaultShowAed,
+          showBankUsd: defaultShowUsd,
+          hideShipping: false,
+        },
     dueDate:
       row.dueDate instanceof Date
         ? row.dueDate.toISOString()

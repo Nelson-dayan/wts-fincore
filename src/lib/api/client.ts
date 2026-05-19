@@ -17,7 +17,10 @@ export async function apiFetch<T>(
   init?: RequestInit
 ): Promise<T> {
   const method = init?.method?.toUpperCase() ?? "GET";
-  const updatedInit = { ...init };
+  const updatedInit: RequestInit = {
+    cache: "no-store",
+    ...init
+  };
 
   if (["POST", "PUT", "PATCH", "DELETE"].includes(method)) {
     const headers = new Headers(updatedInit.headers);

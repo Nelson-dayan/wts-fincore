@@ -32,6 +32,8 @@ const invoiceExtrasSchema = new Schema(
     poNumberRef: { type: String, default: "" },
     bankAed: { type: bankDetailSchema, default: () => ({}) },
     bankUsd: { type: bankDetailSchema, default: () => ({}) },
+    bankAedTitle: { type: String, default: "AED ACCOUNT DETAILS" },
+    bankUsdTitle: { type: String, default: "USD ACCOUNT DETAILS" },
     footerTerms: { type: String, default: "" },
     footerCurrencyLine: { type: String, default: `CURRENCY IN ${DEFAULT_CURRENCY}` },
     disclaimer: {

@@ -82,10 +82,10 @@ export function AdminInvoiceDetailClient({
     setError("");
     try {
       const endpoint = invoiceId
-          ? `${apiPrefix}/invoices/${invoiceId}`
+          ? `${apiPrefix}/invoices/${invoiceId}?_t=${Date.now()}`
           : `${apiPrefix}/invoices/template?poId=${encodeURIComponent(
               String(poId ?? "")
-          )}&invoiceType=${encodeURIComponent(invoiceType)}`;
+          )}&invoiceType=${encodeURIComponent(invoiceType)}&_t=${Date.now()}`;
       const data = await apiFetch<{ item?: Item }>(endpoint);
       if (!data.item) throw new Error("Missing invoice");
       setItem(data.item as Item);
