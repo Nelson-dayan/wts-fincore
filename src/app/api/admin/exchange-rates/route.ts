@@ -45,8 +45,13 @@ export async function GET(req: Request) {
           }
         });
       }
-    } catch (fetchErr) {
-      console.warn("Could not fetch live exchange rates, falling back to static offline rates:", fetchErr);
+    } catch (fetchErr: any) {
+      if (fetchErr?.name === "AbortError" || fetchErr?.code === 20) {
+        console.warn(`[Forex Proxy] Connection timeout (1500ms) reached while fetching live exchange rates for ${base}. Falling back to offline rates.`);
+      } else {
+        const msg = fetchErr instanceof Error ? fetchErr.message : String(fetchErr);
+        console.warn(`[Forex Proxy] Network fetch failed for ${base} (${msg}). Falling back to offline rates.`);
+      }
     }
 
     // 2. Fallback to offline computed rates

@@ -9,14 +9,32 @@ import { Select } from "@/components/ui/select";
 import { ProjectSearchPicker } from "@/components/portals/project-search-picker";
 import { apiFetch } from "@/lib/api/client";
 import { SUPPORTED_CURRENCIES } from "@/lib/constants/finance";
+import { 
+  normalizeToBase, 
+  convertBaseToTreasury,
+  STATIC_FX_RATES 
+} from "@/lib/services/finance/forex.engine";
 
-const EXCHANGE_RATES_TO_INR: Record<string, number> = {
-  INR: 1,
-  USD: 83.0,
-  AED: 22.6,
-  RM: 18.2,
-  SGD: 62.5
-};
+function formatHumanRate(rate: number, from: string, to: string): string {
+  const f = from.toUpperCase();
+  const t = to.toUpperCase();
+  if (f === t || rate === 1.0) {
+    return `${f} \u2192 ${t} = 1.00`;
+  }
+  if (rate < 1.0) {
+    return `1 ${t} = ${(1 / rate).toFixed(2)} ${f}`;
+  }
+  return `1 ${f} = ${rate.toFixed(2)} ${t}`;
+}
+
+function getExchangeRate(from: string, to: string): number {
+  const f = from.toUpperCase();
+  const t = to.toUpperCase();
+  if (f === t) return 1.0;
+  const fromRate = STATIC_FX_RATES[f] || 1.0;
+  const toRate = STATIC_FX_RATES[t] || 1.0;
+  return fromRate / toRate;
+}
 
 export type InvoiceRow = {
   _id: string;
@@ -77,6 +95,8 @@ export function RecordPaymentModal({
   const [fetchingLiveRate, setFetchingLiveRate] = useState(false);
   const [isManualRate, setIsManualRate] = useState(false);
   const [isManualBaseRate, setIsManualBaseRate] = useState(false);
+  const [isRateLive, setIsRateLive] = useState(true);
+  const [isBaseRateLive, setIsBaseRateLive] = useState(true);
 
   // Dynamic Fees states
   const [includeFees, setIncludeFees] = useState(false);
@@ -140,11 +160,12 @@ export function RecordPaymentModal({
         setConversionRate(1.0);
         if (force) setIsManualRate(false);
       }
+      setIsRateLive(true);
       return;
     }
     setFetchingLiveRate(true);
     try {
-      const res = await apiFetch<{ rates: Record<string, number> }>(
+      const res = await apiFetch<{ source?: string; rates: Record<string, number> }>(
         `${apiPrefix}/exchange-rates?base=${from}`
       );
       if (res && res.rates) {
@@ -154,6 +175,7 @@ export function RecordPaymentModal({
             setConversionRate(rate);
             if (force) setIsManualRate(false);
           }
+          setIsRateLive(res.source === "live");
         }
       }
     } catch (err) {
@@ -163,6 +185,7 @@ export function RecordPaymentModal({
         setConversionRate(fallbackRate);
         if (force) setIsManualRate(false);
       }
+      setIsRateLive(false);
     } finally {
       setFetchingLiveRate(false);
     }
@@ -174,10 +197,11 @@ export function RecordPaymentModal({
         setExchangeRateToBase(1.0);
         if (force) setIsManualBaseRate(false);
       }
+      setIsBaseRateLive(true);
       return;
     }
     try {
-      const res = await apiFetch<{ rates: Record<string, number> }>(
+      const res = await apiFetch<{ source?: string; rates: Record<string, number> }>(
         `${apiPrefix}/exchange-rates?base=${accCurrency}`
       );
       if (res && res.rates) {
@@ -187,21 +211,25 @@ export function RecordPaymentModal({
             setExchangeRateToBase(rate);
             if (force) setIsManualBaseRate(false);
           }
+          setIsBaseRateLive(res.source === "live");
         }
       }
     } catch (err) {
       console.warn("Failed to fetch base exchange rate, falling back to static math:", err);
-      const fallbackRate = EXCHANGE_RATES_TO_INR[accCurrency] || 1.0;
+      const fallbackRate = STATIC_FX_RATES[accCurrency] || 1.0;
       if (!isManualBaseRate || force) {
         setExchangeRateToBase(fallbackRate);
         if (force) setIsManualBaseRate(false);
       }
+      setIsBaseRateLive(false);
     }
   };
 
-  const fetchAllocationRate = async (idx: number, from: string, to: string) => {
+  const fetchAllocationRate = async (idx: number, from: string, to: string, invoiceId: string) => {
     if (from === to) {
-      updateAllocationRow(idx, { rate: 1.0 });
+      setAllocations(prev => prev.map((row, i) => 
+        (i === idx && row.invoiceId === invoiceId) ? { ...row, rate: 1.0 } : row
+      ));
       return;
     }
     try {
@@ -211,12 +239,16 @@ export function RecordPaymentModal({
       if (res && res.rates) {
         const rate = res.rates[to];
         if (rate) {
-          updateAllocationRow(idx, { rate });
+          setAllocations(prev => prev.map((row, i) => 
+            (i === idx && row.invoiceId === invoiceId) ? { ...row, rate } : row
+          ));
         }
       }
     } catch (err) {
       const fallbackRate = getExchangeRate(from, to);
-      updateAllocationRow(idx, { rate: fallbackRate });
+      setAllocations(prev => prev.map((row, i) => 
+        (i === idx && row.invoiceId === invoiceId) ? { ...row, rate: fallbackRate } : row
+      ));
     }
   };
 
@@ -255,57 +287,90 @@ export function RecordPaymentModal({
       allocations.forEach((alloc, idx) => {
         const matchingInvoice = projectsInvoices.find(inv => inv._id === alloc.invoiceId);
         if (matchingInvoice) {
-          const invCurrency = (matchingInvoice.invoiceType === "usd" || matchingInvoice.currency?.toUpperCase() === "USD") ? "USD" : "AED";
-          fetchAllocationRate(idx, accountCurrency, invCurrency);
+          const invCurrency = (matchingInvoice.currency || (matchingInvoice.invoiceType === "usd" ? "USD" : "AED")).toUpperCase();
+          fetchAllocationRate(idx, accountCurrency, invCurrency, alloc.invoiceId);
         }
       });
     }
-  }, [accountCurrency, isOpen, allocateToInvoice]);
+  }, [accountCurrency, isOpen, allocateToInvoice, projectsInvoices]);
+
+  // Keep fee currencies in sync with allowed currencies
+  useEffect(() => {
+    if (isOpen) {
+      const allowed = isDifferentCurrency 
+        ? Array.from(new Set([paymentCurrency, accountCurrency]))
+        : [accountCurrency];
+      
+      setFees(prev => prev.map(f => {
+        if (!allowed.includes(f.currency)) {
+          return { ...f, currency: accountCurrency };
+        }
+        return f;
+      }));
+    }
+  }, [isOpen, isDifferentCurrency, paymentCurrency, accountCurrency]);
 
   // Live Math calculations
-  const getExchangeRate = (from: string, to: string) => {
-    if (from === to) return 1;
-    const fromInr = EXCHANGE_RATES_TO_INR[from] || 1;
-    const toInr = EXCHANGE_RATES_TO_INR[to] || 1;
-    return fromInr / toInr;
-  };
-
-  // Convert all fees to paymentCurrency
-  let totalFeesInPaymentCurrency = 0;
+  // 1. Calculate fees in base INR (Layer 1)
+  let totalFeesBase = 0;
   if (includeFees) {
     fees.forEach(f => {
       if (f.amount > 0) {
-        if (f.currency === paymentCurrency) {
-          totalFeesInPaymentCurrency += f.amount;
-        } else {
-          const rate = getExchangeRate(f.currency, paymentCurrency);
-          totalFeesInPaymentCurrency += f.amount * rate;
+        const norm = normalizeToBase({ 
+          amount: f.amount, 
+          currency: f.currency, 
+          rates: STATIC_FX_RATES 
+        });
+        totalFeesBase += norm.amount;
+      }
+    });
+  }
+
+  // 2. Gross in base INR (Layer 1)
+  const payCur = isDifferentCurrency ? paymentCurrency : accountCurrency;
+  const paymentRateToBase = isDifferentCurrency ? (conversionRate * exchangeRateToBase) : exchangeRateToBase;
+  const grossBase = grossAmount * paymentRateToBase;
+
+  // 3. Net in base INR (Layer 1)
+  const netBase = Math.max(0, grossBase - totalFeesBase);
+
+  // 4. Net in payment currency (Layer 3 display) and Account currency (Layer 2 display)
+  const netAmountInPaymentCurrency = paymentRateToBase > 0 ? (netBase / paymentRateToBase) : 0;
+  const netAmountInAccountCurrency = exchangeRateToBase > 0 ? (netBase / exchangeRateToBase) : 0;
+  const totalFeesInPaymentCurrency = paymentRateToBase > 0 ? (totalFeesBase / paymentRateToBase) : 0;
+
+  // 5. Calculate allocations in base INR (Layer 1)
+  let totalAllocatedBase = 0;
+  if (allocateToInvoice) {
+    allocations.forEach(alloc => {
+      if (alloc.amount > 0) {
+        const matchingInvoice = projectsInvoices.find(inv => inv._id === alloc.invoiceId);
+        if (matchingInvoice) {
+          const invCurrency = (matchingInvoice.currency || (matchingInvoice.invoiceType === "usd" ? "USD" : "AED")).toUpperCase();
+          const norm = normalizeToBase({ 
+            amount: alloc.amount, 
+            currency: invCurrency, 
+            rates: STATIC_FX_RATES 
+          });
+          totalAllocatedBase += norm.amount;
         }
       }
     });
   }
 
-  const netAmountInPaymentCurrency = Math.max(0, grossAmount - totalFeesInPaymentCurrency);
-  const netAmountInAccountCurrency = netAmountInPaymentCurrency * conversionRate;
-
-  // Calculate allocation sum in account currency
-  let totalAllocatedInAccountCurrency = 0;
-  if (allocateToInvoice) {
-    allocations.forEach(alloc => {
-      if (alloc.amount > 0 && alloc.rate > 0) {
-        totalAllocatedInAccountCurrency += alloc.amount / alloc.rate;
-      }
-    });
-  }
-
-  const remainingInAccountCurrency = netAmountInAccountCurrency - totalAllocatedInAccountCurrency;
+  // 6. Compute Remaining and Allocated in Base INR, Payment Currency, and Account Currency
+  const remainingBase = netBase - totalAllocatedBase;
+  const remainingInPaymentCurrency = paymentRateToBase > 0 ? (remainingBase / paymentRateToBase) : 0;
+  const remainingInAccountCurrency = exchangeRateToBase > 0 ? (remainingBase / exchangeRateToBase) : 0;
+  const totalAllocatedInAccountCurrency = exchangeRateToBase > 0 ? (totalAllocatedBase / exchangeRateToBase) : 0;
 
   // Set default allocation rates when invoices or account currencies update
   const handleSelectInvoice = (idx: number, invId: string) => {
+    updateAllocationRow(idx, { invoiceId: invId });
     const inv = projectsInvoices.find(i => i._id === invId);
     if (inv) {
-      const invCurrency = (inv.invoiceType === "usd" || inv.currency?.toUpperCase() === "USD") ? "USD" : "AED";
-      fetchAllocationRate(idx, accountCurrency, invCurrency);
+      const invCurrency = (inv.currency || (inv.invoiceType === "usd" ? "USD" : "AED")).toUpperCase();
+      fetchAllocationRate(idx, accountCurrency, invCurrency, invId);
     }
   };
 
@@ -313,7 +378,7 @@ export function RecordPaymentModal({
     const unused = projectsInvoices.find(inv => !allocations.some(a => a.invoiceId === inv._id));
     const invId = unused?._id || (projectsInvoices[0]?._id ?? "");
     const inv = projectsInvoices.find(i => i._id === invId);
-    const invCurrency = (inv?.invoiceType === "usd" || inv?.currency?.toUpperCase() === "USD") ? "USD" : "AED";
+    const invCurrency = (inv?.currency || (inv?.invoiceType === "usd" ? "USD" : "AED")).toUpperCase();
     const defaultRate = getExchangeRate(accountCurrency, invCurrency);
 
     const newIdx = allocations.length;
@@ -326,7 +391,7 @@ export function RecordPaymentModal({
       }
     ]);
 
-    fetchAllocationRate(newIdx, accountCurrency, invCurrency);
+    fetchAllocationRate(newIdx, accountCurrency, invCurrency, invId);
   };
 
   const removeAllocationRow = (index: number) => {
@@ -388,12 +453,12 @@ export function RecordPaymentModal({
             .filter(a => a.invoiceId && a.amount > 0)
             .map(a => {
               const matchingInvoice = projectsInvoices.find(inv => inv._id === a.invoiceId);
-              const invoiceCurrency = (matchingInvoice?.invoiceType === "usd" || matchingInvoice?.currency?.toUpperCase() === "USD") ? "USD" : "AED";
+              const invoiceCurrency = (matchingInvoice?.currency || (matchingInvoice?.invoiceType === "usd" ? "USD" : "AED")).toUpperCase();
               return {
                 invoiceId: a.invoiceId,
                 amount: Number(a.amount),
                 rate: Number(a.rate),
-                rateToBase: EXCHANGE_RATES_TO_INR[invoiceCurrency] || 22.6
+                rateToBase: STATIC_FX_RATES[invoiceCurrency] || 22.6
               };
             })
         : [];
@@ -577,15 +642,19 @@ export function RecordPaymentModal({
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
                         <Label className="text-xs">Conversion Rate ({paymentCurrency} &rarr; {accountCurrency})</Label>
-                        {fetchingLiveRate ? (
+                         {fetchingLiveRate ? (
                           <span className="text-[10px] text-muted-foreground flex items-center gap-1">
                             <Loader2 className="w-2.5 h-2.5 animate-spin text-primary" /> Fetching...
                           </span>
                         ) : isManualRate ? (
                           <span className="text-[10px] text-amber-500 font-semibold">Custom Override</span>
-                        ) : (
+                        ) : isRateLive ? (
                           <span className="text-[10px] text-green-500 font-semibold flex items-center gap-0.5">
                             <CheckCircle2 className="w-2.5 h-2.5 text-green-500" /> Live Rate Loaded
+                          </span>
+                        ) : (
+                          <span className="text-[10px] text-amber-600 font-semibold flex items-center gap-0.5 bg-amber-500/5 border border-amber-500/20 px-1.5 py-0.5 rounded" title="Outbound server timeout: Loaded fallback static rate.">
+                            <AlertTriangle className="w-2.5 h-2.5 text-amber-600" /> Offline Rate Loaded
                           </span>
                         )}
                       </div>
@@ -641,8 +710,14 @@ export function RecordPaymentModal({
                       <Label className="text-xs text-amber-600/80">Exchange Rate ({accountCurrency} &rarr; INR)</Label>
                       {isManualBaseRate ? (
                         <p className="text-[9px] text-amber-500 font-semibold">Custom Override</p>
+                      ) : isBaseRateLive ? (
+                        <p className="text-[9px] text-green-600 font-semibold flex items-center gap-0.5">
+                          <CheckCircle2 className="w-2.5 h-2.5 text-green-600" /> Live Rate Loaded
+                        </p>
                       ) : (
-                        <p className="text-[9px] text-green-600 font-semibold">Live Rate Loaded</p>
+                        <p className="text-[9px] text-amber-600 font-semibold flex items-center gap-0.5" title="Outbound server timeout: Loaded fallback static rate.">
+                          <AlertTriangle className="w-2.5 h-2.5 text-amber-600" /> Offline Rate Loaded
+                        </p>
                       )}
                     </div>
                     <div className="flex gap-1.5">
@@ -734,15 +809,16 @@ export function RecordPaymentModal({
                           </div>
                           <div className="col-span-2">
                             <select 
-                              className="h-8 text-xs bg-card border border-border rounded-md px-1 w-full text-foreground focus:ring-1 focus:ring-primary focus:outline-none"
+                              className="h-8 text-xs bg-card border border-border rounded-md px-1 w-full text-foreground focus:ring-1 focus:ring-primary focus:outline-none font-bold"
                               value={fee.currency}
                               onChange={e => updateFeeRow(idx, { currency: e.target.value })}
                             >
-                              <option value="USD">USD</option>
-                              <option value="INR">INR</option>
-                              <option value="AED">AED</option>
-                              <option value="RM">RM</option>
-                              <option value="SGD">SGD</option>
+                              {(isDifferentCurrency 
+                                ? Array.from(new Set([paymentCurrency, accountCurrency]))
+                                : [accountCurrency]
+                              ).map(cur => (
+                                <option key={cur} value={cur}>{cur}</option>
+                              ))}
                             </select>
                           </div>
                           <div className="col-span-2">
@@ -789,7 +865,11 @@ export function RecordPaymentModal({
                     onChange={e => {
                       setAllocateToInvoice(e.target.checked);
                       if (e.target.checked && allocations.length === 0 && projectsInvoices.length > 0) {
-                        handleSelectInvoice(0, projectsInvoices[0]._id);
+                        const inv = projectsInvoices[0];
+                        const invCurrency = (inv.currency || (inv.invoiceType === "usd" ? "USD" : "AED")).toUpperCase();
+                        const defaultRate = getExchangeRate(accountCurrency, invCurrency);
+                        setAllocations([{ invoiceId: inv._id, amount: 0, rate: defaultRate }]);
+                        fetchAllocationRate(0, accountCurrency, invCurrency, inv._id);
                       }
                     }} 
                   />
@@ -813,7 +893,7 @@ export function RecordPaymentModal({
                     <div className="space-y-3">
                       {allocations.map((row, idx) => {
                         const matchingInvoice = projectsInvoices.find(inv => inv._id === row.invoiceId);
-                        const invoiceCurrency = (matchingInvoice?.invoiceType === "usd" || matchingInvoice?.currency?.toUpperCase() === "USD") ? "USD" : "AED";
+                        const invoiceCurrency = (matchingInvoice?.currency || (matchingInvoice?.invoiceType === "usd" ? "USD" : "AED")).toUpperCase();
                         return (
                           <div key={idx} className="p-4 bg-muted/20 rounded-xl border border-border/80 space-y-3.5 relative animate-in slide-in-from-top-2">
                             <div className="flex items-center justify-between">
@@ -835,7 +915,7 @@ export function RecordPaymentModal({
                                 value={row.invoiceId} 
                                 onChange={e => handleSelectInvoice(idx, e.target.value)}
                                 options={projectsInvoices.map(i => {
-                                  const currencySymbol = (i.invoiceType === "usd" || i.currency?.toUpperCase() === "USD") ? "USD" : "AED";
+                                  const currencySymbol = (i.currency || (i.invoiceType === "usd" ? "USD" : "AED")).toUpperCase();
                                   return { 
                                     value: i._id, 
                                     label: `${i.invoiceNumber} (${currencySymbol} ${(i.total || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}) - ${i.status}` 
@@ -866,11 +946,9 @@ export function RecordPaymentModal({
                                   <Input 
                                     disabled 
                                     className="bg-muted/30 border-border/60 pr-8 font-semibold text-muted-foreground cursor-not-allowed select-none"
-                                    type="number" 
-                                    step="0.0001" 
-                                    value={row.rate || ""} 
-                                    placeholder="1.0000"
-                                    onChange={e => updateAllocationRow(idx, { rate: Number(e.target.value) })} 
+                                    type="text" 
+                                    value={formatHumanRate(row.rate || 1.0, accountCurrency, invoiceCurrency)} 
+                                    placeholder="1.00"
                                   />
                                   <Lock className="w-3.5 h-3.5 text-muted-foreground/60 absolute right-3 top-1/2 -translate-y-1/2" />
                                 </div>
