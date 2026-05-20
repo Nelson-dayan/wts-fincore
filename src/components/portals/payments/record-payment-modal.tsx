@@ -151,7 +151,7 @@ export function RecordPaymentModal({
         const rate = res.rates[to];
         if (rate) {
           if (!isManualRate || force) {
-            setConversionRate(Number(rate.toFixed(4)));
+            setConversionRate(rate);
             if (force) setIsManualRate(false);
           }
         }
@@ -160,7 +160,7 @@ export function RecordPaymentModal({
       console.warn("Failed to fetch live exchange rate, falling back to static math:", err);
       const fallbackRate = getExchangeRate(from, to);
       if (!isManualRate || force) {
-        setConversionRate(Number(fallbackRate.toFixed(4)));
+        setConversionRate(fallbackRate);
         if (force) setIsManualRate(false);
       }
     } finally {
@@ -184,7 +184,7 @@ export function RecordPaymentModal({
         const rate = res.rates["INR"];
         if (rate) {
           if (!isManualBaseRate || force) {
-            setExchangeRateToBase(Number(rate.toFixed(4)));
+            setExchangeRateToBase(rate);
             if (force) setIsManualBaseRate(false);
           }
         }
@@ -193,7 +193,7 @@ export function RecordPaymentModal({
       console.warn("Failed to fetch base exchange rate, falling back to static math:", err);
       const fallbackRate = EXCHANGE_RATES_TO_INR[accCurrency] || 1.0;
       if (!isManualBaseRate || force) {
-        setExchangeRateToBase(Number(fallbackRate.toFixed(4)));
+        setExchangeRateToBase(fallbackRate);
         if (force) setIsManualBaseRate(false);
       }
     }
@@ -211,7 +211,7 @@ export function RecordPaymentModal({
       if (res && res.rates) {
         const rate = res.rates[to];
         if (rate) {
-          updateAllocationRow(idx, { rate: Number(rate.toFixed(4)) });
+          updateAllocationRow(idx, { rate });
         }
       }
     } catch (err) {

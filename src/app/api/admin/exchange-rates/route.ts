@@ -56,8 +56,8 @@ export async function GET(req: Request) {
     Object.keys(FALLBACK_EXCHANGE_RATES).forEach((currency) => {
       const targetInr = FALLBACK_EXCHANGE_RATES[currency];
       // base -> target = baseInr / targetInr
-      // e.g., USD -> INR = 83 / 1 = 83. USD -> AED = 83 / 22.6 = 3.67
-      computedRates[currency] = Number((baseInr / targetInr).toFixed(4));
+      // Keep full precision for finance-grade stability, rounding only at persistence or display
+      computedRates[currency] = baseInr / targetInr;
     });
 
     return NextResponse.json({
