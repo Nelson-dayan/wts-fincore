@@ -56,6 +56,7 @@ export const paymentSchema = new Schema(
     amountBase: decimalField,
     
     receivedAt: { type: Date, default: Date.now, index: true },
+    savedAt: { type: Date, default: Date.now },
     
     note: { type: String, default: "" },
     

@@ -36,6 +36,7 @@ export async function allocate(
       allocatedAmountBase,
       exchangeRateUsed: rateUsed,
       exchangeRateToBase: rateToBase,
+      allocatedAt: new Date(),
       createdBy
     },
     { upsert: true, session }

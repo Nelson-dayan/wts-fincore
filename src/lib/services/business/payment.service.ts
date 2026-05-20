@@ -85,6 +85,7 @@ export async function recordPayment(input: RecordPaymentInput) {
             method: input.method,
             referenceNumber: input.referenceNumber,
             receivedAt: input.receivedAt || new Date(),
+            savedAt: new Date(),
             note: input.note,
             createdBy: input.createdBy,
             invoiceId: input.invoiceId, // Backward compatibility link

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { X, CreditCard, Loader2, Calculator, Lock, Plus, Trash2, CheckCircle2, AlertTriangle, Info } from "lucide-react";
+import { X, CreditCard, Loader2, Calculator, Lock, Plus, Trash2, CheckCircle2, AlertTriangle, Info, TrendingUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -73,6 +73,11 @@ export function RecordPaymentModal({
   const [grossAmount, setGrossAmount] = useState(0);
   const [exchangeRateToBase, setExchangeRateToBase] = useState(1.0);
 
+  // Live Rates dynamic state
+  const [fetchingLiveRate, setFetchingLiveRate] = useState(false);
+  const [isManualRate, setIsManualRate] = useState(false);
+  const [isManualBaseRate, setIsManualBaseRate] = useState(false);
+
   // Dynamic Fees states
   const [includeFees, setIncludeFees] = useState(false);
   const [fees, setFees] = useState<Array<{
@@ -128,18 +133,134 @@ export function RecordPaymentModal({
   const selectedAccount = accounts.find(a => a._id === accountId);
   const accountCurrency = selectedAccount?.currency || "INR";
 
-  // Lock target currency and set exchange rates when account or conversion toggles change
+  // Dynamic Live Exchange Rate Fetchers
+  const fetchLiveExchangeRates = async (from: string, to: string, force = false) => {
+    if (from === to) {
+      if (!isManualRate || force) {
+        setConversionRate(1.0);
+        if (force) setIsManualRate(false);
+      }
+      return;
+    }
+    setFetchingLiveRate(true);
+    try {
+      const res = await apiFetch<{ rates: Record<string, number> }>(
+        `${apiPrefix}/exchange-rates?base=${from}`
+      );
+      if (res && res.rates) {
+        const rate = res.rates[to];
+        if (rate) {
+          if (!isManualRate || force) {
+            setConversionRate(Number(rate.toFixed(4)));
+            if (force) setIsManualRate(false);
+          }
+        }
+      }
+    } catch (err) {
+      console.warn("Failed to fetch live exchange rate, falling back to static math:", err);
+      const fallbackRate = getExchangeRate(from, to);
+      if (!isManualRate || force) {
+        setConversionRate(Number(fallbackRate.toFixed(4)));
+        if (force) setIsManualRate(false);
+      }
+    } finally {
+      setFetchingLiveRate(false);
+    }
+  };
+
+  const fetchLiveBaseRate = async (accCurrency: string, force = false) => {
+    if (accCurrency === "INR") {
+      if (!isManualBaseRate || force) {
+        setExchangeRateToBase(1.0);
+        if (force) setIsManualBaseRate(false);
+      }
+      return;
+    }
+    try {
+      const res = await apiFetch<{ rates: Record<string, number> }>(
+        `${apiPrefix}/exchange-rates?base=${accCurrency}`
+      );
+      if (res && res.rates) {
+        const rate = res.rates["INR"];
+        if (rate) {
+          if (!isManualBaseRate || force) {
+            setExchangeRateToBase(Number(rate.toFixed(4)));
+            if (force) setIsManualBaseRate(false);
+          }
+        }
+      }
+    } catch (err) {
+      console.warn("Failed to fetch base exchange rate, falling back to static math:", err);
+      const fallbackRate = EXCHANGE_RATES_TO_INR[accCurrency] || 1.0;
+      if (!isManualBaseRate || force) {
+        setExchangeRateToBase(Number(fallbackRate.toFixed(4)));
+        if (force) setIsManualBaseRate(false);
+      }
+    }
+  };
+
+  const fetchAllocationRate = async (idx: number, from: string, to: string) => {
+    if (from === to) {
+      updateAllocationRow(idx, { rate: 1.0 });
+      return;
+    }
+    try {
+      const res = await apiFetch<{ rates: Record<string, number> }>(
+        `${apiPrefix}/exchange-rates?base=${from}`
+      );
+      if (res && res.rates) {
+        const rate = res.rates[to];
+        if (rate) {
+          updateAllocationRow(idx, { rate: Number(rate.toFixed(4)) });
+        }
+      }
+    } catch (err) {
+      const fallbackRate = getExchangeRate(from, to);
+      updateAllocationRow(idx, { rate: fallbackRate });
+    }
+  };
+
+  // Lock target currency when conversion toggles change
   useEffect(() => {
     if (selectedAccount) {
-      const defaultBaseRate = EXCHANGE_RATES_TO_INR[selectedAccount.currency] || 1.0;
-      setExchangeRateToBase(defaultBaseRate);
-      
       if (!isDifferentCurrency) {
         setPaymentCurrency(selectedAccount.currency);
         setConversionRate(1.0);
+        setIsManualRate(false);
       }
     }
   }, [accountId, selectedAccount, isDifferentCurrency]);
+
+  // Load live base rate when account changes
+  useEffect(() => {
+    if (isOpen && selectedAccount) {
+      if (!isManualBaseRate) {
+        fetchLiveBaseRate(accountCurrency);
+      }
+    }
+  }, [isOpen, accountId, accountCurrency]);
+
+  // Load live conversion rate when currency or toggle changes
+  useEffect(() => {
+    if (isOpen && isDifferentCurrency && selectedAccount) {
+      if (!isManualRate) {
+        fetchLiveExchangeRates(paymentCurrency, accountCurrency);
+      }
+    }
+  }, [isOpen, isDifferentCurrency, paymentCurrency, accountCurrency]);
+
+  // Sync allocations rate when account currency changes
+  useEffect(() => {
+    if (isOpen && allocateToInvoice && allocations.length > 0 && projectsInvoices.length > 0) {
+      allocations.forEach((alloc, idx) => {
+        const matchingInvoice = projectsInvoices.find(inv => inv._id === alloc.invoiceId);
+        if (matchingInvoice) {
+          const invCurrency = (matchingInvoice.invoiceType === "usd" || matchingInvoice.currency?.toUpperCase() === "USD") ? "USD" : "AED";
+          fetchAllocationRate(idx, accountCurrency, invCurrency);
+        }
+      });
+    }
+  }, [accountCurrency, isOpen, allocateToInvoice]);
 
   // Live Math calculations
   const getExchangeRate = (from: string, to: string) => {
@@ -184,8 +305,7 @@ export function RecordPaymentModal({
     const inv = projectsInvoices.find(i => i._id === invId);
     if (inv) {
       const invCurrency = (inv.invoiceType === "usd" || inv.currency?.toUpperCase() === "USD") ? "USD" : "AED";
-      const defaultRate = getExchangeRate(accountCurrency, invCurrency);
-      updateAllocationRow(idx, { invoiceId: invId, rate: defaultRate });
+      fetchAllocationRate(idx, accountCurrency, invCurrency);
     }
   };
 
@@ -196,6 +316,7 @@ export function RecordPaymentModal({
     const invCurrency = (inv?.invoiceType === "usd" || inv?.currency?.toUpperCase() === "USD") ? "USD" : "AED";
     const defaultRate = getExchangeRate(accountCurrency, invCurrency);
 
+    const newIdx = allocations.length;
     setAllocations(prev => [
       ...prev,
       {
@@ -204,6 +325,8 @@ export function RecordPaymentModal({
         rate: defaultRate,
       }
     ]);
+
+    fetchAllocationRate(newIdx, accountCurrency, invCurrency);
   };
 
   const removeAllocationRow = (index: number) => {
@@ -452,14 +575,44 @@ export function RecordPaymentModal({
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label className="text-xs">Conversion Rate ({paymentCurrency} &rarr; {accountCurrency})</Label>
-                      <Input 
-                        type="number" 
-                        step="0.0001" 
-                        placeholder="1.0000"
-                        value={conversionRate || ""}
-                        onChange={e => setConversionRate(Number(e.target.value))} 
-                      />
+                      <div className="flex items-center justify-between">
+                        <Label className="text-xs">Conversion Rate ({paymentCurrency} &rarr; {accountCurrency})</Label>
+                        {fetchingLiveRate ? (
+                          <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+                            <Loader2 className="w-2.5 h-2.5 animate-spin text-primary" /> Fetching...
+                          </span>
+                        ) : isManualRate ? (
+                          <span className="text-[10px] text-amber-500 font-semibold">Custom Override</span>
+                        ) : (
+                          <span className="text-[10px] text-green-500 font-semibold flex items-center gap-0.5">
+                            <CheckCircle2 className="w-2.5 h-2.5 text-green-500" /> Live Rate Loaded
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex gap-2">
+                        <Input 
+                          type="number" 
+                          step="0.0001" 
+                          placeholder="1.0000"
+                          className="flex-1"
+                          value={conversionRate || ""}
+                          onChange={e => {
+                            setConversionRate(Number(e.target.value));
+                            setIsManualRate(true);
+                          }} 
+                        />
+                        <Button 
+                          type="button" 
+                          variant="outline" 
+                          size="icon" 
+                          className="h-10 w-10 shrink-0 border-border hover:bg-muted/50 text-muted-foreground hover:text-primary transition-colors" 
+                          title="Auto Load Live Exchange Rate"
+                          onClick={() => fetchLiveExchangeRates(paymentCurrency, accountCurrency, true)}
+                          disabled={fetchingLiveRate}
+                        >
+                          <TrendingUp className={`w-4 h-4 ${fetchingLiveRate ? 'animate-spin text-muted-foreground' : 'text-primary'}`} />
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -478,20 +631,42 @@ export function RecordPaymentModal({
 
               {/* Extra Exchange Rate Field to Base if receiving in a foreign account */}
               {accountCurrency !== "INR" && (
-                <div className="p-3.5 bg-amber-500/5 border border-amber-500/20 rounded-xl space-y-2">
+                <div className="p-3.5 bg-amber-500/5 border border-amber-500/20 rounded-xl space-y-3">
                   <div className="flex items-center gap-1.5 text-xs font-semibold text-amber-700">
                     <Calculator className="w-4 h-4 text-amber-600" />
                     Aggregated Base Treasury Settings
                   </div>
                   <div className="grid grid-cols-2 gap-3 items-center">
-                    <Label className="text-xs text-amber-600/80">Exchange Rate ({accountCurrency} &rarr; INR)</Label>
-                    <Input 
-                      type="number" 
-                      step="0.0001"
-                      className="h-8 text-xs border-amber-500/30"
-                      value={exchangeRateToBase || ""}
-                      onChange={e => setExchangeRateToBase(Number(e.target.value))} 
-                    />
+                    <div className="space-y-1">
+                      <Label className="text-xs text-amber-600/80">Exchange Rate ({accountCurrency} &rarr; INR)</Label>
+                      {isManualBaseRate ? (
+                        <p className="text-[9px] text-amber-500 font-semibold">Custom Override</p>
+                      ) : (
+                        <p className="text-[9px] text-green-600 font-semibold">Live Rate Loaded</p>
+                      )}
+                    </div>
+                    <div className="flex gap-1.5">
+                      <Input 
+                        type="number" 
+                        step="0.0001"
+                        className="h-8 text-xs border-amber-500/30 flex-1 bg-background"
+                        value={exchangeRateToBase || ""}
+                        onChange={e => {
+                          setExchangeRateToBase(Number(e.target.value));
+                          setIsManualBaseRate(true);
+                        }} 
+                      />
+                      <Button 
+                        type="button" 
+                        variant="outline" 
+                        size="icon" 
+                        className="h-8 w-8 shrink-0 border-amber-500/30 hover:bg-amber-500/10 text-amber-700" 
+                        title="Auto Load Live Base Rate"
+                        onClick={() => fetchLiveBaseRate(accountCurrency, true)}
+                      >
+                        <TrendingUp className="w-3.5 h-3.5 text-amber-600" />
+                      </Button>
+                    </div>
                   </div>
                 </div>
               )}
@@ -681,14 +856,24 @@ export function RecordPaymentModal({
                                 />
                               </div>
                               <div className="space-y-2">
-                                <Label className="text-xs">Conversion Rate ({accountCurrency} &rarr; {invoiceCurrency})</Label>
-                                <Input 
-                                  type="number" 
-                                  step="0.0001" 
-                                  value={row.rate || ""} 
-                                  placeholder="1.0000"
-                                  onChange={e => updateAllocationRow(idx, { rate: Number(e.target.value) })} 
-                                />
+                                <div className="flex items-center justify-between">
+                                  <Label className="text-xs">Conversion Rate ({accountCurrency} &rarr; {invoiceCurrency})</Label>
+                                  <span className="text-[9px] text-primary/80 font-bold flex items-center gap-0.5 bg-primary/5 px-1.5 py-0.5 rounded border border-primary/10 select-none">
+                                    <Lock className="w-2 h-2" /> Same-day Locked
+                                  </span>
+                                </div>
+                                <div className="relative">
+                                  <Input 
+                                    disabled 
+                                    className="bg-muted/30 border-border/60 pr-8 font-semibold text-muted-foreground cursor-not-allowed select-none"
+                                    type="number" 
+                                    step="0.0001" 
+                                    value={row.rate || ""} 
+                                    placeholder="1.0000"
+                                    onChange={e => updateAllocationRow(idx, { rate: Number(e.target.value) })} 
+                                  />
+                                  <Lock className="w-3.5 h-3.5 text-muted-foreground/60 absolute right-3 top-1/2 -translate-y-1/2" />
+                                </div>
                               </div>
                             </div>
                           </div>
