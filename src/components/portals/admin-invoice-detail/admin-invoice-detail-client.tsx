@@ -17,6 +17,7 @@ import { SaveSuccessToast } from "@/components/ui/save-success-toast";
 import { usePortalConfig } from "@/components/portals/portal-config-context";
 import { useSaveFeedback } from "@/lib/hooks/use-save-feedback";
 import { SaveConfirmModal } from "@/components/ui/save-confirm-modal";
+import { ApplyCreditModal } from "@/components/portals/admin-invoice-detail/apply-credit-modal";
 
 
 function toDocData(item: Item): InvoiceDocData {
@@ -76,6 +77,9 @@ export function AdminInvoiceDetailClient({
   const [pdfExporting, setPdfExporting] = useState(false);
   const [ledgerOpen, setLedgerOpen] = useState(false);
   const [showSaveConfirm, setShowSaveConfirm] = useState(false);
+  const [creditBalance, setCreditBalance] = useState<number>(0);
+  const [creditPayments, setCreditPayments] = useState<any[]>([]);
+  const [creditModalOpen, setCreditModalOpen] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -100,6 +104,29 @@ export function AdminInvoiceDetailClient({
   useEffect(() => {
     load().catch(() => {});
   }, [load]);
+
+  // Load client credit balance dynamically
+  useEffect(() => {
+    if (item) {
+      const clientId = item.clientSnapshot?.id || (item as any).clientId;
+      if (clientId) {
+        apiFetch<{ totalCreditBase: number; payments: any[] }>(`${apiPrefix}/clients/${clientId}/credit-balance?_t=${Date.now()}`)
+          .then(res => {
+            setCreditBalance(res.totalCreditBase || 0);
+            setCreditPayments(res.payments || []);
+          })
+          .catch(err => console.warn("Failed to load client credit balance:", err));
+      }
+    }
+  }, [item, apiPrefix]);
+
+  const unpaidAmountBase = useMemo(() => {
+    if (!item) return 0;
+    const cache = (item as any).totalsCache || {};
+    const totalIntended = cache.totalIntendedBase || 0;
+    const totalReceived = cache.totalReceivedBase || 0;
+    return Math.max(0, totalIntended - totalReceived);
+  }, [item]);
 
   const liveTotals = useMemo(() => {
     if (!item) return { subtotal: 0, tax: 0, total: 0 };
@@ -396,6 +423,8 @@ export function AdminInvoiceDetailClient({
             onSave={() => setShowSaveConfirm(true)}
             onDownloadPdf={() => void downloadPdf()}
             onOpenLedger={() => setLedgerOpen(true)}
+            creditBalance={creditBalance}
+            onApplyCreditClick={() => setCreditModalOpen(true)}
           />
 
           <div className="flex flex-col gap-8 print:col-span-full">
@@ -419,6 +448,32 @@ export function AdminInvoiceDetailClient({
         loading={saving}
         entityName="invoice"
       />
+
+      {item && (
+        <ApplyCreditModal
+          isOpen={creditModalOpen}
+          onClose={() => setCreditModalOpen(false)}
+          onSuccess={async () => {
+            showSaveSuccess();
+            await load();
+            // Reload credits
+            const clientId = item.clientSnapshot?.id || (item as any).clientId;
+            if (clientId) {
+              const res = await apiFetch<{ totalCreditBase: number; payments: any[] }>(
+                `${apiPrefix}/clients/${clientId}/credit-balance?_t=${Date.now()}`
+              );
+              setCreditBalance(res.totalCreditBase || 0);
+              setCreditPayments(res.payments || []);
+            }
+          }}
+          invoiceId={String(item._id)}
+          invoiceNumber={item.invoiceNumber}
+          invoiceCurrency={String(item.currency || item.invoiceType || "AED").toUpperCase()}
+          invoiceUnpaidBase={unpaidAmountBase}
+          creditPayments={creditPayments}
+          apiPrefix={apiPrefix}
+        />
+      )}
     </div>
   );
 }

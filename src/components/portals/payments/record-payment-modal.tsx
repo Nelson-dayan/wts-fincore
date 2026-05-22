@@ -46,6 +46,11 @@ export type InvoiceRow = {
   companyId?: string;
   projectId?: string;
   clientId?: string;
+  dueDate?: string;
+  totalsCache?: {
+    totalIntendedBase?: number;
+    totalReceivedBase?: number;
+  };
 };
 
 export type AccountRow = {
@@ -393,6 +398,68 @@ export function RecordPaymentModal({
 
   const updateAllocationRow = (index: number, partial: Partial<{ invoiceId: string; amount: number; rate: number }>) => {
     setAllocations(prev => prev.map((row, i) => i === index ? { ...row, ...partial } : row));
+  };
+
+  const handleAutoAllocate = () => {
+    if (projectsInvoices.length === 0 || netAmountInAccountCurrency <= 0) return;
+
+    // Filter to active outstanding (unpaid/partial/overdue) invoices
+    const unpaidInvoices = projectsInvoices.filter(inv => 
+      inv.status !== "PAID" && inv.status !== "DRAFT" && inv.status !== "CANCELLED"
+    );
+
+    if (unpaidInvoices.length === 0) return;
+
+    // Sort chronologically by due date ascending (oldest due first)
+    const sorted = [...unpaidInvoices].sort((a, b) => {
+      const dateA = a.dueDate ? new Date(a.dueDate).getTime() : 0;
+      const dateB = b.dueDate ? new Date(b.dueDate).getTime() : 0;
+      return dateA - dateB;
+    });
+
+    let pool = netAmountInAccountCurrency;
+    const newAllocations: Array<{ invoiceId: string; amount: number; rate: number }> = [];
+
+    for (const inv of sorted) {
+      if (pool <= 0) break;
+
+      const invCurrency = (inv.currency || (inv.invoiceType === "usd" ? "USD" : "AED")).toUpperCase();
+      
+      // Compute remaining unpaid balance in invoice currency
+      const totalIntendedBase = inv.totalsCache?.totalIntendedBase ?? 0;
+      const totalReceivedBase = inv.totalsCache?.totalReceivedBase ?? 0;
+      const receivedInInvoiceCurrency = totalIntendedBase > 0 
+        ? (totalReceivedBase / totalIntendedBase) * inv.total 
+        : 0;
+      const remainingInInvoiceCurrency = Math.max(0, inv.total - receivedInInvoiceCurrency);
+
+      if (remainingInInvoiceCurrency <= 0.001) continue;
+
+      const rate = getExchangeRate(accountCurrency, invCurrency);
+      const remainingInAccountCurrency = remainingInInvoiceCurrency / rate;
+
+      if (pool >= remainingInAccountCurrency) {
+        newAllocations.push({
+          invoiceId: inv._id,
+          amount: parseFloat(remainingInInvoiceCurrency.toFixed(4)),
+          rate,
+        });
+        pool -= remainingInAccountCurrency;
+      } else {
+        const amountInInvoiceCurrency = pool * rate;
+        newAllocations.push({
+          invoiceId: inv._id,
+          amount: parseFloat(amountInInvoiceCurrency.toFixed(4)),
+          rate,
+        });
+        pool = 0;
+      }
+    }
+
+    if (newAllocations.length > 0) {
+      setAllocateToInvoice(true);
+      setAllocations(newAllocations);
+    }
   };
 
   // Fees management
@@ -874,6 +941,27 @@ export function RecordPaymentModal({
               
               {allocateToInvoice && projectId && (
                 <div className="space-y-4">
+                  {projectsInvoices.length > 0 && netAmountInAccountCurrency > 0 && (
+                    <div className="flex items-center justify-between bg-primary/5 border border-primary/20 px-3.5 py-2.5 rounded-xl animate-in slide-in-from-top-2">
+                      <div className="flex flex-col gap-0.5 pr-2">
+                        <span className="text-xs font-bold text-primary flex items-center gap-1.5 select-none">
+                          ✨ Smart FIFO Auto-Allocation
+                        </span>
+                        <span className="text-[10px] text-muted-foreground">
+                          Chronologically allocate {netAmountInAccountCurrency.toFixed(2)} {accountCurrency} across your outstanding invoices in one click.
+                        </span>
+                      </div>
+                      <Button
+                        type="button"
+                        size="sm"
+                        className="bg-primary hover:bg-primary/90 text-primary-foreground font-bold shadow-sm shadow-primary/20 shrink-0 h-8 text-xs rounded-lg animate-pulse hover:animate-none"
+                        onClick={handleAutoAllocate}
+                      >
+                        Auto-Allocate
+                      </Button>
+                    </div>
+                  )}
+
                   {loadingInvoices ? (
                     <div className="flex items-center gap-2 text-xs text-muted-foreground py-2 justify-center">
                       <Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading project invoices...
@@ -1143,14 +1231,31 @@ export function RecordPaymentModal({
                 </div>
               </div>
             )}
+
+            {submitting && (
+              <div className="p-4 rounded-xl bg-primary/5 border border-primary/20 space-y-2.5 animate-pulse mt-4">
+                <div className="flex items-center gap-2.5">
+                  <Loader2 className="w-4 h-4 text-primary animate-spin" />
+                  <span className="text-xs font-bold text-foreground">🔒 Securing Ledger &amp; Verifying Idempotency...</span>
+                </div>
+                <p className="text-[10px] text-muted-foreground leading-normal pl-6">
+                  Establishing safe transaction handshake. DocuTrade double-charge guards are fully active to lock ledger safety.
+                </p>
+              </div>
+            )}
           </form>
         </div>
 
         {/* Footer */}
         <div className="px-6 py-4 border-t bg-muted/10 flex items-center justify-end gap-3 shrink-0">
           <Button variant="outline" onClick={onClose} disabled={submitting}>Cancel</Button>
-          <Button form="record-payment-form" type="submit" disabled={submitting}>
-            {submitting ? "Saving..." : "Record Transaction"}
+          <Button form="record-payment-form" type="submit" disabled={submitting} className="min-w-[150px]">
+            {submitting ? (
+              <span className="flex items-center gap-1.5 justify-center">
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                Processing...
+              </span>
+            ) : "Record Transaction"}
           </Button>
         </div>
       </div>

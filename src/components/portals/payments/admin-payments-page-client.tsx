@@ -56,9 +56,7 @@ export function AdminPaymentsPageClient({ apiPrefix }: { apiPrefix: string }) {
           { key: "referenceNumber", label: "Tx ID" },
           { key: "receivedAt", label: "Date" },
         ]}
-        extraRowLinks={[
-          { label: "Invoice Detail", hrefPattern: `${pathPrefix}/invoices/{invoiceId}` }
-        ]}
+        extraRowLinks={[]}
         customCellRenders={{
           invoiceId: (val, row: any) => {
             const allocations = row.allocations || [];
