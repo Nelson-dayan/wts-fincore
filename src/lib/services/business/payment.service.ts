@@ -158,7 +158,7 @@ export async function recordPayment(input: RecordPaymentInput) {
             savedAt: new Date(),
             note: input.note,
             createdBy: input.createdBy,
-            invoiceId: input.invoiceId, // Backward compatibility link
+            invoiceId: input.invoiceId || rawAllocationsList[0]?.invoiceId || undefined, // Backward compatibility link fallback
             paymentCurrency: payCur,
             paymentAmountGross: payGross,
             paymentAmountNet,
