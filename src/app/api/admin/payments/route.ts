@@ -57,6 +57,7 @@ export async function GET(req: Request) {
       .populate("createdBy", "name email")
       .populate("accountId", "name currency")
       .populate("projectId", "name")
+      .populate("invoiceId", "invoiceNumber")
       .lean(),
       PaymentModel.countDocuments(filter),
     ]);
@@ -130,14 +131,22 @@ export async function POST(req: Request) {
       }
     }
 
-    const { ProjectModel } = await import("@/lib/db/models");
+    const { ProjectModel, CompanyModel } = await import("@/lib/db/models");
     const project = await ProjectModel.findById(pId).select("clientId companyId").lean();
     if (!project) {
       if (isIdempotencyEnabled) await saveIdempotencyFailed(idempotencyKey!, userId);
       return NextResponse.json({ message: "Project not found" }, { status: 400 });
     }
+    
+    // Defensive self-healing fallback for missing companyId on historical projects
+    let companyId = project.companyId;
+    if (!companyId) {
+      const primaryCompany = await CompanyModel.findOne({ isPrimary: true }).select("_id").lean();
+      companyId = primaryCompany?._id || "69c661683654f65d914b4abc";
+    }
+
     body.clientId = project.clientId;
-    body.companyId = project.companyId;
+    body.companyId = companyId;
 
     // Ensure createdBy is set from the session user
     body.createdBy = session.user.id;

@@ -339,21 +339,14 @@ export function RecordPaymentModal({
   const netAmountInAccountCurrency = exchangeRateToBase > 0 ? (netBase / exchangeRateToBase) : 0;
   const totalFeesInPaymentCurrency = paymentRateToBase > 0 ? (totalFeesBase / paymentRateToBase) : 0;
 
-  // 5. Calculate allocations in base INR (Layer 1)
+  // 5. Calculate allocations in base INR (Layer 1) using exact displayed/locked snapshot rates
   let totalAllocatedBase = 0;
   if (allocateToInvoice) {
     allocations.forEach(alloc => {
-      if (alloc.amount > 0) {
-        const matchingInvoice = projectsInvoices.find(inv => inv._id === alloc.invoiceId);
-        if (matchingInvoice) {
-          const invCurrency = (matchingInvoice.currency || (matchingInvoice.invoiceType === "usd" ? "USD" : "AED")).toUpperCase();
-          const norm = normalizeToBase({ 
-            amount: alloc.amount, 
-            currency: invCurrency, 
-            rates: STATIC_FX_RATES 
-          });
-          totalAllocatedBase += norm.amount;
-        }
+      if (alloc.amount > 0 && alloc.rate > 0) {
+        // Base amount in INR = (amount in Invoice Currency / rate) * exchangeRateToBase
+        const allocBase = (alloc.amount / alloc.rate) * exchangeRateToBase;
+        totalAllocatedBase += allocBase;
       }
     });
   }
@@ -1000,15 +993,25 @@ export function RecordPaymentModal({
 
             {/* Zoho/QuickBooks Premium Live Summary Card */}
             {grossAmount > 0 && (
-              <div className="p-5 rounded-2xl bg-gradient-to-br from-primary/[0.04] to-primary/[0.01] border border-primary/20 shadow-lg space-y-4 animate-in fade-in duration-300">
-                <h3 className="text-xs font-extrabold uppercase tracking-wider text-primary flex items-center gap-1.5">
-                  <Calculator className="w-4.5 h-4.5" />
-                  Real-time Payment Summary
-                </h3>
+              <div className="p-6 rounded-2xl bg-gradient-to-br from-zinc-900/50 to-zinc-950/50 backdrop-blur-md border border-border/80 shadow-2xl space-y-5 animate-in fade-in duration-300">
+                <div className="flex items-center justify-between border-b border-border/40 pb-2">
+                  <h3 className="text-xs font-extrabold uppercase tracking-wider text-primary flex items-center gap-1.5">
+                    <Calculator className="w-4 h-4 text-primary animate-pulse" />
+                    Treasury Money Flow Summary
+                  </h3>
+                  <span className="text-[9px] font-bold text-green-600 bg-green-500/10 px-2 py-0.5 rounded border border-green-500/20 uppercase tracking-wider select-none">
+                    Normalized Base: INR
+                  </span>
+                </div>
                 
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4 items-center">
                   <div className="space-y-1">
-                    <p className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider">Gross Amount</p>
+                    <div className="flex items-center gap-1 text-[10px] text-muted-foreground font-semibold uppercase tracking-wider">
+                      Gross Received
+                      <span className="cursor-help text-muted-foreground/60" title="The total amount of funds collected from the client in the original payment currency.">
+                        <Info className="w-3 h-3" />
+                      </span>
+                    </div>
                     <p className="text-lg font-extrabold text-foreground tabular-nums">
                       {grossAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })} <span className="text-xs text-muted-foreground font-medium">{paymentCurrency}</span>
                     </p>
@@ -1016,7 +1019,12 @@ export function RecordPaymentModal({
                   
                   {includeFees && totalFeesInPaymentCurrency > 0 && (
                     <div className="space-y-1">
-                      <p className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider text-red-500">Total Deductions</p>
+                      <div className="flex items-center gap-1 text-[10px] text-red-500 font-semibold uppercase tracking-wider">
+                        Total Deductions
+                        <span className="cursor-help text-red-500/60" title="All transaction fees, gateway charges, TDS, or local taxes normalized and deducted.">
+                          <Info className="w-3 h-3" />
+                        </span>
+                      </div>
                       <p className="text-lg font-extrabold text-red-500/90 tabular-nums">
                         -{totalFeesInPaymentCurrency.toLocaleString(undefined, { minimumFractionDigits: 2 })} <span className="text-xs text-muted-foreground font-medium">{paymentCurrency}</span>
                       </p>
@@ -1024,7 +1032,12 @@ export function RecordPaymentModal({
                   )}
 
                   <div className="space-y-1">
-                    <p className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider text-green-500">Net Converted</p>
+                    <div className="flex items-center gap-1 text-[10px] text-green-500 font-semibold uppercase tracking-wider">
+                      Net Converted
+                      <span className="cursor-help text-green-500/60" title="The net amount normalized to base and converted into the receiving account's currency.">
+                        <Info className="w-3 h-3" />
+                      </span>
+                    </div>
                     <p className="text-lg font-extrabold text-green-500 tabular-nums">
                       {netAmountInAccountCurrency.toLocaleString(undefined, { minimumFractionDigits: 2 })} <span className="text-xs text-muted-foreground font-medium">{accountCurrency}</span>
                     </p>
@@ -1032,16 +1045,26 @@ export function RecordPaymentModal({
                 </div>
 
                 {allocateToInvoice && (
-                  <div className="pt-3 border-t border-border/40 grid grid-cols-2 md:grid-cols-3 gap-4">
+                  <div className="pt-4 border-t border-border/40 grid grid-cols-2 md:grid-cols-3 gap-4">
                     <div className="space-y-1">
-                      <p className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider">Allocated</p>
+                      <div className="flex items-center gap-1 text-[10px] text-muted-foreground font-semibold uppercase tracking-wider">
+                        Allocated
+                        <span className="cursor-help text-muted-foreground/60" title="The sum of funds currently assigned to active project invoices.">
+                          <Info className="w-3 h-3" />
+                        </span>
+                      </div>
                       <p className="text-base font-bold text-foreground tabular-nums">
                         {totalAllocatedInAccountCurrency.toLocaleString(undefined, { minimumFractionDigits: 2 })} <span className="text-xs text-muted-foreground font-medium">{accountCurrency}</span>
                       </p>
                     </div>
 
                     <div className="space-y-1">
-                      <p className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider">Remaining</p>
+                      <div className="flex items-center gap-1 text-[10px] text-muted-foreground font-semibold uppercase tracking-wider">
+                        Remaining
+                        <span className="cursor-help text-muted-foreground/60" title="Unallocated amount. Zero indicates perfect book balance. Positive values log as client credit.">
+                          <Info className="w-3 h-3" />
+                        </span>
+                      </div>
                       <p className={`text-base font-bold tabular-nums ${
                         remainingInAccountCurrency < -0.01 
                           ? "text-destructive" 
@@ -1055,21 +1078,65 @@ export function RecordPaymentModal({
                   </div>
                 )}
 
+                {/* VISUAL MONEY FLOW JOURNEY - EXTREMELY HIGH PREMIUM FINTECH UX */}
+                <div className="mt-2 p-3.5 bg-zinc-950/40 rounded-xl border border-border/40 space-y-2.5">
+                  <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                    <TrendingUp className="w-3.5 h-3.5 text-primary" />
+                    Interactive Ledger Flow Map
+                  </span>
+                  <div className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+                    <span className="font-semibold text-foreground bg-muted/40 px-2 py-0.5 rounded border border-border/60">
+                      {grossAmount.toFixed(2)} {paymentCurrency}
+                    </span>
+                    <span className="text-muted-foreground/40">&rarr;</span>
+                    
+                    {includeFees && totalFeesInPaymentCurrency > 0 && (
+                      <>
+                        <span className="text-red-400 bg-red-950/30 px-2 py-0.5 rounded border border-red-500/20">
+                          -{totalFeesInPaymentCurrency.toFixed(2)} {paymentCurrency} (Fees)
+                        </span>
+                        <span className="text-muted-foreground/40">&rarr;</span>
+                      </>
+                    )}
+
+                    <span className="font-semibold text-green-400 bg-green-950/30 px-2 py-0.5 rounded border border-green-500/20">
+                      {netAmountInAccountCurrency.toFixed(2)} {accountCurrency} (Net)
+                    </span>
+
+                    {allocateToInvoice && totalAllocatedInAccountCurrency > 0 && (
+                      <>
+                        <span className="text-muted-foreground/40">&rarr;</span>
+                        <span className="font-semibold text-blue-400 bg-blue-950/30 px-2 py-0.5 rounded border border-blue-500/20">
+                          {totalAllocatedInAccountCurrency.toFixed(2)} {accountCurrency} (Allocated)
+                        </span>
+                      </>
+                    )}
+
+                    {allocateToInvoice && remainingInAccountCurrency > 0.01 && (
+                      <>
+                        <span className="text-muted-foreground/40">&rarr;</span>
+                        <span className="font-semibold text-amber-400 bg-amber-950/30 px-2 py-0.5 rounded border border-amber-500/20" title="Logged to Client account credit.">
+                          +{remainingInAccountCurrency.toFixed(2)} {accountCurrency} (Credit)
+                        </span>
+                      </>
+                    )}
+                  </div>
+                </div>
                 {/* Info & Warning Badges */}
                 <div className="pt-2">
                   {remainingInAccountCurrency < -0.01 ? (
-                    <div className="p-2 rounded-lg bg-destructive/10 border border-destructive/20 text-[11px] font-semibold text-destructive flex items-center gap-1.5">
-                      <AlertTriangle className="w-3.5 h-3.5" />
+                    <div className="p-2.5 rounded-xl bg-destructive/10 border border-destructive/20 text-xs font-semibold text-destructive flex items-center gap-1.5">
+                      <AlertTriangle className="w-4 h-4" />
                       Overallocated by {Math.abs(remainingInAccountCurrency).toFixed(2)} {accountCurrency}! Please lower allocation amounts.
                     </div>
                   ) : remainingInAccountCurrency > 0.01 ? (
-                    <div className="p-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-[11px] font-semibold text-amber-600 flex items-center gap-1.5">
-                      <Info className="w-3.5 h-3.5" />
+                    <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs font-semibold text-amber-600 flex items-center gap-1.5">
+                      <Info className="w-4 h-4" />
                       Unallocated remainder of {remainingInAccountCurrency.toFixed(2)} {accountCurrency} will be logged as client account credit.
                     </div>
                   ) : (
-                    <div className="p-2 rounded-lg bg-green-500/10 border border-green-500/20 text-[11px] font-semibold text-green-600 flex items-center gap-1.5">
-                      <CheckCircle2 className="w-3.5 h-3.5" />
+                    <div className="p-2.5 rounded-xl bg-green-500/10 border border-green-500/20 text-xs font-semibold text-green-600 flex items-center gap-1.5">
+                      <CheckCircle2 className="w-4 h-4" />
                       All payment funds are perfectly matched and allocated.
                     </div>
                   )}

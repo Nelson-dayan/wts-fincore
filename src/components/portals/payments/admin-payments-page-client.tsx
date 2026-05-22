@@ -49,11 +49,11 @@ export function AdminPaymentsPageClient({ apiPrefix }: { apiPrefix: string }) {
         refreshKey={refreshKey}
         columns={[
           { key: "invoiceId", label: "Invoice #" },
-          { key: "receivedAmount", label: "Amount" },
+          { key: "amount", label: "Amount" },
           { key: "currency", label: "Curr" },
           { key: "method", label: "Method" },
-          { key: "transactionId", label: "Tx ID" },
-          { key: "createdAt", label: "Date" },
+          { key: "referenceNumber", label: "Tx ID" },
+          { key: "receivedAt", label: "Date" },
         ]}
         extraRowLinks={[
           { label: "Invoice Detail", hrefPattern: `${pathPrefix}/invoices/{invoiceId}` }

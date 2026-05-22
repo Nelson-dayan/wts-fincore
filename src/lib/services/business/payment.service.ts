@@ -114,16 +114,21 @@ export async function recordPayment(input: RecordPaymentInput) {
           if (!invoice) throw new Error(`Invoice not found: ${alloc.invoiceId}`);
 
           const invCurrency = (invoice.currency || (invoice as any).invoiceType === "usd" ? "USD" : "AED").toUpperCase();
-          const allocNorm = normalizeToBase({ amount: alloc.amount, currency: invCurrency });
-          const allocBase = allocNorm.amount;
+          
+          // Compute allocation base consistently with the UI formula: (amount / rateUsed) * exchangeRateToBase
+          const allocBase = alloc.rate > 0
+            ? (alloc.amount / alloc.rate) * input.exchangeRateToBase
+            : normalizeToBase({ amount: alloc.amount, currency: invCurrency }).amount;
 
           totalAllocatedBase += allocBase;
+
+          const effectiveRateToBase = alloc.amount > 0 ? (allocBase / alloc.amount) : 1.0;
 
           allocationsToProcess.push({
             invoiceId: alloc.invoiceId,
             amount: alloc.amount, // original invoice currency amount
             rateUsed: alloc.rate,
-            rateToBase: allocNorm.rate // snapshotted rate to base
+            rateToBase: effectiveRateToBase
           });
         }
       }
