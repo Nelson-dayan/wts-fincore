@@ -316,33 +316,35 @@ export function RecordPaymentModal({
   }, [isOpen, isDifferentCurrency, paymentCurrency, accountCurrency]);
 
   // Live Math calculations
-  // 1. Calculate fees in base INR (Layer 1)
-  let totalFeesBase = 0;
+  // 1. Calculate total fees directly in payment currency (Layer 3)
+  let totalFeesInPaymentCurrency = 0;
   if (includeFees) {
     fees.forEach(f => {
       if (f.amount > 0) {
-        const norm = normalizeToBase({ 
-          amount: f.amount, 
-          currency: f.currency, 
-          rates: STATIC_FX_RATES 
-        });
-        totalFeesBase += norm.amount;
+        if (f.currency.toUpperCase() === paymentCurrency.toUpperCase()) {
+          totalFeesInPaymentCurrency += f.amount;
+        } else if (f.currency.toUpperCase() === accountCurrency.toUpperCase()) {
+          totalFeesInPaymentCurrency += conversionRate > 0 ? (f.amount / conversionRate) : 0;
+        } else {
+          const rate = getExchangeRate(f.currency, paymentCurrency);
+          totalFeesInPaymentCurrency += f.amount * rate;
+        }
       }
     });
   }
 
-  // 2. Gross in base INR (Layer 1)
+  // 2. Gross & Net in Payment Currency (Layer 3)
+  const netAmountInPaymentCurrency = Math.max(0, grossAmount - totalFeesInPaymentCurrency);
+
+  // 3. Gross, Net, and Fees in Base INR (Layer 1)
   const payCur = isDifferentCurrency ? paymentCurrency : accountCurrency;
   const paymentRateToBase = isDifferentCurrency ? (conversionRate * exchangeRateToBase) : exchangeRateToBase;
   const grossBase = grossAmount * paymentRateToBase;
+  const netBase = netAmountInPaymentCurrency * paymentRateToBase;
+  const totalFeesBase = totalFeesInPaymentCurrency * paymentRateToBase;
 
-  // 3. Net in base INR (Layer 1)
-  const netBase = Math.max(0, grossBase - totalFeesBase);
-
-  // 4. Net in payment currency (Layer 3 display) and Account currency (Layer 2 display)
-  const netAmountInPaymentCurrency = paymentRateToBase > 0 ? (netBase / paymentRateToBase) : 0;
-  const netAmountInAccountCurrency = exchangeRateToBase > 0 ? (netBase / exchangeRateToBase) : 0;
-  const totalFeesInPaymentCurrency = paymentRateToBase > 0 ? (totalFeesBase / paymentRateToBase) : 0;
+  // 4. Net in Account Currency (Layer 2)
+  const netAmountInAccountCurrency = netAmountInPaymentCurrency * conversionRate;
 
   // 5. Calculate allocations in base INR (Layer 1) using exact displayed/locked snapshot rates
   let totalAllocatedBase = 0;
