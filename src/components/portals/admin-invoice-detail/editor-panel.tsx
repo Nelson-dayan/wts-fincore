@@ -7,6 +7,7 @@ import { CompanyCard } from "@/components/portals/admin-invoice-detail/company-c
 import { HeadingCard } from "@/components/portals/admin-invoice-detail/heading-card";
 import { LineItemsCard } from "@/components/portals/admin-invoice-detail/line-items-card";
 import { Button } from "@/components/ui/button";
+import { TimelineCard } from "@/components/portals/admin-invoice-detail/timeline-card";
 import type { Bank, Item } from "./types";
 
 type EditorPanelProps = {
@@ -31,10 +32,11 @@ type EditorPanelProps = {
   onOpenLedger: () => void;
   creditBalance?: number;
   onApplyCreditClick?: () => void;
+  apiPrefix: string;
 };
 
 export function EditorPanel(props: EditorPanelProps) {
-  const { item, extras, bankAed, bankUsd, taxLabelPreview, liveTotals, saving, pdfExporting, msg, onItemChange, onPatchExtra, onPatchBank, onPatchLine, onAddLine, onRemoveLine, onCopyBillToShip, onSave, onDownloadPdf, onOpenLedger, creditBalance = 0, onApplyCreditClick } = props;
+  const { item, extras, bankAed, bankUsd, taxLabelPreview, liveTotals, saving, pdfExporting, msg, onItemChange, onPatchExtra, onPatchBank, onPatchLine, onAddLine, onRemoveLine, onCopyBillToShip, onSave, onDownloadPdf, onOpenLedger, creditBalance = 0, onApplyCreditClick, apiPrefix } = props;
 
   return (
     <div className="print:hidden space-y-4">
@@ -108,6 +110,13 @@ export function EditorPanel(props: EditorPanelProps) {
         onPatchBank={onPatchBank}
         onPatchExtra={onPatchExtra}
       />
+      {item._id && (
+        <TimelineCard 
+          entityType="invoice" 
+          entityId={item._id} 
+          apiPrefix={apiPrefix} 
+        />
+      )}
       <div className="h-10" />
     </div>
   );

@@ -425,6 +425,7 @@ export function AdminInvoiceDetailClient({
             onOpenLedger={() => setLedgerOpen(true)}
             creditBalance={creditBalance}
             onApplyCreditClick={() => setCreditModalOpen(true)}
+            apiPrefix={apiPrefix}
           />
 
           <div className="flex flex-col gap-8 print:col-span-full">
