@@ -334,11 +334,11 @@ export function AdminProjectDetailsClient({
                     <select
                       value={form.status}
                       onChange={(e) => setForm({ ...form, status: e.target.value as any })}
-                      className="rounded-full border border-dashed border-primary/30 bg-primary/5 text-primary px-3 py-0.5 text-xs font-semibold focus:outline-none cursor-pointer appearance-none"
+                      className="rounded-full border border-dashed border-primary/30 bg-primary/5 text-primary px-3 py-0.5 text-xs font-semibold focus:outline-none cursor-pointer appearance-none bg-slate-950 text-slate-50 dark:bg-slate-950 dark:text-slate-50"
                     >
-                      <option value="active">Active</option>
-                      <option value="completed">Completed</option>
-                      <option value="on_hold">On Hold</option>
+                      <option value="active" className="bg-slate-950 text-slate-50 dark:bg-slate-950 dark:text-slate-50">Active</option>
+                      <option value="completed" className="bg-slate-950 text-slate-50 dark:bg-slate-950 dark:text-slate-50">Completed</option>
+                      <option value="on_hold" className="bg-slate-950 text-slate-50 dark:bg-slate-950 dark:text-slate-50">On Hold</option>
                     </select>
                   ) : (
                     <Badge
@@ -449,10 +449,10 @@ export function AdminProjectDetailsClient({
                     <select
                       value={form.currency}
                       onChange={(e) => setForm({ ...form, currency: e.target.value })}
-                      className="bg-transparent border-none p-0 m-0 font-semibold focus:outline-none cursor-pointer appearance-none text-2xl text-foreground"
+                      className="bg-transparent border-none p-0 m-0 font-semibold focus:outline-none cursor-pointer appearance-none text-2xl text-foreground bg-slate-950 text-slate-50 dark:bg-slate-950 dark:text-slate-50"
                     >
                       {SUPPORTED_CURRENCIES.map((c) => (
-                        <option key={c.value} value={c.value}>{c.value}</option>
+                        <option key={c.value} value={c.value} className="bg-slate-950 text-slate-50 dark:bg-slate-950 dark:text-slate-50">{c.value}</option>
                       ))}
                     </select>
                     <input
@@ -463,15 +463,6 @@ export function AdminProjectDetailsClient({
                       placeholder="0.00"
                     />
                   </div>
-                  <label className="flex items-center gap-1.5 cursor-pointer text-[10px] text-muted-foreground select-none">
-                    <input
-                      type="checkbox"
-                      checked={form.fixCurrency}
-                      onChange={(e) => setForm({ ...form, fixCurrency: e.target.checked })}
-                      className="size-3 rounded border-input text-primary focus:ring-ring"
-                    />
-                    Fix Currency
-                  </label>
                 </div>
               ) : (
                 <p className="mt-2 text-2xl font-semibold tracking-tight">
@@ -489,11 +480,11 @@ export function AdminProjectDetailsClient({
                 <select
                   value={form.priority}
                   onChange={(e) => setForm({ ...form, priority: e.target.value as any })}
-                  className="mt-2 bg-transparent border-b border-dashed border-muted-foreground/30 focus:border-solid focus:border-primary text-2xl font-semibold capitalize tracking-tight focus:outline-none w-full p-0 cursor-pointer appearance-none"
+                  className="mt-2 bg-transparent border-b border-dashed border-muted-foreground/30 focus:border-solid focus:border-primary text-2xl font-semibold capitalize tracking-tight focus:outline-none w-full p-0 cursor-pointer appearance-none bg-slate-950 text-slate-50 dark:bg-slate-950 dark:text-slate-50"
                 >
-                  <option value="low">Low</option>
-                  <option value="medium">Medium</option>
-                  <option value="high">High</option>
+                  <option value="low" className="bg-slate-950 text-slate-50 dark:bg-slate-950 dark:text-slate-50">Low</option>
+                  <option value="medium" className="bg-slate-950 text-slate-50 dark:bg-slate-950 dark:text-slate-50">Medium</option>
+                  <option value="high" className="bg-slate-950 text-slate-50 dark:bg-slate-950 dark:text-slate-50">High</option>
                 </select>
               ) : (
                 <p className="mt-2 text-2xl font-semibold capitalize tracking-tight">
@@ -670,11 +661,17 @@ export function AdminProjectDetailsClient({
                     Category
                   </h3>
                   {editing ? (
-                    <input
+                    <Select
+                      id="project-category"
                       value={form.category}
                       onChange={(e) => setForm({ ...form, category: e.target.value })}
-                      className="bg-transparent border-b border-dashed border-muted-foreground/30 focus:border-solid focus:border-primary text-sm focus:outline-none w-full p-0"
-                      placeholder="e.g. Fixed Price"
+                      className="mt-1 bg-background text-foreground border-border/70 dark:bg-slate-900"
+                      options={[
+                        { value: "Fixed Price", label: "Fixed Price" },
+                        { value: "Retainer", label: "Retainer" },
+                        { value: "Time & Materials", label: "Time & Materials" },
+                        { value: "Other", label: "Other" },
+                      ]}
                     />
                   ) : (
                     <p className="text-sm">
