@@ -17,6 +17,7 @@ export const paymentAllocationSchema = new Schema(
     exchangeRateToBase: decimalField, // Rate from Invoice Currency to System Base Currency
     
     note: { type: String, default: "" },
+    allocatedAt: { type: Date, default: Date.now },
     
     createdBy: { type: Types.ObjectId, ref: "User", required: true },
   },

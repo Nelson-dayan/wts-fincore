@@ -57,9 +57,61 @@ export async function GET(req: Request) {
       .populate("createdBy", "name email")
       .populate("accountId", "name currency")
       .populate("projectId", "name")
+      .populate("invoiceId", "invoiceNumber")
       .lean(),
       PaymentModel.countDocuments(filter),
     ]);
+
+    // Fetch allocations for all returned payments to resolve invoice numbers and details dynamically
+    const paymentIds = items.map(item => item._id);
+    const allocations = await PaymentAllocationModel.find({
+      paymentId: { $in: paymentIds }
+    })
+    .populate("invoiceId", "invoiceNumber")
+    .lean();
+
+    // Group allocations by paymentId
+    const allocationsByPayment = new Map<string, any[]>();
+    for (const alloc of allocations) {
+      const pId = String(alloc.paymentId);
+      if (!allocationsByPayment.has(pId)) {
+        allocationsByPayment.set(pId, []);
+      }
+      allocationsByPayment.get(pId)!.push(alloc);
+    }
+
+    // Merge allocations and apply fallbacks
+    for (const item of items as any[]) {
+      const pId = String(item._id);
+      const pAllocations = allocationsByPayment.get(pId) || [];
+
+      // Fallback for referenceNumber from transactionId
+      if (!item.referenceNumber && item.transactionId) {
+        item.referenceNumber = item.transactionId;
+      }
+
+      // Attach allocations
+      item.allocations = pAllocations;
+
+      // If invoiceId is not populated/set (e.g. multi-allocation or legacy missing field),
+      // dynamically construct it from the allocations
+      if (!item.invoiceId) {
+        if (pAllocations.length === 1) {
+          item.invoiceId = pAllocations[0].invoiceId;
+        } else if (pAllocations.length > 1) {
+          const firstAlloc = pAllocations[0];
+          const allNumbers = pAllocations
+            .map(a => (a.invoiceId as any)?.invoiceNumber)
+            .filter(Boolean)
+            .join(", ");
+          
+          item.invoiceId = {
+            _id: (firstAlloc.invoiceId as any)?._id || String(firstAlloc.invoiceId),
+            invoiceNumber: allNumbers || "Multiple"
+          };
+        }
+      }
+    }
 
     // Convert Mongoose Decimal128 to numbers for React rendering
     const sanitizedItems = JSON.parse(JSON.stringify(items), (key, value) => {
@@ -130,14 +182,22 @@ export async function POST(req: Request) {
       }
     }
 
-    const { ProjectModel } = await import("@/lib/db/models");
+    const { ProjectModel, CompanyModel } = await import("@/lib/db/models");
     const project = await ProjectModel.findById(pId).select("clientId companyId").lean();
     if (!project) {
       if (isIdempotencyEnabled) await saveIdempotencyFailed(idempotencyKey!, userId);
       return NextResponse.json({ message: "Project not found" }, { status: 400 });
     }
+    
+    // Defensive self-healing fallback for missing companyId on historical projects
+    let companyId = project.companyId;
+    if (!companyId) {
+      const primaryCompany = await CompanyModel.findOne({ isPrimary: true }).select("_id").lean();
+      companyId = primaryCompany?._id || "69c661683654f65d914b4abc";
+    }
+
     body.clientId = project.clientId;
-    body.companyId = project.companyId;
+    body.companyId = companyId;
 
     // Ensure createdBy is set from the session user
     body.createdBy = session.user.id;

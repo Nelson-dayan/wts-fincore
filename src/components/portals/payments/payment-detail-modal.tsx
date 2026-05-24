@@ -95,19 +95,26 @@ export function PaymentDetailModal({ paymentId, apiPrefix, onClose, onOpenStatem
           </button>
         </div>
 
-        {/* Body */}
-        <div className="p-6 overflow-y-auto space-y-8 custom-scrollbar">
+        <div className="p-6 overflow-y-auto space-y-6 custom-scrollbar">
           {/* Main Stats */}
           <div className="grid grid-cols-2 gap-4">
             <div className="p-4 rounded-xl bg-muted/30 border border-border/50">
-              <p className="text-[10px] uppercase font-bold tracking-widest text-muted-foreground mb-1">Intended Amount</p>
-              <p className="text-xl font-bold">{payment?.currency} {payment?.intendedAmount?.toLocaleString()}</p>
-              <p className="text-xs text-muted-foreground mt-0.5">≈ ₹{payment?.intendedAmountBase?.toLocaleString()} (Base)</p>
+              <p className="text-[10px] uppercase font-bold tracking-widest text-muted-foreground mb-1">Gross Payment Sent</p>
+              <p className="text-xl font-bold">
+                {payment?.paymentCurrency || payment?.currency || "INR"} {(payment?.paymentAmountGross ?? payment?.amount ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+              </p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                ≈ ₹{((payment?.amountBase ?? 0) + (payment?.feeAmountBase ?? 0)).toLocaleString(undefined, { minimumFractionDigits: 2 })} (Base)
+              </p>
             </div>
             <div className="p-4 rounded-xl bg-primary/5 border border-primary/10">
-              <p className="text-[10px] uppercase font-bold tracking-widest text-primary mb-1">Received Amount</p>
-              <p className="text-xl font-bold text-primary">{payment?.currency} {payment?.receivedAmount?.toLocaleString()}</p>
-              <p className="text-xs text-primary/60 mt-0.5">≈ ₹{payment?.receivedAmountBase?.toLocaleString()} (Base)</p>
+              <p className="text-[10px] uppercase font-bold tracking-widest text-primary mb-1">Net Converted Received</p>
+              <p className="text-xl font-bold text-primary">
+                {payment?.currency || "INR"} {(payment?.amount ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+              </p>
+              <p className="text-xs text-primary/60 mt-0.5">
+                ≈ ₹{(payment?.amountBase ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })} (Base)
+              </p>
             </div>
           </div>
 
@@ -117,13 +124,25 @@ export function PaymentDetailModal({ paymentId, apiPrefix, onClose, onOpenStatem
               <div className="flex items-center gap-2 text-muted-foreground">
                 <Receipt className="w-4 h-4" /> <span>Invoice</span>
               </div>
-              <span className="font-semibold text-primary">{payment?.invoiceId?.invoiceNumber || "N/A"}</span>
+              <span className="font-semibold text-primary">
+                {payment?.invoiceId?.invoiceNumber || (payment?.allocations && payment.allocations.length > 0
+                  ? payment.allocations.map((a: any) => a.invoiceId?.invoiceNumber).filter(Boolean).join(", ")
+                  : "N/A")}
+              </span>
             </div>
+            {payment?.referenceNumber && (
+              <div className="flex items-center justify-between text-sm py-2 border-b border-border/40">
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <FileText className="w-4 h-4" /> <span>Reference Number / Tx ID</span>
+                </div>
+                <span className="font-semibold font-mono text-xs">{payment.referenceNumber}</span>
+              </div>
+            )}
             <div className="flex items-center justify-between text-sm py-2 border-b border-border/40">
               <div className="flex items-center gap-2 text-muted-foreground">
                 <Calendar className="w-4 h-4" /> <span>Date & Time</span>
               </div>
-              <span className="font-medium">{payment?.createdAt ? format(new Date(payment.createdAt), "PPP p") : "N/A"}</span>
+              <span className="font-medium">{payment?.receivedAt ? format(new Date(payment.receivedAt), "PPP p") : payment?.createdAt ? format(new Date(payment.createdAt), "PPP p") : "N/A"}</span>
             </div>
             <div className="flex items-center justify-between text-sm py-2 border-b border-border/40">
               <div className="flex items-center gap-2 text-muted-foreground">
@@ -137,17 +156,57 @@ export function PaymentDetailModal({ paymentId, apiPrefix, onClose, onOpenStatem
               </div>
               <span className="font-medium">{payment?.createdBy?.name || "System"}</span>
             </div>
+            {payment?.note && (
+              <div className="flex flex-col gap-1.5 p-3.5 rounded-xl bg-amber-500/5 border border-amber-500/10 text-xs text-amber-800">
+                <span className="font-bold uppercase tracking-wider text-[9px] text-amber-600/80">Transaction Note</span>
+                <span className="font-medium">{payment.note}</span>
+              </div>
+            )}
           </div>
 
+          {/* Allocations Breakdown */}
+          {payment?.allocations && payment.allocations.length > 0 && (
+            <div className="p-4 rounded-xl border bg-muted/10">
+              <p className="text-xs font-bold uppercase text-muted-foreground mb-3">Invoice Allocations</p>
+              <div className="space-y-3">
+                {payment.allocations.map((alloc: any, idx: number) => {
+                  const invoice = alloc.invoiceId;
+                  const invNum = invoice?.invoiceNumber || "Unknown Invoice";
+                  const invCurrency = alloc.allocatedCurrency || "USD";
+                  const amt = alloc.allocatedAmount ?? 0;
+                  const rate = alloc.exchangeRateUsed ?? 1;
+                  return (
+                    <div key={idx} className="flex items-center justify-between text-sm py-1.5 border-b border-border/20 last:border-0">
+                      <div className="flex flex-col">
+                        <span className="font-semibold text-primary">{invNum}</span>
+                        <span className="text-[10px] text-muted-foreground">
+                          Rate: {rate.toFixed(4)} ({payment.currency} &rarr; {invCurrency})
+                        </span>
+                      </div>
+                      <div className="flex flex-col items-end text-right">
+                        <span className="font-bold text-foreground">
+                          {invCurrency} {amt.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                        </span>
+                        <span className="text-[10px] text-muted-foreground">
+                          ≈ ₹{(alloc.allocatedAmountBase ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })} (Base)
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {/* Fees */}
-          {payment?.fees?.length > 0 && (
+          {payment?.fees && payment.fees.length > 0 && (
             <div className="p-4 rounded-xl border bg-muted/10">
               <p className="text-xs font-bold uppercase text-muted-foreground mb-3">Gateway & Bank Fees</p>
               <div className="space-y-2">
                 {payment.fees.map((fee: any, idx: number) => (
                   <div key={idx} className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">{fee.type.replace(/_/g, ' ')}</span>
-                    <span className="font-mono text-red-500 font-medium">-{payment.currency} {fee.amount}</span>
+                    <span className="text-muted-foreground">{fee.label || fee.type.replace(/_/g, ' ')}</span>
+                    <span className="font-mono text-red-500 font-medium">-{fee.currency || payment.currency} {fee.amount}</span>
                   </div>
                 ))}
               </div>
@@ -161,9 +220,10 @@ export function PaymentDetailModal({ paymentId, apiPrefix, onClose, onOpenStatem
                 variant="outline" 
                 className="w-full gap-2 text-muted-foreground hover:text-primary transition-all group"
                 onClick={loadRelated}
+                disabled={!payment?.invoiceId?._id}
               >
                 <History className="w-4 h-4 group-hover:rotate-180 transition-transform duration-500" />
-                View Other Payments for {payment?.invoiceId?.invoiceNumber}
+                View Other Payments for {payment?.invoiceId?.invoiceNumber || "Invoice"}
               </Button>
             ) : (
               <div className="space-y-3 animate-in slide-in-from-top-2 duration-300">
@@ -179,7 +239,7 @@ export function PaymentDetailModal({ paymentId, apiPrefix, onClose, onOpenStatem
                         <span className="text-[10px] text-muted-foreground">{format(new Date(p.createdAt), "dd MMM, HH:mm")}</span>
                       </div>
                       <div className="flex flex-col items-end text-right">
-                        <span className="text-sm font-bold text-primary">{p.currency} {p.receivedAmount}</span>
+                        <span className="text-sm font-bold text-primary">{p.currency} {(p.amount ?? p.receivedAmount ?? 0).toLocaleString()}</span>
                         {p._id === paymentId && <span className="text-[9px] text-primary font-bold uppercase">Current</span>}
                       </div>
                     </div>

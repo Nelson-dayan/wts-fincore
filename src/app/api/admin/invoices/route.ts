@@ -64,7 +64,7 @@ export async function GET(req: Request) {
     const [rawItems, total] = await Promise.all([
       InvoiceModel.find(filter)
         .select(
-          "invoiceNumber invoiceType status dueDate projectId poId companyId createdAt totals extras.poNumberRef totalsCache"
+          "invoiceNumber invoiceType currency status dueDate projectId poId companyId createdAt totals extras.poNumberRef totalsCache"
         )
         .populate("projectId", "name fixCurrency")
         .sort({ createdAt: -1 })
@@ -81,6 +81,7 @@ export async function GET(req: Request) {
         _id: String(row._id),
         invoiceNumber: row.invoiceNumber,
         invoiceType: row.invoiceType === "usd" ? "usd" : "aed",
+        currency: String((row as any).currency || "AED").toUpperCase(),
         status: row.status,
         dueDate: dd instanceof Date ? dd.toISOString() : dd,
         projectId: row.projectId && typeof row.projectId === "object" ? {
@@ -96,7 +97,6 @@ export async function GET(req: Request) {
           totalReceivedBase: decimalToNumber((row.totalsCache as any).totalReceivedBase),
         } : undefined,
         fixCurrency: (row.projectId as any)?.fixCurrency || false,
-        exchangeRate: decimalToNumber((row as any).exchangeRate),
         createdAt:
           row.createdAt instanceof Date ? row.createdAt.toISOString() : row.createdAt,
       };

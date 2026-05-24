@@ -89,6 +89,8 @@ export async function PATCH(req: Request, ctx: Ctx) {
 
     const body = (await req.json()) as {
       invoiceNumber?: string;
+      invoiceType?: string;
+      currency?: string;
       status?: string;
       dueDate?: string;
       documentInfo?: Record<string, unknown>;
@@ -107,6 +109,18 @@ export async function PATCH(req: Request, ctx: Ctx) {
       extras?: Record<string, unknown>;
       branding?: Record<string, unknown>;
     };
+
+    if (body.invoiceType !== undefined) {
+      const t = String(body.invoiceType).toLowerCase();
+      if (["aed", "usd"].includes(t)) {
+        inv.invoiceType = t as "aed" | "usd";
+      }
+    }
+
+    if (body.currency !== undefined) {
+      const c = String(body.currency).toUpperCase();
+      inv.currency = c;
+    }
 
     if (body.invoiceNumber !== undefined) {
       const next = String(body.invoiceNumber).trim();

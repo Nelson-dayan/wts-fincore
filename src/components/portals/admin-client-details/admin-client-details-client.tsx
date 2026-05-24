@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ClientProfileCard } from "@/components/portals/admin-client-details/client-profile-card";
 import { SectionTable } from "@/components/portals/admin-client-details/section-table";
+import { ClientStatementModal } from "@/components/portals/admin-client-details/client-statement-modal";
 import type { ClientDetailsPayload, ClientProfileForm } from "@/components/portals/admin-client-details/types";
 import { readResponseJson } from "@/lib/http/read-response-json";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -57,6 +58,7 @@ export function AdminClientDetailsClient({ clientId }: { clientId: string }) {
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState<ClientProfileForm>(EMPTY_FORM);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [statementOpen, setStatementOpen] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -205,6 +207,7 @@ export function AdminClientDetailsClient({ clientId }: { clientId: string }) {
         onCancel={() => setEditing(false)}
         onStartEdit={() => setEditing(true)}
         onDelete={() => setDeleteConfirmOpen(true)}
+        onOpenStatement={() => setStatementOpen(true)}
       />
 
       <Card className="mb-6 border-border/70 bg-card/90 shadow-(--shadow-premium) backdrop-blur-[2px]">
@@ -330,6 +333,12 @@ export function AdminClientDetailsClient({ clientId }: { clientId: string }) {
         }))}
         actionHref="/admin/expenses"
         actionLabel="View all expenses"
+      />
+      <ClientStatementModal 
+        clientId={clientId}
+        isOpen={statementOpen}
+        onClose={() => setStatementOpen(false)}
+        apiPrefix="/api/admin"
       />
     </div>
   );
