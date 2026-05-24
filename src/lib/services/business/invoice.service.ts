@@ -320,6 +320,7 @@ export function formatInvoiceForApi(row: Record<string, unknown>): Record<string
     _id: String(row._id),
     invoiceNumber: row.invoiceNumber,
     invoiceType,
+    currency: String(row.currency || "AED").toUpperCase(),
     createdBy: String(row.createdBy ?? ""),
     status: row.status,
     fixCurrency: !!(row.projectId as any)?.fixCurrency,

@@ -5,6 +5,11 @@ import { logActivity } from "@/lib/services/activity/log-activity.service";
 import * as accountEngine from "@/lib/services/finance/account.engine";
 import * as allocationEngine from "@/lib/services/finance/allocation.engine";
 import { assertPeriodNotLocked } from "@/lib/services/business/period-lock.service";
+import { 
+  normalizeToBase, 
+  convertBaseToTreasury, 
+  floatLessThanOrEqual 
+} from "@/lib/services/finance/forex.engine";
 
 export interface RecordPaymentInput {
   projectId: string | Types.ObjectId;
@@ -51,9 +56,10 @@ export interface RecordPaymentInput {
 
 /**
  * Records a new payment event.
- * 1. Creates Payment record.
- * 2. Updates Account balance and records Transaction.
- * 3. (Optional) Allocates funds to an invoice.
+ * 1. Normalizes gross payment, fees, and allocations into Layer 1 base INR.
+ * 2. Validates overallocation bounds entirely in base currency.
+ * 3. Creates Payment record with locked exchange rate snapshots.
+ * 4. Updates Account balance and records Transaction atomically.
  */
 export async function recordPayment(input: RecordPaymentInput) {
   const db = await connectDB();
@@ -63,12 +69,76 @@ export async function recordPayment(input: RecordPaymentInput) {
 
     await session.withTransaction(async () => {
       await assertPeriodNotLocked(input.receivedAt || new Date());
-      const amountBase = input.amount * input.exchangeRateToBase;
-      // For now, let's assume fees are handled in the input if we want them
-      const feeAmount = (input as any).feeAmount || 0;
-      const feeAmountBase = feeAmount * input.exchangeRateToBase;
 
-      // 1. Create Payment (Money Movement)
+      // 1. Core normalization to Layer 1 Base Currency (INR)
+      const payCur = (input.paymentCurrency || input.currency).toUpperCase();
+      const payGross = input.paymentAmountGross ?? input.amount;
+      
+      const grossBaseResult = normalizeToBase({ amount: payGross, currency: payCur });
+      const paymentAmountGrossBase = grossBaseResult.amount;
+
+      // 2. Normalize each individual fee currency to base INR independently
+      const normalizedFees = (input.fees || []).map(f => {
+        const norm = normalizeToBase({ amount: f.amount, currency: f.currency });
+        return {
+          type: f.type,
+          label: f.label,
+          amount: f.amount,
+          currency: f.currency.toUpperCase(),
+          baseAmount: norm.amount,
+          note: f.note ?? ""
+        };
+      });
+
+      const feeAmountBase = normalizedFees.reduce((sum, f) => sum + f.baseAmount, 0);
+
+      // 3. Compute net amount in base INR
+      const netBase = paymentAmountGrossBase - feeAmountBase;
+
+      // 4. Compute original net payment currency representation
+      const paymentAmountNet = input.paymentAmountNet ?? (payGross - (input.fees || []).reduce((sum, f) => sum + f.amount, 0));
+
+      // 5. Build allocations pipeline & perform over-allocation validation strictly in base INR
+      const rawAllocationsList = input.allocations && input.allocations.length > 0
+        ? input.allocations
+        : (input.invoiceId && input.allocationAmount
+            ? [{ invoiceId: input.invoiceId, amount: input.allocationAmount, rate: input.allocationRate || 1, rateToBase: input.allocationRateToBase }]
+            : []);
+
+      let totalAllocatedBase = 0;
+      const allocationsToProcess = [];
+
+      for (const alloc of rawAllocationsList) {
+        if (alloc.invoiceId && alloc.amount > 0) {
+          const invoice = await InvoiceModel.findById(alloc.invoiceId).session(session);
+          if (!invoice) throw new Error(`Invoice not found: ${alloc.invoiceId}`);
+
+          const invCurrency = (invoice.currency || (invoice as any).invoiceType === "usd" ? "USD" : "AED").toUpperCase();
+          
+          // Compute allocation base consistently with the UI formula: (amount / rateUsed) * exchangeRateToBase
+          const allocBase = alloc.rate > 0
+            ? (alloc.amount / alloc.rate) * input.exchangeRateToBase
+            : normalizeToBase({ amount: alloc.amount, currency: invCurrency }).amount;
+
+          totalAllocatedBase += allocBase;
+
+          const effectiveRateToBase = alloc.amount > 0 ? (allocBase / alloc.amount) : 1.0;
+
+          allocationsToProcess.push({
+            invoiceId: alloc.invoiceId,
+            amount: alloc.amount, // original invoice currency amount
+            rateUsed: alloc.rate,
+            rateToBase: effectiveRateToBase
+          });
+        }
+      }
+
+      // STRICT OVER-ALLOCATION LEDGER CHECK IN BASE INR
+      if (!floatLessThanOrEqual(totalAllocatedBase, netBase)) {
+        throw new Error(`Overallocation detected: Total allocated amount in base (${totalAllocatedBase.toFixed(2)} INR) exceeds net payment base (${netBase.toFixed(2)} INR).`);
+      }
+
+      // 6. Create Payment Record (Money Movement)
       const payment = await PaymentModel.create(
         [
           {
@@ -76,25 +146,23 @@ export async function recordPayment(input: RecordPaymentInput) {
             clientId: input.clientId,
             companyId: input.companyId,
             accountId: input.accountId,
-            amount: input.amount,
-            amountBase,
-            feeAmount,
-            feeAmountBase,
-            currency: input.currency,
+            amount: input.amount, // Net amount received in account (Layer 2)
+            amountBase: netBase,  // Layer 1
+            feeAmount: (input.fees || []).reduce((sum, f) => sum + f.amount, 0),
+            feeAmountBase,        // Layer 1
+            currency: input.currency.toUpperCase(),
             exchangeRateToBase: input.exchangeRateToBase,
             method: input.method,
             referenceNumber: input.referenceNumber,
             receivedAt: input.receivedAt || new Date(),
+            savedAt: new Date(),
             note: input.note,
             createdBy: input.createdBy,
-            invoiceId: input.invoiceId, // Backward compatibility link
-            paymentCurrency: input.paymentCurrency || input.currency,
-            paymentAmountGross: input.paymentAmountGross ?? input.amount,
-            paymentAmountNet: input.paymentAmountNet ?? input.amount,
-            fees: (input.fees || []).map(f => ({
-              ...f,
-              baseAmount: (f.baseAmount ?? f.amount) * (input.exchangeRateToBase || 1)
-            }))
+            invoiceId: input.invoiceId || rawAllocationsList[0]?.invoiceId || undefined, // Backward compatibility link fallback
+            paymentCurrency: payCur,
+            paymentAmountGross: payGross,
+            paymentAmountNet,
+            fees: normalizedFees
           },
         ],
         { session }
@@ -102,7 +170,7 @@ export async function recordPayment(input: RecordPaymentInput) {
 
       const paymentId = payment[0]._id;
 
-      // 2. Deposit into Account
+      // 7. Deposit into Treasury Account
       await accountEngine.deposit(
         input.accountId,
         input.amount,
@@ -112,30 +180,14 @@ export async function recordPayment(input: RecordPaymentInput) {
         `Payment ${input.referenceNumber || paymentId} received`
       );
 
-      // 3. Handle Optional Allocation
-      if (input.allocations && input.allocations.length > 0) {
-        for (const alloc of input.allocations) {
-          if (alloc.invoiceId && alloc.amount > 0) {
-            const rateToBase = 1;
-
-            await allocationEngine.allocate(
-              paymentId,
-              alloc.invoiceId,
-              alloc.amount,
-              alloc.rate || 1,
-              alloc.rateToBase || rateToBase,
-              input.createdBy,
-              session
-            );
-          }
-        }
-      } else if (input.invoiceId && input.allocationAmount) {
+      // 8. Process Locked Invoice Allocations
+      for (const alloc of allocationsToProcess) {
         await allocationEngine.allocate(
           paymentId,
-          input.invoiceId,
-          input.allocationAmount,
-          input.allocationRate || 1,
-          input.allocationRateToBase || 1,
+          alloc.invoiceId,
+          alloc.amount,
+          alloc.rateUsed,
+          alloc.rateToBase,
           input.createdBy,
           session
         );

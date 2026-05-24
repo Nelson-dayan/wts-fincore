@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireRole } from "@/lib/auth/require-role";
 import { connectDB } from "@/lib/db/connect";
-import { PaymentModel } from "@/lib/db/models";
+import { PaymentModel, PaymentAllocationModel } from "@/lib/db/models";
 import { authErrorResponse } from "@/lib/api/route-auth";
 import { deletePayment } from "@/lib/services/business/payment.service";
 
@@ -23,8 +23,26 @@ export async function GET(
       return NextResponse.json({ message: "Payment not found" }, { status: 404 });
     }
 
+    // Fetch associated allocations
+    const allocations = await PaymentAllocationModel.find({ paymentId })
+      .populate("invoiceId", "invoiceNumber status totalsCache")
+      .lean();
+
+    const itemObj = item as any;
+    itemObj.allocations = allocations;
+
+    // Fallback for referenceNumber from transactionId
+    if (!itemObj.referenceNumber && itemObj.transactionId) {
+      itemObj.referenceNumber = itemObj.transactionId;
+    }
+
+    // Dynamic fallback for invoiceId if not set directly (e.g. multi-allocation)
+    if (!itemObj.invoiceId && allocations.length > 0) {
+      itemObj.invoiceId = allocations[0].invoiceId;
+    }
+
     // Convert Mongoose Decimal128 to numbers for React rendering
-    const sanitized = JSON.parse(JSON.stringify(item), (key, value) => {
+    const sanitized = JSON.parse(JSON.stringify(itemObj), (key, value) => {
       if (value && typeof value === 'object' && value.$numberDecimal) {
         return parseFloat(value.$numberDecimal);
       }

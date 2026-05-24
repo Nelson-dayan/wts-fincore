@@ -21,7 +21,6 @@ export type InvoiceRow = {
     totalReceivedBase: number;
   };
   fixCurrency?: boolean;
-  exchangeRate?: number;
 };
 
 export function InvoiceSearchPicker({
@@ -71,7 +70,6 @@ export function InvoiceSearchPicker({
           currency: p.currency,
           totalsCache: p.totalsCache,
           fixCurrency: p.fixCurrency,
-          exchangeRate: p.exchangeRate,
         }))
       );
     } catch (e) {

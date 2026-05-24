@@ -53,6 +53,8 @@ interface ResourceTableClientProps {
   onDelete?: (id: string) => Promise<void>;
   /** Optional callback to handle row viewing. If provided, a View button is shown. */
   onView?: (id: string) => void;
+  /** Optional dictionary of custom cell rendering functions */
+  customCellRenders?: Record<string, (value: any, row: any) => React.ReactNode>;
 }
 
 function formatCell(value: unknown): string {
@@ -97,6 +99,7 @@ export function ResourceTableClient({
   refreshKey = 0,
   onDelete,
   onView,
+  customCellRenders,
 }: ResourceTableClientProps) {
   const detailPrefix = rowDetailPathPrefix?.replace(/\/$/, "") ?? "";
   const hasActionsCol = Boolean(detailPrefix || (extraRowLinks && extraRowLinks.length > 0) || onDelete || onView);
@@ -250,7 +253,9 @@ export function ResourceTableClient({
                       >
                         {columns.map((column) => (
                           <td key={column.key} className="py-2 pr-3">
-                            {formatCell(row[column.key])}
+                            {customCellRenders && customCellRenders[column.key]
+                              ? customCellRenders[column.key](row[column.key], row)
+                              : formatCell(row[column.key])}
                           </td>
                         ))}
                         {hasActionsCol ? (

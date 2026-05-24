@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import { Plus, X, Lock, Unlock, CreditCard, RotateCcw, Loader2, Calculator } from "lucide-react";
 import { ResourceTableClient } from "@/components/portals/resource-table-client";
 import { Button } from "@/components/ui/button";
@@ -49,15 +50,55 @@ export function AdminPaymentsPageClient({ apiPrefix }: { apiPrefix: string }) {
         refreshKey={refreshKey}
         columns={[
           { key: "invoiceId", label: "Invoice #" },
-          { key: "receivedAmount", label: "Amount" },
+          { key: "amount", label: "Amount" },
           { key: "currency", label: "Curr" },
           { key: "method", label: "Method" },
-          { key: "transactionId", label: "Tx ID" },
-          { key: "createdAt", label: "Date" },
+          { key: "referenceNumber", label: "Tx ID" },
+          { key: "receivedAt", label: "Date" },
         ]}
-        extraRowLinks={[
-          { label: "Invoice Detail", hrefPattern: `${pathPrefix}/invoices/{invoiceId}` }
-        ]}
+        extraRowLinks={[]}
+        customCellRenders={{
+          invoiceId: (val, row: any) => {
+            const allocations = row.allocations || [];
+            if (allocations.length === 0) {
+              if (val && typeof val === "object") {
+                const inv = val as { _id?: string; invoiceNumber?: string };
+                if (inv.invoiceNumber) {
+                  return (
+                    <Link
+                      href={`${pathPrefix}/invoices/${inv._id}`}
+                      className="text-primary font-semibold hover:underline"
+                    >
+                      {inv.invoiceNumber}
+                    </Link>
+                  );
+                }
+              }
+              return <span className="text-muted-foreground">-</span>;
+            }
+
+            return (
+              <div className="flex flex-wrap gap-1.5 max-w-[280px]">
+                {allocations.map((alloc: any, idx: number) => {
+                  const inv = alloc.invoiceId;
+                  if (!inv) return null;
+                  const invId = inv._id || String(inv);
+                  const invNum = inv.invoiceNumber || "Unknown";
+                  return (
+                    <Link
+                      key={idx}
+                      href={`${pathPrefix}/invoices/${invId}`}
+                      className="inline-flex items-center rounded bg-primary/10 border border-primary/20 px-2 py-0.5 text-xs font-bold text-primary hover:bg-primary/20 transition-all shadow-sm"
+                      title={`Amount allocated: ${alloc.allocatedCurrency} ${(alloc.allocatedAmount || 0).toLocaleString()}`}
+                    >
+                      {invNum}
+                    </Link>
+                  );
+                })}
+              </div>
+            );
+          }
+        }}
         onView={(id) => setViewingPaymentId(id)}
         onDelete={async (id) => {
           const res = await fetch(`${apiPrefix}/payments/${id}`, { method: "DELETE" });
