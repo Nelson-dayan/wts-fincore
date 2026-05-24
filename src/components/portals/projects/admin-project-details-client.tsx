@@ -312,21 +312,42 @@ export function AdminProjectDetailsClient({
             <div className="flex items-center gap-4">
 
               <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10 text-2xl font-bold text-primary shadow-inner">
-                {data.project?.name?.charAt(0) || "P"}
+                {editing ? (form.name?.charAt(0) || "P") : (data.project?.name?.charAt(0) || "P")}
               </div>
 
               <div className="space-y-1">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <h2 className="text-2xl font-semibold tracking-tight">
-                    {data.project?.name || "Untitled Project"}
-                  </h2>
+                  {editing ? (
+                    <input
+                      value={form.name}
+                      onChange={(e) => setForm({ ...form, name: e.target.value })}
+                      className="bg-transparent border-b border-dashed border-primary/40 focus:border-solid focus:border-primary text-2xl font-semibold tracking-tight focus:outline-none w-72 max-w-full px-0 py-0"
+                      placeholder="Project Name"
+                    />
+                  ) : (
+                    <h2 className="text-2xl font-semibold tracking-tight">
+                      {data.project?.name || "Untitled Project"}
+                    </h2>
+                  )}
 
-                  <Badge
-                    variant="outline"
-                    className="rounded-full border-primary/20 bg-primary/5 text-primary"
-                  >
-                    {data.project?.status?.replace("_", " ")}
-                  </Badge>
+                  {editing ? (
+                    <select
+                      value={form.status}
+                      onChange={(e) => setForm({ ...form, status: e.target.value as any })}
+                      className="rounded-full border border-dashed border-primary/30 bg-primary/5 text-primary px-3 py-0.5 text-xs font-semibold focus:outline-none cursor-pointer appearance-none"
+                    >
+                      <option value="active">Active</option>
+                      <option value="completed">Completed</option>
+                      <option value="on_hold">On Hold</option>
+                    </select>
+                  ) : (
+                    <Badge
+                      variant="outline"
+                      className="rounded-full border-primary/20 bg-primary/5 text-primary"
+                    >
+                      {data.project?.status?.replace("_", " ")}
+                    </Badge>
+                  )}
                 </div>
 
                 <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
@@ -338,7 +359,7 @@ export function AdminProjectDetailsClient({
 
                   <span className="h-1 w-1 rounded-full bg-muted-foreground/40" />
 
-                  <span>{data.project?.category || "Uncategorized"}</span>
+                  <span>{editing ? form.category || "Uncategorized" : (data.project?.category || "Uncategorized")}</span>
                 </div>
               </div>
             </div>
@@ -361,7 +382,27 @@ export function AdminProjectDetailsClient({
                       size="sm"
                       variant="outline"
                       className="rounded-xl"
-                      onClick={() => setEditing(false)}
+                      onClick={() => {
+                        setEditing(false);
+                        if (data.project) {
+                          const normalizedBudget = normalizeBudget(data.project.budget);
+                          setForm({
+                            name: data.project.name ?? "",
+                            description: data.project.description ?? "",
+                            status: data.project.status ?? "active",
+                            priority: data.project.priority ?? "medium",
+                            budget: normalizedBudget,
+                            currency: data.project.currency ?? "AED",
+                            category: data.project.category ?? "Fixed Price",
+                            clientReference: data.project.clientReference ?? "",
+                            notes: data.project.notes ?? "",
+                            startDate: data.project.startDate ? new Date(data.project.startDate).toISOString().split('T')[0] : "",
+                            targetEndDate: data.project.targetEndDate ? new Date(data.project.targetEndDate).toISOString().split('T')[0] : "",
+                            actualEndDate: data.project.actualEndDate ? new Date(data.project.actualEndDate).toISOString().split('T')[0] : "",
+                            fixCurrency: !!data.project.fixCurrency,
+                          });
+                        }
+                      }}
                     >
                       Cancel
                     </Button>
@@ -402,45 +443,119 @@ export function AdminProjectDetailsClient({
               <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
                 Budget
               </p>
-
-              <p className="mt-2 text-2xl font-semibold tracking-tight">
-                {data.project?.currency || "INR"}{" "}
-                {normalizeBudget(data.project?.budget) || "-"}
-              </p>
+              {editing ? (
+                <div className="mt-2 space-y-1">
+                  <div className="flex items-baseline gap-1 text-2xl font-semibold tracking-tight">
+                    <select
+                      value={form.currency}
+                      onChange={(e) => setForm({ ...form, currency: e.target.value })}
+                      className="bg-transparent border-none p-0 m-0 font-semibold focus:outline-none cursor-pointer appearance-none text-2xl text-foreground"
+                    >
+                      {SUPPORTED_CURRENCIES.map((c) => (
+                        <option key={c.value} value={c.value}>{c.value}</option>
+                      ))}
+                    </select>
+                    <input
+                      type="number"
+                      value={form.budget}
+                      onChange={(e) => setForm({ ...form, budget: e.target.value })}
+                      className="bg-transparent border-b border-dashed border-muted-foreground/30 focus:border-solid focus:border-primary font-semibold focus:outline-none p-0 w-full tracking-tight"
+                      placeholder="0.00"
+                    />
+                  </div>
+                  <label className="flex items-center gap-1.5 cursor-pointer text-[10px] text-muted-foreground select-none">
+                    <input
+                      type="checkbox"
+                      checked={form.fixCurrency}
+                      onChange={(e) => setForm({ ...form, fixCurrency: e.target.checked })}
+                      className="size-3 rounded border-input text-primary focus:ring-ring"
+                    />
+                    Fix Currency
+                  </label>
+                </div>
+              ) : (
+                <p className="mt-2 text-2xl font-semibold tracking-tight">
+                  {data.project?.currency || "INR"}{" "}
+                  {normalizeBudget(data.project?.budget) || "-"}
+                </p>
+              )}
             </div>
 
             <div className="rounded-2xl border border-border/50 bg-muted/30 p-5">
               <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
                 Priority
               </p>
-
-              <p className="mt-2 text-2xl font-semibold capitalize tracking-tight">
-                {data.project?.priority || "-"}
-              </p>
+              {editing ? (
+                <select
+                  value={form.priority}
+                  onChange={(e) => setForm({ ...form, priority: e.target.value as any })}
+                  className="mt-2 bg-transparent border-b border-dashed border-muted-foreground/30 focus:border-solid focus:border-primary text-2xl font-semibold capitalize tracking-tight focus:outline-none w-full p-0 cursor-pointer appearance-none"
+                >
+                  <option value="low">Low</option>
+                  <option value="medium">Medium</option>
+                  <option value="high">High</option>
+                </select>
+              ) : (
+                <p className="mt-2 text-2xl font-semibold capitalize tracking-tight">
+                  {data.project?.priority || "-"}
+                </p>
+              )}
             </div>
 
             <div className="rounded-2xl border border-border/50 bg-muted/30 p-5">
               <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
                 Start Date
               </p>
-
-              <p className="mt-2 text-lg font-medium">
-                {data.project?.startDate
-                  ? new Date(data.project.startDate).toLocaleDateString()
-                  : "-"}
-              </p>
+              {editing ? (
+                <input
+                  type="date"
+                  value={form.startDate}
+                  onChange={(e) => setForm({ ...form, startDate: e.target.value })}
+                  className="mt-2 bg-transparent border-b border-dashed border-muted-foreground/30 focus:border-solid focus:border-primary text-lg font-medium focus:outline-none w-full p-0"
+                />
+              ) : (
+                <p className="mt-2 text-lg font-medium">
+                  {data.project?.startDate
+                    ? new Date(data.project.startDate).toLocaleDateString()
+                    : "-"}
+                </p>
+              )}
             </div>
 
             <div className="rounded-2xl border border-border/50 bg-muted/30 p-5">
               <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
                 Target End
               </p>
-
-              <p className="mt-2 text-lg font-medium">
-                {data.project?.targetEndDate
-                  ? new Date(data.project.targetEndDate).toLocaleDateString()
-                  : "-"}
-              </p>
+              {editing ? (
+                <div className="mt-2 space-y-2">
+                  <input
+                    type="date"
+                    value={form.targetEndDate}
+                    onChange={(e) => setForm({ ...form, targetEndDate: e.target.value })}
+                    className="bg-transparent border-b border-dashed border-muted-foreground/30 focus:border-solid focus:border-primary text-lg font-medium focus:outline-none w-full p-0"
+                  />
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Actual:</span>
+                    <input
+                      type="date"
+                      value={form.actualEndDate}
+                      onChange={(e) => setForm({ ...form, actualEndDate: e.target.value })}
+                      className="bg-transparent border-b border-dashed border-muted-foreground/30 focus:border-solid focus:border-primary text-xs focus:outline-none w-full p-0"
+                    />
+                  </div>
+                </div>
+              ) : (
+                <p className="mt-2 text-lg font-medium">
+                  {data.project?.targetEndDate
+                    ? new Date(data.project.targetEndDate).toLocaleDateString()
+                    : "-"}
+                  {data.project?.actualEndDate && (
+                    <span className="block text-xs text-muted-foreground mt-1">
+                      Actual: {new Date(data.project.actualEndDate).toLocaleDateString()}
+                    </span>
+                  )}
+                </p>
+              )}
             </div>
           </div>
 
@@ -467,20 +582,36 @@ export function AdminProjectDetailsClient({
                     <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
                       Description
                     </p>
-
-                    <p className="leading-7 text-muted-foreground">
-                      {data.project?.description || "No description provided."}
-                    </p>
+                    {editing ? (
+                      <textarea
+                        value={form.description}
+                        onChange={(e) => setForm({ ...form, description: e.target.value })}
+                        className="w-full bg-transparent border-b border-dashed border-muted-foreground/30 focus:border-solid focus:border-primary text-muted-foreground leading-7 focus:outline-none p-0 resize-y min-h-[80px]"
+                        placeholder="Project description..."
+                      />
+                    ) : (
+                      <p className="leading-7 text-muted-foreground">
+                        {data.project?.description || "No description provided."}
+                      </p>
+                    )}
                   </div>
 
                   <div>
                     <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
                       Internal Notes
                     </p>
-
-                    <div className="rounded-xl bg-muted/40 p-4 text-sm leading-6 text-muted-foreground">
-                      {data.project?.notes || "No internal notes available."}
-                    </div>
+                    {editing ? (
+                      <textarea
+                        value={form.notes}
+                        onChange={(e) => setForm({ ...form, notes: e.target.value })}
+                        className="w-full bg-muted/40 rounded-xl p-4 text-sm leading-6 text-muted-foreground border-b-2 border-dashed border-primary/30 focus:border-solid focus:border-primary focus:outline-none resize-y min-h-[80px]"
+                        placeholder="Internal notes..."
+                      />
+                    ) : (
+                      <div className="rounded-xl bg-muted/40 p-4 text-sm leading-6 text-muted-foreground">
+                        {data.project?.notes || "No internal notes available."}
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -515,15 +646,42 @@ export function AdminProjectDetailsClient({
               </div>
 
               {/* Reference */}
-              <div className="rounded-2xl border border-border/50 bg-background p-5 shadow-sm">
+              <div className="rounded-2xl border border-border/50 bg-background p-5 shadow-sm space-y-4">
+                <div>
+                  <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                    Client Reference
+                  </h3>
+                  {editing ? (
+                    <input
+                      value={form.clientReference}
+                      onChange={(e) => setForm({ ...form, clientReference: e.target.value })}
+                      className="bg-transparent border-b border-dashed border-muted-foreground/30 focus:border-solid focus:border-primary font-mono text-sm focus:outline-none w-full p-0"
+                      placeholder="e.g. REF-102"
+                    />
+                  ) : (
+                    <p className="font-mono text-sm">
+                      {data.project?.clientReference || "N/A"}
+                    </p>
+                  )}
+                </div>
 
-                <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-                  Client Reference
-                </h3>
-
-                <p className="font-mono text-sm">
-                  {data.project?.clientReference || "N/A"}
-                </p>
+                <div>
+                  <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                    Category
+                  </h3>
+                  {editing ? (
+                    <input
+                      value={form.category}
+                      onChange={(e) => setForm({ ...form, category: e.target.value })}
+                      className="bg-transparent border-b border-dashed border-muted-foreground/30 focus:border-solid focus:border-primary text-sm focus:outline-none w-full p-0"
+                      placeholder="e.g. Fixed Price"
+                    />
+                  ) : (
+                    <p className="text-sm">
+                      {data.project?.category || "Uncategorized"}
+                    </p>
+                  )}
+                </div>
               </div>
             </div>
           </div>
