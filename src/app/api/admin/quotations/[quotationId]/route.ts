@@ -3,6 +3,7 @@ import { requireRole } from "@/lib/auth/require-role";
 import { connectDB } from "@/lib/db/connect";
 import { PurchaseOrderModel, QuotationModel } from "@/lib/db/models";
 import { apiSuccess, apiError } from "@/lib/api/response";
+import { executeTransition } from "@/lib/services/orchestration";
 import { logActivity } from "@/lib/services/activity/log-activity.service";
 import { decimalToNumber } from "@/lib/services/business/money";
 import {
@@ -297,6 +298,42 @@ export async function PATCH(req: Request, ctx: RouteCtx) {
     const nextInternalNotes =
       body.internalNotes !== undefined ? String(body.internalNotes) : existingInternal;
 
+    if (body.status !== undefined && body.status !== existing.status) {
+      let policyId = "";
+      let triggerEvent = "QUOTATION_PATCH_UPDATE";
+
+      if (body.status === "approved") {
+        policyId = "POL-QTN-001";
+        triggerEvent = "QUOTATION_APPROVED_VIA_PATCH";
+      } else if (body.status === "sent") {
+        policyId = "POL-QTN-002";
+        triggerEvent = "QUOTATION_SENT_VIA_PATCH";
+      } else if (body.status === "rejected") {
+        policyId = "POL-QTN-003";
+        triggerEvent = "QUOTATION_REJECTED_VIA_PATCH";
+      }
+
+      if (policyId) {
+        const result = await executeTransition({
+          policyId,
+          entityId: quotationId,
+          approvedBy: session.user.id,
+          triggerEvent,
+          route: `/api/admin/quotations/${quotationId}`
+        });
+
+        if (!result.success) {
+          return apiError(
+            result.message || "Quotation transition validation failed.",
+            400,
+            { blockers: result.blockers }
+          );
+        }
+      } else {
+        return apiError(`Direct status transitions to '${body.status}' are prohibited. Policy not defined.`, 400);
+      }
+    }
+
     const updated = await QuotationModel.findByIdAndUpdate(
       quotationId,
       {
@@ -321,10 +358,10 @@ export async function PATCH(req: Request, ctx: RouteCtx) {
               bodyQ.validity !== undefined ? String(bodyQ.validity) : String(qInfo?.validity ?? ""),
             remainingAmount:
               bodyQ.remainingAmount !== undefined
-                ? toDecimal128(Number(bodyQ.remainingAmount))
-                : qInfo?.remainingAmount !== undefined && qInfo?.remainingAmount !== null
-                  ? toDecimal128(decimalToNumber(qInfo.remainingAmount))
-                  : undefined,
+                 ? toDecimal128(Number(bodyQ.remainingAmount))
+                 : qInfo?.remainingAmount !== undefined && qInfo?.remainingAmount !== null
+                   ? toDecimal128(decimalToNumber(qInfo.remainingAmount))
+                   : undefined,
             remainingText:
               bodyQ.remainingText !== undefined
                 ? String(bodyQ.remainingText)
@@ -332,7 +369,6 @@ export async function PATCH(req: Request, ctx: RouteCtx) {
           },
           branding: nextBranding,
           internalNotes: nextInternalNotes,
-          ...(body.status !== undefined ? { status: body.status } : {}),
         },
       },
       { new: true }

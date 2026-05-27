@@ -3,6 +3,7 @@ import { requireRole } from "@/lib/auth/require-role";
 import { authErrorResponse } from "@/lib/api/route-auth";
 import { connectDB } from "@/lib/db/connect";
 import { InvoiceModel, PurchaseOrderModel } from "@/lib/db/models";
+import { executeTransition } from "@/lib/services/orchestration";
 import { logActivity } from "@/lib/services/activity/log-activity.service";
 import mongoose from "mongoose";
 import {
@@ -175,9 +176,6 @@ export async function PATCH(req: Request, ctx: Ctx) {
     if (externalPoNumber !== undefined) {
       po.externalPoNumber = externalPoNumber.trim();
     }
-    if (status) {
-      po.status = status;
-    }
     if (totalAmountInput !== undefined) {
       const n = Number.parseFloat(String(totalAmountInput).replace(/,/g, ""));
       if (Number.isFinite(n)) {
@@ -209,6 +207,41 @@ export async function PATCH(req: Request, ctx: Ctx) {
     }
 
     await po.save();
+
+    if (status !== undefined && status !== po.status) {
+      let policyId = "";
+      let triggerEvent = "PURCHASE_ORDER_PATCH_UPDATE";
+
+      if (status === "active") {
+        policyId = "POL-PO-001";
+        triggerEvent = "PO_ACTIVATED_VIA_PATCH";
+      } else if (status === "completed") {
+        policyId = "POL-PO-002";
+        triggerEvent = "PO_COMPLETED_VIA_PATCH";
+      }
+
+      if (policyId) {
+        const result = await executeTransition({
+          policyId,
+          entityId: purchaseOrderId,
+          approvedBy: session.user.id,
+          triggerEvent,
+          route: `/api/admin/purchase-orders/${purchaseOrderId}`
+        });
+
+        if (!result.success) {
+          return NextResponse.json(
+            { message: result.message || "Purchase order transition validation failed.", blockers: result.blockers },
+            { status: 400 }
+          );
+        }
+      } else {
+        return NextResponse.json(
+          { message: `Direct status transitions to '${status}' are prohibited. Policy not defined.` },
+          { status: 400 }
+        );
+      }
+    }
 
     await logActivity({
       userId: session.user.id,

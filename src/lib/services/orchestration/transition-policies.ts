@@ -121,9 +121,95 @@ export const ProjectCompletionPolicy: TransitionPolicy = {
   sideEffects: ["LOG_PROJECT_ARCHIVE"]
 };
 
+export const QuotationSentPolicy: TransitionPolicy = {
+  id: "POL-QTN-002",
+  entityType: "quotation",
+  from: ["draft"],
+  to: "sent",
+  requiresConfirmation: false,
+  conditions: [],
+  sideEffects: []
+};
+
+export const QuotationRejectedPolicy: TransitionPolicy = {
+  id: "POL-QTN-003",
+  entityType: "quotation",
+  from: ["draft", "sent"],
+  to: "rejected",
+  requiresConfirmation: true,
+  conditions: [],
+  sideEffects: []
+};
+
+export const PurchaseOrderCompletedPolicy: TransitionPolicy = {
+  id: "POL-PO-002",
+  entityType: "purchase_order",
+  from: ["active"],
+  to: "completed",
+  requiresConfirmation: true,
+  conditions: [],
+  sideEffects: []
+};
+
+export const ProjectHoldPolicy: TransitionPolicy = {
+  id: "POL-PRJ-001",
+  entityType: "project",
+  from: ["active"],
+  to: "on_hold",
+  requiresConfirmation: true,
+  conditions: [],
+  sideEffects: []
+};
+
+export const ProjectResumePolicy: TransitionPolicy = {
+  id: "POL-PRJ-002",
+  entityType: "project",
+  from: ["on_hold"],
+  to: "active",
+  requiresConfirmation: false,
+  conditions: [],
+  sideEffects: []
+};
+
+export const InvoiceSentPolicy: TransitionPolicy = {
+  id: "POL-INV-001",
+  entityType: "invoice",
+  from: ["DRAFT"],
+  to: "SENT",
+  requiresConfirmation: false,
+  conditions: [
+    {
+      code: "HAS_TOTAL",
+      description: "Invoice must have items and a total greater than 0",
+      validate: async (inv) => {
+        const total = inv.totals?.total ? Number(inv.totals.total) : 0;
+        return { ok: total > 0, blocker: total <= 0 ? "Invoice total must be greater than zero." : undefined };
+      }
+    }
+  ],
+  sideEffects: []
+};
+
+export const InvoiceCancelledPolicy: TransitionPolicy = {
+  id: "POL-INV-003",
+  entityType: "invoice",
+  from: ["DRAFT", "SENT", "PARTIAL", "OVERDUE"],
+  to: "CANCELLED",
+  requiresConfirmation: true,
+  conditions: [],
+  sideEffects: []
+};
+
 export const ALL_TRANSITION_POLICIES: Record<string, TransitionPolicy> = {
   "POL-QTN-001": QuotationApprovalPolicy,
+  "POL-QTN-002": QuotationSentPolicy,
+  "POL-QTN-003": QuotationRejectedPolicy,
   "POL-PO-001": PurchaseOrderActivePolicy,
+  "POL-PO-002": PurchaseOrderCompletedPolicy,
+  "POL-PRJ-001": ProjectHoldPolicy,
+  "POL-PRJ-002": ProjectResumePolicy,
+  "POL-INV-001": InvoiceSentPolicy,
   "POL-INV-002": InvoicePaidPolicy,
+  "POL-INV-003": InvoiceCancelledPolicy,
   "POL-PRJ-003": ProjectCompletionPolicy
 };
