@@ -349,3 +349,55 @@ export function getFinancialPolicies(): TransitionPolicy[] {
 export function getPoliciesByEntityType(entityType: TransitionPolicy["entityType"]): TransitionPolicy[] {
   return Object.values(ALL_TRANSITION_POLICIES).filter(p => p.entityType === entityType);
 }
+
+export interface PolicyManifest {
+  policies: Array<{
+    id: string;
+    entityType: string;
+    from: string[];
+    to: string;
+    requiresConfirmation: boolean;
+    sideEffects: TransitionSideEffect[];
+    metadata: PolicyMetadata;
+    conditions: string[];
+  }>;
+  categories: string[];
+  riskMatrix: Record<string, string[]>;
+  sideEffects: string[];
+  contractVersion: string;
+}
+
+export function exportPolicyManifest(): PolicyManifest {
+  const policies = Object.values(ALL_TRANSITION_POLICIES).map(p => ({
+    id: p.id,
+    entityType: p.entityType,
+    from: p.from,
+    to: p.to,
+    requiresConfirmation: p.requiresConfirmation,
+    sideEffects: p.sideEffects,
+    metadata: p.metadata,
+    conditions: p.conditions.map(c => c.description)
+  }));
+
+  const categories = Object.values(TransitionCategory);
+  const sideEffects = Object.values(TransitionSideEffect);
+
+  const riskMatrix: Record<string, string[]> = {
+    LOW: [],
+    MEDIUM: [],
+    HIGH: [],
+    CRITICAL: []
+  };
+
+  for (const p of Object.values(ALL_TRANSITION_POLICIES)) {
+    riskMatrix[p.metadata.riskLevel].push(p.id);
+  }
+
+  return {
+    policies,
+    categories,
+    riskMatrix,
+    sideEffects,
+    contractVersion: "v1"
+  };
+}

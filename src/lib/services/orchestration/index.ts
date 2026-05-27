@@ -16,7 +16,8 @@ export {
 export type { 
   TransitionPolicy, 
   PolicyConditionResult,
-  PolicyMetadata
+  PolicyMetadata,
+  PolicyManifest
 } from "./transition-policies";
 
 export {
@@ -25,7 +26,8 @@ export {
   getPoliciesByCategory,
   getCriticalPolicies,
   getFinancialPolicies,
-  getPoliciesByEntityType
+  getPoliciesByEntityType,
+  exportPolicyManifest
 } from "./transition-policies";
 
 export { 
