@@ -1,4 +1,4 @@
-import { ALL_TRANSITION_POLICIES, TransitionPolicy, TransitionSideEffect } from "./transition-policies";
+import { ALL_TRANSITION_POLICIES, TransitionPolicy, TransitionSideEffect, PolicyMetadata } from "./transition-policies";
 
 export interface RecommendationResult {
   canTransition: boolean;
@@ -51,6 +51,7 @@ export interface SimulationResult {
   sideEffects: TransitionSideEffect[];
   confidence: "HIGH" | "MEDIUM" | "LOW";
   contractVersion: string;
+  metadata?: PolicyMetadata;
 }
 
 export async function simulateTransition(params: {
@@ -104,6 +105,7 @@ export async function simulateTransition(params: {
     warnings,
     sideEffects: policy.sideEffects || [],
     confidence: "HIGH",
-    contractVersion: "v1"
+    contractVersion: "v1",
+    metadata: policy.metadata
   };
 }

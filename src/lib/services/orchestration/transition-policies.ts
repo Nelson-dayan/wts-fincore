@@ -8,6 +8,23 @@ export enum TransitionSideEffect {
   LOG_PROJECT_ARCHIVE = "LOG_PROJECT_ARCHIVE"
 }
 
+export enum TransitionCategory {
+  FINANCIAL = "FINANCIAL",
+  OPERATIONAL = "OPERATIONAL",
+  COMPLIANCE = "COMPLIANCE",
+  SYSTEM = "SYSTEM",
+  RISK = "RISK"
+}
+
+export interface PolicyMetadata {
+  category: TransitionCategory;
+  riskLevel: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+  requiresApproval: boolean;
+  reversible: boolean;
+  impactsLedger: boolean;
+  impactsReporting: boolean;
+}
+
 export interface PolicyConditionResult {
   ok: boolean;
   blocker?: string;
@@ -25,6 +42,7 @@ export interface TransitionPolicy {
     validate: (entity: any, ctx?: any) => Promise<PolicyConditionResult>;
   }>;
   sideEffects: TransitionSideEffect[];
+  metadata: PolicyMetadata;
 }
 
 export const QuotationApprovalPolicy: TransitionPolicy = {
@@ -43,7 +61,15 @@ export const QuotationApprovalPolicy: TransitionPolicy = {
       }
     }
   ],
-  sideEffects: [TransitionSideEffect.TRIGGER_PO_INITIALIZATION]
+  sideEffects: [TransitionSideEffect.TRIGGER_PO_INITIALIZATION],
+  metadata: {
+    category: TransitionCategory.OPERATIONAL,
+    riskLevel: "LOW",
+    requiresApproval: true,
+    reversible: true,
+    impactsLedger: false,
+    impactsReporting: true
+  }
 };
 
 export const PurchaseOrderActivePolicy: TransitionPolicy = {
@@ -62,7 +88,15 @@ export const PurchaseOrderActivePolicy: TransitionPolicy = {
       }
     }
   ],
-  sideEffects: [TransitionSideEffect.TRIGGER_INVOICE_INITIALIZATION]
+  sideEffects: [TransitionSideEffect.TRIGGER_INVOICE_INITIALIZATION],
+  metadata: {
+    category: TransitionCategory.OPERATIONAL,
+    riskLevel: "MEDIUM",
+    requiresApproval: true,
+    reversible: false,
+    impactsLedger: false,
+    impactsReporting: true
+  }
 };
 
 export const InvoicePaidPolicy: TransitionPolicy = {
@@ -86,7 +120,15 @@ export const InvoicePaidPolicy: TransitionPolicy = {
       }
     }
   ],
-  sideEffects: [TransitionSideEffect.CHECK_PROJECT_COMPLETION]
+  sideEffects: [TransitionSideEffect.CHECK_PROJECT_COMPLETION],
+  metadata: {
+    category: TransitionCategory.FINANCIAL,
+    riskLevel: "HIGH",
+    requiresApproval: true,
+    reversible: false,
+    impactsLedger: true,
+    impactsReporting: true
+  }
 };
 
 export const ProjectCompletionPolicy: TransitionPolicy = {
@@ -126,7 +168,15 @@ export const ProjectCompletionPolicy: TransitionPolicy = {
       }
     }
   ],
-  sideEffects: [TransitionSideEffect.LOG_PROJECT_ARCHIVE]
+  sideEffects: [TransitionSideEffect.LOG_PROJECT_ARCHIVE],
+  metadata: {
+    category: TransitionCategory.COMPLIANCE,
+    riskLevel: "HIGH",
+    requiresApproval: true,
+    reversible: false,
+    impactsLedger: false,
+    impactsReporting: true
+  }
 };
 
 export const QuotationSentPolicy: TransitionPolicy = {
@@ -136,7 +186,15 @@ export const QuotationSentPolicy: TransitionPolicy = {
   to: "sent",
   requiresConfirmation: false,
   conditions: [],
-  sideEffects: []
+  sideEffects: [],
+  metadata: {
+    category: TransitionCategory.OPERATIONAL,
+    riskLevel: "LOW",
+    requiresApproval: false,
+    reversible: true,
+    impactsLedger: false,
+    impactsReporting: false
+  }
 };
 
 export const QuotationRejectedPolicy: TransitionPolicy = {
@@ -146,7 +204,15 @@ export const QuotationRejectedPolicy: TransitionPolicy = {
   to: "rejected",
   requiresConfirmation: true,
   conditions: [],
-  sideEffects: []
+  sideEffects: [],
+  metadata: {
+    category: TransitionCategory.OPERATIONAL,
+    riskLevel: "LOW",
+    requiresApproval: true,
+    reversible: true,
+    impactsLedger: false,
+    impactsReporting: false
+  }
 };
 
 export const PurchaseOrderCompletedPolicy: TransitionPolicy = {
@@ -156,7 +222,15 @@ export const PurchaseOrderCompletedPolicy: TransitionPolicy = {
   to: "completed",
   requiresConfirmation: true,
   conditions: [],
-  sideEffects: []
+  sideEffects: [],
+  metadata: {
+    category: TransitionCategory.OPERATIONAL,
+    riskLevel: "MEDIUM",
+    requiresApproval: true,
+    reversible: false,
+    impactsLedger: false,
+    impactsReporting: true
+  }
 };
 
 export const ProjectHoldPolicy: TransitionPolicy = {
@@ -166,7 +240,15 @@ export const ProjectHoldPolicy: TransitionPolicy = {
   to: "on_hold",
   requiresConfirmation: true,
   conditions: [],
-  sideEffects: []
+  sideEffects: [],
+  metadata: {
+    category: TransitionCategory.RISK,
+    riskLevel: "MEDIUM",
+    requiresApproval: true,
+    reversible: true,
+    impactsLedger: false,
+    impactsReporting: true
+  }
 };
 
 export const ProjectResumePolicy: TransitionPolicy = {
@@ -176,7 +258,15 @@ export const ProjectResumePolicy: TransitionPolicy = {
   to: "active",
   requiresConfirmation: false,
   conditions: [],
-  sideEffects: []
+  sideEffects: [],
+  metadata: {
+    category: TransitionCategory.OPERATIONAL,
+    riskLevel: "LOW",
+    requiresApproval: false,
+    reversible: true,
+    impactsLedger: false,
+    impactsReporting: true
+  }
 };
 
 export const InvoiceSentPolicy: TransitionPolicy = {
@@ -195,7 +285,15 @@ export const InvoiceSentPolicy: TransitionPolicy = {
       }
     }
   ],
-  sideEffects: []
+  sideEffects: [],
+  metadata: {
+    category: TransitionCategory.COMPLIANCE,
+    riskLevel: "MEDIUM",
+    requiresApproval: false,
+    reversible: true,
+    impactsLedger: false,
+    impactsReporting: true
+  }
 };
 
 export const InvoiceCancelledPolicy: TransitionPolicy = {
@@ -205,7 +303,15 @@ export const InvoiceCancelledPolicy: TransitionPolicy = {
   to: "CANCELLED",
   requiresConfirmation: true,
   conditions: [],
-  sideEffects: []
+  sideEffects: [],
+  metadata: {
+    category: TransitionCategory.FINANCIAL,
+    riskLevel: "CRITICAL",
+    requiresApproval: true,
+    reversible: false,
+    impactsLedger: true,
+    impactsReporting: true
+  }
 };
 
 export const ALL_TRANSITION_POLICIES: Record<string, TransitionPolicy> = {

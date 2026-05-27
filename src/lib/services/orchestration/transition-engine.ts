@@ -1,5 +1,5 @@
 import mongoose from "mongoose";
-import { ALL_TRANSITION_POLICIES } from "./transition-policies";
+import { ALL_TRANSITION_POLICIES, PolicyMetadata, TransitionSideEffect } from "./transition-policies";
 import { logTransitionAudit } from "./audit-engine";
 import { generateEventFingerprint, checkOrRegisterEventFingerprint, updateEventFingerprintStatus } from "./idempotency";
 import { QuotationModel, PurchaseOrderModel, InvoiceModel, ProjectModel } from "@/lib/db/models";
@@ -11,8 +11,10 @@ export interface TransitionExecutionResult {
   message?: string;
   blockers: string[];
   warnings: string[];
-  sideEffects: string[];
+  sideEffects: TransitionSideEffect[];
   events: string[];
+  metadata?: PolicyMetadata;
+  contractVersion: string;
 }
 
 const POLICY_TO_EVENT_MAP: Record<string, string> = {
@@ -45,7 +47,8 @@ export async function executeTransition(params: {
       blockers: [`Orchestration policy ${params.policyId} does not exist.`],
       warnings: [],
       sideEffects: [],
-      events: []
+      events: [],
+      contractVersion: "v1"
     };
   }
 
@@ -71,7 +74,8 @@ export async function executeTransition(params: {
         blockers: [`Unsupported entity type: ${policy.entityType}`],
         warnings: [],
         sideEffects: [],
-        events: []
+        events: [],
+        contractVersion: "v1"
       };
   }
 
@@ -90,7 +94,8 @@ export async function executeTransition(params: {
     blockers: [],
     warnings: [],
     sideEffects: [],
-    events: []
+    events: [],
+    contractVersion: "v1"
   };
 
   try {
@@ -140,7 +145,8 @@ export async function executeTransition(params: {
           blockers,
           warnings,
           sideEffects: [],
-          events: []
+          events: [],
+          contractVersion: "v1"
         };
         throw new Error("VALIDATION_FAILED");
       }
@@ -175,7 +181,9 @@ export async function executeTransition(params: {
         blockers: [],
         warnings,
         sideEffects: policy.sideEffects || [],
-        events: mappedEvent ? [mappedEvent] : []
+        events: mappedEvent ? [mappedEvent] : [],
+        metadata: policy.metadata,
+        contractVersion: "v1"
       };
     });
 
@@ -218,7 +226,8 @@ export async function executeTransition(params: {
       blockers: [err.message || "Failed to commit transition updates to database."],
       warnings: [],
       sideEffects: [],
-      events: []
+      events: [],
+      contractVersion: "v1"
     };
   } finally {
     await session.endSession();

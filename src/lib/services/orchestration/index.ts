@@ -15,11 +15,13 @@ export {
 
 export type { 
   TransitionPolicy, 
-  PolicyConditionResult 
+  PolicyConditionResult,
+  PolicyMetadata
 } from "./transition-policies";
 
 export {
-  TransitionSideEffect
+  TransitionSideEffect,
+  TransitionCategory
 } from "./transition-policies";
 
 export { 
