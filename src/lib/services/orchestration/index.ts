@@ -1,14 +1,33 @@
 export { 
   ALL_TRANSITION_POLICIES, 
   QuotationApprovalPolicy, 
+  QuotationSentPolicy,
+  QuotationRejectedPolicy,
   PurchaseOrderActivePolicy, 
+  PurchaseOrderCompletedPolicy,
+  ProjectHoldPolicy,
+  ProjectResumePolicy,
+  InvoiceSentPolicy,
   InvoicePaidPolicy, 
+  InvoiceCancelledPolicy,
   ProjectCompletionPolicy 
 } from "./transition-policies";
 
 export type { 
   TransitionPolicy, 
-  PolicyConditionResult 
+  PolicyConditionResult,
+  PolicyMetadata,
+  PolicyManifest
+} from "./transition-policies";
+
+export {
+  TransitionSideEffect,
+  TransitionCategory,
+  getPoliciesByCategory,
+  getCriticalPolicies,
+  getFinancialPolicies,
+  getPoliciesByEntityType,
+  exportPolicyManifest
 } from "./transition-policies";
 
 export { 
@@ -20,11 +39,13 @@ export type {
 } from "./transition-engine";
 
 export { 
-  assessTransitions 
+  assessTransitions,
+  simulateTransition
 } from "./recommendation-engine";
 
 export type { 
-  RecommendationResult 
+  RecommendationResult,
+  SimulationResult
 } from "./recommendation-engine";
 
 export { 
@@ -40,3 +61,12 @@ export type {
 export { 
   generateEventFingerprint 
 } from "./idempotency";
+
+export {
+  domainEventDispatcher
+} from "./domain-event";
+
+export type {
+  DomainEvent,
+  DomainEventSubscriber
+} from "./domain-event";

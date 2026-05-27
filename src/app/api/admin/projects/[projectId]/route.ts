@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireRole } from "@/lib/auth/require-role";
 import { connectDB } from "@/lib/db/connect";
+import { executeTransition } from "@/lib/services/orchestration";
 import {
   ExpenseModel,
   InvoiceModel,
@@ -63,6 +64,12 @@ export async function PATCH(req: Request, ctx: RouteCtx) {
       fixCurrency?: boolean;
     };
 
+    const project = await ProjectModel.findById(projectId);
+    if (!project) {
+      return NextResponse.json({ message: "Project not found" }, { status: 404 });
+    }
+    const previousStatus = project.status;
+
     if (Array.isArray(body.assignedTo) && body.assignedTo.length > 0) {
       const userCount = await UserModel.countDocuments({ _id: { $in: body.assignedTo } });
       if (userCount !== body.assignedTo.length) {
@@ -76,7 +83,6 @@ export async function PATCH(req: Request, ctx: RouteCtx) {
     const $set: Record<string, unknown> = {
       name: body.name !== undefined ? String(body.name).trim() : undefined,
       description: body.description !== undefined ? String(body.description) : undefined,
-      status: body.status,
       priority: body.priority,
       budget: body.budget,
       assignedTo: body.assignedTo,
@@ -104,6 +110,44 @@ export async function PATCH(req: Request, ctx: RouteCtx) {
       return NextResponse.json({ message: "Project not found" }, { status: 404 });
     }
 
+    if (body.status !== undefined && body.status !== previousStatus) {
+      let policyId = "";
+      let triggerEvent = "PROJECT_PATCH_UPDATE";
+
+      if (body.status === "completed") {
+        policyId = "POL-PRJ-003";
+        triggerEvent = "PROJECT_COMPLETED_VIA_PATCH";
+      } else if (body.status === "on_hold") {
+        policyId = "POL-PRJ-001";
+        triggerEvent = "PROJECT_HOLD_VIA_PATCH";
+      } else if (body.status === "active") {
+        policyId = "POL-PRJ-002";
+        triggerEvent = "PROJECT_RESUMED_VIA_PATCH";
+      }
+
+      if (policyId) {
+        const result = await executeTransition({
+          policyId,
+          entityId: projectId,
+          approvedBy: session.user.id,
+          triggerEvent,
+          route: `/api/admin/projects/${projectId}`
+        });
+
+        if (!result.success) {
+          return NextResponse.json(
+            { message: result.message || "Project transition validation failed.", blockers: result.blockers },
+            { status: 400 }
+          );
+        }
+      } else {
+        return NextResponse.json(
+          { message: `Direct status transitions to '${body.status}' are prohibited. Policy not defined.` },
+          { status: 400 }
+        );
+      }
+    }
+
     await logActivity({
       userId: session.user.id,
       action: "updated_project",
@@ -113,7 +157,8 @@ export async function PATCH(req: Request, ctx: RouteCtx) {
       projectId: String(updated._id),
     });
 
-    return NextResponse.json({ item: updated });
+    const refreshed = await ProjectModel.findById(projectId).lean();
+    return NextResponse.json({ item: refreshed });
   } catch (error) {
     return authErrorResponse(error, "Failed to update project");
   }

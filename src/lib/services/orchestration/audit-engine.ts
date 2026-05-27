@@ -27,7 +27,7 @@ export async function logTransitionAudit(params: {
   fingerprint: string;
   projectId?: string;
   metadata?: any;
-}): Promise<string> {
+}, session?: any): Promise<string> {
   const transitionId = generateTransitionId();
 
   const auditRecord: OrchestrationTransitionLog = {
@@ -41,15 +41,17 @@ export async function logTransitionAudit(params: {
     metadata: params.metadata
   };
 
-  await ActivityLogModel.create({
-    userId: params.approvedBy,
-    action: "ORCHESTRATED_TRANSITION",
-    entityType: params.entityType.toUpperCase(),
-    entityId: params.entityId,
-    projectId: params.projectId,
-    message: `Transitioned ${params.entityType} status from ${params.fromStatus} to ${params.toStatus} (Tx ID: ${transitionId})`,
-    metadata: auditRecord
-  });
+  await ActivityLogModel.create([
+    {
+      userId: params.approvedBy,
+      action: "ORCHESTRATED_TRANSITION",
+      entityType: params.entityType.toUpperCase(),
+      entityId: params.entityId,
+      projectId: params.projectId,
+      message: `Transitioned ${params.entityType} status from ${params.fromStatus} to ${params.toStatus} (Tx ID: ${transitionId})`,
+      metadata: auditRecord
+    }
+  ], { session });
 
   return transitionId;
 }

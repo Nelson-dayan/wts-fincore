@@ -17,6 +17,10 @@ const securityHeaders = [
 const nextConfig: NextConfig = {
   reactCompiler: true,
   poweredByHeader: false,
+  cacheComponents: true,
+  experimental: {
+    instantNavigationDevToolsToggle: true,
+  },
   /** PDFKit loads .afm metrics from its package dir; bundling breaks those paths (e.g. C:\\ROOT\\node_modules). */
   serverExternalPackages: ["pdfkit"],
   async headers() {

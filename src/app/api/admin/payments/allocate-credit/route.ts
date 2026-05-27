@@ -5,6 +5,7 @@ import { connectDB } from "@/lib/db/connect";
 import { PaymentModel, PaymentAllocationModel, InvoiceModel } from "@/lib/db/models";
 import { allocate } from "@/lib/services/finance/allocation.engine";
 import { decimalToNumber } from "@/lib/services/business/money";
+import { convertToBase } from "@/lib/services/finance/exchange.engine";
 
 export async function POST(req: Request) {
   try {
@@ -49,7 +50,7 @@ export async function POST(req: Request) {
     const invCurrency = String(invoice.currency || (invoice as any).invoiceType || "AED").toUpperCase();
     const invoiceRateToBase = decimalToNumber((invoice as any).totalsCache?.totalIntendedBase) / decimalToNumber((invoice.totals as any)?.total || 1) || 1.0;
     
-    const requestedAllocationBase = amount * invoiceRateToBase;
+    const requestedAllocationBase = convertToBase(amount, invoiceRateToBase);
 
     // Safety check with a 0.05 currency rounding tolerance
     if (requestedAllocationBase - availableCreditBase > 0.05) {
