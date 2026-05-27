@@ -37,6 +37,9 @@ export function AdminAccountsClient({ apiPrefix }: { apiPrefix: string }) {
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   
+  const [projection, setProjection] = useState<any>(null);
+  const [projectionLoading, setProjectionLoading] = useState(true);
+  
   // Modals
   const [modalOpen, setModalOpen] = useState(false);
   const [transferOpen, setTransferOpen] = useState(false);
@@ -61,6 +64,17 @@ export function AdminAccountsClient({ apiPrefix }: { apiPrefix: string }) {
     isPrimary: false
   });
 
+  const loadProjection = useCallback(async () => {
+    try {
+      const res = await apiFetch<any>(`${apiPrefix}/treasury/projection`);
+      setProjection(res.projection);
+    } catch (err) {
+      console.error("Failed to load treasury projection", err);
+    } finally {
+      setProjectionLoading(false);
+    }
+  }, [apiPrefix]);
+
   const load = useCallback(async () => {
     try {
       const res = await apiFetch<{ items: any[] }>(`${apiPrefix}/accounts`);
@@ -80,7 +94,8 @@ export function AdminAccountsClient({ apiPrefix }: { apiPrefix: string }) {
 
   useEffect(() => {
     load();
-  }, [load]);
+    loadProjection();
+  }, [load, loadProjection]);
 
   // Load transactions whenever selected account or page changes
   const loadTransactions = useCallback(async () => {
@@ -127,6 +142,7 @@ export function AdminAccountsClient({ apiPrefix }: { apiPrefix: string }) {
         isPrimary: false
       });
       load();
+      loadProjection();
     } catch (err: any) {
       setError(err.message || "Failed to create account");
     } finally {
@@ -142,7 +158,7 @@ export function AdminAccountsClient({ apiPrefix }: { apiPrefix: string }) {
   const selectedAccount = items.find(a => a._id === selectedAccountId);
   const primaryAccount = items.find(a => a.isPrimary);
 
-  // Financial aggregation
+  // Financial aggregation for native client totals
   const totalNetWorthInr = items.reduce((acc, account) => {
     const rate = EXCHANGE_RATES_TO_INR[account.currency] || 1;
     return acc + (account.currentBalance || 0) * rate;
@@ -172,45 +188,95 @@ export function AdminAccountsClient({ apiPrefix }: { apiPrefix: string }) {
         </div>
       </div>
 
-      {/* Aggregated Net Worth Widget */}
-      {!loading && items.length > 0 && (
-        <Card className="border-border/80 bg-gradient-to-br from-primary/[0.04] via-transparent to-primary/[0.02] shadow-sm relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full blur-3xl pointer-events-none" />
-          <CardContent className="p-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-center">
-              
-              {/* Grand Total */}
-              <div className="space-y-1.5 border-b md:border-b-0 md:border-r border-border/60 pb-4 md:pb-0 pr-4">
-                <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                  <TrendingUp className="w-4 h-4 text-primary" />
-                  Estimated Treasury (Base)
-                </div>
-                <div className="text-3xl font-extrabold tracking-tight text-foreground tabular-nums mt-1">
-                  ₹{totalNetWorthInr.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                </div>
-                <p className="text-[10px] text-muted-foreground">Aggregated grand total converted into INR</p>
-              </div>
-
-              {/* Currency Breakdown */}
-              <div className="md:col-span-2">
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2.5">Available by Currency</p>
-                <div className="flex flex-wrap gap-3">
-                  {Object.entries(currenciesBreakdown).map(([currency, bal]) => (
-                    <div key={currency} className="px-3.5 py-2 rounded-xl bg-card border border-border shadow-sm flex items-center gap-2">
-                      <span className="text-xs font-extrabold text-primary bg-primary/10 px-2 py-0.5 rounded-md uppercase">
-                        {currency}
-                      </span>
-                      <span className="text-sm font-bold text-foreground tabular-nums">
-                        {(bal as number).toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
+      {/* 🆕 Treasury Summary Header (Projection Driven) */}
+      {projectionLoading ? (
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          {[...Array(4)].map((_, i) => (
+            <Card key={i} className="border-border/60 bg-background/30 shadow-sm flex flex-col justify-between p-5 min-h-[120px] animate-pulse">
+              <div className="h-3.5 w-24 bg-muted/40 rounded-md" />
+              <div className="mt-4 h-8 w-32 bg-muted/65 rounded-md" />
+              <div className="mt-2 h-3.5 w-44 bg-muted/40 rounded-md" />
+            </Card>
+          ))}
+        </div>
+      ) : projection && (
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          {/* Card 1: Total Assets (Dominant Operational Anchor) */}
+          <Card className="border-primary/20 bg-gradient-to-br from-primary/[0.03] to-background/55 hover:bg-background/85 transition-all shadow-sm ring-1 ring-primary/10 relative overflow-hidden flex flex-col justify-between p-5 min-h-[120px]">
+            <div className="flex items-center justify-between text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+              <span>Total Assets</span>
+              <TrendingUp className="w-3.5 h-3.5 text-primary animate-pulse" />
             </div>
-          </CardContent>
-        </Card>
+            <div className="mt-4">
+              <span className="text-sm font-medium text-muted-foreground mr-1">INR</span>
+              <span className="text-xl font-extrabold tracking-tight text-foreground tabular-nums">
+                {projection.totalAssetsBase.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+              </span>
+            </div>
+            <span className="text-[10px] text-muted-foreground mt-2 block font-medium">Aggregated bank & reserve assets</span>
+          </Card>
+
+          {/* Card 2: Receivables Pipeline (Secondary) */}
+          <Card className="border-border/60 bg-background/50 hover:bg-background/80 transition-colors shadow-sm relative overflow-hidden flex flex-col justify-between p-5 min-h-[120px]">
+            <div className="flex items-center justify-between text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+              <span>Receivables Pipeline</span>
+              <History className="w-3.5 h-3.5 text-indigo-500/80" />
+            </div>
+            <div className="mt-4">
+              <span className="text-sm font-medium text-muted-foreground mr-1">INR</span>
+              <span className="text-xl font-extrabold tracking-tight text-foreground tabular-nums">
+                {projection.totalReceivablesBase.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+              </span>
+            </div>
+            <span className="text-[10px] text-muted-foreground mt-2 block">
+              {projection.unsettledInvoicesCount} open {projection.unsettledInvoicesCount === 1 ? 'invoice' : 'invoices'} pending
+            </span>
+          </Card>
+
+          {/* Card 3: Unallocated Funds (Secondary) */}
+          <Card className="border-border/60 bg-background/50 hover:bg-background/80 transition-colors shadow-sm relative overflow-hidden flex flex-col justify-between p-5 min-h-[120px]">
+            <div className="flex items-center justify-between text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+              <span>Unallocated Funds</span>
+              <Wallet className="w-3.5 h-3.5 text-amber-500/80" />
+            </div>
+            <div className="mt-4">
+              <span className="text-sm font-medium text-muted-foreground mr-1">INR</span>
+              <span className="text-xl font-extrabold tracking-tight text-foreground tabular-nums">
+                {projection.totalUnallocatedPaymentsBase.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+              </span>
+            </div>
+            <span className="text-[10px] text-muted-foreground mt-2 block">Logged payments awaiting allocation</span>
+          </Card>
+
+          {/* Card 4: Reconciliation Integrity (Emotionally Grounding Anchor) */}
+          <Card className={`transition-all duration-300 shadow-sm relative overflow-hidden flex flex-col justify-between p-5 min-h-[120px] ${
+            projection.reconciliationScore === 100 
+              ? 'border-emerald-500/20 bg-emerald-500/[0.02] shadow-[0_0_12px_rgba(16,185,129,0.03)]' 
+              : 'border-border/60 bg-background/50'
+          }`}>
+            <div className="flex items-center justify-between text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+              <span>Reconciliation</span>
+              <span className={`size-2 rounded-full ${
+                projection.reconciliationScore === 100 
+                  ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.6)] animate-pulse' 
+                  : 'bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.6)] animate-pulse'
+              }`} />
+            </div>
+            <div className="mt-4 flex flex-col gap-1">
+              <span className="text-xl font-extrabold tracking-tight text-foreground tabular-nums">
+                {projection.reconciliationScore}%
+              </span>
+              <span className={`inline-flex items-center justify-center text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-md w-max ${
+                projection.reconciliationScore === 100 
+                  ? 'bg-emerald-500/10 text-emerald-600' 
+                  : 'bg-amber-500/10 text-amber-600'
+              }`}>
+                {projection.reconciliationScore === 100 ? 'Fully Reconciled' : 'Pending Allocation'}
+              </span>
+            </div>
+            <span className="text-[10px] text-muted-foreground mt-2 block">Ledger and asset audit score</span>
+          </Card>
+        </div>
       )}
 
       {/* Grid of Accounts */}
