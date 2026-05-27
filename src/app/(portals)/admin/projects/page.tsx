@@ -1,3 +1,6 @@
+export const unstable_instant = { prefetch: 'static' };
+
+import { Suspense } from "react";
 import { CreateProjectForm } from "@/components/portals/create-project-form";
 import { AdminProjectsClient } from "@/components/portals/admin-projects-client";
 
@@ -5,13 +8,20 @@ interface PageProps {
   searchParams?: Promise<{ clientId?: string }>;
 }
 
-export default async function AdminProjectsPage({ searchParams }: PageProps) {
-  const params = (await searchParams) ?? {};
+async function ProjectsContent({ searchParams }: { searchParams: Promise<{ clientId?: string }> }) {
+  const params = await searchParams;
   const clientId = params.clientId ? String(params.clientId) : "";
+  return <AdminProjectsClient initialClientId={clientId} />;
+}
+
+export default function AdminProjectsPage({ searchParams }: PageProps) {
+  const paramsPromise = searchParams ?? Promise.resolve({});
 
   return (
     <>
-      <AdminProjectsClient initialClientId={clientId} />
+      <Suspense fallback={<div className="h-64 flex items-center justify-center">Loading projects...</div>}>
+        <ProjectsContent searchParams={paramsPromise} />
+      </Suspense>
       <CreateProjectForm />
     </>
   );

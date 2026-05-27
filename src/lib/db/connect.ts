@@ -5,7 +5,10 @@ interface GlobalMongoose {
   promise: Promise<typeof mongoose> | null;
 }
 
-const g = globalThis as typeof globalThis & { __mongoose?: GlobalMongoose };
+const g = globalThis as typeof globalThis & { 
+  __mongoose?: GlobalMongoose;
+  __migrated?: boolean;
+};
 
 function getCache(): GlobalMongoose {
   if (!g.__mongoose) {
@@ -26,7 +29,7 @@ export async function connectDB(): Promise<typeof mongoose> {
       minPoolSize: 2,
       serverSelectionTimeoutMS: 5000,
       socketTimeoutMS: 45000,
-      autoIndex: process.env.NODE_ENV !== "production",
+      autoIndex: false, // Disabling autoIndex to avoid network latency of index checks on startup/compilation
     });
   }
   cache.conn = await cache.promise;
@@ -37,10 +40,9 @@ export async function connectDB(): Promise<typeof mongoose> {
   return cache.conn;
 }
 
-let migrated = false;
 async function runLazyBackfill() {
-  if (migrated) return;
-  migrated = true;
+  if (g.__migrated) return;
+  g.__migrated = true;
   try {
     const { InvoiceModel } = await import("@/lib/db/models/invoice.model");
     const unmigratedCount = await InvoiceModel.countDocuments({
