@@ -9,7 +9,10 @@ export interface TransitionExecutionResult {
   success: boolean;
   transitionId?: string;
   message?: string;
-  blockers?: string[];
+  blockers: string[];
+  warnings: string[];
+  sideEffects: string[];
+  events: string[];
 }
 
 const POLICY_TO_EVENT_MAP: Record<string, string> = {
@@ -36,7 +39,14 @@ export async function executeTransition(params: {
 }): Promise<TransitionExecutionResult> {
   const policy = ALL_TRANSITION_POLICIES[params.policyId];
   if (!policy) {
-    return { success: false, message: `Orchestration policy ${params.policyId} does not exist.` };
+    return {
+      success: false,
+      message: `Orchestration policy ${params.policyId} does not exist.`,
+      blockers: [`Orchestration policy ${params.policyId} does not exist.`],
+      warnings: [],
+      sideEffects: [],
+      events: []
+    };
   }
 
   // 1. Resolve target Model type
@@ -55,7 +65,14 @@ export async function executeTransition(params: {
       model = ProjectModel;
       break;
     default:
-      return { success: false, message: `Unsupported entity type: ${policy.entityType}` };
+      return {
+        success: false,
+        message: `Unsupported entity type: ${policy.entityType}`,
+        blockers: [`Unsupported entity type: ${policy.entityType}`],
+        warnings: [],
+        sideEffects: [],
+        events: []
+      };
   }
 
   // Pre-generate event fingerprint to secure distributed locks
@@ -68,7 +85,13 @@ export async function executeTransition(params: {
   // 2. Start atomic MongoDB transaction session
   const connection = mongoose.connection;
   const session = await connection.startSession();
-  let result: TransitionExecutionResult = { success: false };
+  let result: TransitionExecutionResult = {
+    success: false,
+    blockers: [],
+    warnings: [],
+    sideEffects: [],
+    events: []
+  };
 
   try {
     await session.withTransaction(async () => {
@@ -102,11 +125,22 @@ export async function executeTransition(params: {
         }
       }
 
+      const warnings: string[] = [];
+      if (policy.entityType === "invoice") {
+        const totalIntended = doc.totalsCache?.totalIntendedBase ? Number(doc.totalsCache.totalIntendedBase) : 0;
+        if (totalIntended <= 0) {
+          warnings.push("Invoice has an intended total amount of zero.");
+        }
+      }
+
       if (blockers.length > 0) {
         result = {
           success: false,
           message: "Transition blocked by validation conditions.",
-          blockers
+          blockers,
+          warnings,
+          sideEffects: [],
+          events: []
         };
         throw new Error("VALIDATION_FAILED");
       }
@@ -133,9 +167,15 @@ export async function executeTransition(params: {
       // 8. Update Lock status to SUCCESS
       await updateEventFingerprintStatus(fingerprint, params.approvedBy, "SUCCESS", session);
 
+      const mappedEvent = POLICY_TO_EVENT_MAP[params.policyId];
+
       result = {
         success: true,
-        transitionId
+        transitionId,
+        blockers: [],
+        warnings,
+        sideEffects: policy.sideEffects || [],
+        events: mappedEvent ? [mappedEvent] : []
       };
     });
 
@@ -174,7 +214,11 @@ export async function executeTransition(params: {
 
     return {
       success: false,
-      message: err.message || "Failed to commit transition updates to database."
+      message: err.message || "Failed to commit transition updates to database.",
+      blockers: [err.message || "Failed to commit transition updates to database."],
+      warnings: [],
+      sideEffects: [],
+      events: []
     };
   } finally {
     await session.endSession();

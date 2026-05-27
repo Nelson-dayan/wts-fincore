@@ -1,4 +1,4 @@
-import { ALL_TRANSITION_POLICIES, TransitionPolicy } from "./transition-policies";
+import { ALL_TRANSITION_POLICIES, TransitionPolicy, TransitionSideEffect } from "./transition-policies";
 
 export interface RecommendationResult {
   canTransition: boolean;
@@ -48,7 +48,9 @@ export interface SimulationResult {
   policyId?: string;
   blockers: string[];
   warnings: string[];
-  sideEffects: string[];
+  sideEffects: TransitionSideEffect[];
+  confidence: "HIGH" | "MEDIUM" | "LOW";
+  contractVersion: string;
 }
 
 export async function simulateTransition(params: {
@@ -68,7 +70,9 @@ export async function simulateTransition(params: {
       allowed: false,
       blockers: [`No valid transition policy defined from state '${params.entity.status}' to '${params.targetState}'.`],
       warnings: [],
-      sideEffects: []
+      sideEffects: [],
+      confidence: "HIGH",
+      contractVersion: "v1"
     };
   }
 
@@ -98,6 +102,8 @@ export async function simulateTransition(params: {
     policyId: policy.id,
     blockers,
     warnings,
-    sideEffects: policy.sideEffects || []
+    sideEffects: policy.sideEffects || [],
+    confidence: "HIGH",
+    contractVersion: "v1"
   };
 }

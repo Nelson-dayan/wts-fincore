@@ -18,6 +18,10 @@ export type {
   PolicyConditionResult 
 } from "./transition-policies";
 
+export {
+  TransitionSideEffect
+} from "./transition-policies";
+
 export { 
   executeTransition 
 } from "./transition-engine";

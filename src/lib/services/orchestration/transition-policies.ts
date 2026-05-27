@@ -1,6 +1,13 @@
 import { InvoiceModel, PurchaseOrderModel, ProjectModel } from "@/lib/db/models";
 import { isBalanceSettled } from "@/lib/services/finance/money";
 
+export enum TransitionSideEffect {
+  TRIGGER_PO_INITIALIZATION = "TRIGGER_PO_INITIALIZATION",
+  TRIGGER_INVOICE_INITIALIZATION = "TRIGGER_INVOICE_INITIALIZATION",
+  CHECK_PROJECT_COMPLETION = "CHECK_PROJECT_COMPLETION",
+  LOG_PROJECT_ARCHIVE = "LOG_PROJECT_ARCHIVE"
+}
+
 export interface PolicyConditionResult {
   ok: boolean;
   blocker?: string;
@@ -17,7 +24,7 @@ export interface TransitionPolicy {
     description: string;
     validate: (entity: any, ctx?: any) => Promise<PolicyConditionResult>;
   }>;
-  sideEffects: string[];
+  sideEffects: TransitionSideEffect[];
 }
 
 export const QuotationApprovalPolicy: TransitionPolicy = {
@@ -36,7 +43,7 @@ export const QuotationApprovalPolicy: TransitionPolicy = {
       }
     }
   ],
-  sideEffects: ["TRIGGER_PO_INITIALIZATION"]
+  sideEffects: [TransitionSideEffect.TRIGGER_PO_INITIALIZATION]
 };
 
 export const PurchaseOrderActivePolicy: TransitionPolicy = {
@@ -55,7 +62,7 @@ export const PurchaseOrderActivePolicy: TransitionPolicy = {
       }
     }
   ],
-  sideEffects: ["TRIGGER_INVOICE_INITIALIZATION"]
+  sideEffects: [TransitionSideEffect.TRIGGER_INVOICE_INITIALIZATION]
 };
 
 export const InvoicePaidPolicy: TransitionPolicy = {
@@ -79,7 +86,7 @@ export const InvoicePaidPolicy: TransitionPolicy = {
       }
     }
   ],
-  sideEffects: ["CHECK_PROJECT_COMPLETION"]
+  sideEffects: [TransitionSideEffect.CHECK_PROJECT_COMPLETION]
 };
 
 export const ProjectCompletionPolicy: TransitionPolicy = {
@@ -119,7 +126,7 @@ export const ProjectCompletionPolicy: TransitionPolicy = {
       }
     }
   ],
-  sideEffects: ["LOG_PROJECT_ARCHIVE"]
+  sideEffects: [TransitionSideEffect.LOG_PROJECT_ARCHIVE]
 };
 
 export const QuotationSentPolicy: TransitionPolicy = {
