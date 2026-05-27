@@ -15,12 +15,12 @@ export async function checkOrRegisterEventFingerprint(params: {
   fingerprint: string;
   userId: string;
   route: string;
-}): Promise<{ ok: boolean; message?: string }> {
+}, session?: any): Promise<{ ok: boolean; message?: string }> {
   try {
     const existing = await IdempotencyModel.findOne({
       key: params.fingerprint,
       userId: params.userId
-    });
+    }).session(session || null);
 
     if (existing) {
       if (existing.status === "PROCESSING") {
@@ -31,14 +31,16 @@ export async function checkOrRegisterEventFingerprint(params: {
 
     // Register active processing lease (TTL expires in 1 hour)
     const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
-    await IdempotencyModel.create({
-      key: params.fingerprint,
-      userId: params.userId,
-      route: params.route,
-      requestHash: params.fingerprint,
-      status: "PROCESSING",
-      expiresAt
-    });
+    await IdempotencyModel.create([
+      {
+        key: params.fingerprint,
+        userId: params.userId,
+        route: params.route,
+        requestHash: params.fingerprint,
+        status: "PROCESSING",
+        expiresAt
+      }
+    ], { session });
 
     return { ok: true };
   } catch (err: any) {
@@ -50,13 +52,14 @@ export async function checkOrRegisterEventFingerprint(params: {
 export async function updateEventFingerprintStatus(
   fingerprint: string,
   userId: string,
-  status: "SUCCESS" | "FAILED"
+  status: "SUCCESS" | "FAILED",
+  session?: any
 ): Promise<void> {
   try {
     await IdempotencyModel.updateOne(
       { key: fingerprint, userId },
       { status }
-    );
+    ).session(session || null);
   } catch (err) {
     console.error("Failed to release idempotency lock:", err);
   }

@@ -1,4 +1,5 @@
 import { InvoiceModel, PurchaseOrderModel, ProjectModel } from "@/lib/db/models";
+import { isBalanceSettled } from "@/lib/services/finance/money";
 
 export interface PolicyConditionResult {
   ok: boolean;
@@ -72,7 +73,7 @@ export const InvoicePaidPolicy: TransitionPolicy = {
         const totalReceived = inv.totalsCache?.totalReceivedBase ? Number(inv.totalsCache.totalReceivedBase) : 0;
         const remaining = Math.max(0, totalIntended - totalReceived);
         return {
-          ok: remaining <= 0.015,
+          ok: isBalanceSettled(remaining),
           blocker: remaining > 0.015 ? `Unpaid balance remaining: INR ${remaining.toFixed(2)}` : undefined
         };
       }
