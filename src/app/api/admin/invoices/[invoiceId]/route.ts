@@ -4,6 +4,7 @@ import { requireRole } from "@/lib/auth/require-role";
 import { connectDB } from "@/lib/db/connect";
 import { InvoiceModel } from "@/lib/db/models";
 import { apiSuccess, apiError } from "@/lib/api/response";
+import { executeTransition } from "@/lib/services/orchestration";
 import { logActivity } from "@/lib/services/activity/log-activity.service";
 import { formatInvoiceForApi } from "@/lib/services/business/invoice.service";
 import { computeInvoiceTotals } from "@/lib/invoice/invoice-totals";
@@ -272,6 +273,50 @@ export async function PATCH(req: Request, ctx: Ctx) {
         return apiError(first || "Validation failed", 400);
       }
       throw err;
+    }
+
+    if (body.status !== undefined) {
+      let nextStatus = String(body.status).toUpperCase();
+      if (nextStatus === "UNPAID") nextStatus = "DRAFT";
+
+      if (nextStatus !== previousStatus) {
+        let policyId = "";
+        let triggerEvent = "INVOICE_PATCH_UPDATE";
+
+        if (nextStatus === "SENT") {
+          policyId = "POL-INV-001";
+          triggerEvent = "INV_FINALIZED_VIA_PATCH";
+        } else if (nextStatus === "PAID") {
+          policyId = "POL-INV-002";
+          triggerEvent = "INV_PAID_VIA_PATCH";
+        } else if (nextStatus === "CANCELLED") {
+          policyId = "POL-INV-003";
+          triggerEvent = "INV_CANCELLED_VIA_PATCH";
+        }
+
+        if (policyId) {
+          const result = await executeTransition({
+            policyId,
+            entityId: invoiceId,
+            approvedBy: session.user.id,
+            triggerEvent,
+            route: `/api/admin/invoices/${invoiceId}`
+          });
+
+          if (!result.success) {
+            return apiError(
+              result.message || "Invoice transition validation failed.",
+              400,
+              { blockers: result.blockers }
+            );
+          }
+        } else {
+          return apiError(
+            `Direct status transitions to '${nextStatus}' are prohibited. Policy not defined.`,
+            400
+          );
+        }
+      }
     }
 
     await logActivity({

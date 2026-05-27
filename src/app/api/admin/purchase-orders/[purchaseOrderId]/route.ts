@@ -12,6 +12,7 @@ import {
   validatePoDataUrlString,
 } from "@/lib/api/po-upload";
 import { assertEmployeeCanAccessPurchaseOrder } from "@/lib/auth/employee-resource-access";
+import { convertToBase } from "@/lib/services/finance/exchange.engine";
 
 type Ctx = { params: Promise<{ purchaseOrderId: string }> };
 
@@ -181,7 +182,7 @@ export async function PATCH(req: Request, ctx: Ctx) {
       if (Number.isFinite(n)) {
         po.set("totalAmount", mongoose.Types.Decimal128.fromString(n.toFixed(4)));
         const exRate = po.exchangeRate != null ? Number(po.exchangeRate) : 1;
-        po.set("totalAmountBase", mongoose.Types.Decimal128.fromString((n * exRate).toFixed(4)));
+        po.set("totalAmountBase", mongoose.Types.Decimal128.fromString(convertToBase(n, exRate).toFixed(4)));
       }
     }
 

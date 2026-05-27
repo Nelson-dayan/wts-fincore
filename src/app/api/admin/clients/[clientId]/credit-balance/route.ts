@@ -3,6 +3,7 @@ import { requireRole } from "@/lib/auth/require-role";
 import { connectDB } from "@/lib/db/connect";
 import { PaymentModel, PaymentAllocationModel } from "@/lib/db/models";
 import { decimalToNumber } from "@/lib/services/business/money";
+import { convertBaseToTreasury } from "@/lib/services/finance/forex.engine";
 
 export async function GET(
   req: Request,
@@ -50,12 +51,17 @@ export async function GET(
         totalCreditBase += unallocatedBase;
         
         const exchangeRateToBase = decimalToNumber(p.exchangeRateToBase) || 1.0;
+        const conv = convertBaseToTreasury({
+          baseAmount: unallocatedBase,
+          treasuryCurrency: p.currency,
+          rates: { [p.currency]: exchangeRateToBase, INR: 1.0 }
+        });
         creditCarryingPayments.push({
           paymentId: pId,
           referenceNumber: p.referenceNumber || p.transactionId || "No Reference",
           currency: p.currency,
           netAmount: decimalToNumber(p.amount),
-          unallocatedAmount: unallocatedBase / exchangeRateToBase,
+          unallocatedAmount: conv.amount,
           unallocatedAmountBase: unallocatedBase,
           exchangeRateToBase,
           receivedAt: p.receivedAt,
