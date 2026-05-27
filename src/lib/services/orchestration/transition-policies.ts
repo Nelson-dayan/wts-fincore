@@ -327,3 +327,25 @@ export const ALL_TRANSITION_POLICIES: Record<string, TransitionPolicy> = {
   "POL-INV-003": InvoiceCancelledPolicy,
   "POL-PRJ-003": ProjectCompletionPolicy
 };
+
+/**
+ * -------------------------------------------------------------
+ * Semantic Introspection APIs (Policy Registry & Discovery)
+ * -------------------------------------------------------------
+ */
+
+export function getPoliciesByCategory(category: TransitionCategory): TransitionPolicy[] {
+  return Object.values(ALL_TRANSITION_POLICIES).filter(p => p.metadata.category === category);
+}
+
+export function getCriticalPolicies(): TransitionPolicy[] {
+  return Object.values(ALL_TRANSITION_POLICIES).filter(p => p.metadata.riskLevel === "CRITICAL" || p.metadata.riskLevel === "HIGH");
+}
+
+export function getFinancialPolicies(): TransitionPolicy[] {
+  return Object.values(ALL_TRANSITION_POLICIES).filter(p => p.metadata.category === TransitionCategory.FINANCIAL || p.metadata.impactsLedger);
+}
+
+export function getPoliciesByEntityType(entityType: TransitionPolicy["entityType"]): TransitionPolicy[] {
+  return Object.values(ALL_TRANSITION_POLICIES).filter(p => p.entityType === entityType);
+}

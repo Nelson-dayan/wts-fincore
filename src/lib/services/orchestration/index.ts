@@ -21,7 +21,11 @@ export type {
 
 export {
   TransitionSideEffect,
-  TransitionCategory
+  TransitionCategory,
+  getPoliciesByCategory,
+  getCriticalPolicies,
+  getFinancialPolicies,
+  getPoliciesByEntityType
 } from "./transition-policies";
 
 export { 
