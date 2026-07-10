@@ -44,7 +44,7 @@ export async function GET(req: Request) {
     const projectIds = itemsRaw.map(p => p._id);
     const [invoices, expenses] = await Promise.all([
       InvoiceModel.find({ projectId: { $in: projectIds } }).select("_id projectId").lean(),
-      ExpenseModel.find({ projectId: { $in: projectIds } }).select("projectId amountBase").lean()
+      ExpenseModel.find({ projectId: { $in: projectIds }, isDeleted: { $ne: true } }).select("projectId amountBase").lean()
     ]);
 
     const invoiceToProject: Record<string, string> = {};

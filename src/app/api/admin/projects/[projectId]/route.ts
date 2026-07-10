@@ -174,7 +174,7 @@ export async function DELETE(_req: Request, ctx: RouteCtx) {
       QuotationModel.countDocuments({ projectId }),
       PurchaseOrderModel.countDocuments({ projectId }),
       InvoiceModel.countDocuments({ projectId }),
-      ExpenseModel.countDocuments({ projectId }),
+      ExpenseModel.countDocuments({ projectId, isDeleted: { $ne: true } }),
     ]);
 
     if (quotationCount > 0 || poCount > 0 || invoiceCount > 0 || expenseCount > 0) {

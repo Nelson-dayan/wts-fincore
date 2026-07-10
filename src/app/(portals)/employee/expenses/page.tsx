@@ -25,7 +25,20 @@ async function ExpensesContent({ searchParams }: { searchParams: Promise<{ proje
         fields={[
           { name: "title", label: "Title", required: true },
           { name: "amount", label: "Amount", type: "number", required: true },
-          { name: "category", label: "Category", required: true },
+          {
+            name: "category",
+            label: "Category",
+            type: "select",
+            options: [
+              { value: "SALARY", label: "Salary" },
+              { value: "TOOLS", label: "Tools" },
+              { value: "ADS", label: "Ads" },
+              { value: "INFRA", label: "Infra" },
+              { value: "OTHER", label: "Other" },
+            ],
+            required: true,
+          },
+          { name: "note", label: "Note (Optional)" },
           { name: "projectId", label: "Project", type: "projectSearch" },
         ]}
         initialValues={projectId ? { projectId } : {}}

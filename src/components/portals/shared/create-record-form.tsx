@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { readResponseJson } from "@/lib/http/read-response-json";
 import { ProjectSearchPicker } from "@/components/portals/project-search-picker";
+import { Select } from "@/components/ui/select";
 
 export type CreateRecordFieldConfig =
   | {
@@ -22,6 +23,13 @@ export type CreateRecordFieldConfig =
       required?: boolean;
       /** Shown under the project search (optional). */
       helperText?: string;
+    }
+  | {
+      name: string;
+      label: string;
+      type: "select";
+      options: Array<{ value: string; label: string }>;
+      required?: boolean;
     };
 
 export function CreateRecordForm({
@@ -37,19 +45,37 @@ export function CreateRecordForm({
 }) {
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState("");
-  const [values, setValues] = useState<Record<string, string>>(initialValues);
+  const [values, setValues] = useState<Record<string, string>>(() => {
+    const vals = { ...initialValues };
+    for (const f of fields) {
+      if (f.type === "select" && !vals[f.name] && f.options.length > 0) {
+        vals[f.name] = f.options[0].value;
+      }
+    }
+    return vals;
+  });
 
   useEffect(() => {
     if (initialValues) {
       setValues((prev) => {
-        const hasDiff = Object.keys(initialValues).some((key) => prev[key] !== initialValues[key]);
-        if (hasDiff) {
-          return { ...prev, ...initialValues };
+        const nextValues = { ...prev };
+        let hasDiff = false;
+        for (const key of Object.keys(initialValues)) {
+          if (prev[key] !== initialValues[key]) {
+            nextValues[key] = initialValues[key];
+            hasDiff = true;
+          }
         }
-        return prev;
+        for (const f of fields) {
+          if (f.type === "select" && !nextValues[f.name] && f.options.length > 0) {
+            nextValues[f.name] = f.options[0].value;
+            hasDiff = true;
+          }
+        }
+        return hasDiff ? nextValues : prev;
       });
     }
-  }, [initialValues]);
+  }, [initialValues, fields]);
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -105,6 +131,17 @@ export function CreateRecordForm({
                     field.helperText ??
                     "Optional. Search by project name — no need to copy an ID from elsewhere."
                   }
+                />
+              ) : field.type === "select" ? (
+                <Select
+                  id={field.name}
+                  disabled={pending}
+                  required={field.required}
+                  value={values[field.name] ?? ""}
+                  onChange={(e) =>
+                    setValues((prev) => ({ ...prev, [field.name]: e.target.value }))
+                  }
+                  options={field.options}
                 />
               ) : (
                 <Input

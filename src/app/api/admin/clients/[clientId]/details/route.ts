@@ -52,7 +52,7 @@ export async function GET(_req: Request, ctx: RouteCtx) {
         .lean(),
       projectIds.length === 0
         ? Promise.resolve([])
-        : ExpenseModel.find({ projectId: { $in: projectIds } })
+        : ExpenseModel.find({ projectId: { $in: projectIds }, isDeleted: { $ne: true } })
             .select("_id title amount category projectId createdAt")
             .sort({ createdAt: -1 })
             .lean(),

@@ -47,7 +47,7 @@ export async function GET() {
     });
 
     // 3. Aggregate Expenses by Project
-    const expenses = await ExpenseModel.find({})
+    const expenses = await ExpenseModel.find({ isDeleted: { $ne: true } })
       .select("projectId amountBase createdAt")
       .lean();
 

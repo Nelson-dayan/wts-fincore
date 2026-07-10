@@ -42,15 +42,32 @@ export async function GET(req: Request) {
     const url = new URL(req.url);
     const { page, limit, skip } = parsePagination(url.searchParams);
     const q = parseSearch(url.searchParams);
+    const projectId = url.searchParams.get("projectId");
 
     const parts: Record<string, unknown>[] = [];
+    // Filter out soft-deleted expenses
+    parts.push({ isDeleted: { $ne: true } });
+
     if (session.user.role === "employee") {
       const employeeProjectIds = await getEmployeeAssignedProjectIdStrings(session.user.id);
       if (employeeProjectIds.length === 0) {
         return NextResponse.json({ items: [], page, limit, total: 0, hasMore: false });
       }
-      parts.push({ projectId: { $in: employeeProjectIds } });
+      if (projectId) {
+        if (!employeeProjectIds.includes(projectId)) {
+          return NextResponse.json({ items: [], page, limit, total: 0, hasMore: false });
+        }
+        parts.push({ projectId });
+      } else {
+        parts.push({ projectId: { $in: employeeProjectIds } });
+      }
+    } else {
+      // Admin
+      if (projectId) {
+        parts.push({ projectId });
+      }
     }
+
     if (q) {
       parts.push({
         $or: [
@@ -59,8 +76,10 @@ export async function GET(req: Request) {
         ],
       });
     }
+
     const filter: Record<string, unknown> =
       parts.length === 0 ? {} : parts.length === 1 ? parts[0]! : { $and: parts };
+
     const [itemsRaw, total] = await Promise.all([
       ExpenseModel.find(filter)
         .select("title amount category projectId createdAt")
@@ -87,11 +106,14 @@ export async function POST(req: Request) {
       amount?: number;
       category?: string;
       projectId?: string;
+      note?: string;
     };
     const title = String(body.title ?? "").trim();
     const category = String(body.category ?? "").trim();
     const amount = Number(body.amount ?? 0);
     const projectId = String(body.projectId ?? "").trim();
+    const note = String(body.note ?? "").trim();
+
     if (!title || !category || amount <= 0) {
       return NextResponse.json(
         { message: "title, category and amount (>0) are required" },
@@ -140,6 +162,7 @@ export async function POST(req: Request) {
       exchangeRate,
       companyId,
       projectId,
+      note,
       createdBy: session.user.id,
     });
 

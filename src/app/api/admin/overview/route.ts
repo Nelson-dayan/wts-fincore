@@ -48,9 +48,9 @@ export async function GET() {
       PurchaseOrderModel.countDocuments(),
       InvoiceModel.countDocuments(),
       PaymentModel.countDocuments(),
-      ExpenseModel.countDocuments(),
+      ExpenseModel.countDocuments({ isDeleted: { $ne: true } }),
       ActivityLogModel.countDocuments(),
-      ExpenseModel.find({}).select("amountBase category createdAt projectId").lean(),
+      ExpenseModel.find({ isDeleted: { $ne: true } }).select("amountBase category createdAt projectId").lean(),
       PaymentModel.find({ status: "COMPLETED" }).select("receivedAmountBase feesBase createdAt invoiceId").lean(),
       InvoiceModel.find({
         status: { $in: ["SENT", "PARTIAL", "OVERDUE"] },

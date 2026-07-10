@@ -2,7 +2,7 @@ export const unstable_instant = { prefetch: 'static', unstable_disableValidation
 
 import { Suspense } from "react";
 import { CreateRecordForm } from "@/components/portals/create-record-form";
-import { ResourceTableClient } from "@/components/portals/resource-table-client";
+import { AdminExpensesPageClient } from "@/components/portals/admin-expenses-page-client";
 import { AdminExpensesCreateHelper } from "@/components/portals/admin-expenses-create-helper";
 
 interface PageProps {
@@ -25,23 +25,25 @@ async function ExpensesContent({ searchParams }: { searchParams: Promise<{ proje
         fields={[
           { name: "title", label: "Title", required: true },
           { name: "amount", label: "Amount", type: "number", required: true },
-          { name: "category", label: "Category", required: true },
+          {
+            name: "category",
+            label: "Category",
+            type: "select",
+            options: [
+              { value: "SALARY", label: "Salary" },
+              { value: "TOOLS", label: "Tools" },
+              { value: "ADS", label: "Ads" },
+              { value: "INFRA", label: "Infra" },
+              { value: "OTHER", label: "Other" },
+            ],
+            required: true,
+          },
+          { name: "note", label: "Note (Optional)" },
           { name: "projectId", label: "Project", type: "projectSearch" },
         ]}
         initialValues={projectId ? { projectId } : {}}
       />
-      <ResourceTableClient
-        title="Expenses"
-        description="Operational and project expenses."
-        endpoint={endpoint}
-        columns={[
-          { key: "title", label: "Title" },
-          { key: "amount", label: "Amount" },
-          { key: "category", label: "Category" },
-          { key: "projectName", label: "Project" },
-          { key: "createdAt", label: "Created At" },
-        ]}
-      />
+      <AdminExpensesPageClient endpoint={endpoint} />
     </>
   );
 }
