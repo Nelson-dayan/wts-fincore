@@ -1,18 +1,16 @@
-import { randomBytes } from "node:crypto";
 import type { ClientSession, Types } from "mongoose";
 import { connectDB } from "@/lib/db/connect";
 import { PurchaseOrderModel, QuotationModel } from "@/lib/db/models";
+import { applyExchangeRate } from "@/lib/finance/engine";
+import { getNextFiscalSequence } from "@/lib/services/business/counter.service";
 
 type POType = "client" | "internal";
 
-export async function generatePONumber(): Promise<string> {
-  for (let attempt = 0; attempt < 8; attempt += 1) {
-    const suffix = randomBytes(4).toString("hex").toUpperCase();
-    const num = `PO-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${suffix}`;
-    const exists = await PurchaseOrderModel.exists({ poNumber: num });
-    if (!exists) return num;
-  }
-  throw new Error("Could not generate a unique PO number");
+export async function generatePONumber(userId: string): Promise<{ poNumber: string; seqValue: number; year: string }> {
+  const currentYear = new Date().getFullYear().toString();
+  const seqValue = await getNextFiscalSequence("purchase_order_number", currentYear, "PurchaseOrder", userId);
+  const poNumber = `# SLMEC/PO/${currentYear}/${String(seqValue).padStart(5, "0")}`;
+  return { poNumber, seqValue, year: currentYear };
 }
 
 export interface CreatePurchaseOrderInput {
@@ -30,10 +28,11 @@ export interface CreatePurchaseOrderInput {
 async function assertQuotationRules(
   input: CreatePurchaseOrderInput,
   session: ClientSession
-): Promise<void> {
+) {
   const quotation = await QuotationModel.findById(input.quotationId)
-    .select("status projectId")
-    .session(session);
+    .select("status projectId currency")
+    .session(session)
+    .lean();
 
   if (!quotation) {
     throw new Error("Quotation not found for purchase order");
@@ -47,6 +46,8 @@ async function assertQuotationRules(
   if (input.type === "internal" && quotation.status !== "approved") {
     throw new Error("Internal purchase orders require an approved quotation");
   }
+
+  return quotation;
 }
 
 export async function createPurchaseOrder(
@@ -58,7 +59,14 @@ export async function createPurchaseOrder(
   try {
     let createdId = "";
     await session.withTransaction(async () => {
-      await assertQuotationRules(input, session);
+      const quotation = await assertQuotationRules(input, session);
+
+      let totalAmountBase: number | undefined;
+      const defaultExchangeRate = 1;
+      
+      if (input.totalAmount != null) {
+        totalAmountBase = applyExchangeRate(input.totalAmount, defaultExchangeRate);
+      }
 
       const created = await PurchaseOrderModel.create(
         [
@@ -70,7 +78,10 @@ export async function createPurchaseOrder(
             fileUrl: input.type === "client" ? String(input.fileUrl ?? "").trim() : "",
             externalPoNumber: input.externalPoNumber ?? "",
             generatedFromQuotation: input.type === "internal",
+            currency: quotation.currency ?? "AED",
+            exchangeRate: defaultExchangeRate,
             totalAmount: input.totalAmount,
+            totalAmountBase,
             status: input.status ?? "linked",
             createdBy: input.createdBy,
           },

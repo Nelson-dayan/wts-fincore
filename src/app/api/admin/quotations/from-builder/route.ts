@@ -3,16 +3,23 @@ import mongoose from "mongoose";
 import { requireRole } from "@/lib/auth/require-role";
 import { connectDB } from "@/lib/db/connect";
 import { ProjectModel, QuotationModel } from "@/lib/db/models";
-import { authErrorResponse } from "@/lib/api/route-auth";
+import { apiSuccess, apiError } from "@/lib/api/response";
 import { logActivity } from "@/lib/services/activity/log-activity.service";
+
 import {
   buildQuotationSnapshots,
   computeQuotationTotals,
   generateQuotationNumber,
   toDecimal128,
 } from "@/lib/services/business/quotation.service";
+import { updateSequenceReservationEntity } from "@/lib/services/business/counter.service";
 import { pagesFromGeneratorData } from "@/lib/quotation/map-builder-to-quotation";
+import { checkOrCreateIdempotency, saveIdempotencySuccess, saveIdempotencyFailed } from "@/lib/services/business/idempotency.service";
 import { normalizeQuotationData, type QuotationData } from "@/types/quotation-generator";
+import {
+  assertEmployeeCanAccessProject,
+  assertEmployeeCanAccessQuotation,
+} from "@/lib/auth/employee-resource-access";
 
 function pdfBuilderPayload(data: QuotationData) {
   return JSON.parse(JSON.stringify(normalizeQuotationData(data))) as Record<string, unknown>;
@@ -89,8 +96,13 @@ function mergeSnapshotsWithForm(
  * Optional `quotationId` updates the same document (edit mode).
  */
 export async function POST(req: Request) {
+  let idempotencyKey: string | null = null;
+  let userId: string = "";
+  let isIdempotencyEnabled = false;
+
   try {
-    const session = await requireRole(["admin"]);
+    const session = await requireRole(["admin", "employee"]);
+    userId = session.user.id;
     await connectDB();
     const body = (await req.json()) as {
       projectId?: string;
@@ -100,6 +112,34 @@ export async function POST(req: Request) {
       taxRate?: number;
       taxEnabled?: boolean;
     };
+
+    idempotencyKey = req.headers.get("Idempotency-Key")?.trim() ?? null;
+    if (idempotencyKey) {
+      try {
+        const check = await checkOrCreateIdempotency(
+          idempotencyKey,
+          userId,
+          "/api/admin/quotations/from-builder",
+          body
+        );
+
+        if (check.status === "CACHED") {
+          return NextResponse.json(check.responseBody, { status: check.responseStatus });
+        }
+        if (check.status === "IN_PROGRESS") {
+          return NextResponse.json({ message: "Request already in progress" }, { status: 409 });
+        }
+        isIdempotencyEnabled = true;
+      } catch (e: any) {
+        if (e.message === "IDEMPOTENCY_PAYLOAD_MISMATCH") {
+          return NextResponse.json(
+            { message: "Idempotency key reused with a different body payload" },
+            { status: 409 }
+          );
+        }
+        throw e;
+      }
+    }
 
     const quotationIdRaw = String(body.quotationId ?? "").trim();
     const quotationOid =
@@ -121,7 +161,8 @@ export async function POST(req: Request) {
     if (quotationOid) {
       const existing = await QuotationModel.findById(quotationOid).lean();
       if (!existing) {
-        return NextResponse.json({ message: "Quotation not found" }, { status: 404 });
+        if (isIdempotencyEnabled) await saveIdempotencyFailed(idempotencyKey!, userId);
+        return apiError("Quotation not found", 404);
       }
       existingForUpdate = existing as Record<string, unknown>;
       projectId = String(existing.projectId);
@@ -132,10 +173,8 @@ export async function POST(req: Request) {
         mongoose.Types.ObjectId.isValid(bodyPid) &&
         bodyPid !== projectId
       ) {
-        return NextResponse.json(
-          { message: "Project connection does not match this quotation." },
-          { status: 400 }
-        );
+        if (isIdempotencyEnabled) await saveIdempotencyFailed(idempotencyKey!, userId);
+        return apiError("Project connection does not match this quotation.", 400);
       }
 
       const fromDoc = snapshotsFromExistingDoc(existingForUpdate);
@@ -144,17 +183,32 @@ export async function POST(req: Request) {
     } else {
       const bodyPid = String(body.projectId ?? "").trim();
       if (!bodyPid || !mongoose.Types.ObjectId.isValid(bodyPid)) {
-        return NextResponse.json(
-          { message: "Connect a project before saving (projectId required)." },
-          { status: 400 }
-        );
+        if (isIdempotencyEnabled) await saveIdempotencyFailed(idempotencyKey!, userId);
+        return apiError("Connect a project before saving (projectId required).", 400);
       }
       const projExists = await ProjectModel.exists({ _id: bodyPid });
       if (!projExists) {
-        return NextResponse.json({ message: "Project not found" }, { status: 404 });
+        if (isIdempotencyEnabled) await saveIdempotencyFailed(idempotencyKey!, userId);
+        return apiError("Project not found", 404);
       }
       projectId = bodyPid;
       snapshotBase = await buildQuotationSnapshots(projectId);
+    }
+
+    if (session.user.role === "employee") {
+      try {
+        if (quotationOid) {
+          await assertEmployeeCanAccessQuotation(session.user.id, quotationOid);
+        } else {
+          await assertEmployeeCanAccessProject(session.user.id, projectId);
+        }
+      } catch (e) {
+        if (isIdempotencyEnabled) await saveIdempotencyFailed(idempotencyKey!, userId);
+        if (e instanceof Error && e.message === "FORBIDDEN") {
+          return apiError("Forbidden", 403);
+        }
+        throw e;
+      }
     }
 
     const { clientSnapshot, companySnapshot } = mergeSnapshotsWithForm(snapshotBase, data);
@@ -233,31 +287,35 @@ export async function POST(req: Request) {
       ).lean();
 
       if (!updated) {
-        return NextResponse.json({ message: "Quotation not found" }, { status: 404 });
+        if (isIdempotencyEnabled) await saveIdempotencyFailed(idempotencyKey!, userId);
+        return apiError("Quotation not found", 404);
       }
 
       await logActivity({
         userId: session.user.id,
-        action: "updated_quotation",
-        entityType: "quotation",
+        action: "QUOTATION_UPDATED",
+        entityType: "Quotation",
         entityId: String(updated._id),
         message: `Updated quotation ${updated.quotationNumber} (from PDF builder)`,
         projectId: String(updated.projectId),
       });
 
-      return NextResponse.json(
-        {
-          item: {
-            _id: String(updated._id),
-            quotationNumber: updated.quotationNumber,
-            projectId: String(updated.projectId),
-          },
+      const resData = {
+        item: {
+          _id: String(updated._id),
+          quotationNumber: updated.quotationNumber,
+          projectId: String(updated.projectId),
         },
-        { status: 200 }
-      );
+      };
+
+      if (isIdempotencyEnabled) {
+        await saveIdempotencySuccess(idempotencyKey!, userId, resData, 200);
+      }
+
+      return apiSuccess(resData);
     }
 
-    const quotationNumber = await generateQuotationNumber();
+    const { quotationNumber, seqValue, year } = await generateQuotationNumber(session.user.id);
     const created = await QuotationModel.create({
       quotationNumber,
       projectId: new mongoose.Types.ObjectId(projectId),
@@ -268,37 +326,46 @@ export async function POST(req: Request) {
 
     await logActivity({
       userId: session.user.id,
-      action: "created_quotation",
-      entityType: "quotation",
+      action: "QUOTATION_CREATED",
+      entityType: "Quotation",
       entityId: String(created._id),
       message: `Created quotation ${quotationNumber} (from PDF builder)`,
       projectId,
     });
 
-    return NextResponse.json(
-      {
-        item: {
-          _id: String(created._id),
-          quotationNumber: created.quotationNumber,
-          projectId: String(created.projectId),
-        },
+    await updateSequenceReservationEntity("quotation_number", year, seqValue, String(created._id));
+
+    const resData = {
+      item: {
+        _id: String(created._id),
+        quotationNumber: created.quotationNumber,
+        projectId: String(created.projectId),
       },
-      { status: 201 }
-    );
+    };
+
+    if (isIdempotencyEnabled) {
+      await saveIdempotencySuccess(idempotencyKey!, userId, resData, 201);
+    }
+
+    return apiSuccess(resData, 201);
   } catch (error) {
+    if (isIdempotencyEnabled && idempotencyKey) {
+      await saveIdempotencyFailed(idempotencyKey, userId);
+    }
+    console.error("POST Quotation Builder Error:", error);
     if (error instanceof Error) {
       const msg = error.message;
       if (msg === "UNAUTHORIZED" || msg === "FORBIDDEN") {
-        return authErrorResponse(error, "Forbidden");
+        return apiError("Forbidden", 403);
       }
       if (
         msg.startsWith("Project not found") ||
         msg.startsWith("Client not found") ||
         msg.startsWith("Primary company")
       ) {
-        return NextResponse.json({ message: msg }, { status: 400 });
+        return apiError(msg, 400);
       }
     }
-    return authErrorResponse(error, "Failed to save quotation");
+    return apiError("Failed to save quotation", 500);
   }
 }

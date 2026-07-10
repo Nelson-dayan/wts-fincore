@@ -1,5 +1,7 @@
 import { Schema, Types } from "mongoose";
 import { optionalDecimalField, schemaOptions } from "@/lib/db/schemas/shared.schema";
+import { DEFAULT_CURRENCY, SUPPORTED_CURRENCY_VALUES } from "@/lib/constants/finance";
+
 
 export const projectSchema = new Schema(
   {
@@ -9,8 +11,8 @@ export const projectSchema = new Schema(
     assignedTo: [{ type: Types.ObjectId, ref: "User", index: true }],
     status: {
       type: String,
-      enum: ["lead", "in_progress", "completed", "on_hold"],
-      default: "lead",
+      enum: ["active", "completed", "on_hold"],
+      default: "active",
       index: true,
     },
     budget: optionalDecimalField,
@@ -22,8 +24,13 @@ export const projectSchema = new Schema(
     },
     
     // New Advanced B2B Fields
-    currency: { type: String, default: "AED", trim: true },
-    category: { type: String, default: "", trim: true },
+    currency: { type: String, enum: SUPPORTED_CURRENCY_VALUES, default: DEFAULT_CURRENCY, trim: true },
+    category: {
+      type: String,
+      enum: ["Fixed Price", "Retainer", "Time & Materials", "Other"],
+      default: "Fixed Price",
+      trim: true,
+    },
     clientReference: { type: String, default: "", trim: true },
     notes: { type: String, default: "" },
     
@@ -31,6 +38,7 @@ export const projectSchema = new Schema(
     startDate: { type: Date },
     targetEndDate: { type: Date },
     actualEndDate: { type: Date },
+    fixCurrency: { type: Boolean, default: false },
   },
   schemaOptions
 );

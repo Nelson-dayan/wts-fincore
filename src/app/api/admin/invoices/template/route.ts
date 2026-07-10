@@ -7,14 +7,14 @@ import { authErrorResponse } from "@/lib/api/route-auth";
 import { aedAmountInWords } from "@/lib/invoice/aed-amount-words";
 import { computeInvoiceTotals } from "@/lib/invoice/invoice-totals";
 import { generateUniqueInvoiceNumber } from "@/lib/services/business/invoice.service";
+import { assertEmployeeCanAccessPurchaseOrder } from "@/lib/auth/employee-resource-access";
 
 export async function GET(req: Request) {
   try {
-    await requireRole(["admin"]);
+    const session = await requireRole(["admin", "employee"]);
     await connectDB();
     const url = new URL(req.url);
     const poId = String(url.searchParams.get("poId") ?? "").trim();
-    const invoiceType = url.searchParams.get("invoiceType") === "usd" ? "usd" : "aed";
     if (!poId || !mongoose.Types.ObjectId.isValid(poId)) {
       return NextResponse.json({ message: "Valid poId is required" }, { status: 400 });
     }
@@ -28,6 +28,21 @@ export async function GET(req: Request) {
         { message: "Quotation not found for this purchase order" },
         { status: 404 }
       );
+    }
+
+    const qCurrency = String(quotation.currency ?? "AED").toUpperCase();
+    const urlType = url.searchParams.get("invoiceType");
+    const invoiceType = urlType === "usd" ? "usd" : (urlType === "aed" ? "aed" : (qCurrency === "USD" ? "usd" : "aed"));
+
+    if (session.user.role === "employee") {
+      try {
+        await assertEmployeeCanAccessPurchaseOrder(session.user.id, poId);
+      } catch (e) {
+        if (e instanceof Error && e.message === "FORBIDDEN") {
+          return NextResponse.json({ message: "Forbidden" }, { status: 403 });
+        }
+        throw e;
+      }
     }
 
     const primary = await CompanyModel.findOne({ isPrimary: true }).sort({ updatedAt: -1 }).lean();
@@ -48,7 +63,7 @@ export async function GET(req: Request) {
       signatureText: s(primary?.signatureText) || s(qCompany.signatureText),
     };
 
-    const invoiceNumber = await generateUniqueInvoiceNumber();
+    const { invoiceNumber } = await generateUniqueInvoiceNumber(session.user.id);
     const invDate = new Date();
     const due = new Date(invDate);
     due.setUTCDate(due.getUTCDate() + 30);
@@ -56,28 +71,36 @@ export async function GET(req: Request) {
     const docInfo = quotation.documentInfo as Record<string, unknown> | undefined;
     let taxRate = docInfo && typeof docInfo.taxRate === "number" ? docInfo.taxRate : 5;
     let taxEnabled = docInfo && typeof docInfo.taxEnabled === "boolean" ? docInfo.taxEnabled : true;
-    const dt = primary?.defaultTax as { taxRate?: unknown; taxEnabled?: unknown } | undefined;
-    if (typeof dt?.taxRate === "number") taxRate = dt.taxRate;
-    if (typeof dt?.taxEnabled === "boolean") taxEnabled = dt.taxEnabled;
     if (invoiceType === "usd") {
       taxRate = 0;
       taxEnabled = false;
     }
 
-    const pages = [
-      {
-        pageNumber: 1,
-        items: [
+    const pages = Array.isArray(quotation.pages) && quotation.pages.length > 0 
+      ? quotation.pages.map((p: any) => ({
+          pageNumber: p.pageNumber || 1,
+          items: Array.isArray(p.items) ? p.items.map((it: any) => ({
+            number: it.number || 1,
+            name: it.name || "Item",
+            description: it.description || "",
+            quantity: it.quantity || 1,
+            price: typeof it.price === "number" ? it.price : (it.price != null && typeof it.price === "object" ? parseFloat(it.price.toString()) : 0)
+          })) : []
+        }))
+      : [
           {
-            number: 1,
-            name: "Description of services / goods",
-            description: "",
-            quantity: 1,
-            price: 0,
+            pageNumber: 1,
+            items: [
+              {
+                number: 1,
+                name: "Description of services / goods",
+                description: "",
+                quantity: 1,
+                price: 0,
+              },
+            ],
           },
-        ],
-      },
-    ];
+        ];
     const totals = computeInvoiceTotals(pages, taxRate, taxEnabled);
     const clientSnap =
       quotation.clientSnapshot && typeof quotation.clientSnapshot === "object"
@@ -90,6 +113,7 @@ export async function GET(req: Request) {
       item: {
         invoiceNumber,
         invoiceType,
+        currency: quotation.currency ?? (invoiceType === "usd" ? "USD" : "AED"),
         projectId: String(po.projectId ?? ""),
         poId: String(po._id),
         status: "unpaid",
@@ -122,6 +146,9 @@ export async function GET(req: Request) {
             invoiceType === "usd"
               ? `${totals.total.toFixed(2)} US Dollars Only.`
               : aedAmountInWords(totals.total),
+          showBankAed: invoiceType === "aed",
+          showBankUsd: invoiceType === "usd",
+          hideShipping: false,
         },
         branding: {
           customLogoUrl: "",

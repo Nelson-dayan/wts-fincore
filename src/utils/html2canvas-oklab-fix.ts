@@ -4,20 +4,48 @@
  */
 
 function colorNeedsSanitize(value: string): boolean {
-  if (/\boklab\s*\(|\boklch\s*\(/i.test(value)) return true;
-  // Avoid false positives inside words (e.g. "collab(") for bare lab()/lch()
-  if (/(?<![a-zA-Z])lab\s*\(/i.test(value)) return true;
-  if (/(?<![a-zA-Z])lch\s*\(/i.test(value)) return true;
-  if (/\bhwb\s*\(|\bcolor-mix\s*\(/i.test(value)) return true;
-  if (/\bcolor\s*\(\s*(?:srgb|display-p3|a98-rgb)/i.test(value)) return true;
-  return false;
+  if (!value) return false;
+  const v = value.toLowerCase();
+  return (
+    v.includes("oklab") ||
+    v.includes("oklch") ||
+    v.includes("lab(") ||
+    v.includes("lch(") ||
+    v.includes("color-mix") ||
+    v.includes("hwb(") ||
+    v.includes("color(")
+  );
 }
 
-/** Resolve a color value for `prop` to sRGB strings html2canvas accepts. */
+let sharedCanvas: HTMLCanvasElement | null = null;
+let sharedCtx: CanvasRenderingContext2D | null = null;
+
+function getSharedCanvasCtx() {
+  if (!sharedCanvas) {
+    sharedCanvas = document.createElement("canvas");
+    sharedCanvas.width = 1;
+    sharedCanvas.height = 1;
+    sharedCtx = sharedCanvas.getContext("2d", { willReadFrequently: true });
+  }
+  return sharedCtx;
+}
+
+/** Resolve a single CSS color value to an rgba() string using Canvas API. */
+function convertColorToRgba(value: string): string {
+  const ctx = getSharedCanvasCtx();
+  if (!ctx) return "rgba(0,0,0,1)";
+  ctx.clearRect(0, 0, 1, 1);
+  ctx.fillStyle = "rgba(0,0,0,0)"; // fallback
+  ctx.fillStyle = value;
+  ctx.fillRect(0, 0, 1, 1);
+  const data = ctx.getImageData(0, 0, 1, 1).data;
+  return `rgba(${data[0]}, ${data[1]}, ${data[2]}, ${data[3] / 255})`;
+}
+
+/** Resolve a CSS property value to sRGB strings html2canvas accepts. */
 function toComputedColor(prop: string, value: string): string {
   const probe = document.createElement("div");
-  probe.style.cssText =
-    "position:fixed;left:-9999px;top:0;visibility:hidden;contain:strict;";
+  probe.style.cssText = "position:fixed;left:-9999px;top:0;visibility:hidden;contain:strict;";
   try {
     probe.style.setProperty(prop, value);
   } catch {
@@ -26,7 +54,11 @@ function toComputedColor(prop: string, value: string): string {
   document.body.appendChild(probe);
   const resolved = getComputedStyle(probe).getPropertyValue(prop);
   probe.remove();
-  return resolved && !colorNeedsSanitize(resolved) ? resolved : "rgba(0,0,0,1)";
+  
+  if (resolved && colorNeedsSanitize(resolved)) {
+    return convertColorToRgba(resolved);
+  }
+  return resolved || "rgba(0,0,0,1)";
 }
 
 function sanitizeCSSValue(prop: string, value: string): string {
@@ -43,12 +75,14 @@ function sanitizeCSSValue(prop: string, value: string): string {
     p.includes("background") ||
     p.includes("border") ||
     p.includes("outline") ||
-    p === "caret-color"
+    p === "caret-color" ||
+    p.includes("shadow") ||
+    p.includes("decoration")
   ) {
     if (p === "background-image") return "none";
     return toComputedColor(prop, value);
   }
-  return value;
+  return ""; // Fallback: strip the property to prevent html2canvas oklab crashes
 }
 
 function copyComputedStyleInline(original: Element, clone: Element) {
@@ -57,6 +91,8 @@ function copyComputedStyleInline(original: Element, clone: Element) {
   const cs = window.getComputedStyle(original);
   for (let i = 0; i < cs.length; i++) {
     const prop = cs.item(i);
+    if (prop.startsWith("--")) continue; // skip custom properties to avoid oklab/oklch parser crashes in html2canvas
+    
     let val = cs.getPropertyValue(prop);
     const pri = cs.getPropertyPriority(prop);
     val = sanitizeCSSValue(prop, val);
@@ -79,9 +115,6 @@ function walkInlineStyles(original: Element, clone: Element) {
   }
 }
 
-/**
- * Call from html2canvas `onclone` with the live node and its clone (root of capture).
- */
 export function stripUnsupportedColorsFromClone(
   clonedDoc: Document,
   clonedRoot: HTMLElement,
@@ -96,6 +129,26 @@ export function stripUnsupportedColorsFromClone(
     svg{overflow:visible}
   `;
   clonedDoc.head?.prepend(reset);
+
+  // Clean all ancestors (including body and html) of potentially crashing oklab styles
+  // Theme providers often set `--var: oklab(...)` on <html> which html2canvas parses and crashes on.
+  let curr: HTMLElement | null = clonedRoot.parentElement;
+  while (curr) {
+    if (curr.style) {
+      const propsToRemove: string[] = [];
+      for (let i = 0; i < curr.style.length; i++) {
+        const prop = curr.style.item(i);
+        const val = curr.style.getPropertyValue(prop);
+        if (prop.startsWith("--") || colorNeedsSanitize(val)) {
+          propsToRemove.push(prop);
+        }
+      }
+      for (const prop of propsToRemove) {
+        curr.style.removeProperty(prop);
+      }
+    }
+    curr = curr.parentElement;
+  }
 
   walkInlineStyles(originalRoot, clonedRoot);
 }

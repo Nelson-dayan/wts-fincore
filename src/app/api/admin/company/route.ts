@@ -7,7 +7,7 @@ import { logActivity } from "@/lib/services/activity/log-activity.service";
 
 export async function GET() {
   try {
-    await requireRole(["admin"]);
+    await requireRole(["admin", "employee"]);
     await connectDB();
     const item = await CompanyModel.findOne({ isPrimary: true })
       .sort({ updatedAt: -1 })
@@ -30,7 +30,6 @@ export async function PATCH(req: Request) {
       website?: string;
       logoText?: string;
       signatureText?: string;
-      defaultTax?: { taxRate?: number; taxEnabled?: boolean };
     };
 
     const current = await CompanyModel.findOne({ isPrimary: true }).lean();
@@ -44,10 +43,6 @@ export async function PATCH(req: Request) {
         website: String(body.website ?? ""),
         logoText: String(body.logoText ?? ""),
         signatureText: String(body.signatureText ?? ""),
-        defaultTax: {
-          taxRate: Number(body.defaultTax?.taxRate ?? 0),
-          taxEnabled: Boolean(body.defaultTax?.taxEnabled),
-        },
         isPrimary: true,
       });
     } else {
@@ -66,17 +61,9 @@ export async function PATCH(req: Request) {
             signatureText: String(
               body.signatureText ?? current.signatureText ?? ""
             ),
-            defaultTax: {
-              taxRate: Number(
-                body.defaultTax?.taxRate ?? current.defaultTax?.taxRate ?? 0
-              ),
-              taxEnabled: Boolean(
-                body.defaultTax?.taxEnabled ?? current.defaultTax?.taxEnabled
-              ),
-            },
           },
         },
-        { new: true }
+        { returnDocument: "after" }
       );
     }
 

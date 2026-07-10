@@ -21,6 +21,7 @@ export type InvoiceDocBank = {
 export type InvoiceDocData = {
   invoiceNumber: string;
   invoiceType?: "aed" | "usd";
+  currency?: string;
   documentInfo: {
     date?: string;
     title?: string;
@@ -51,28 +52,30 @@ export type InvoiceDocData = {
     poNumberRef?: string;
     bankAed?: InvoiceDocBank;
     bankUsd?: InvoiceDocBank;
+    bankAedTitle?: string;
+    bankUsdTitle?: string;
     footerTerms?: string;
     footerCurrencyLine?: string;
     disclaimer?: string;
     amountInWords?: string;
+    showBankAed?: boolean;
+    showBankUsd?: boolean;
+    hideShipping?: boolean;
   };
   dueDate?: string;
   poId?: string;
 };
 
-function formatAed(n: number): string {
-  const num = new Intl.NumberFormat("en-IN", {
+function formatCurrency(n: number, formatting: "aed" | "usd", currency: string): string {
+  const isUsdStyle = formatting === "usd";
+  const locale = isUsdStyle ? "en-US" : "en-IN";
+  const num = new Intl.NumberFormat(locale, {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(n);
-  return `AED ${num}`;
-}
-
-function formatUsd(n: number): string {
-  return new Intl.NumberFormat("en-US", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(n);
+  
+  if (isUsdStyle) return num;
+  return `${currency} ${num}`;
 }
 
 function formatDate(iso?: string): string {
@@ -150,7 +153,8 @@ export function InvoiceSecDocument({
 
   const lines = pages.flatMap((p) => p.items);
   const balanceDue = totals.total ?? 0;
-  const fmt = isUsd ? formatUsd : formatAed;
+  const currency = data.currency || (isUsd ? "USD" : "AED");
+  const fmt = (n: number) => formatCurrency(n, invoiceType, currency);
 
   const shell =
     mode === "print"
@@ -199,37 +203,39 @@ export function InvoiceSecDocument({
           </div>
         </header>
 
-        <div className="mb-3 grid grid-cols-[1fr_1fr_1.25fr] gap-4 text-[12px]">
+        <div className={`mb-3 grid gap-4 text-[12px] ${extras.hideShipping === true ? "grid-cols-[1.75fr_1.25fr]" : "grid-cols-[1fr_1fr_1.25fr]"}`}>
           <div>
             <p className="mb-1 text-[15px] font-light text-[#666]">Bill To:</p>
             <p className="font-bold">{clientSnapshot.name || "—"}</p>
             <p className="font-bold">{clientSnapshot.company || ""}</p>
             <p className="whitespace-pre-wrap leading-tight">{clientSnapshot.address || ""}</p>
           </div>
-          <div>
-            <p className="mb-1 text-[15px] font-light text-[#666]">Ship To:</p>
-            <p className="font-bold">{extras.shipToCompany || clientSnapshot.company || "—"}</p>
-            <p className="whitespace-pre-wrap leading-tight">
-              {extras.shipToAddress || clientSnapshot.address || ""}
-            </p>
-          </div>
+          {extras.hideShipping !== true && (
+            <div>
+              <p className="mb-1 text-[15px] font-light text-[#666]">Ship To:</p>
+              <p className="font-bold">{extras.shipToCompany || clientSnapshot.company || "—"}</p>
+              <p className="whitespace-pre-wrap leading-tight">
+                {extras.shipToAddress || clientSnapshot.address || ""}
+              </p>
+            </div>
+          )}
           <div className="pt-2">
-            <table className="ml-auto w-full text-right text-[12px]">
+            <table className="w-full text-[12px]">
               <tbody>
                 <tr>
-                  <td className="pr-5 whitespace-nowrap text-[#6b6b6b]">Date:</td>
+                  <td className=" text-[#6b6b6b]">Date:</td>
                   <td className="whitespace-nowrap">{formatDate(documentInfo.date)}</td>
                 </tr>
                 <tr>
-                  <td className="pr-5 whitespace-nowrap text-[#6b6b6b]">Payment Terms:</td>
+                  <td className="text-[#6b6b6b]">Payment Terms:</td>
                   <td className="whitespace-nowrap">{extras.paymentTerms || "—"}</td>
                 </tr>
                 <tr>
-                  <td className="pr-5 whitespace-nowrap text-[#6b6b6b]">Due Date:</td>
+                  <td className="text-[#6b6b6b]">Due Date:</td>
                   <td className="whitespace-nowrap">{formatDate(data.dueDate)}</td>
                 </tr>
                 <tr>
-                  <td className="pr-5 whitespace-nowrap text-[#6b6b6b]">PO Number:</td>
+                  <td className="text-[#6b6b6b]">PO Number:</td>
                   <td className="whitespace-nowrap">{extras.poNumberRef || "—"}</td>
                 </tr>
               </tbody>
@@ -251,10 +257,10 @@ export function InvoiceSecDocument({
                 <th className="border-r border-black px-1 py-1.5">Rate</th>
                 <th className="border-r border-black px-1 py-1.5">Gross Amount</th>
                 <th className="border-r border-black px-1 py-1.5">Disc.</th>
-                <th className="border-r border-black px-1 py-1.5">Taxable Amount (USD)</th>
+                <th className="border-r border-black px-1 py-1.5">Taxable Amount ({currency})</th>
                 <th className="border-r border-black px-1 py-1.5">VAT %</th>
                 <th className="border-r border-black px-1 py-1.5">VAT Amount</th>
-                <th className="px-1 py-1.5">Net Amount (USD)</th>
+                <th className="px-1 py-1.5">Net Amount ({currency})</th>
               </tr>
             </thead>
             <tbody>
@@ -268,13 +274,13 @@ export function InvoiceSecDocument({
                     <td className="border-r border-black px-1 py-1.5 text-center font-semibold">{row.name || "—"}</td>
                     <td className="border-r border-black px-1 py-1.5 text-center">1</td>
                     <td className="border-r border-black px-1 py-1.5 text-center">{qty}</td>
-                    <td className="border-r border-black px-1 py-1.5 text-right">{formatUsd(rate)}</td>
-                    <td className="border-r border-black px-1 py-1.5 text-right">{formatUsd(gross)}</td>
+                    <td className="border-r border-black px-1 py-1.5 text-right">{fmt(rate)}</td>
+                    <td className="border-r border-black px-1 py-1.5 text-right">{fmt(gross)}</td>
                     <td className="border-r border-black px-1 py-1.5 text-center">-</td>
-                    <td className="border-r border-black px-1 py-1.5 text-right">{formatUsd(gross)}</td>
+                    <td className="border-r border-black px-1 py-1.5 text-right">{fmt(gross)}</td>
                     <td className="border-r border-black px-1 py-1.5 text-center">-</td>
                     <td className="border-r border-black px-1 py-1.5 text-right">-</td>
-                    <td className="px-1 py-1.5 text-right">{formatUsd(gross)}</td>
+                    <td className="px-1 py-1.5 text-right">{fmt(gross)}</td>
                   </tr>
                 );
               })}
@@ -282,12 +288,12 @@ export function InvoiceSecDocument({
                 <td className="border-r border-black px-1 py-1 text-right" colSpan={5}>
                   Total
                 </td>
-                <td className="border-r border-black px-1 py-1 text-right">{formatUsd(totals.subtotal)}</td>
+                <td className="border-r border-black px-1 py-1 text-right">{fmt(totals.subtotal)}</td>
                 <td className="border-r border-black px-1 py-1 text-center">-</td>
-                <td className="border-r border-black px-1 py-1 text-right">{formatUsd(totals.subtotal)}</td>
+                <td className="border-r border-black px-1 py-1 text-right">{fmt(totals.subtotal)}</td>
                 <td className="border-r border-black px-1 py-1 text-center">-</td>
                 <td className="border-r border-black px-1 py-1 text-right">-</td>
-                <td className="px-1 py-1 text-right">{formatUsd(totals.total)}</td>
+                <td className="px-1 py-1 text-right">{fmt(totals.total)}</td>
               </tr>
             </tbody>
           </table>
@@ -297,7 +303,7 @@ export function InvoiceSecDocument({
             <div className="border-l border-black text-[10px]">
               <div className="grid grid-cols-[1fr_auto] border-b border-black">
                 <div className="border-r border-black px-2 py-1 font-bold">Taxable Amount</div>
-                <div className="min-w-28 px-2 py-1 text-right font-bold">{formatUsd(totals.subtotal)}</div>
+                <div className="min-w-28 px-2 py-1 text-right font-bold">{fmt(totals.subtotal)}</div>
               </div>
               <div className="grid grid-cols-[1fr_auto] border-b border-black">
                 <div className="border-r border-black px-2 py-1 font-bold">Vat Total</div>
@@ -309,7 +315,7 @@ export function InvoiceSecDocument({
               </div>
               <div className="grid grid-cols-[1fr_auto]">
                 <div className="border-r border-black px-2 py-1 text-[16px] font-bold">Total</div>
-                <div className="px-2 py-1 text-right text-[16px] font-bold">{formatUsd(totals.total)}</div>
+                <div className="px-2 py-1 text-right text-[16px] font-bold">{fmt(totals.total)}</div>
               </div>
             </div>
           </div>
@@ -320,36 +326,47 @@ export function InvoiceSecDocument({
         </p>
 
         <div className="mb-2 text-[10px] leading-[1.4]">
-          <p className="font-bold">Notes:</p>
-          <div className="mb-2 border border-black">
-            <p className="border-b border-black px-2 py-1 text-[12px] font-bold">USD ACCOUNT DETAILS:</p>
-            <table className="w-full border-collapse text-[10px] leading-[1.45]">
-              <tbody>
-                {usdBankRows(extras.bankUsd).map(([k, v]) => (
-                  <tr key={`usd-${k}`} className="border-b border-black last:border-b-0">
-                    <td className="w-[43%] border-r border-black px-2 py-1">{k}</td>
-                    <td className="px-2 py-1">{v || "-"}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <div className="mb-2 border border-black">
-            <p className="border-b border-black px-2 py-1 text-[12px] font-bold">AED ACCOUNT DETAILS:</p>
-            <table className="w-full border-collapse text-[10px] leading-[1.45]">
-              <tbody>
-                {usdBankRows(extras.bankAed).map(([k, v]) => (
-                  <tr key={`aed-${k}`} className="border-b border-black last:border-b-0">
-                    <td className="w-[43%] border-r border-black px-2 py-1">{k}</td>
-                    <td className="px-2 py-1">{v || "-"}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          {(extras.showBankUsd !== false || extras.showBankAed !== false) && (
+            <>
+              <p className="font-bold">Notes:</p>
+              {extras.showBankUsd !== false && (
+                <div className="mb-2 border border-black">
+                  <p className="border-b border-black px-2 py-1 text-[12px] font-bold">
+                    {extras.bankUsdTitle || "USD ACCOUNT DETAILS"}:
+                  </p>
+                  <table className="w-full border-collapse text-[10px] leading-[1.45]">
+                    <tbody>
+                      {usdBankRows(extras.bankUsd).map(([k, v]) => (
+                        <tr key={`usd-${k}`} className="border-b border-black last:border-b-0">
+                          <td className="w-[43%] border-r border-black px-2 py-1">{k}</td>
+                          <td className="px-2 py-1">{v || "-"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+              {extras.showBankAed !== false && (
+                <div className="mb-2 border border-black">
+                  <p className="border-b border-black px-2 py-1 text-[12px] font-bold">
+                    {extras.bankAedTitle || "AED ACCOUNT DETAILS"}:
+                  </p>
+                  <table className="w-full border-collapse text-[10px] leading-[1.45]">
+                    <tbody>
+                      {usdBankRows(extras.bankAed).map(([k, v]) => (
+                        <tr key={`aed-${k}`} className="border-b border-black last:border-b-0">
+                          <td className="w-[43%] border-r border-black px-2 py-1">{k}</td>
+                          <td className="px-2 py-1">{v || "-"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </>
+          )}
           <p className="mt-1 font-bold">{extras.footerTerms || "Terms:"}</p>
-          <p className="mt-1">1 USD = 3.67 AED TOTAL AMOUNT = {(totals.total * 3.67).toFixed(2)} AED</p>
-          <p className="mt-1 uppercase">{extras.footerCurrencyLine || "CURRENCY IN USD"}</p>
+          <p className="mt-1 uppercase">{extras.footerCurrencyLine || `CURRENCY IN ${currency}`}</p>
         </div>
 
         <footer className="pt-1 text-[10px] text-neutral-700">
@@ -404,7 +421,7 @@ export function InvoiceSecDocument({
         </div>
       </header>
 
-      <div className="mb-5 grid gap-4 sm:grid-cols-[1fr_1fr_1.3fr]">
+      <div className={`mb-5 grid gap-4 ${extras.hideShipping === true ? "sm:grid-cols-[1.7fr_1.3fr]" : "sm:grid-cols-[1fr_1fr_1.3fr]"}`}>
         <div className="min-w-0">
           <p className="text-[11px] font-medium text-neutral-500">Bill To:</p>
           <p className="mt-0.5 text-[12px] font-bold text-neutral-900">{clientSnapshot.name || "—"}</p>
@@ -414,18 +431,20 @@ export function InvoiceSecDocument({
             <p className="mt-1 text-[12px] font-semibold">TRN: {extras.clientTrn}</p>
           ) : null}
         </div>
-        <div className="min-w-0">
-          <p className="text-[11px] font-medium text-neutral-500">Ship To:</p>
-          <p className="mt-0.5 text-[12px] font-bold text-neutral-900">
-            {extras.shipToCompany || clientSnapshot.company || "—"}
-          </p>
-          <p className="whitespace-pre-wrap text-[12px] font-semibold leading-tight text-neutral-900">
-            {extras.shipToAddress || clientSnapshot.address || ""}
-          </p>
-          {extras.shipToTrn ? (
-            <p className="mt-1 text-[12px] font-semibold">TRN: {extras.shipToTrn}</p>
-          ) : null}
-        </div>
+        {extras.hideShipping !== true && (
+          <div className="min-w-0">
+            <p className="text-[11px] font-medium text-neutral-500">Ship To:</p>
+            <p className="mt-0.5 text-[12px] font-bold text-neutral-900">
+              {extras.shipToCompany || clientSnapshot.company || "—"}
+            </p>
+            <p className="whitespace-pre-wrap text-[12px] font-semibold leading-tight text-neutral-900">
+              {extras.shipToAddress || clientSnapshot.address || ""}
+            </p>
+            {extras.shipToTrn ? (
+              <p className="mt-1 text-[12px] font-semibold">TRN: {extras.shipToTrn}</p>
+            ) : null}
+          </div>
+        )}
         <div className="min-w-0">
           <table className="ml-auto w-full text-right text-[12px]">
           <tbody>
@@ -508,10 +527,12 @@ export function InvoiceSecDocument({
               <td className="py-1 pr-4 text-right text-neutral-500">Subtotal:</td>
               <td className="py-1 text-right font-medium tabular-nums">{fmt(totals.subtotal)}</td>
             </tr>
-            <tr>
-              <td className="py-1 pr-4 text-right text-neutral-500">{taxLabel}:</td>
-              <td className="py-1 text-right font-medium tabular-nums">{fmt(totals.tax)}</td>
-            </tr>
+            {documentInfo.taxEnabled !== false ? (
+              <tr>
+                <td className="py-1 pr-4 text-right text-neutral-500">{taxLabel}:</td>
+                <td className="py-1 text-right font-medium tabular-nums">{fmt(totals.tax)}</td>
+              </tr>
+            ) : null}
             <tr className="border-t border-neutral-300">
               <td className="py-2 pr-4 text-right font-bold text-neutral-900">Total:</td>
               <td className="py-2 text-right text-[18px] font-bold tabular-nums text-neutral-900">
@@ -528,10 +549,18 @@ export function InvoiceSecDocument({
         </p>
       ) : null}
 
-      <div className="grid gap-4 border-t border-neutral-200 pt-4 sm:grid-cols-2">
-        <BankBlock title="AED ACCOUNT DETAILS" b={extras.bankAed} />
-        <BankBlock title="USD ACCOUNT DETAILS" b={extras.bankUsd} />
-      </div>
+      {(extras.showBankAed !== false || extras.showBankUsd !== false) && (
+        <div className={`grid gap-4 border-t border-neutral-200 pt-4 ${
+          (extras.showBankAed !== false && extras.showBankUsd !== false) ? "sm:grid-cols-2" : "grid-cols-1"
+        }`}>
+          {extras.showBankAed !== false && (
+            <BankBlock title={extras.bankAedTitle || "AED ACCOUNT DETAILS"} b={extras.bankAed} />
+          )}
+          {extras.showBankUsd !== false && (
+            <BankBlock title={extras.bankUsdTitle || "USD ACCOUNT DETAILS"} b={extras.bankUsd} />
+          )}
+        </div>
+      )}
 
       <footer className="mt-7 pt-2 text-[10px] text-neutral-600">
         <p className="font-medium text-neutral-800">{extras.footerTerms || "TERM:"}</p>

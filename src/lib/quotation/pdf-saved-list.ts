@@ -22,7 +22,10 @@ function cloneForStorage(data: QuotationData): QuotationData {
   try {
     return normalizeQuotationData(JSON.parse(JSON.stringify(data)));
   } catch {
-    return normalizeQuotationData({ ...data, items: data.items.map((r) => ({ ...r })) });
+    return normalizeQuotationData({ 
+      ...data, 
+      pages: data.pages ? data.pages.map((p) => ({ ...p, items: p.items ? p.items.map((r) => ({ ...r })) : [] })) : [] 
+    });
   }
 }
 

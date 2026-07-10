@@ -23,7 +23,6 @@ export async function PATCH(req: Request, ctx: RouteCtx) {
       logoText?: string;
       signatureText?: string;
       isPrimary?: boolean;
-      defaultTax?: { taxRate?: number; taxEnabled?: boolean };
     };
 
     if (body.isPrimary === true) {
@@ -42,17 +41,9 @@ export async function PATCH(req: Request, ctx: RouteCtx) {
           logoText: body.logoText,
           signatureText: body.signatureText,
           isPrimary: body.isPrimary,
-          ...(body.defaultTax
-            ? {
-                defaultTax: {
-                  taxRate: Number(body.defaultTax.taxRate ?? 0),
-                  taxEnabled: Boolean(body.defaultTax.taxEnabled),
-                },
-              }
-            : {}),
         },
       },
-      { new: true }
+      { returnDocument: "after" }
     ).lean();
 
     if (!updated) {

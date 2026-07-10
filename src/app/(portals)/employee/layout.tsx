@@ -1,3 +1,5 @@
+export const unstable_instant = false;
+
 import Link from "next/link";
 import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
@@ -10,6 +12,7 @@ import { PortalShell } from "@/components/layout/portal-shell";
 import { SignOutButton } from "@/components/portals/sign-out-button";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { User } from "lucide-react";
+import { EmployeePortalProviders } from "@/components/portals/employee-portal-providers";
 
 export default async function EmployeePortalLayout({
   children,
@@ -44,8 +47,14 @@ export default async function EmployeePortalLayout({
             <PortalNavLink href="/employee/quotations" match="prefix" className="w-full justify-start">
               Quotations
             </PortalNavLink>
+            <PortalNavLink href="/employee/purchase-orders" match="prefix" className="w-full justify-start">
+              POs
+            </PortalNavLink>
             <PortalNavLink href="/employee/invoices" match="prefix" className="w-full justify-start">
               Invoices
+            </PortalNavLink>
+            <PortalNavLink href="/employee/payments" match="prefix" className="w-full justify-start">
+              Payments
             </PortalNavLink>
             <PortalNavLink href="/employee/expenses" match="prefix" className="w-full justify-start">
               Expenses
@@ -88,15 +97,17 @@ export default async function EmployeePortalLayout({
               <PortalNavLink href="/employee/projects" match="prefix" className="w-full justify-start">
                 Projects
               </PortalNavLink>
-              <PortalNavLink
-                href="/employee/quotations"
-                match="prefix"
-                className="w-full justify-start"
-              >
+              <PortalNavLink href="/employee/quotations" match="prefix" className="w-full justify-start">
                 Quotations
+              </PortalNavLink>
+              <PortalNavLink href="/employee/purchase-orders" match="prefix" className="w-full justify-start">
+                POs
               </PortalNavLink>
               <PortalNavLink href="/employee/invoices" match="prefix" className="w-full justify-start">
                 Invoices
+              </PortalNavLink>
+              <PortalNavLink href="/employee/payments" match="prefix" className="w-full justify-start">
+                Payments
               </PortalNavLink>
               <PortalNavLink href="/employee/expenses" match="prefix" className="w-full justify-start">
                 Expenses
@@ -131,7 +142,7 @@ export default async function EmployeePortalLayout({
           </div>
         </header>
         <div className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
-          {children}
+          <EmployeePortalProviders>{children}</EmployeePortalProviders>
         </div>
       </PortalShell>
     </div>

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { requireRole } from "@/lib/auth/require-role";
 import { connectDB } from "@/lib/db/connect";
 import { PurchaseOrderModel, QuotationModel } from "@/lib/db/models";
-import { authErrorResponse } from "@/lib/api/route-auth";
+import { apiSuccess, apiError } from "@/lib/api/response";
 import { parsePagination, parseSearch } from "@/lib/api/pagination";
 import { logActivity } from "@/lib/services/activity/log-activity.service";
 import {
@@ -14,10 +14,13 @@ import {
 } from "@/lib/services/business/quotation.service";
 import mongoose from "mongoose";
 import { decimalToNumber } from "@/lib/services/business/money";
+import { getEmployeeAssignedProjectIdStrings } from "@/lib/auth/employee-resource-access";
+import { updateSequenceReservationEntity } from "@/lib/services/business/counter.service";
+
 
 export async function GET(req: Request) {
   try {
-    await requireRole(["admin"]);
+    const session = await requireRole(["admin", "employee"]);
     await connectDB();
     const url = new URL(req.url);
     const { page, limit, skip } = parsePagination(url.searchParams);
@@ -25,7 +28,23 @@ export async function GET(req: Request) {
     const projectId = String(url.searchParams.get("projectId") ?? "").trim();
     const filter: Record<string, unknown> = {};
     if (q) filter.quotationNumber = { $regex: q, $options: "i" };
-    if (projectId) filter.projectId = projectId;
+
+    if (session.user.role === "employee") {
+      const employeeProjectIds = await getEmployeeAssignedProjectIdStrings(session.user.id);
+      if (projectId) {
+        if (!employeeProjectIds.includes(projectId)) {
+          return NextResponse.json({ items: [], page, limit, total: 0, hasMore: false });
+        }
+        filter.projectId = projectId;
+      } else {
+        if (employeeProjectIds.length === 0) {
+          return NextResponse.json({ items: [], page, limit, total: 0, hasMore: false });
+        }
+        filter.projectId = { $in: employeeProjectIds };
+      }
+    } else if (projectId) {
+      filter.projectId = projectId;
+    }
     const [itemsRaw, total] = await Promise.all([
       QuotationModel.find(filter)
         .select("quotationNumber status projectId createdAt totals")
@@ -81,11 +100,12 @@ export async function GET(req: Request) {
         purchaseOrderCount: poInfo.count,
         purchaseOrderNumbers: poInfo.poNumbers,
         totalAmount,
-      };
+      }
     });
-    return NextResponse.json({ items, page, limit, total, hasMore: skip + items.length < total });
+    return apiSuccess({ items, page, limit, total, hasMore: skip + items.length < total });
   } catch (error) {
-    return authErrorResponse(error, "Failed to load quotations");
+    console.error("GET Quotations Error:", error);
+    return apiError("Failed to load quotations", 500);
   }
 }
 
@@ -122,6 +142,7 @@ export async function POST(req: Request) {
         customLogoText?: string;
         customSignatureText?: string;
       };
+      currency?: string;
       internalNotes?: string;
       clientSnapshot?: Partial<{
         name: string;
@@ -143,14 +164,14 @@ export async function POST(req: Request) {
 
     const projectId = String(body.projectId ?? "").trim();
     if (!projectId) {
-      return NextResponse.json({ message: "projectId is required" }, { status: 400 });
+      return apiError("projectId is required", 400);
     }
 
     const docDate = body.documentInfo?.date
       ? new Date(body.documentInfo.date)
       : new Date();
     if (Number.isNaN(docDate.getTime())) {
-      return NextResponse.json({ message: "Invalid document date" }, { status: 400 });
+      return apiError("Invalid document date", 400);
     }
 
     const taxRate = Number(body.documentInfo?.taxRate ?? 0);
@@ -180,7 +201,7 @@ export async function POST(req: Request) {
       ...(co.logoText !== undefined ? { logoText: String(co.logoText) } : {}),
       ...(co.signatureText !== undefined ? { signatureText: String(co.signatureText) } : {}),
     };
-    const quotationNumber = await generateQuotationNumber();
+    const { quotationNumber, seqValue, year } = await generateQuotationNumber(session.user.id);
 
     const pagesForDb = pages.map((p) => ({
       pageNumber: p.pageNumber,
@@ -246,24 +267,28 @@ export async function POST(req: Request) {
         customSignatureText: String(branding.customSignatureText ?? ""),
       },
       internalNotes: String(body.internalNotes ?? ""),
+      currency: String(body.currency || "").trim() || undefined,
       status: body.status ?? "draft",
     });
 
     await logActivity({
       userId: session.user.id,
-      action: "created_quotation",
-      entityType: "quotation",
+      action: "QUOTATION_CREATED",
+      entityType: "Quotation",
       entityId: String(created._id),
       message: `Created quotation ${quotationNumber}`,
       projectId,
     });
 
-    return NextResponse.json({ item: created }, { status: 201 });
+    await updateSequenceReservationEntity("quotation_number", year, seqValue, String(created._id));
+
+    return apiSuccess({ item: created }, 201);
   } catch (error) {
+    console.error("POST Quotation Error:", error);
     if (error instanceof Error) {
       const msg = error.message;
       if (msg === "UNAUTHORIZED" || msg === "FORBIDDEN") {
-        return authErrorResponse(error, "Failed to create quotation");
+        return apiError("Forbidden", 403);
       }
       const clientMsg =
         msg.startsWith("At least one page") ||
@@ -276,9 +301,9 @@ export async function POST(req: Request) {
           ? msg
           : undefined;
       if (clientMsg) {
-        return NextResponse.json({ message: clientMsg }, { status: 400 });
+        return apiError(clientMsg, 400);
       }
     }
-    return authErrorResponse(error, "Failed to create quotation");
+    return apiError("Failed to create quotation", 500);
   }
 }

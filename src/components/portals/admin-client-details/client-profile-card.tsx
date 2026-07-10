@@ -1,10 +1,10 @@
-"use client";
-
-import { Building2, Mail, MapPin, Phone, Trash2 } from "lucide-react";
+import { Building2, Mail, MapPin, Phone, Trash2, Receipt } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select } from "@/components/ui/select";
+import { SUPPORTED_CURRENCIES } from "@/lib/constants/finance";
 import { cn } from "@/lib/utils/cn";
 import { UploadCard } from "@/components/ui/upload-card";
 import type { ClientDetailsPayload, ClientProfileForm } from "./types";
@@ -41,6 +41,7 @@ type ClientProfileCardProps = {
   onCancel: () => void;
   onStartEdit: () => void;
   onDelete: () => void;
+  onOpenStatement?: () => void;
 };
 
 export function ClientProfileCard({
@@ -53,6 +54,7 @@ export function ClientProfileCard({
   onCancel,
   onStartEdit,
   onDelete,
+  onOpenStatement,
 }: ClientProfileCardProps) {
   const clientName = data.client?.name;
 
@@ -101,6 +103,15 @@ export function ClientProfileCard({
               </>
             ) : (
               <>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={onOpenStatement}
+                  className="transition-[box-shadow,border-color] duration-200 hover:border-primary/35 hover:bg-primary/5 flex items-center gap-1.5"
+                >
+                  <Receipt className="size-3.5" aria-hidden />
+                  Statement
+                </Button>
                 <Button
                   size="sm"
                   variant="outline"
@@ -170,7 +181,11 @@ export function ClientProfileCard({
                 </div>
                 <div className="space-y-2">
                   <Label>Preferred Currency</Label>
-                  <Input value={form.currency} onChange={(e) => onFormChange({ currency: e.target.value })} placeholder="AED" />
+                  <Select 
+                    value={form.currency} 
+                    onChange={(e: React.ChangeEvent<HTMLSelectElement>) => onFormChange({ currency: e.target.value })}
+                    options={[...SUPPORTED_CURRENCIES]}
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label>Payment Terms</Label>

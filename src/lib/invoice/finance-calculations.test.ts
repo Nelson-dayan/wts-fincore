@@ -4,7 +4,7 @@ import {
   getPaymentSummary, 
   getInvoiceSummary, 
   PaymentInput, 
-  InvoiceInput 
+  AllocationInput 
 } from "./finance-calculations";
 
 test("Finance Engine - getPaymentSummary (Standard Payment)", () => {
@@ -22,9 +22,6 @@ test("Finance Engine - getPaymentSummary (Standard Payment)", () => {
   assert.equal(sum.intendedBase, 200 * 85); // 17000
   assert.equal(sum.receivedBase, 188 * 85); // 15980
   assert.equal(sum.totalFeesBase, 12 * 85); // 1020
-
-  // Mismatch should be 0 because 188 = 200 - 12
-  assert.equal(sum.mismatchBase, 0);
 });
 
 test("Finance Engine - getPaymentSummary (Refund Payment)", () => {
@@ -42,68 +39,32 @@ test("Finance Engine - getPaymentSummary (Refund Payment)", () => {
   assert.equal(sum.intendedBase, -8500);
   assert.equal(sum.receivedBase, -8500);
   assert.equal(sum.totalFeesBase, 0);
-  assert.equal(sum.mismatchBase, 0);
 });
 
-test("Finance Engine - getInvoiceSummary (Forex Fluctuation)", () => {
-  const inv: InvoiceInput = { exchangeRate: 83, totalAmount: 1000 };
-  
-  // Payment happens later when rate is 85
-  const payments: PaymentInput[] = [{
-    type: "PAYMENT",
-    exchangeRate: 85,
-    intendedAmount: 200,
-    receivedAmount: 200,
-    fees: []
+test("Finance Engine - getInvoiceSummary", () => {
+  const allocations: AllocationInput[] = [{
+    amount: 200,
+    amountBase: 17000
   }];
 
-  const summary = getInvoiceSummary(payments, inv);
+  const summary = getInvoiceSummary(allocations, 1000);
 
-  // We intended to get 200 * 83 = 16600, but actually got 200 * 85 = 17000
-  // Fluctuation = (85 - 83) * 200 = 400
-  assert.equal(summary.totalForexDifference, 400);
-  
-  // Base properties
-  assert.equal(summary.invoiceAmountBase, 83000);
-  assert.equal(summary.totalIntendedBase, 17000);
-  assert.equal(summary.remainingIntendedBase, 83000 - 17000); // 66000
-});
-
-test("Finance Engine - getInvoiceSummary (Forex Fluctuation with Refund)", () => {
-  const inv: InvoiceInput = { exchangeRate: 83, totalAmount: 1000 };
-  
-  // We receive $200 at rate 85
-  // We refund $100 at rate 82
-  const payments: PaymentInput[] = [
-    { type: "PAYMENT", exchangeRate: 85, intendedAmount: 200, receivedAmount: 200, fees: [] },
-    { type: "REFUND", exchangeRate: 82, intendedAmount: 100, receivedAmount: 100, fees: [] }
-  ];
-
-  const summary = getInvoiceSummary(payments, inv);
-
-  // Payment 1 Diff: (85 - 83) * 200 = +400
-  // Payment 2 (Refund) Diff: (82 - 83) * 100 = -100 (Wait, it's a refund multiplier = -1)
-  // So: (-100) * -1 = +100
-  // Total Diff: +500
-  assert.equal(summary.totalForexDifference, 500);
+  assert.equal(summary.totalAllocated, 200);
+  assert.equal(summary.totalAllocatedBase, 17000);
+  assert.equal(summary.remaining, 800);
+  assert.equal(summary.isOverpaid, false);
 });
 
 test("Finance Engine - getInvoiceSummary (Overpayment Tracking)", () => {
-  const inv: InvoiceInput = { exchangeRate: 80, totalAmount: 100 };
-  
-  const payments: PaymentInput[] = [{
-    type: "PAYMENT",
-    exchangeRate: 80,
-    intendedAmount: 150, // client pays more than invoice total
-    receivedAmount: 150,
-    fees: []
+  const allocations: AllocationInput[] = [{
+    amount: 150,
+    amountBase: 12000
   }];
 
-  const summary = getInvoiceSummary(payments, inv);
+  const summary = getInvoiceSummary(allocations, 100);
 
-  assert.equal(summary.invoiceAmountBase, 8000);
-  assert.equal(summary.totalReceivedBase, 12000); // 150 * 80
-  
-  // Overpayment should be 4000
-  assert.equal(summary.overpaidAmountBase, 4000);
+  assert.equal(summary.totalAllocated, 150);
+  assert.equal(summary.remaining, -50);
+  assert.equal(summary.isOverpaid, true);
+  assert.equal(summary.overpaidAmount, 50);
 });

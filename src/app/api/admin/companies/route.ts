@@ -62,7 +62,6 @@ export async function POST(req: Request) {
       logoText: String(body.logoText ?? ""),
       signatureText: String(body.signatureText ?? ""),
       isPrimary: false,
-      defaultTax: { taxRate: 0, taxEnabled: false },
     });
 
     await logActivity({

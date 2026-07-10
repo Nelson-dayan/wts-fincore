@@ -7,6 +7,7 @@ import {
   QuotationModel,
 } from "@/lib/db/models";
 import { decimalToNumber } from "@/lib/services/business/money";
+import { computeTotals } from "@/lib/finance/engine";
 
 export type QuotationItemInput = {
   number: number;
@@ -35,29 +36,21 @@ export function computeQuotationTotals(
   taxEnabled: boolean,
   discount: number = 0
 ): { subtotal: number; tax: number; total: number } {
-  let subtotal = 0;
-  for (const page of pages) {
-    for (const item of page.items ?? []) {
-      const qty = Number(item.quantity ?? 0);
-      const price = decimalToNumber(item.price);
-      subtotal += qty * price;
-    }
-  }
-  const taxableAmount = Math.max(0, subtotal - discount);
-  const rate = Math.max(0, taxRate);
-  const tax = taxEnabled ? (taxableAmount * rate) / 100 : 0;
-  const total = taxableAmount + tax;
-  return { subtotal, tax, total };
+  const items = pages.flatMap(page => page.items ?? []).map(item => ({
+    quantity: Number(item.quantity ?? 0),
+    unitPrice: decimalToNumber(item.price)
+  }));
+
+  return computeTotals(items, discount, taxEnabled ? taxRate : 0);
 }
 
-export async function generateQuotationNumber(): Promise<string> {
-  for (let attempt = 0; attempt < 8; attempt += 1) {
-    const suffix = randomBytes(4).toString("hex").toUpperCase();
-    const num = `QT-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${suffix}`;
-    const exists = await QuotationModel.exists({ quotationNumber: num });
-    if (!exists) return num;
-  }
-  throw new Error("Could not generate a unique quotation number");
+import { getNextFiscalSequence } from "@/lib/services/business/counter.service";
+
+export async function generateQuotationNumber(userId: string): Promise<{ quotationNumber: string; seqValue: number; year: string }> {
+  const currentYear = new Date().getFullYear().toString();
+  const seqValue = await getNextFiscalSequence("quotation_number", currentYear, "Quotation", userId);
+  const quotationNumber = `# SLMEC/QT/${currentYear}/${String(seqValue).padStart(5, "0")}`;
+  return { quotationNumber, seqValue, year: currentYear };
 }
 
 export async function buildQuotationSnapshots(projectId: string): Promise<{

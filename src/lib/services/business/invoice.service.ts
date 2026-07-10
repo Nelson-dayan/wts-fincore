@@ -11,21 +11,19 @@ import { aedAmountInWords } from "@/lib/invoice/aed-amount-words";
 import { MAX_INVOICES_PER_PURCHASE_ORDER } from "@/lib/invoice/invoice-limits";
 import * as invoiceTotals from "@/lib/invoice/invoice-totals";
 import { decimalToNumber } from "@/lib/services/business/money";
+import { logActivity } from "@/lib/services/activity/log-activity.service";
+import { DEFAULT_CURRENCY } from "@/lib/constants/finance";
+import { getNextFiscalSequence, updateSequenceReservationEntity } from "@/lib/services/business/counter.service";
+import { assertPeriodNotLocked } from "@/lib/services/business/period-lock.service";
+
 
 export { MAX_INVOICES_PER_PURCHASE_ORDER };
 
-export async function generateUniqueInvoiceNumber(): Promise<string> {
-  for (let attempt = 0; attempt < 8; attempt += 1) {
-    const suffix = randomBytes(3).toString("hex").toUpperCase();
-    const d = new Date();
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, "0");
-    const day = String(d.getDate()).padStart(2, "0");
-    const num = `# SLMEC/INV/${y}/${m}${day}/${suffix}`;
-    const exists = await InvoiceModel.exists({ invoiceNumber: num });
-    if (!exists) return num;
-  }
-  throw new Error("Could not generate a unique invoice number");
+export async function generateUniqueInvoiceNumber(userId: string): Promise<{ invoiceNumber: string; seqValue: number; year: string }> {
+  const currentYear = new Date().getFullYear().toString();
+  const seqValue = await getNextFiscalSequence("invoice_number", currentYear, "Invoice", userId);
+  const invoiceNumber = `# SLMEC/INV/${currentYear}/${String(seqValue).padStart(5, "0")}`;
+  return { invoiceNumber, seqValue, year: currentYear };
 }
 
 function toDecimal128(value: number): mongoose.Types.Decimal128 {
@@ -42,6 +40,7 @@ export async function countInvoicesForPurchaseOrder(poId: string): Promise<numbe
 }
 
 type CompanyDocLean = {
+  _id?: any;
   name?: string;
   address?: string;
   email?: string;
@@ -58,6 +57,7 @@ async function getPrimaryCompanyForInvoice(): Promise<CompanyDocLean | null> {
     .lean();
   if (!row) return null;
   return {
+    _id: row._id,
     name: row.name,
     address: row.address,
     email: row.email,
@@ -124,7 +124,7 @@ export async function createInvoiceForPurchaseOrder(
   const existingHidden = await InvoiceModel.findOne({
     poId: new mongoose.Types.ObjectId(input.poId),
     invoiceType,
-    "extras._hiddenUntilSaved": true,
+    lifecycleStatus: "DRAFT_HIDDEN",
   })
     .sort({ createdAt: -1 })
     .lean();
@@ -154,8 +154,9 @@ export async function createInvoiceForPurchaseOrder(
     primaryCompany
   );
 
-  const invoiceNumber = await generateUniqueInvoiceNumber();
+  const { invoiceNumber, seqValue, year } = await generateUniqueInvoiceNumber(input.createdBy);
   const invDate = new Date();
+  await assertPeriodNotLocked(invDate);
   const due = new Date(invDate);
   due.setUTCDate(due.getUTCDate() + 30);
 
@@ -164,28 +165,36 @@ export async function createInvoiceForPurchaseOrder(
     docInfo && typeof docInfo.taxRate === "number" ? docInfo.taxRate : 5;
   let taxEnabled =
     docInfo && typeof docInfo.taxEnabled === "boolean" ? docInfo.taxEnabled : true;
-  const pt = primaryCompany?.defaultTax;
-  if (pt && typeof pt.taxRate === "number") taxRate = pt.taxRate;
-  if (pt && typeof pt.taxEnabled === "boolean") taxEnabled = pt.taxEnabled;
   if (invoiceType === "usd") {
     taxRate = 0;
     taxEnabled = false;
   }
 
-  const pages: invoiceTotals.InvoiceTotalsPage[] = [
-    {
-      pageNumber: 1,
-      items: [
+  const pages: invoiceTotals.InvoiceTotalsPage[] = Array.isArray(quotation.pages) && quotation.pages.length > 0 
+    ? quotation.pages.map((p: any) => ({
+        pageNumber: p.pageNumber || 1,
+        items: Array.isArray(p.items) ? p.items.map((it: any) => ({
+          number: it.number || 1,
+          name: it.name || "Item",
+          description: it.description || "",
+          quantity: it.quantity || 1,
+          price: typeof it.price === "number" ? it.price : (it.price != null && typeof it.price === "object" ? parseFloat(it.price.toString()) : 0)
+        })) : []
+      }))
+    : [
         {
-          number: 1,
-          name: "Description of services / goods",
-          description: "",
-          quantity: 1,
-          price: 0,
+          pageNumber: 1,
+          items: [
+            {
+              number: 1,
+              name: "Description of services / goods",
+              description: "",
+              quantity: 1,
+              price: 0,
+            },
+          ],
         },
-      ],
-    },
-  ];
+      ];
 
   const { subtotal, tax, total } = invoiceTotals.computeInvoiceTotals(
     pages,
@@ -196,6 +205,10 @@ export async function createInvoiceForPurchaseOrder(
   const created = await InvoiceModel.create({
     invoiceNumber,
     invoiceType,
+    lifecycleStatus: "DRAFT_HIDDEN",
+    paymentStatus: "UNPAID",
+    currency: quotation.currency ?? DEFAULT_CURRENCY,
+    companyId: (primaryCompany as any)?._id,
     projectId: po.projectId,
     poId: po._id,
     createdBy: new mongoose.Types.ObjectId(input.createdBy),
@@ -223,11 +236,19 @@ export async function createInvoiceForPurchaseOrder(
       tax: toDecimal128(tax),
       total: toDecimal128(total),
     },
+    totalAmountBase: toDecimal128(total),
+    totalsCache: {
+      totalReceivedBase: toDecimal128(0),
+      totalFeesBase: toDecimal128(0),
+      totalIntendedBase: toDecimal128(total),
+      overpaidAmountBase: toDecimal128(0),
+      version: 0,
+    },
     branding: {
       customLogoUrl: "",
       customSignatureUrl: "",
     },
-    status: "unpaid",
+    status: "DRAFT",
     dueDate: due,
     extras: {
       paymentTerms: "30 DAYS",
@@ -244,14 +265,33 @@ export async function createInvoiceForPurchaseOrder(
       bankAed: {},
       bankUsd: {},
       footerTerms: "TERM:",
-      footerCurrencyLine: invoiceType === "usd" ? "CURRENCY IN USD" : "CURRENCY IN AED",
+      footerCurrencyLine: invoiceType === "usd" ? "CURRENCY IN USD" : `CURRENCY IN ${DEFAULT_CURRENCY}`,
       disclaimer:
         "This is an electronically generated invoice, hence does not require signature.",
       amountInWords:
-        invoiceType === "usd" ? `${total.toFixed(2)} US Dollars Only.` : aedAmountInWords(total),
+        invoiceType === "usd" ? `${total.toFixed(2)} US Dollars Only.` : `INR ${total.toFixed(2)} Only.`,
+      showBankAed: invoiceType === "aed",
+      showBankUsd: invoiceType === "usd",
+      hideShipping: false,
       _hiddenUntilSaved: true,
     },
   });
+
+  await logActivity({
+    userId: input.createdBy,
+    action: "INVOICE_CREATED",
+    entityType: "Invoice",
+    entityId: String(created._id),
+    message: `Created invoice ${invoiceNumber} for PO ${po.poNumber}`,
+    projectId: String(po.projectId),
+    metadata: {
+      poId: String(po._id),
+      invoiceNumber,
+      totalAmount: total
+    }
+  });
+
+  await updateSequenceReservationEntity("invoice_number", year, seqValue, String(created._id));
 
   return {
     id: String(created._id),
@@ -262,6 +302,9 @@ export async function createInvoiceForPurchaseOrder(
 
 /** Normalize stored invoice pages for API (Decimal128 → number). */
 export function formatInvoiceForApi(row: Record<string, unknown>): Record<string, unknown> {
+  const invoiceType = row.invoiceType === "usd" ? "usd" : "aed";
+  const defaultShowAed = invoiceType === "aed";
+  const defaultShowUsd = invoiceType === "usd";
   const totals = row.totals as Record<string, unknown> | undefined;
   const pages = row.pages as
     | Array<{
@@ -276,11 +319,13 @@ export function formatInvoiceForApi(row: Record<string, unknown>): Record<string
   return {
     _id: String(row._id),
     invoiceNumber: row.invoiceNumber,
-    invoiceType: row.invoiceType === "usd" ? "usd" : "aed",
-    projectId: String(row.projectId ?? ""),
-    poId: row.poId ? String(row.poId) : "",
+    invoiceType,
+    currency: String(row.currency || "AED").toUpperCase(),
     createdBy: String(row.createdBy ?? ""),
     status: row.status,
+    fixCurrency: !!(row.projectId as any)?.fixCurrency,
+    projectId: String((row.projectId as any)?._id ?? row.projectId ?? ""),
+    poId: row.poId ? String(row.poId) : "",
     documentInfo: docInfo
       ? {
           ...docInfo,
@@ -302,6 +347,14 @@ export function formatInvoiceForApi(row: Record<string, unknown>): Record<string
           total: decimalToNumber(totals.total),
         }
       : { subtotal: 0, tax: 0, total: 0 },
+    totalsCache: row.totalsCache
+      ? {
+          totalReceivedBase: decimalToNumber((row.totalsCache as any).totalReceivedBase),
+          totalFeesBase: decimalToNumber((row.totalsCache as any).totalFeesBase),
+          totalIntendedBase: decimalToNumber((row.totalsCache as any).totalIntendedBase),
+          overpaidAmountBase: decimalToNumber((row.totalsCache as any).overpaidAmountBase),
+        }
+      : undefined,
     pages: pages?.map((p) => ({
       pageNumber: p.pageNumber,
       items: p.items.map((item) => ({
@@ -312,7 +365,18 @@ export function formatInvoiceForApi(row: Record<string, unknown>): Record<string
         price: decimalToNumber(item.price),
       })),
     })),
-    extras: extras ? JSON.parse(JSON.stringify(extras)) : {},
+    extras: extras
+      ? {
+          showBankAed: defaultShowAed,
+          showBankUsd: defaultShowUsd,
+          hideShipping: false,
+          ...JSON.parse(JSON.stringify(extras)),
+        }
+      : {
+          showBankAed: defaultShowAed,
+          showBankUsd: defaultShowUsd,
+          hideShipping: false,
+        },
     dueDate:
       row.dueDate instanceof Date
         ? row.dueDate.toISOString()

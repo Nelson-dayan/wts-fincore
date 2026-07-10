@@ -1,9 +1,9 @@
-import { NextResponse } from "next/server";
 import mongoose from "mongoose";
 import { requireRole } from "@/lib/auth/require-role";
 import { connectDB } from "@/lib/db/connect";
 import { PurchaseOrderModel, QuotationModel } from "@/lib/db/models";
-import { authErrorResponse } from "@/lib/api/route-auth";
+import { apiSuccess, apiError } from "@/lib/api/response";
+import { executeTransition } from "@/lib/services/orchestration";
 import { logActivity } from "@/lib/services/activity/log-activity.service";
 import { decimalToNumber } from "@/lib/services/business/money";
 import {
@@ -13,6 +13,7 @@ import {
   pagesFromStoredDoc,
   toDecimal128,
 } from "@/lib/services/business/quotation.service";
+import { assertEmployeeCanAccessProject, assertEmployeeCanAccessQuotation } from "@/lib/auth/employee-resource-access";
 
 interface RouteCtx {
   params: Promise<{ quotationId: string }>;
@@ -65,14 +66,27 @@ function formatQuotation(quotation: Record<string, unknown>) {
 
 export async function GET(_req: Request, ctx: RouteCtx) {
   try {
-    await requireRole(["admin"]);
+    const session = await requireRole(["admin", "employee"]);
     await connectDB();
     const { quotationId } = await ctx.params;
+    if (session.user.role === "employee") {
+      try {
+        await assertEmployeeCanAccessQuotation(session.user.id, quotationId);
+      } catch (e) {
+        if (e instanceof Error && e.message === "FORBIDDEN") {
+          return apiError("Forbidden", 403);
+        }
+        if (e instanceof Error && e.message === "NOT_FOUND") {
+          return apiError("Quotation not found", 404);
+        }
+        throw e;
+      }
+    }
     const raw = await QuotationModel.findById(quotationId)
-      .populate("projectId", "name")
+      .populate("projectId", "name fixCurrency currency")
       .lean();
     if (!raw) {
-      return NextResponse.json({ message: "Quotation not found" }, { status: 404 });
+      return apiError("Quotation not found", 404);
     }
     const row = raw as Record<string, unknown>;
     const proj = row.projectId as unknown;
@@ -84,21 +98,44 @@ export async function GET(_req: Request, ctx: RouteCtx) {
       proj && typeof proj === "object" && "name" in proj
         ? String((proj as { name?: string }).name ?? "")
         : "";
+    const projectFixCurrency =
+      proj && typeof proj === "object" && "fixCurrency" in proj
+        ? Boolean((proj as { fixCurrency?: boolean }).fixCurrency)
+        : false;
+    const projectCurrency =
+      proj && typeof proj === "object" && "currency" in proj
+        ? String((proj as { currency?: string }).currency ?? "").trim().toUpperCase()
+        : "";
+
     const formatted = formatQuotation({ ...row, projectId: projectIdStr });
-    return NextResponse.json({ item: { ...formatted, projectName } });
+    return apiSuccess({ item: { ...formatted, projectName, projectFixCurrency, projectCurrency } });
   } catch (error) {
-    return authErrorResponse(error, "Failed to load quotation");
+    console.error("GET Quotation Error:", error);
+    return apiError("Failed to load quotation", 500);
   }
 }
 
 export async function PATCH(req: Request, ctx: RouteCtx) {
   try {
-    const session = await requireRole(["admin"]);
+    const session = await requireRole(["admin", "employee"]);
     await connectDB();
     const { quotationId } = await ctx.params;
+    if (session.user.role === "employee") {
+      try {
+        await assertEmployeeCanAccessQuotation(session.user.id, quotationId);
+      } catch (e) {
+        if (e instanceof Error && e.message === "FORBIDDEN") {
+          return apiError("Forbidden", 403);
+        }
+        if (e instanceof Error && e.message === "NOT_FOUND") {
+          return apiError("Quotation not found", 404);
+        }
+        throw e;
+      }
+    }
     const existing = await QuotationModel.findById(quotationId).lean();
     if (!existing) {
-      return NextResponse.json({ message: "Quotation not found" }, { status: 404 });
+      return apiError("Quotation not found", 404);
     }
 
     const body = (await req.json()) as {
@@ -137,6 +174,16 @@ export async function PATCH(req: Request, ctx: RouteCtx) {
     const nextProjectId = String(
       body.projectId !== undefined ? body.projectId : existing.projectId
     ).trim();
+    if (session.user.role === "employee") {
+      try {
+        await assertEmployeeCanAccessProject(session.user.id, nextProjectId);
+      } catch (e) {
+        if (e instanceof Error && e.message === "FORBIDDEN") {
+          return apiError("Forbidden", 403);
+        }
+        throw e;
+      }
+    }
     const shouldRefreshSnapshots =
       Boolean(body.refreshSnapshots) ||
       (body.projectId !== undefined &&
@@ -186,7 +233,7 @@ export async function PATCH(req: Request, ctx: RouteCtx) {
     };
 
     if (Number.isNaN(nextDocInfo.date.getTime())) {
-      return NextResponse.json({ message: "Invalid document date" }, { status: 400 });
+      return apiError("Invalid document date", 400);
     }
 
     const pagesSource =
@@ -251,6 +298,42 @@ export async function PATCH(req: Request, ctx: RouteCtx) {
     const nextInternalNotes =
       body.internalNotes !== undefined ? String(body.internalNotes) : existingInternal;
 
+    if (body.status !== undefined && body.status !== existing.status) {
+      let policyId = "";
+      let triggerEvent = "QUOTATION_PATCH_UPDATE";
+
+      if (body.status === "approved") {
+        policyId = "POL-QTN-001";
+        triggerEvent = "QUOTATION_APPROVED_VIA_PATCH";
+      } else if (body.status === "sent") {
+        policyId = "POL-QTN-002";
+        triggerEvent = "QUOTATION_SENT_VIA_PATCH";
+      } else if (body.status === "rejected") {
+        policyId = "POL-QTN-003";
+        triggerEvent = "QUOTATION_REJECTED_VIA_PATCH";
+      }
+
+      if (policyId) {
+        const result = await executeTransition({
+          policyId,
+          entityId: quotationId,
+          approvedBy: session.user.id,
+          triggerEvent,
+          route: `/api/admin/quotations/${quotationId}`
+        });
+
+        if (!result.success) {
+          return apiError(
+            result.message || "Quotation transition validation failed.",
+            400,
+            { blockers: result.blockers }
+          );
+        }
+      } else {
+        return apiError(`Direct status transitions to '${body.status}' are prohibited. Policy not defined.`, 400);
+      }
+    }
+
     const updated = await QuotationModel.findByIdAndUpdate(
       quotationId,
       {
@@ -275,10 +358,10 @@ export async function PATCH(req: Request, ctx: RouteCtx) {
               bodyQ.validity !== undefined ? String(bodyQ.validity) : String(qInfo?.validity ?? ""),
             remainingAmount:
               bodyQ.remainingAmount !== undefined
-                ? toDecimal128(Number(bodyQ.remainingAmount))
-                : qInfo?.remainingAmount !== undefined && qInfo?.remainingAmount !== null
-                  ? toDecimal128(decimalToNumber(qInfo.remainingAmount))
-                  : undefined,
+                 ? toDecimal128(Number(bodyQ.remainingAmount))
+                 : qInfo?.remainingAmount !== undefined && qInfo?.remainingAmount !== null
+                   ? toDecimal128(decimalToNumber(qInfo.remainingAmount))
+                   : undefined,
             remainingText:
               bodyQ.remainingText !== undefined
                 ? String(bodyQ.remainingText)
@@ -286,31 +369,38 @@ export async function PATCH(req: Request, ctx: RouteCtx) {
           },
           branding: nextBranding,
           internalNotes: nextInternalNotes,
-          ...(body.status !== undefined ? { status: body.status } : {}),
         },
       },
       { new: true }
     ).lean();
 
     if (!updated) {
-      return NextResponse.json({ message: "Quotation not found" }, { status: 404 });
+      return apiError("Quotation not found", 404);
     }
 
     await logActivity({
       userId: session.user.id,
-      action: "updated_quotation",
-      entityType: "quotation",
+      action: existing.status !== body.status && body.status ? "INVOICE_STATUS_CHANGED" : "QUOTATION_UPDATED",
+      entityType: "Quotation",
       entityId: String(updated._id),
-      message: `Updated quotation ${updated.quotationNumber}`,
+      message: existing.status !== body.status && body.status
+        ? `Quotation ${updated.quotationNumber} status changed from ${existing.status} to ${body.status}`
+        : `Updated quotation ${updated.quotationNumber}`,
       projectId: String(updated.projectId),
+      metadata: {
+        previous: { status: existing.status },
+        current: { status: updated.status },
+        changedFields: Object.keys(body)
+      }
     });
 
-    return NextResponse.json({ item: formatQuotation(updated as Record<string, unknown>) });
+    return apiSuccess({ item: formatQuotation(updated as Record<string, unknown>) });
   } catch (error) {
+    console.error("PATCH Quotation Error:", error);
     if (error instanceof Error) {
       const msg = error.message;
       if (msg === "UNAUTHORIZED" || msg === "FORBIDDEN") {
-        return authErrorResponse(error, "Failed to update quotation");
+        return apiError("Forbidden", 403);
       }
       if (
         msg.startsWith("At least one page") ||
@@ -321,48 +411,60 @@ export async function PATCH(req: Request, ctx: RouteCtx) {
         msg.startsWith("Client not found") ||
         msg.startsWith("Primary company")
       ) {
-        return NextResponse.json({ message: msg }, { status: 400 });
+        return apiError(msg, 400);
       }
     }
-    return authErrorResponse(error, "Failed to update quotation");
+    return apiError("Failed to update quotation", 500);
   }
 }
 
 export async function DELETE(_req: Request, ctx: RouteCtx) {
   try {
-    const session = await requireRole(["admin"]);
+    const session = await requireRole(["admin", "employee"]);
     await connectDB();
     const { quotationId } = await ctx.params;
+
+    if (session.user.role === "employee") {
+      try {
+        await assertEmployeeCanAccessQuotation(session.user.id, quotationId);
+      } catch (e) {
+        if (e instanceof Error && e.message === "FORBIDDEN") {
+          return apiError("Forbidden", 403);
+        }
+        if (e instanceof Error && e.message === "NOT_FOUND") {
+          return apiError("Quotation not found", 404);
+        }
+        throw e;
+      }
+    }
 
     const poCount = await PurchaseOrderModel.countDocuments({
       quotationId: new mongoose.Types.ObjectId(quotationId),
     });
     if (poCount > 0) {
-      return NextResponse.json(
-        {
-          message:
-            "This quotation cannot be deleted because purchase orders are linked to it.",
-        },
-        { status: 400 }
+      return apiError(
+        "This quotation cannot be deleted because purchase orders are linked to it.",
+        400
       );
     }
 
     const deleted = await QuotationModel.findByIdAndDelete(quotationId).lean();
     if (!deleted) {
-      return NextResponse.json({ message: "Quotation not found" }, { status: 404 });
+      return apiError("Quotation not found", 404);
     }
 
     await logActivity({
       userId: session.user.id,
-      action: "deleted_quotation",
-      entityType: "quotation",
+      action: "QUOTATION_DELETED",
+      entityType: "Quotation",
       entityId: String(deleted._id),
       message: `Deleted quotation ${deleted.quotationNumber}`,
       projectId: String(deleted.projectId),
     });
 
-    return NextResponse.json({ ok: true });
+    return apiSuccess({ ok: true });
   } catch (error) {
-    return authErrorResponse(error, "Failed to delete quotation");
+    console.error("DELETE Quotation Error:", error);
+    return apiError("Failed to delete quotation", 500);
   }
 }

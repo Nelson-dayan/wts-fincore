@@ -3,11 +3,14 @@ import mongoose from "mongoose";
 import { requireRole } from "@/lib/auth/require-role";
 import { connectDB } from "@/lib/db/connect";
 import { InvoiceModel } from "@/lib/db/models";
-import { authErrorResponse } from "@/lib/api/route-auth";
+import { apiSuccess, apiError } from "@/lib/api/response";
+import { executeTransition } from "@/lib/services/orchestration";
 import { logActivity } from "@/lib/services/activity/log-activity.service";
 import { formatInvoiceForApi } from "@/lib/services/business/invoice.service";
 import { computeInvoiceTotals } from "@/lib/invoice/invoice-totals";
 import { aedAmountInWords } from "@/lib/invoice/aed-amount-words";
+import { assertEmployeeCanAccessInvoice } from "@/lib/auth/employee-resource-access";
+import { assertPeriodNotLocked } from "@/lib/services/business/period-lock.service";
 
 type Ctx = { params: Promise<{ invoiceId: string }> };
 
@@ -18,41 +21,78 @@ function toDecimal128(value: number): mongoose.Types.Decimal128 {
 
 export async function GET(_req: Request, ctx: Ctx) {
   try {
-    await requireRole(["admin"]);
+    const session = await requireRole(["admin", "employee"]);
     await connectDB();
     const { invoiceId } = await ctx.params;
     if (!mongoose.Types.ObjectId.isValid(invoiceId)) {
-      return NextResponse.json({ message: "Invalid invoice id" }, { status: 400 });
+      return apiError("Invalid invoice id", 400);
     }
-    const raw = await InvoiceModel.findById(invoiceId).lean();
+    if (session.user.role === "employee") {
+      try {
+        await assertEmployeeCanAccessInvoice(session.user.id, invoiceId);
+      } catch (e) {
+        if (e instanceof Error && e.message === "FORBIDDEN") {
+          return NextResponse.json({ message: "Forbidden" }, { status: 403 });
+        }
+        if (e instanceof Error && e.message === "NOT_FOUND") {
+          return NextResponse.json({ message: "Invoice not found" }, { status: 404 });
+        }
+        throw e;
+      }
+    }
+    const raw = await InvoiceModel.findById(invoiceId).populate("projectId", "fixCurrency").lean();
     if (!raw) {
-      return NextResponse.json({ message: "Invoice not found" }, { status: 404 });
+      return apiError("Invoice not found", 404);
     }
     const row = raw as unknown as Record<string, unknown>;
     const formatted = formatInvoiceForApi(row);
-    return NextResponse.json({ item: formatted });
+    return apiSuccess({ item: formatted });
   } catch (error) {
-    return authErrorResponse(error, "Failed to load invoice");
+    console.error("GET Invoice Error:", error);
+    return apiError("Failed to load invoice", 500);
   }
 }
 
 export async function PATCH(req: Request, ctx: Ctx) {
   try {
-    const session = await requireRole(["admin"]);
+    const session = await requireRole(["admin", "employee"]);
     await connectDB();
     const { invoiceId } = await ctx.params;
     if (!mongoose.Types.ObjectId.isValid(invoiceId)) {
-      return NextResponse.json({ message: "Invalid invoice id" }, { status: 400 });
+      return apiError("Invalid invoice id", 400);
+    }
+
+    if (session.user.role === "employee") {
+      try {
+        await assertEmployeeCanAccessInvoice(session.user.id, invoiceId);
+      } catch (e) {
+        if (e instanceof Error && e.message === "FORBIDDEN") {
+          return NextResponse.json({ message: "Forbidden" }, { status: 403 });
+        }
+        if (e instanceof Error && e.message === "NOT_FOUND") {
+          return NextResponse.json({ message: "Invoice not found" }, { status: 404 });
+        }
+        throw e;
+      }
     }
 
     const inv = await InvoiceModel.findById(invoiceId);
     if (!inv) {
-      return NextResponse.json({ message: "Invoice not found" }, { status: 404 });
+      return apiError("Invoice not found", 404);
     }
+
+    const existingDate = (inv.documentInfo as any)?.date;
+    if (existingDate) {
+      await assertPeriodNotLocked(existingDate);
+    }
+
+    const previousStatus = inv.status;
 
     const body = (await req.json()) as {
       invoiceNumber?: string;
-      status?: "unpaid" | "partial" | "paid" | "overdue";
+      invoiceType?: string;
+      currency?: string;
+      status?: string;
       dueDate?: string;
       documentInfo?: Record<string, unknown>;
       clientSnapshot?: Record<string, unknown>;
@@ -71,6 +111,18 @@ export async function PATCH(req: Request, ctx: Ctx) {
       branding?: Record<string, unknown>;
     };
 
+    if (body.invoiceType !== undefined) {
+      const t = String(body.invoiceType).toLowerCase();
+      if (["aed", "usd"].includes(t)) {
+        inv.invoiceType = t as "aed" | "usd";
+      }
+    }
+
+    if (body.currency !== undefined) {
+      const c = String(body.currency).toUpperCase();
+      inv.currency = c;
+    }
+
     if (body.invoiceNumber !== undefined) {
       const next = String(body.invoiceNumber).trim();
       if (next) {
@@ -79,14 +131,18 @@ export async function PATCH(req: Request, ctx: Ctx) {
           _id: { $ne: inv._id },
         }).lean();
         if (clash) {
-          return NextResponse.json({ message: "Invoice number already in use" }, { status: 400 });
+          return apiError("Invoice number already in use", 400);
         }
         inv.invoiceNumber = next;
       }
     }
 
-    if (body.status && ["unpaid", "partial", "paid", "overdue"].includes(body.status)) {
-      inv.status = body.status;
+    if (body.status) {
+      const s = String(body.status).toUpperCase();
+      if (s === "UNPAID") inv.status = "DRAFT";
+      else if (["DRAFT", "SENT", "PARTIAL", "PAID", "OVERDUE", "CANCELLED"].includes(s)) {
+        inv.status = s;
+      }
     }
 
     if (body.dueDate) {
@@ -100,7 +156,10 @@ export async function PATCH(req: Request, ctx: Ctx) {
       if (b.quotationCode !== undefined) di.quotationCode = String(b.quotationCode ?? "");
       if (b.date !== undefined) {
         const dt = new Date(String(b.date));
-        if (!Number.isNaN(dt.getTime())) di.date = dt;
+        if (!Number.isNaN(dt.getTime())) {
+          await assertPeriodNotLocked(dt);
+          di.date = dt;
+        }
       }
       if (b.subject !== undefined) di.subject = String(b.subject ?? "");
       if (b.title !== undefined) di.title = String(b.title ?? "");
@@ -129,14 +188,22 @@ export async function PATCH(req: Request, ctx: Ctx) {
       if (inv.extras == null) {
         inv.set("extras", {});
       }
-      const ex = inv.extras as Record<string, unknown>;
+      const ex = inv.extras as any;
       for (const [k, v] of Object.entries(body.extras)) {
         if (k === "bankAed" || k === "bankUsd") {
           if (v && typeof v === "object") {
-            ex[k] = { ...(ex[k] as object), ...(v as object) };
+            const rawBank = ex[k] && typeof ex[k] === "object" ? JSON.parse(JSON.stringify(ex[k])) : {};
+            const merged = {
+              accountName: String((v as any).accountName ?? rawBank.accountName ?? ""),
+              accountNo: String((v as any).accountNo ?? rawBank.accountNo ?? ""),
+              iban: String((v as any).iban ?? rawBank.iban ?? ""),
+              bankName: String((v as any).bankName ?? rawBank.bankName ?? ""),
+              swift: String((v as any).swift ?? rawBank.swift ?? ""),
+            };
+            ex.set(k, merged);
           }
         } else if (v !== undefined) {
-          ex[k] = v;
+          ex.set(k, v);
         }
       }
       inv.markModified("extras");
@@ -179,14 +246,20 @@ export async function PATCH(req: Request, ctx: Ctx) {
         tax: toDecimal128(tax),
         total: toDecimal128(total),
       };
+      inv.totalAmountBase = toDecimal128(total);
+      if (inv.totalsCache) {
+        inv.totalsCache.totalIntendedBase = toDecimal128(total);
+      }
       if (inv.extras == null) {
         inv.set("extras", {});
       }
       const ex = inv.extras as { amountInWords?: string };
-      ex.amountInWords =
-        inv.invoiceType === "usd"
-          ? `${total.toFixed(2)} US Dollars Only.`
-          : aedAmountInWords(total);
+      if (!body.extras || body.extras.amountInWords === undefined) {
+        ex.amountInWords =
+          inv.invoiceType === "usd"
+            ? `${total.toFixed(2)} US Dollars Only.`
+            : aedAmountInWords(total);
+      }
       inv.markModified("extras");
       inv.markModified("pages");
       inv.markModified("totals");
@@ -197,25 +270,131 @@ export async function PATCH(req: Request, ctx: Ctx) {
     } catch (err) {
       if (err instanceof mongoose.Error.ValidationError) {
         const first = Object.values(err.errors)[0]?.message ?? err.message;
-        return NextResponse.json({ message: first || "Validation failed" }, { status: 400 });
+        return apiError(first || "Validation failed", 400);
       }
       throw err;
     }
 
+    if (body.status !== undefined) {
+      let nextStatus = String(body.status).toUpperCase();
+      if (nextStatus === "UNPAID") nextStatus = "DRAFT";
+
+      if (nextStatus !== previousStatus) {
+        let policyId = "";
+        let triggerEvent = "INVOICE_PATCH_UPDATE";
+
+        if (nextStatus === "SENT") {
+          policyId = "POL-INV-001";
+          triggerEvent = "INV_FINALIZED_VIA_PATCH";
+        } else if (nextStatus === "PAID") {
+          policyId = "POL-INV-002";
+          triggerEvent = "INV_PAID_VIA_PATCH";
+        } else if (nextStatus === "CANCELLED") {
+          policyId = "POL-INV-003";
+          triggerEvent = "INV_CANCELLED_VIA_PATCH";
+        }
+
+        if (policyId) {
+          const result = await executeTransition({
+            policyId,
+            entityId: invoiceId,
+            approvedBy: session.user.id,
+            triggerEvent,
+            route: `/api/admin/invoices/${invoiceId}`
+          });
+
+          if (!result.success) {
+            return apiError(
+              result.message || "Invoice transition validation failed.",
+              400,
+              { blockers: result.blockers }
+            );
+          }
+        } else {
+          return apiError(
+            `Direct status transitions to '${nextStatus}' are prohibited. Policy not defined.`,
+            400
+          );
+        }
+      }
+    }
+
     await logActivity({
       userId: session.user.id,
-      action: "updated_invoice",
-      entityType: "invoice",
+      action: previousStatus !== inv.status ? "INVOICE_STATUS_CHANGED" : "INVOICE_UPDATED",
+      entityType: "Invoice",
       entityId: String(inv._id),
-      message: `Updated invoice ${inv.invoiceNumber}`,
+      message: previousStatus !== inv.status 
+        ? `Invoice ${inv.invoiceNumber} status changed from ${previousStatus} to ${inv.status}`
+        : `Updated invoice ${inv.invoiceNumber}`,
+      projectId: String(inv.projectId),
+      metadata: {
+        previous: { status: previousStatus },
+        current: { status: inv.status },
+        changedFields: Object.keys(body)
+      }
+    });
+
+    return apiSuccess({ ok: true });
+  } catch (error) {
+    console.error("PATCH Invoice Error:", error);
+    if (error instanceof Error) {
+      if (error.message === "UNAUTHORIZED" || error.message === "FORBIDDEN") {
+        return apiError("Forbidden", 403);
+      }
+      if (error.message.includes("closed accounting period") || error.message.includes("locked")) {
+        return apiError(error.message, 400);
+      }
+    }
+    return apiError("Failed to update invoice", 500);
+  }
+}
+
+export async function DELETE(_req: Request, ctx: Ctx) {
+  try {
+    const session = await requireRole(["admin"]);
+    await connectDB();
+    const { invoiceId } = await ctx.params;
+    if (!mongoose.Types.ObjectId.isValid(invoiceId)) {
+      return apiError("Invalid invoice id", 400);
+    }
+
+    const inv = await InvoiceModel.findById(invoiceId);
+    if (!inv) {
+      return apiError("Invoice not found", 404);
+    }
+
+    // Check if period is locked
+    const docDate = (inv.documentInfo as any)?.date || inv.dueDate;
+    if (docDate) {
+      await assertPeriodNotLocked(docDate);
+    }
+
+    // Soft delete
+    inv.set("isDeleted", true);
+    inv.set("deletedAt", new Date());
+    await inv.save();
+
+    await logActivity({
+      userId: session.user.id,
+      action: "INVOICE_DELETED",
+      entityType: "Invoice",
+      entityId: invoiceId,
+      message: `Deleted invoice ${inv.invoiceNumber}`,
       projectId: String(inv.projectId),
     });
 
-    return NextResponse.json({ ok: true });
+    return apiSuccess({ ok: true });
   } catch (error) {
-    if (error instanceof Error && (error.message === "UNAUTHORIZED" || error.message === "FORBIDDEN")) {
-      return authErrorResponse(error, "Forbidden");
+    console.error("DELETE Invoice Error:", error);
+    if (error instanceof Error) {
+      if (error.message === "UNAUTHORIZED" || error.message === "FORBIDDEN") {
+        return apiError("Forbidden", 403);
+      }
+      if (error.message.includes("closed accounting period") || error.message.includes("locked")) {
+        return apiError(error.message, 400);
+      }
     }
-    return authErrorResponse(error, "Failed to update invoice");
+    return apiError("Failed to delete invoice", 500);
   }
 }

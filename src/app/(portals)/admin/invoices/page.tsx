@@ -1,12 +1,15 @@
+export const unstable_instant = { prefetch: 'static', unstable_disableValidation: true };
+
+import { Suspense } from "react";
 import { AdminInvoicesCreateHelper } from "@/components/portals/admin-invoices-create-helper";
-import { ResourceTableClient } from "@/components/portals/resource-table-client";
+import { AdminInvoicesPageClient } from "@/components/portals/admin-invoice-detail/admin-invoices-page-client";
 
 interface PageProps {
   searchParams?: Promise<{ projectId?: string }>;
 }
 
-export default async function AdminInvoicesPage({ searchParams }: PageProps) {
-  const params = (await searchParams) ?? {};
+async function InvoicesContent({ searchParams }: { searchParams: Promise<{ projectId?: string }> }) {
+  const params = await searchParams;
   const projectId = params.projectId ? String(params.projectId) : "";
   const endpoint = projectId
     ? `/api/admin/invoices?projectId=${encodeURIComponent(projectId)}`
@@ -15,25 +18,20 @@ export default async function AdminInvoicesPage({ searchParams }: PageProps) {
   return (
     <>
       <AdminInvoicesCreateHelper projectId={projectId} />
-      <ResourceTableClient
-      title="Invoices"
-      description={
-        projectId
-          ? "Invoices for this project. Payment status and due dates are shown in each row."
-          : "Payment status, totals, due dates, and linked PO. Open a row to edit or print."
-      }
-      endpoint={endpoint}
-      columns={[
-        { key: "invoiceNumber", label: "Invoice #" },
-        { key: "poNumberRef", label: "PO #" },
-        { key: "status", label: "Status" },
-        { key: "total", label: "Total" },
-        { key: "dueDate", label: "Due Date" },
-        { key: "projectId", label: "Project" },
-        { key: "createdAt", label: "Created" },
-      ]}
-      rowDetailPathPrefix="/admin/invoices"
-    />
+      <AdminInvoicesPageClient
+        projectId={projectId}
+        endpoint={endpoint}
+      />
     </>
+  );
+}
+
+export default function AdminInvoicesPage({ searchParams }: PageProps) {
+  const paramsPromise = searchParams ?? Promise.resolve({});
+
+  return (
+    <Suspense fallback={<div className="h-64 flex items-center justify-center">Loading invoices...</div>}>
+      <InvoicesContent searchParams={paramsPromise} />
+    </Suspense>
   );
 }

@@ -9,6 +9,7 @@ export const activityLogSchema = new Schema(
     entityId: { type: Types.ObjectId, required: true, index: true },
     message: { type: String, default: "" },
     projectId: { type: Types.ObjectId, ref: "Project", index: true },
+    metadata: { type: Schema.Types.Mixed, default: {} },
   },
   schemaOptions
 );

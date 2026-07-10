@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { aedAmountInWords } from "@/lib/invoice/aed-amount-words";
+import { amountInWords } from "@/lib/invoice/aed-amount-words";
 import type { Item } from "./types";
 import { formatAedAmount } from "./utils";
 
@@ -30,8 +30,9 @@ export function LineItemsCard({
   onPatchExtra,
 }: LineItemsCardProps) {
   const rows = item.pages[0]?.items ?? [];
+  const currency = item.currency || "AED";
   const manualWords = String(extras.amountInWords ?? "").trim();
-  const computedWords = aedAmountInWords(liveTotals.total);
+  const computedWords = amountInWords(liveTotals.total, currency);
 
   return (
     <Card>
@@ -61,7 +62,7 @@ export function LineItemsCard({
                   Qty
                 </th>
                 <th scope="col" className="text-muted-foreground w-28 px-2 py-2.5 text-right text-xs font-semibold">
-                  Rate (AED)
+                  Rate ({currency})
                 </th>
                 <th scope="col" className="text-muted-foreground w-28 px-2 py-2.5 text-right text-xs font-semibold">
                   Line total
@@ -122,7 +123,7 @@ export function LineItemsCard({
                     </td>
                     <td className="p-1.5 align-top">
                       <Label htmlFor={`inv-line-${idx}-rate`} className="sr-only">
-                        Unit rate AED row {row.number}
+                        Unit rate {currency} row {row.number}
                       </Label>
                       <Input
                         id={`inv-line-${idx}-rate`}
@@ -138,7 +139,7 @@ export function LineItemsCard({
                     </td>
                     <td className="px-2 py-2 align-middle text-right">
                       <span className="text-xs font-semibold tabular-nums text-foreground" title="Quantity × rate">
-                        AED {formatAedAmount(amt)}
+                        {currency} {formatAedAmount(amt)}
                       </span>
                     </td>
                     <td className="p-1 align-middle">
@@ -168,18 +169,20 @@ export function LineItemsCard({
             <div className="flex flex-wrap justify-between gap-x-8 gap-y-1">
               <span className="text-muted-foreground">Subtotal</span>
               <span className="tabular-nums font-medium text-foreground">
-                AED {formatAedAmount(liveTotals.subtotal)}
+                {currency} {formatAedAmount(liveTotals.subtotal)}
               </span>
             </div>
-            <div className="flex flex-wrap justify-between gap-x-8 gap-y-1">
-              <span className="text-muted-foreground">{taxLabelPreview}</span>
-              <span className="tabular-nums font-medium text-foreground">
-                AED {formatAedAmount(liveTotals.tax)}
-              </span>
-            </div>
+            {item.documentInfo.taxEnabled !== false && (
+              <div className="flex flex-wrap justify-between gap-x-8 gap-y-1">
+                <span className="text-muted-foreground">{taxLabelPreview}</span>
+                <span className="tabular-nums font-medium text-foreground">
+                  {currency} {formatAedAmount(liveTotals.tax)}
+                </span>
+              </div>
+            )}
             <div className="flex flex-wrap justify-between gap-x-8 gap-y-1 border-t border-border/60 pt-2 font-semibold text-foreground">
               <span>Total / Balance due</span>
-              <span className="tabular-nums">AED {formatAedAmount(liveTotals.total)}</span>
+              <span className="tabular-nums">{currency} {formatAedAmount(liveTotals.total)}</span>
             </div>
           </div>
         </div>
@@ -203,7 +206,7 @@ export function LineItemsCard({
               variant="secondary"
               onClick={() => onPatchExtra("amountInWords", computedWords)}
             >
-              Use amount for {formatAedAmount(liveTotals.total)} AED
+              Use amount for {formatAedAmount(liveTotals.total)} {currency}
             </Button>
             {manualWords ? (
               <Button type="button" size="sm" variant="ghost" onClick={() => onPatchExtra("amountInWords", "")}>

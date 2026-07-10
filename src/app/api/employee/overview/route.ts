@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { connectDB } from "@/lib/db/connect";
-import { InvoiceModel, ProjectModel, QuotationModel } from "@/lib/db/models";
+import { InvoiceModel, ProjectModel, PurchaseOrderModel, QuotationModel } from "@/lib/db/models";
 import { requireRole } from "@/lib/auth/require-role";
+import { getEmployeeAssignedProjectIdStrings } from "@/lib/auth/employee-resource-access";
 
 export async function GET() {
   try {
@@ -10,25 +11,38 @@ export async function GET() {
 
     const userId = session.user.id;
 
-    const [myProjects, myQuotations, myInvoices] = await Promise.all([
+    const projectIds = await getEmployeeAssignedProjectIdStrings(userId);
+
+    const [myProjects, myQuotations, myPurchaseOrders, myInvoices] = await Promise.all([
       ProjectModel.find({ assignedTo: userId })
         .select("name status priority updatedAt")
         .sort({ updatedAt: -1 })
         .limit(8)
         .lean(),
-      QuotationModel.find({ createdBy: userId })
-        .select("quotationNumber status projectId createdAt")
-        .sort({ createdAt: -1 })
-        .limit(8)
-        .lean(),
-      InvoiceModel.find({ createdBy: userId })
-        .select("invoiceNumber status dueDate projectId createdAt")
-        .sort({ createdAt: -1 })
-        .limit(8)
-        .lean(),
+      projectIds.length === 0
+        ? Promise.resolve([])
+        : QuotationModel.find({ projectId: { $in: projectIds } })
+            .select("quotationNumber status projectId createdAt")
+            .sort({ createdAt: -1 })
+            .limit(8)
+            .lean(),
+      projectIds.length === 0
+        ? Promise.resolve([])
+        : PurchaseOrderModel.find({ projectId: { $in: projectIds } })
+            .select("poNumber status projectId createdAt")
+            .sort({ createdAt: -1 })
+            .limit(8)
+            .lean(),
+      projectIds.length === 0
+        ? Promise.resolve([])
+        : InvoiceModel.find({ projectId: { $in: projectIds } })
+            .select("invoiceNumber status dueDate projectId createdAt")
+            .sort({ createdAt: -1 })
+            .limit(8)
+            .lean(),
     ]);
 
-    return NextResponse.json({ myProjects, myQuotations, myInvoices });
+    return NextResponse.json({ myProjects, myQuotations, myPurchaseOrders, myInvoices });
   } catch (error) {
     if (error instanceof Error && error.message === "UNAUTHORIZED") {
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 });

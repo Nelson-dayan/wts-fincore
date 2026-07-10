@@ -60,14 +60,30 @@ function integerToIndianWords(n: number): string {
   return neg ? `Negative ${s}` : s;
 }
 
-export function aedAmountInWords(amount: number): string {
+export function amountInWords(amount: number, currencyCode: string = "AED"): string {
   const safe = Number.isFinite(amount) ? amount : 0;
   const whole = Math.floor(Math.abs(safe) + 1e-9);
-  const fils = Math.min(
+  const frac = Math.min(
     99,
     Math.round((Math.abs(safe) - whole + 1e-9) * 100)
   );
   const wordsWhole = integerToIndianWords(safe < 0 ? -whole : whole);
-  const wordsFils = fils === 0 ? "Zero" : num0to99(fils);
-  return `${wordsWhole} Dirhams and ${wordsFils} Fils.`;
+  const wordsFrac = frac === 0 ? "Zero" : num0to99(frac);
+
+  const c = currencyCode.toUpperCase();
+  if (c === "INR") {
+    return `${wordsWhole} Rupees and ${wordsFrac} Paise.`;
+  } else if (c === "USD") {
+    return `${wordsWhole} Dollars and ${wordsFrac} Cents.`;
+  } else if (c === "EUR") {
+    return `${wordsWhole} Euros and ${wordsFrac} Cents.`;
+  } else if (c === "GBP") {
+    return `${wordsWhole} Pounds and ${wordsFrac} Pence.`;
+  } else {
+    return `${wordsWhole} Dirhams and ${wordsFrac} Fils.`;
+  }
+}
+
+export function aedAmountInWords(amount: number): string {
+  return amountInWords(amount, "AED");
 }

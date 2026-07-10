@@ -13,6 +13,8 @@ import {
 } from "@/lib/db/models";
 import { requireRole } from "@/lib/auth/require-role";
 import { decimalToNumber } from "@/lib/services/business/money";
+import { apiSuccess, apiError } from "@/lib/api/response";
+
 
 function monthKey(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
@@ -22,6 +24,8 @@ export async function GET() {
   try {
     await requireRole(["admin"]);
     await connectDB();
+
+    const today = new Date();
 
     const [
       users,
@@ -34,6 +38,8 @@ export async function GET() {
       expenses,
       activityLogs,
       allExpensesLean,
+      allPaymentsLean,
+      overdueInvoices,
     ] = await Promise.all([
       UserModel.countDocuments(),
       ClientModel.countDocuments(),
@@ -44,69 +50,76 @@ export async function GET() {
       PaymentModel.countDocuments(),
       ExpenseModel.countDocuments(),
       ActivityLogModel.countDocuments(),
-      ExpenseModel.find({}).select("amount category createdAt projectId").lean(),
+      ExpenseModel.find({}).select("amountBase category createdAt projectId").lean(),
+      PaymentModel.find({ status: "COMPLETED" }).select("receivedAmountBase feesBase createdAt invoiceId").lean(),
+      InvoiceModel.find({
+        status: { $in: ["SENT", "PARTIAL", "OVERDUE"] },
+        dueDate: { $lt: today },
+        isDeleted: false
+      }).select("invoiceNumber dueDate status").limit(5).lean()
     ]);
 
+    // 1. Expense Aggregation
     const expenseTotalAmount = allExpensesLean.reduce(
-      (s, e) => s + decimalToNumber(e.amount),
+      (s, e) => s + decimalToNumber(e.amountBase || (e as any).amount),
       0
     );
 
+    // 2. Revenue Aggregation
+    const revenueTotalAmount = allPaymentsLean.reduce(
+      (s, p) => s + decimalToNumber(p.receivedAmountBase),
+      0
+    );
+
+    const feesTotalAmount = allPaymentsLean.reduce(
+      (s, p) => s + decimalToNumber(p.feesBase),
+      0
+    );
+
+    // 3. Time Series (Last 6 Months)
     const now = new Date();
-    const expenseByMonth: Array<{ key: string; label: string; total: number }> = [];
+    const timeSeries: Array<{ key: string; label: string; revenue: number; expenses: number }> = [];
     for (let i = 5; i >= 0; i--) {
       const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      expenseByMonth.push({
+      timeSeries.push({
         key: monthKey(d),
         label: d.toLocaleString(undefined, { month: "short", year: "numeric" }),
-        total: 0,
+        revenue: 0,
+        expenses: 0,
       });
     }
-    const monthIndex = new Map(expenseByMonth.map((m, idx) => [m.key, idx]));
+    const monthIndex = new Map(timeSeries.map((m, idx) => [m.key, idx]));
+
     for (const e of allExpensesLean) {
       const c = e.createdAt ? new Date(e.createdAt as Date) : null;
       if (!c || Number.isNaN(c.getTime())) continue;
       const key = monthKey(c);
       const idx = monthIndex.get(key);
       if (idx !== undefined) {
-        expenseByMonth[idx].total += decimalToNumber(e.amount);
+        timeSeries[idx].expenses += decimalToNumber(e.amountBase || (e as any).amount);
       }
     }
 
-    const categoryMap = new Map<string, number>();
-    for (const e of allExpensesLean) {
-      const cat = String(e.category ?? "Other").trim() || "Other";
-      categoryMap.set(cat, (categoryMap.get(cat) ?? 0) + decimalToNumber(e.amount));
+    for (const p of allPaymentsLean) {
+      const c = p.createdAt ? new Date(p.createdAt as Date) : null;
+      if (!c || Number.isNaN(c.getTime())) continue;
+      const key = monthKey(c);
+      const idx = monthIndex.get(key);
+      if (idx !== undefined) {
+        timeSeries[idx].revenue += decimalToNumber(p.receivedAmountBase);
+      }
     }
-    const expenseByCategory = [...categoryMap.entries()]
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 8)
-      .map(([category, total]) => ({ category, total }));
 
-    const projectTotals = new Map<string, number>();
-    for (const e of allExpensesLean) {
-      if (!e.projectId) continue;
-      const pid = String(e.projectId);
-      projectTotals.set(pid, (projectTotals.get(pid) ?? 0) + decimalToNumber(e.amount));
-    }
-    const topProjectIds = [...projectTotals.entries()]
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 5)
-      .map(([id]) => id);
-    const projectDocs =
-      topProjectIds.length > 0
-        ? await ProjectModel.find({ _id: { $in: topProjectIds } })
-            .select("name")
-            .lean()
-        : [];
-    const nameById = new Map(projectDocs.map((p) => [String(p._id), String(p.name ?? "")]));
-    const topProjectsByExpense = topProjectIds.map((id) => ({
-      projectId: id,
-      name: nameById.get(id) ?? id,
-      total: projectTotals.get(id) ?? 0,
+    // 4. Notifications (Actionable)
+    const notifications = overdueInvoices.map(inv => ({
+      type: "OVERDUE_INVOICE",
+      title: `Invoice ${inv.invoiceNumber} is overdue`,
+      description: `Due date was ${new Date(inv.dueDate).toLocaleDateString()}. Action suggested: Trigger reminder or follow up.`,
+      actionUrl: `/admin/invoices/${inv._id}`,
+      severity: inv.status === "OVERDUE" ? "high" : "medium"
     }));
 
-    return NextResponse.json({
+    return apiSuccess({
       users,
       clients,
       projects,
@@ -116,21 +129,19 @@ export async function GET() {
       payments,
       expenses,
       activityLogs,
+      revenueTotalAmount,
       expenseTotalAmount,
-      expenseByMonth,
-      expenseByCategory,
-      topProjectsByExpense,
+      feesTotalAmount,
+      profitTotalAmount: revenueTotalAmount - (expenseTotalAmount + feesTotalAmount),
+      timeSeries,
+      notifications,
+      // For backward compatibility with AdminOverviewCharts if needed
+      expenseByMonth: timeSeries.map(t => ({ key: t.key, label: t.label, total: t.expenses })),
+      expenseByCategory: [], // Could aggregate if needed
+      topProjectsByExpense: [] // Could aggregate if needed
     });
   } catch (error) {
-    if (error instanceof Error && error.message === "UNAUTHORIZED") {
-      return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
-    }
-    if (error instanceof Error && error.message === "FORBIDDEN") {
-      return NextResponse.json({ message: "Forbidden" }, { status: 403 });
-    }
-    return NextResponse.json(
-      { message: "Failed to load admin overview" },
-      { status: 500 }
-    );
+    console.error("Overview error:", error);
+    return apiError("Failed to load admin overview", 500);
   }
 }

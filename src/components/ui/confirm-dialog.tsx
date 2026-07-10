@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useId } from "react";
+import { useEffect, useId, useState } from "react";
+import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/button";
 
 export type ConfirmDialogProps = {
@@ -26,8 +27,13 @@ export function ConfirmDialog({
   loading = false,
   onConfirm,
 }: ConfirmDialogProps) {
+  const [mounted, setMounted] = useState(false);
   const titleId = useId();
   const descId = useId();
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     if (!open) return;
@@ -38,11 +44,11 @@ export function ConfirmDialog({
     return () => window.removeEventListener("keydown", onKey);
   }, [open, loading, onOpenChange]);
 
-  if (!open) return null;
+  if (!open || !mounted) return null;
 
-  return (
+  return createPortal(
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6"
+      className="fixed inset-0 z-[9999] flex items-center justify-center p-4 sm:p-6"
       role="presentation"
     >
       <button
@@ -57,7 +63,7 @@ export function ConfirmDialog({
         aria-modal="true"
         aria-labelledby={titleId}
         aria-describedby={description ? descId : undefined}
-        className="relative z-10 w-full max-w-md overflow-hidden rounded-2xl border border-border/80 bg-card shadow-[0_24px_80px_-12px_rgba(0,0,0,0.35)] dark:shadow-[0_24px_80px_-12px_rgba(0,0,0,0.55)]"
+        className="relative z-10 w-full max-w-md overflow-hidden rounded-2xl border border-border/80 bg-card shadow-[0_24px_80px_-12px_rgba(0,0,0,0.35)] dark:shadow-[0_24px_80px_-12px_rgba(0,0,0,0.55)] animate-in fade-in zoom-in-95 duration-200"
       >
         <div className="h-1 bg-linear-to-r from-primary/80 via-primary to-primary/40" />
         <div className="px-6 pb-6 pt-5 sm:px-7 sm:pt-6">
@@ -91,6 +97,7 @@ export function ConfirmDialog({
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

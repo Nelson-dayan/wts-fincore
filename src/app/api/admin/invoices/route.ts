@@ -2,36 +2,71 @@ import { NextResponse } from "next/server";
 import mongoose from "mongoose";
 import { requireRole } from "@/lib/auth/require-role";
 import { connectDB } from "@/lib/db/connect";
-import { InvoiceModel } from "@/lib/db/models";
+import { InvoiceModel, PurchaseOrderModel } from "@/lib/db/models";
 import { authErrorResponse } from "@/lib/api/route-auth";
 import { parsePagination, parseSearch } from "@/lib/api/pagination";
 import { logActivity } from "@/lib/services/activity/log-activity.service";
 import { createInvoiceForPurchaseOrder } from "@/lib/services/business/invoice.service";
 import { decimalToNumber } from "@/lib/services/business/money";
+import { checkOrCreateIdempotency, saveIdempotencySuccess, saveIdempotencyFailed } from "@/lib/services/business/idempotency.service";
+import {
+  assertEmployeeCanAccessPurchaseOrder,
+  getEmployeeAssignedProjectIdStrings,
+} from "@/lib/auth/employee-resource-access";
 
 export async function GET(req: Request) {
   try {
-    await requireRole(["admin"]);
+    const session = await requireRole(["admin", "employee"]);
     await connectDB();
     const url = new URL(req.url);
     const { page, limit, skip } = parsePagination(url.searchParams);
     const q = parseSearch(url.searchParams);
     const projectId = String(url.searchParams.get("projectId") ?? "").trim();
     const poId = String(url.searchParams.get("poId") ?? "").trim();
-    const filter: Record<string, unknown> = { "extras._hiddenUntilSaved": { $ne: true } };
+    const filter: Record<string, unknown> = {
+      lifecycleStatus: { $ne: "DRAFT_HIDDEN" },
+      isDeleted: { $ne: true }
+    };
     if (q) filter.invoiceNumber = { $regex: q, $options: "i" };
-    if (projectId) filter.projectId = projectId;
-    if (poId) {
-      if (!mongoose.Types.ObjectId.isValid(poId)) {
-        return NextResponse.json({ message: "Invalid poId" }, { status: 400 });
+
+    if (session.user.role === "employee") {
+      const employeeProjectIds = await getEmployeeAssignedProjectIdStrings(session.user.id);
+      if (poId) {
+        if (!mongoose.Types.ObjectId.isValid(poId)) {
+          return NextResponse.json({ message: "Invalid poId" }, { status: 400 });
+        }
+        const po = await PurchaseOrderModel.findById(poId).select("projectId").lean();
+        const pPid = po?.projectId ? String(po.projectId) : "";
+        if (!pPid || !employeeProjectIds.includes(pPid)) {
+          return NextResponse.json({ items: [], page, limit, total: 0, hasMore: false });
+        }
+        filter.poId = new mongoose.Types.ObjectId(poId);
+      } else if (projectId) {
+        if (!employeeProjectIds.includes(projectId)) {
+          return NextResponse.json({ items: [], page, limit, total: 0, hasMore: false });
+        }
+        filter.projectId = projectId;
+      } else {
+        if (employeeProjectIds.length === 0) {
+          return NextResponse.json({ items: [], page, limit, total: 0, hasMore: false });
+        }
+        filter.projectId = { $in: employeeProjectIds };
       }
-      filter.poId = new mongoose.Types.ObjectId(poId);
+    } else {
+      if (projectId) filter.projectId = projectId;
+      if (poId) {
+        if (!mongoose.Types.ObjectId.isValid(poId)) {
+          return NextResponse.json({ message: "Invalid poId" }, { status: 400 });
+        }
+        filter.poId = new mongoose.Types.ObjectId(poId);
+      }
     }
     const [rawItems, total] = await Promise.all([
       InvoiceModel.find(filter)
         .select(
-          "invoiceNumber invoiceType status dueDate projectId poId createdAt totals extras.poNumberRef"
+          "invoiceNumber invoiceType currency status dueDate projectId poId companyId createdAt totals extras.poNumberRef totalsCache"
         )
+        .populate("projectId", "name fixCurrency")
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
@@ -46,12 +81,22 @@ export async function GET(req: Request) {
         _id: String(row._id),
         invoiceNumber: row.invoiceNumber,
         invoiceType: row.invoiceType === "usd" ? "usd" : "aed",
+        currency: String((row as any).currency || "AED").toUpperCase(),
         status: row.status,
         dueDate: dd instanceof Date ? dd.toISOString() : dd,
-        projectId: String(row.projectId ?? ""),
+        projectId: row.projectId && typeof row.projectId === "object" ? {
+          _id: String((row.projectId as any)._id),
+          name: String((row.projectId as any).name || "Unnamed Project"),
+        } : null,
         poId: row.poId ? String(row.poId) : "",
+        companyId: String(row.companyId ?? ""),
         poNumberRef: String(extras?.poNumberRef ?? ""),
         total: decimalToNumber(totals?.total),
+        totalsCache: row.totalsCache ? {
+          totalIntendedBase: decimalToNumber((row.totalsCache as any).totalIntendedBase),
+          totalReceivedBase: decimalToNumber((row.totalsCache as any).totalReceivedBase),
+        } : undefined,
+        fixCurrency: (row.projectId as any)?.fixCurrency || false,
         createdAt:
           row.createdAt instanceof Date ? row.createdAt.toISOString() : row.createdAt,
       };
@@ -63,14 +108,65 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
+  let idempotencyKey: string | null = null;
+  let userId: string = "";
+  let isIdempotencyEnabled = false;
+
   try {
-    const session = await requireRole(["admin"]);
+    const session = await requireRole(["admin", "employee"]);
+    userId = session.user.id;
     await connectDB();
+
     const body = (await req.json()) as { poId?: string; invoiceType?: "aed" | "usd" };
     const poId = String(body.poId ?? "").trim();
     const invoiceType = body.invoiceType === "usd" ? "usd" : "aed";
+
+    idempotencyKey = req.headers.get("Idempotency-Key")?.trim() ?? null;
+    if (idempotencyKey) {
+      try {
+        const check = await checkOrCreateIdempotency(
+          idempotencyKey,
+          userId,
+          "/api/admin/invoices",
+          body
+        );
+
+        if (check.status === "CACHED") {
+          return NextResponse.json(check.responseBody, { status: check.responseStatus });
+        }
+        if (check.status === "IN_PROGRESS") {
+          return NextResponse.json({ message: "Request already in progress" }, { status: 409 });
+        }
+        isIdempotencyEnabled = true;
+      } catch (e: any) {
+        if (e.message === "IDEMPOTENCY_PAYLOAD_MISMATCH") {
+          return NextResponse.json(
+            { message: "Idempotency key reused with a different body payload" },
+            { status: 409 }
+          );
+        }
+        throw e;
+      }
+    }
+
     if (!poId) {
+      if (isIdempotencyEnabled) await saveIdempotencyFailed(idempotencyKey!, userId);
       return NextResponse.json({ message: "poId is required" }, { status: 400 });
+    }
+
+    if (session.user.role === "employee") {
+      try {
+        await assertEmployeeCanAccessPurchaseOrder(session.user.id, poId);
+      } catch (e) {
+        if (isIdempotencyEnabled) await saveIdempotencyFailed(idempotencyKey!, userId);
+        if (e instanceof Error && e.message === "FORBIDDEN") {
+          return NextResponse.json({ message: "Forbidden" }, { status: 403 });
+        }
+        if (e instanceof Error && e.message === "NOT_FOUND") {
+          return NextResponse.json({ message: "Purchase order not found" }, { status: 404 });
+        }
+        throw e;
+      }
     }
 
     const { id, invoiceNumber, projectId } = await createInvoiceForPurchaseOrder({
@@ -88,8 +184,16 @@ export async function POST(req: Request) {
       projectId,
     });
 
-    return NextResponse.json({ id, invoiceNumber, projectId }, { status: 201 });
+    const resData = { id, invoiceNumber, projectId };
+    if (isIdempotencyEnabled) {
+      await saveIdempotencySuccess(idempotencyKey!, userId, resData, 201);
+    }
+
+    return NextResponse.json(resData, { status: 201 });
   } catch (error) {
+    if (isIdempotencyEnabled && idempotencyKey) {
+      await saveIdempotencyFailed(idempotencyKey, userId);
+    }
     if (error instanceof Error) {
       const msg = error.message;
       if (msg === "UNAUTHORIZED" || msg === "FORBIDDEN") {
@@ -100,11 +204,14 @@ export async function POST(req: Request) {
         msg.startsWith("Purchase order") ||
         msg.startsWith("Quotation") ||
         msg.startsWith("Invalid") ||
-        msg.startsWith("Could not generate")
+        msg.startsWith("Could not generate") ||
+        msg.includes("closed accounting period") ||
+        msg.includes("locked")
       ) {
         return NextResponse.json({ message: msg }, { status: 400 });
       }
     }
+    console.error("INVOICE CREATE ERROR:", error);
     return authErrorResponse(error, "Failed to create invoice");
   }
 }

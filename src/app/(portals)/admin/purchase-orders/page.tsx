@@ -1,3 +1,6 @@
+export const unstable_instant = { prefetch: 'static', unstable_disableValidation: true };
+
+import { Suspense } from "react";
 import { DashboardPageHeader } from "@/components/dashboard/page-header";
 import { AdminPurchaseOrdersPageClient } from "@/components/portals/admin-purchase-orders-page-client";
 
@@ -5,17 +8,25 @@ interface PageProps {
   searchParams?: Promise<{ projectId?: string }>;
 }
 
-export default async function AdminPurchaseOrdersPage({ searchParams }: PageProps) {
-  const params = (await searchParams) ?? {};
+async function PurchaseOrdersContent({ searchParams }: { searchParams: Promise<{ projectId?: string }> }) {
+  const params = await searchParams;
   const projectId = params.projectId ? String(params.projectId) : "";
   const endpoint = projectId
     ? `/api/admin/purchase-orders?projectId=${encodeURIComponent(projectId)}`
     : "/api/admin/purchase-orders";
 
+  return <AdminPurchaseOrdersPageClient projectId={projectId} endpoint={endpoint} />;
+}
+
+export default function AdminPurchaseOrdersPage({ searchParams }: PageProps) {
+  const paramsPromise = searchParams ?? Promise.resolve({});
+
   return (
     <>
       <DashboardPageHeader title="Purchase orders" description="Add PO below. List underneath." />
-      <AdminPurchaseOrdersPageClient projectId={projectId} endpoint={endpoint} />
+      <Suspense fallback={<div className="h-64 flex items-center justify-center">Loading POs...</div>}>
+        <PurchaseOrdersContent searchParams={paramsPromise} />
+      </Suspense>
     </>
   );
 }

@@ -3,6 +3,7 @@ import { requireRole } from "@/lib/auth/require-role";
 import { authErrorResponse } from "@/lib/api/route-auth";
 import { connectDB } from "@/lib/db/connect";
 import { InvoiceModel, PurchaseOrderModel } from "@/lib/db/models";
+import { executeTransition } from "@/lib/services/orchestration";
 import { logActivity } from "@/lib/services/activity/log-activity.service";
 import mongoose from "mongoose";
 import {
@@ -10,16 +11,31 @@ import {
   formFileEntryToBlob,
   validatePoDataUrlString,
 } from "@/lib/api/po-upload";
+import { assertEmployeeCanAccessPurchaseOrder } from "@/lib/auth/employee-resource-access";
+import { convertToBase } from "@/lib/services/finance/exchange.engine";
 
 type Ctx = { params: Promise<{ purchaseOrderId: string }> };
 
 export async function GET(_req: Request, ctx: Ctx) {
   try {
-    await requireRole(["admin"]);
+    const session = await requireRole(["admin", "employee"]);
     await connectDB();
     const { purchaseOrderId } = await ctx.params;
     if (!mongoose.Types.ObjectId.isValid(purchaseOrderId)) {
       return NextResponse.json({ message: "Invalid purchase order id" }, { status: 400 });
+    }
+    if (session.user.role === "employee") {
+      try {
+        await assertEmployeeCanAccessPurchaseOrder(session.user.id, purchaseOrderId);
+      } catch (e) {
+        if (e instanceof Error && e.message === "FORBIDDEN") {
+          return NextResponse.json({ message: "Forbidden" }, { status: 403 });
+        }
+        if (e instanceof Error && e.message === "NOT_FOUND") {
+          return NextResponse.json({ message: "Purchase order not found" }, { status: 404 });
+        }
+        throw e;
+      }
     }
     const raw = await PurchaseOrderModel.findById(purchaseOrderId)
       .populate("quotationId", "quotationNumber")
@@ -61,6 +77,7 @@ export async function GET(_req: Request, ctx: Ctx) {
       status: raw.status,
       fileUrl: raw.fileUrl ?? "",
       externalPoNumber: String(raw.externalPoNumber ?? "").trim(),
+      currency: raw.currency ?? "AED",
       totalAmount,
       createdAt,
     };
@@ -73,11 +90,25 @@ export async function GET(_req: Request, ctx: Ctx) {
 
 export async function PATCH(req: Request, ctx: Ctx) {
   try {
-    const session = await requireRole(["admin"]);
+    const session = await requireRole(["admin", "employee"]);
     await connectDB();
     const { purchaseOrderId } = await ctx.params;
     if (!mongoose.Types.ObjectId.isValid(purchaseOrderId)) {
       return NextResponse.json({ message: "Invalid purchase order id" }, { status: 400 });
+    }
+
+    if (session.user.role === "employee") {
+      try {
+        await assertEmployeeCanAccessPurchaseOrder(session.user.id, purchaseOrderId);
+      } catch (e) {
+        if (e instanceof Error && e.message === "FORBIDDEN") {
+          return NextResponse.json({ message: "Forbidden" }, { status: 403 });
+        }
+        if (e instanceof Error && e.message === "NOT_FOUND") {
+          return NextResponse.json({ message: "Purchase order not found" }, { status: 404 });
+        }
+        throw e;
+      }
     }
 
     const ct = (req.headers.get("content-type") ?? "").toLowerCase();
@@ -146,13 +177,12 @@ export async function PATCH(req: Request, ctx: Ctx) {
     if (externalPoNumber !== undefined) {
       po.externalPoNumber = externalPoNumber.trim();
     }
-    if (status) {
-      po.status = status;
-    }
     if (totalAmountInput !== undefined) {
       const n = Number.parseFloat(String(totalAmountInput).replace(/,/g, ""));
       if (Number.isFinite(n)) {
         po.set("totalAmount", mongoose.Types.Decimal128.fromString(n.toFixed(4)));
+        const exRate = po.exchangeRate != null ? Number(po.exchangeRate) : 1;
+        po.set("totalAmountBase", mongoose.Types.Decimal128.fromString(convertToBase(n, exRate).toFixed(4)));
       }
     }
 
@@ -178,6 +208,41 @@ export async function PATCH(req: Request, ctx: Ctx) {
     }
 
     await po.save();
+
+    if (status !== undefined && status !== po.status) {
+      let policyId = "";
+      let triggerEvent = "PURCHASE_ORDER_PATCH_UPDATE";
+
+      if (status === "active") {
+        policyId = "POL-PO-001";
+        triggerEvent = "PO_ACTIVATED_VIA_PATCH";
+      } else if (status === "completed") {
+        policyId = "POL-PO-002";
+        triggerEvent = "PO_COMPLETED_VIA_PATCH";
+      }
+
+      if (policyId) {
+        const result = await executeTransition({
+          policyId,
+          entityId: purchaseOrderId,
+          approvedBy: session.user.id,
+          triggerEvent,
+          route: `/api/admin/purchase-orders/${purchaseOrderId}`
+        });
+
+        if (!result.success) {
+          return NextResponse.json(
+            { message: result.message || "Purchase order transition validation failed.", blockers: result.blockers },
+            { status: 400 }
+          );
+        }
+      } else {
+        return NextResponse.json(
+          { message: `Direct status transitions to '${status}' are prohibited. Policy not defined.` },
+          { status: 400 }
+        );
+      }
+    }
 
     await logActivity({
       userId: session.user.id,

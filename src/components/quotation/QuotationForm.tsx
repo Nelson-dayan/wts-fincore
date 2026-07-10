@@ -1,16 +1,14 @@
 "use client";
 
-import { useState } from "react";
-
 import { ImageUp, Plus, Save, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { SaveConfirmModal } from "@/components/ui/save-confirm-modal";
 import { Dropdown } from "@/components/ui/select";
 import { cn } from "@/lib/utils/cn";
 import { UploadCard } from "@/components/ui/upload-card";
+import { SUPPORTED_CURRENCIES } from "@/lib/constants/finance";
 import type { QuotationData, QuotationItem, QuotationPage } from "@/types/quotation-generator";
 
 export type QuotationFormProps = {
@@ -26,7 +24,9 @@ export type QuotationFormProps = {
   formTitle?: string;
   /** Admin embedded: close builder without navigating away. */
   onCancelEdit?: () => void;
+  isCurrencyLocked?: boolean;
 };
+
 
 export function QuotationForm({
   data,
@@ -39,8 +39,8 @@ export function QuotationForm({
   pdfError = null,
   formTitle = "Quotation",
   onCancelEdit,
+  isCurrencyLocked = false,
 }: QuotationFormProps) {
-  const [saveConfirmOpen, setSaveConfirmOpen] = useState(false);
 
   const patch = (partial: Partial<QuotationData>) => {
     onChange({ ...data, ...partial });
@@ -100,17 +100,8 @@ export function QuotationForm({
   };
 
   return (
-    <Card className="mx-auto w-full max-w-4xl shrink-0 border-border/80 shadow-md">
-      <SaveConfirmModal
-        open={saveConfirmOpen}
-        onClose={() => setSaveConfirmOpen(false)}
-        onConfirm={() => {
-          onSaveQuotation();
-          setSaveConfirmOpen(false);
-        }}
-        entityName="quotation"
-      />
-      <CardHeader className="sticky top-0 z-50 flex flex-row items-center justify-between border-b border-border/80 bg-card/95 py-4 shadow-sm backdrop-blur supports-backdrop-filter:bg-card/80">
+    <Card className="mx-auto w-full border-border/80 shadow-md">
+      <CardHeader className="sticky top-10 z-50 flex flex-row items-center justify-between border-b border-border/80 bg-card/95 py-4 shadow-sm backdrop-blur supports-backdrop-filter:bg-card/80">
         <CardTitle>{formTitle}</CardTitle>
         <div className="flex items-center gap-2">
           {onCancelEdit ? (
@@ -121,7 +112,7 @@ export function QuotationForm({
           <Button size="sm" type="button" variant="outline" onClick={onReset}>
             Reset
           </Button>
-          <Button size="sm" type="button" variant="secondary" onClick={() => setSaveConfirmOpen(true)}>
+          <Button size="sm" type="button" variant="secondary" onClick={onSaveQuotation}>
             <Save className="mr-2 size-4" aria-hidden />
             Save quotation
           </Button>
@@ -265,13 +256,16 @@ export function QuotationForm({
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="qg-currency">Currency Code</Label>
-                <Input
+                <Dropdown
                   id="qg-currency"
                   value={data.currency}
                   onChange={(e) => patch({ currency: e.target.value.toUpperCase() })}
-                  placeholder="AED"
+                  disabled={isCurrencyLocked}
+                  className={cn(isCurrencyLocked && "bg-muted cursor-not-allowed")}
+                  options={[...SUPPORTED_CURRENCIES]}
                 />
               </div>
+
               <div className="grid gap-2">
                 <Label htmlFor="qg-taxrate">Tax Rate (%)</Label>
                 <Input

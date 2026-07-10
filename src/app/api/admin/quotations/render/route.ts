@@ -4,8 +4,6 @@ import type { QuotationRenderDraft } from "@/lib/services/business/quotation-ren
 import { renderQuotationDocx } from "@/lib/services/business/quotation-render-docx";
 import { renderQuotationPdf } from "@/lib/services/business/quotation-render-pdf";
 
-export const runtime = "nodejs";
-
 export async function POST(req: Request) {
   try {
     await requireRole(["admin"]);
