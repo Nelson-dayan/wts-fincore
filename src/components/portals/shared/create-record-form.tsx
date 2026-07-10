@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -28,14 +28,28 @@ export function CreateRecordForm({
   title,
   endpoint,
   fields,
+  initialValues = {},
 }: {
   title: string;
   endpoint: string;
   fields: CreateRecordFieldConfig[];
+  initialValues?: Record<string, string>;
 }) {
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState("");
-  const [values, setValues] = useState<Record<string, string>>({});
+  const [values, setValues] = useState<Record<string, string>>(initialValues);
+
+  useEffect(() => {
+    if (initialValues) {
+      setValues((prev) => {
+        const hasDiff = Object.keys(initialValues).some((key) => prev[key] !== initialValues[key]);
+        if (hasDiff) {
+          return { ...prev, ...initialValues };
+        }
+        return prev;
+      });
+    }
+  }, [initialValues]);
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();

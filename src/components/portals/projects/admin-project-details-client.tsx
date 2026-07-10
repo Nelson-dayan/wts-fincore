@@ -692,6 +692,9 @@ export function AdminProjectDetailsClient({
         <Button size="sm" className="" onClick={() => setPaymentModalOpen(true)}>
           Record Payment
         </Button>
+        <Link href={`${pathPrefix}/expenses?projectId=${projectId}`}>
+          <Button size="sm">Add Expense</Button>
+        </Link>
         <Link href={`${pathPrefix}/quotations?projectId=${projectId}#quotation-builder`}>
           <Button size="sm">Create quotation</Button>
         </Link>
@@ -704,7 +707,7 @@ export function AdminProjectDetailsClient({
         <Link href={`${pathPrefix}/invoices?projectId=${projectId}`}>
           <Button size="sm" variant="outline">Invoices</Button>
         </Link>
-        <Link href={`${pathPrefix}/expenses`}>
+        <Link href={`${pathPrefix}/expenses?projectId=${projectId}`}>
           <Button size="sm" variant="outline">Expenses</Button>
         </Link>
       </div>

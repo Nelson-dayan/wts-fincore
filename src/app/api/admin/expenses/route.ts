@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
 import { requireRole } from "@/lib/auth/require-role";
 import { connectDB } from "@/lib/db/connect";
-import { ExpenseModel } from "@/lib/db/models";
+import { ExpenseModel, ProjectModel, ClientModel, CompanyModel } from "@/lib/db/models";
 import { authErrorResponse } from "@/lib/api/route-auth";
 import { parsePagination, parseSearch } from "@/lib/api/pagination";
 import { logActivity } from "@/lib/services/activity/log-activity.service";
 import { decimalToNumber } from "@/lib/services/business/money";
+import { normalizeToBase } from "@/lib/services/finance/forex.engine";
 import {
   assertEmployeeCanAccessProject,
   getEmployeeAssignedProjectIdStrings,
@@ -112,10 +113,32 @@ export async function POST(req: Request) {
       }
     }
 
+    const project = await ProjectModel.findById(projectId).select("clientId currency").lean();
+    if (!project) {
+      return NextResponse.json({ message: "Project not found" }, { status: 400 });
+    }
+
+    const client = await ClientModel.findById(project.clientId).select("companyId").lean();
+    let companyId = client?.companyId;
+    if (!companyId) {
+      const primaryCompany = await CompanyModel.findOne({ isPrimary: true }).select("_id").lean();
+      companyId = primaryCompany?._id || "69c661683654f65d914b4abc";
+    }
+
+    const currency = project.currency || "INR";
+    const norm = normalizeToBase({ amount, currency });
+    const baseAmount = norm.amount;
+    const exchangeRate = norm.rate;
+
     const created = await ExpenseModel.create({
       title,
       amount,
       category,
+      currency,
+      baseAmount,
+      amountBase: baseAmount,
+      exchangeRate,
+      companyId,
       projectId,
       createdBy: session.user.id,
     });
