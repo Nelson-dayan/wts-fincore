@@ -103,11 +103,14 @@ const RevenueAreaChart = dynamic(() => import("@/components/charts/revenue-area-
   loading: () => <div className="h-[280px] w-full flex items-center justify-center text-muted-foreground text-xs uppercase font-bold tracking-widest">Loading Analytics...</div>
 });
 
+import { DateRangeSelector, DateRangeOption } from "@/components/dashboard/date-range-selector";
+
 function formatCount(n: number): string {
   return n.toLocaleString();
 }
 
 export function AdminOverviewClient() {
+  const [range, setRange] = useState<DateRangeOption>("last_6_months");
   const [data, setData] = useState<AdminOverview | null>(null);
   const [error, setError] = useState<string>("");
   const [loading, setLoading] = useState(true);
@@ -117,7 +120,7 @@ export function AdminOverviewClient() {
     const timer = setTimeout(() => setMounted(true), 100);
     async function load() {
       try {
-        const payload = await apiFetch<AdminOverview>("/api/admin/overview");
+        const payload = await apiFetch<AdminOverview>(`/api/admin/overview?range=${range}`);
         setData(payload);
       } catch (e) {
         setError(e instanceof Error ? e.message : "Failed to load");
@@ -127,7 +130,7 @@ export function AdminOverviewClient() {
     }
     load();
     return () => clearTimeout(timer);
-  }, []);
+  }, [range]);
 
   const formatBase = (n: number) => {
     return "₹" + n.toLocaleString(undefined, { maximumFractionDigits: 0 });
@@ -135,7 +138,10 @@ export function AdminOverviewClient() {
 
   return (
     <div className="animate-fade-in space-y-9">
-      <DashboardPageHeader eyebrow="Admin" title="Dashboard" />
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <DashboardPageHeader eyebrow="Admin" title="Dashboard" />
+        <DateRangeSelector value={range} onChange={setRange} />
+      </div>
 
       {error && (
         <div className="mb-6 rounded-xl border border-destructive/40 bg-destructive/5 p-4 text-sm text-destructive">

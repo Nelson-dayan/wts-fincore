@@ -5,7 +5,8 @@ import {
   InvoiceModel, 
   ClientModel, 
   PurchaseOrderModel, 
-  QuotationModel 
+  QuotationModel,
+  ExpenseModel
 } from "@/lib/db/models";
 import { requireRole } from "@/lib/auth/require-role";
 import { authErrorResponse } from "@/lib/api/route-auth";
@@ -24,69 +25,98 @@ export async function GET(req: Request) {
 
     const regex = new RegExp(q, "i");
 
-    // Parallel search across collections
-    const [projects, invoices, clients, pos, quotes] = await Promise.all([
+    // Parallel search across all primary collections
+    const [projects, invoices, clients, pos, quotes, expenses] = await Promise.all([
       ProjectModel.find({ name: regex }).limit(5).lean(),
-      InvoiceModel.find({ invoiceNumber: regex }).limit(5).lean(),
+      InvoiceModel.find({ 
+        $or: [
+          { invoiceNumber: regex },
+          { status: regex }
+        ] 
+      }).limit(5).lean(),
       ClientModel.find({ 
         $or: [
           { name: regex },
-          { company: regex }
+          { company: regex },
+          { email: regex }
         ] 
       }).limit(5).lean(),
-      PurchaseOrderModel.find({ poNumber: regex }).limit(5).lean(),
-      QuotationModel.find({ quotationNumber: regex }).limit(5).lean()
+      PurchaseOrderModel.find({ 
+        $or: [
+          { poNumber: regex },
+          { vendorName: regex }
+        ] 
+      }).limit(5).lean(),
+      QuotationModel.find({ quotationNumber: regex }).limit(5).lean(),
+      ExpenseModel.find({
+        isDeleted: { $ne: true },
+        $or: [
+          { title: regex },
+          { category: regex },
+          { vendorName: regex }
+        ]
+      }).limit(5).lean()
     ]);
 
     const items: any[] = [];
 
     projects.forEach((p: any) => {
       items.push({
-        id: p._id,
+        id: String(p._id),
         type: "Project",
         title: p.name,
-        subtitle: `Status: ${p.status || "Active"}`,
+        subtitle: `Status: ${p.status || "Active"} · Budget: ₹${(p.budget || 0).toLocaleString()}`,
         url: `/admin/projects/${p._id}`
       });
     });
 
     invoices.forEach((i: any) => {
       items.push({
-        id: i._id,
+        id: String(i._id),
         type: "Invoice",
         title: i.invoiceNumber,
-        subtitle: `Status: ${i.status} · Total: ${i.total?.toLocaleString()}`,
+        subtitle: `Status: ${i.status} · Total: ₹${(i.total || 0).toLocaleString()}`,
         url: `/admin/invoices/${i._id}`
       });
     });
 
     clients.forEach((c: any) => {
       items.push({
-        id: c._id,
+        id: String(c._id),
         type: "Client",
-        title: c.name || c.company,
-        subtitle: c.email || "No email",
+        title: c.name || c.company || "Unnamed Client",
+        subtitle: `${c.company ? c.company + " · " : ""}${c.email || "No email"}`,
         url: `/admin/clients/${c._id}`
       });
     });
 
     pos.forEach((p: any) => {
       items.push({
-        id: p._id,
+        id: String(p._id),
         type: "Purchase Order",
         title: p.poNumber,
-        subtitle: `Quotation: ${p.quotationNumber || "N/A"}`,
-        url: `/admin/purchase-orders` // We don't have individual PO pages, but we can jump to the list or specific tab
+        subtitle: `Vendor: ${p.vendorName || "N/A"} · Quotation: ${p.quotationNumber || "N/A"}`,
+        url: `/admin/purchase-orders`
       });
     });
 
     quotes.forEach((q: any) => {
       items.push({
-        id: q._id,
+        id: String(q._id),
         type: "Quotation",
         title: q.quotationNumber,
         subtitle: `Client: ${q.clientSnapshot?.name || "N/A"}`,
         url: `/admin/quotations/${q._id}`
+      });
+    });
+
+    expenses.forEach((e: any) => {
+      items.push({
+        id: String(e._id),
+        type: "Expense",
+        title: e.title || e.category || "Expense",
+        subtitle: `Category: ${e.category || "General"} · Amount: ₹${(e.amountBase || e.amount || 0).toLocaleString()}`,
+        url: `/admin/expenses`
       });
     });
 

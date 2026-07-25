@@ -15,8 +15,10 @@ import { decimalToNumber } from "@/lib/services/business/money";
 export async function buildProjectDetailPayload(projectId: string) {
   const project = await ProjectModel.findById(projectId)
     .select(
-      "name description status priority budget currency category clientReference notes startDate targetEndDate actualEndDate clientId assignedTo createdAt updatedAt fixCurrency"
+      "name description status priority budget currency category clientReference notes startDate targetEndDate actualEndDate clientId assignedTo assignedMembers createdAt updatedAt fixCurrency"
     )
+    .populate({ path: "assignedMembers.userId", select: "name email role", strictPopulate: false })
+    .populate({ path: "assignedTo", select: "name email role", strictPopulate: false })
     .lean();
   if (!project) {
     return { notFound: true as const };

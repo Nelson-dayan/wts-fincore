@@ -54,6 +54,11 @@ export async function PATCH(req: Request, ctx: RouteCtx) {
       priority?: "low" | "medium" | "high";
       budget?: number;
       assignedTo?: string[];
+      assignedMembers?: Array<{
+        userId: string;
+        rolePreset?: string;
+        permissions?: any;
+      }>;
       currency?: string;
       category?: string;
       clientReference?: string;
@@ -86,8 +91,15 @@ export async function PATCH(req: Request, ctx: RouteCtx) {
       priority: body.priority,
       budget: body.budget,
       assignedTo: body.assignedTo,
+      assignedMembers: body.assignedMembers,
       fixCurrency: body.fixCurrency,
     };
+
+    if (Array.isArray(body.assignedMembers)) {
+      // Keep assignedTo in sync with member userIds
+      const memberUserIds = body.assignedMembers.map(m => m.userId);
+      $set.assignedTo = Array.from(new Set([...(body.assignedTo || []), ...memberUserIds]));
+    }
     
     if (body.currency !== undefined) $set.currency = String(body.currency).trim().toUpperCase();
     if (body.category !== undefined) $set.category = String(body.category).trim();

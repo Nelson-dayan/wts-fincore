@@ -57,7 +57,10 @@ const ProjectsBarChart = dynamic(() => import("@/components/charts/projects-bar-
   loading: () => <div className="h-[300px] w-full flex items-center justify-center text-muted-foreground text-xs uppercase font-bold tracking-widest">Loading Projects...</div>
 });
 
+import { DateRangeSelector, DateRangeOption } from "@/components/dashboard/date-range-selector";
+
 export function AdminProfitabilityClient() {
+  const [range, setRange] = useState<DateRangeOption>("last_6_months");
   const [data, setData] = useState<ReportData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -68,7 +71,7 @@ export function AdminProfitabilityClient() {
     async function load() {
       setLoading(true);
       try {
-        const res = await fetch("/api/admin/reports/profitability");
+        const res = await fetch(`/api/admin/reports/profitability?range=${range}`);
         const payload = await res.json();
         if (!res.ok) throw new Error(payload.message || "Failed to load report");
         setData(payload);
@@ -80,7 +83,7 @@ export function AdminProfitabilityClient() {
     }
     load();
     return () => clearTimeout(timer);
-  }, []);
+  }, [range]);
 
   const formatBase = (n: number) => {
     return "₹" + n.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 });
@@ -120,10 +123,13 @@ export function AdminProfitabilityClient() {
       transition={{ duration: 0.5 }}
       className="space-y-8 pb-20"
     >
-      <DashboardPageHeader 
-        title="Project Profitability" 
-        description="Real-time financial performance tracking across all active and completed projects."
-      />
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <DashboardPageHeader 
+          title="Project Profitability" 
+          description="Real-time financial performance tracking across all active and completed projects."
+        />
+        <DateRangeSelector value={range} onChange={setRange} />
+      </div>
 
       {/* KPI Cards */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">

@@ -16,7 +16,7 @@ import { AdminInvoicesCreateHelper } from "@/components/portals/admin-invoices-c
 import { SUPPORTED_CURRENCIES, DEFAULT_CURRENCY } from "@/lib/constants/finance";
 import { usePortalConfig } from "@/components/portals/portal-config-context";
 import { useSaveFeedback } from "@/lib/hooks/use-save-feedback";
-
+import { ProjectTeamPermissions } from "./project-team-permissions";
 
 type ProjectDetailsPayload = {
   project?: {
@@ -27,6 +27,7 @@ type ProjectDetailsPayload = {
     priority: "low" | "medium" | "high";
     budget?: unknown;
     clientId: string;
+    assignedMembers?: any[];
     currency?: string;
     category?: string;
     clientReference?: string;
@@ -172,6 +173,7 @@ export function AdminProjectDetailsClient({
   });
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
+  const [allUsers, setAllUsers] = useState<Array<{ _id: string; name: string; email: string; role: string }>>([]);
 
   const load = useCallback(async () => {
     const response = await fetch(`${apiPrefix}/projects/${encodeURIComponent(projectId)}`, {
@@ -212,7 +214,20 @@ export function AdminProjectDetailsClient({
 
   useEffect(() => {
     load().catch((e) => setError(e instanceof Error ? e.message : "Failed to load details"));
-  }, [load]);
+
+    if (allowProjectMutations) {
+      fetch(`${apiPrefix}/users?limit=100`)
+        .then((res) => res.json())
+        .then((data) => {
+          if (Array.isArray(data.items)) {
+            setAllUsers(data.items);
+          } else if (Array.isArray(data.users)) {
+            setAllUsers(data.users);
+          }
+        })
+        .catch(() => {});
+    }
+  }, [load, allowProjectMutations, apiPrefix]);
 
   async function saveProject(): Promise<boolean> {
     setSaving(true);
@@ -615,6 +630,15 @@ export function AdminProjectDetailsClient({
                   </div>
                 </div>
               </div>
+
+              {allowProjectMutations && (
+                <ProjectTeamPermissions
+                  projectId={projectId}
+                  initialMembers={data.project?.assignedMembers || []}
+                  allUsers={allUsers}
+                  onUpdate={load}
+                />
+              )}
             </div>
 
             {/* Right Sidebar */}
