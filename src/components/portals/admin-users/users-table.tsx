@@ -122,7 +122,7 @@ export function UsersTable({
           </div>
         ) : loading && users.length === 0 ? (
           <div className="overflow-x-auto" aria-busy="true">
-            <table className="w-full min-w-230 text-left text-sm">
+            <table className="w-full min-w-[760px] text-left text-sm">
               <thead>
                 <tr className="border-b border-border/80 bg-muted/30 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground dark:bg-muted/15">
                   <th className="px-5 py-3.5 pr-3">Member</th>
@@ -181,7 +181,7 @@ export function UsersTable({
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-230 text-left text-sm">
+            <table className="w-full min-w-[760px] text-left text-sm">
               <thead>
                 <tr className="border-b border-border/80 bg-muted/30 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground dark:bg-muted/15">
                   <th className="px-5 py-3.5 pr-3">Member</th>
