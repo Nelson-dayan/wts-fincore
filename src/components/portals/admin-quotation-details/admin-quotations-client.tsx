@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Eye, FileText, Loader2, Plus, Trash2 } from "lucide-react";
+import { ArrowLeft, Eye, FileEdit, FileText, Loader2, Plus, Trash2 } from "lucide-react";
 import { DashboardPageHeader } from "@/components/dashboard/page-header";
 import { QuotationBuilderPanel } from "@/components/quotation/QuotationBuilderPanel";
 import { quotationItemToGeneratorData } from "@/lib/quotation/map-stored-to-generator";
@@ -388,43 +388,47 @@ export function AdminQuotationsClient({
                             : "—"}
                         </td>
                         <td className="whitespace-nowrap px-0 py-3.5 pr-5 text-right align-middle">
-                          <div className="flex flex-nowrap items-center justify-end gap-2">
+                          <div className="flex flex-nowrap items-center justify-end gap-1.5">
                             <Button
                               type="button"
                               variant="secondary"
                               size="sm"
-                              className="rounded-lg"
+                              className="h-8 w-8 rounded-lg p-0"
+                              title="View quotation details"
+                              aria-label="View quotation details"
                               asChild
                             >
                               <Link href={`${pathPrefix}/quotations/${row._id}`}>
                                 <Eye className="size-4" aria-hidden />
-                                View
                               </Link>
                             </Button>
                             <Button
                               type="button"
                               variant="outline"
                               size="sm"
-                              className="rounded-lg"
+                              className="h-8 w-8 rounded-lg p-0"
                               disabled={busy}
                               onClick={() => loadQuotation(row._id)}
+                              title="Load into builder"
+                              aria-label="Load into builder"
                             >
                               {busy ? (
                                 <Loader2 className="size-4 animate-spin" aria-hidden />
                               ) : (
-                                "Load"
+                                <FileEdit className="size-4" aria-hidden />
                               )}
                             </Button>
                             <Button
                               type="button"
                               variant="outline"
                               size="sm"
-                              className="rounded-lg text-destructive hover:bg-destructive/10 hover:text-destructive"
+                              className="h-8 w-8 rounded-lg p-0 text-destructive hover:bg-destructive/10 hover:text-destructive"
                               disabled={busy}
                               onClick={() => setDeleteTargetId(row._id)}
+                              title="Delete quotation"
+                              aria-label="Delete quotation"
                             >
                               <Trash2 className="size-4" aria-hidden />
-                              <span className="sr-only sm:not-sr-only sm:ml-1">Delete</span>
                             </Button>
                           </div>
                         </td>

@@ -33,6 +33,7 @@ export function UsersTable({
   onDraftChange,
   onSave,
   onDelete,
+  onResetPassword,
 }: {
   users: AdminUser[];
   total: number;
@@ -53,6 +54,7 @@ export function UsersTable({
   onDraftChange: (userId: string, patch: Partial<AdminUser>) => void;
   onSave: (userId: string) => void;
   onDelete: (userId: string) => void;
+  onResetPassword?: (user: AdminUser) => void;
 }) {
   const totalPages = Math.max(1, Math.ceil(total / limit));
   const end = Math.min(page * limit, total);
@@ -204,6 +206,7 @@ export function UsersTable({
                     onCancelEdit={onCancelEdit}
                     onStartEdit={onStartEdit}
                     onDelete={onDelete}
+                    onResetPassword={onResetPassword}
                   />
                 ))}
               </tbody>

@@ -4,6 +4,7 @@ import { UserModel } from "@/lib/db/models";
 import { requireRole } from "@/lib/auth/require-role";
 import { authErrorResponse } from "@/lib/api/route-auth";
 import { logActivity } from "@/lib/services/activity/log-activity.service";
+import { hashPassword } from "@/lib/auth/password";
 
 interface RouteCtx {
   params: Promise<{ userId: string }>;
@@ -20,6 +21,7 @@ export async function PATCH(req: Request, ctx: RouteCtx) {
       phone?: string;
       isActive?: boolean;
       signatureUrl?: string;
+      password?: string;
     };
 
     const updates: Record<string, unknown> = {};
@@ -32,6 +34,17 @@ export async function PATCH(req: Request, ctx: RouteCtx) {
     if (body.isActive !== undefined) updates.isActive = Boolean(body.isActive);
     if (body.signatureUrl !== undefined) {
       updates.signatureUrl = String(body.signatureUrl);
+    }
+    let passwordReset = false;
+    if (body.password !== undefined && String(body.password).trim() !== "") {
+      const pass = String(body.password).trim();
+      if (pass.length < 6) {
+        return NextResponse.json({ message: "Password must be at least 6 characters long" }, { status: 400 });
+      }
+      updates.password = await hashPassword(pass);
+      updates.resetPasswordToken = null;
+      updates.resetPasswordExpires = null;
+      passwordReset = true;
     }
 
     const updated = await UserModel.findByIdAndUpdate(userId, { $set: updates }, { new: true })
@@ -46,7 +59,7 @@ export async function PATCH(req: Request, ctx: RouteCtx) {
       action: "updated_user",
       entityType: "user",
       entityId: String(updated._id),
-      message: `Updated user ${updated.email}`,
+      message: passwordReset ? `Reset password for user ${updated.email}` : `Updated user ${updated.email}`,
     });
 
     return NextResponse.json({ item: updated });

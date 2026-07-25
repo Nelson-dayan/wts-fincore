@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { DashboardPageHeader } from "@/components/dashboard/page-header";
 import { AddUserForm } from "@/components/portals/admin-users/add-user-form";
 import { UsersTable } from "@/components/portals/admin-users/users-table";
+import { AdminResetPasswordModal } from "@/components/portals/admin-users/admin-reset-password-modal";
 import type { AdminUser, NewUserForm } from "@/components/portals/admin-users/types";
 import { apiFetch } from "@/lib/api/client";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -29,6 +30,7 @@ export function AdminUsersClient() {
   });
   const [saveTargetId, setSaveTargetId] = useState<string | null>(null);
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
+  const [resetTargetUser, setResetTargetUser] = useState<AdminUser | null>(null);
 
   async function loadUsers(nextPage = page, nextQuery = query) {
     setLoading(true);
@@ -223,8 +225,18 @@ export function AdminUsersClient() {
         }
         onSave={(id) => setSaveTargetId(id)}
         onDelete={(id) => setDeleteTargetId(id)}
+        onResetPassword={(user) => setResetTargetUser(user)}
       />
       </div>
+
+      <AdminResetPasswordModal
+        user={resetTargetUser}
+        onClose={() => setResetTargetUser(null)}
+        onResetComplete={() => {
+          setResetTargetUser(null);
+          loadUsers(page, query);
+        }}
+      />
     </div>
   );
 }
