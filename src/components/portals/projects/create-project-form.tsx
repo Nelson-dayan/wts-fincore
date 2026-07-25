@@ -163,12 +163,25 @@ export function CreateProjectForm() {
   }
 
   return (
-    <Card className="mb-4 mt-10 border-border/80 md:mt-12">
-      <CardHeader>
-        <CardTitle className="text-base">Create project</CardTitle>
+    <Card className="glass-card mb-4 mt-6 border border-border/70 shadow-lg transition-all duration-300 hover:shadow-xl">
+      <div className="h-1 bg-linear-to-r from-primary via-indigo-500 to-sky-400" />
+      <CardHeader className="pb-3 pt-6 px-6">
+        <div className="flex items-center gap-3.5">
+          <div className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary ring-1 ring-primary/20 shadow-xs">
+            <Users className="size-5.5" aria-hidden />
+          </div>
+          <div>
+            <CardTitle className="text-lg font-bold tracking-tight text-foreground sm:text-xl">
+              Create New Project
+            </CardTitle>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              Define project budget, client assignment, timelines, and team permissions.
+            </p>
+          </div>
+        </div>
       </CardHeader>
-      <CardContent>
-        <form onSubmit={onSubmit} className="grid gap-3 sm:grid-cols-2">
+      <CardContent className="p-6 pt-2">
+        <form onSubmit={onSubmit} className="grid gap-5 sm:grid-cols-2">
           <div className="space-y-2 sm:col-span-2">
             <Label
               htmlFor="project-client-search"
@@ -475,11 +488,15 @@ export function CreateProjectForm() {
             />
           </div>
 
-          <div className="sm:col-span-2 flex items-center gap-3">
-            <Button type="submit" disabled={pending || !clientId}>
-              {pending ? "Saving..." : "Create Project"}
+          <div className="sm:col-span-2 flex items-center justify-end gap-3 pt-2">
+            {message ? <p className="text-xs font-medium text-emerald-600 dark:text-emerald-400">{message}</p> : null}
+            <Button
+              type="submit"
+              disabled={pending || !clientId}
+              className="h-10 px-6 rounded-xl font-bold text-xs shadow-md shadow-primary/20 transition-all hover:scale-[1.01]"
+            >
+              {pending ? "Creating Project…" : "Create Project"}
             </Button>
-            {message ? <p className="text-sm text-muted-foreground">{message}</p> : null}
           </div>
         </form>
       </CardContent>

@@ -1,6 +1,6 @@
 "use client";
 
-import { Loader2, UserPlus } from "lucide-react";
+import { Building2, Globe, Loader2, Mail, MapPin, Phone, User, UserPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -18,137 +18,164 @@ type CreateClientCardProps = {
 
 export function CreateClientCard({ form, saving, onFormChange, onSubmit }: CreateClientCardProps) {
   return (
-    <Card className="overflow-hidden border-border/80 shadow-[0_24px_48px_-24px_rgba(0,0,0,0.18)] dark:shadow-[0_24px_56px_-24px_rgba(0,0,0,0.5)]">
-      <div className="h-1 bg-linear-to-r from-primary/80 via-primary to-primary/40" />
-      <CardHeader className="border-b border-border/50 bg-muted/10 pb-5 dark:bg-muted/5">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-          <div className="flex items-start gap-3">
-            <span className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-primary/12 text-primary ring-1 ring-primary/20">
-              <UserPlus className="size-5" aria-hidden />
-            </span>
+    <Card className="glass-card overflow-hidden border border-border/70 shadow-lg transition-all duration-300 hover:shadow-xl">
+      <div className="h-1 bg-linear-to-r from-primary via-indigo-500 to-sky-400" />
+      <CardHeader className="pb-3 pt-6 px-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-3.5">
+            <div className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary ring-1 ring-primary/20 shadow-xs">
+              <UserPlus className="size-5.5" aria-hidden />
+            </div>
             <div>
-              <CardTitle className="text-[1.15rem] sm:text-xl">Add a client</CardTitle>
-              <CardDescription className="mt-1.5 max-w-xl">
-                Capture the basics now; open the profile anytime for documents, uploads, and history.
+              <CardTitle className="text-lg font-bold tracking-tight text-foreground sm:text-xl">
+                Add New Client Profile
+              </CardTitle>
+              <CardDescription className="mt-0.5 text-xs text-muted-foreground">
+                Capture the client contact details, branding assets, and billing profile.
               </CardDescription>
             </div>
           </div>
-          <span className="inline-flex w-fit items-center rounded-full border border-border/80 bg-background/90 px-3 py-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-            New record
+          <span className="inline-flex w-fit items-center rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-wider text-primary">
+            New Client Record
           </span>
         </div>
       </CardHeader>
 
-      <CardContent className="pt-6">
+      <CardContent className="p-6 pt-2">
         <form onSubmit={onSubmit} className="grid gap-5 sm:grid-cols-2">
+          {/* Logo & Signature Uploads */}
           <div className="space-y-3 sm:col-span-2">
             <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-              Upload client logo &amp; signature (optional)
+              Branding Assets (Optional)
             </p>
             <div className="grid gap-4 sm:grid-cols-2">
               <UploadCard
-                label="Upload client logo"
+                label="Upload Client Logo"
                 value={form.clientLogoText}
                 onChange={(val) => onFormChange({ ...form, clientLogoText: val })}
               />
               <UploadCard
-                label="Upload client signature"
+                label="Upload Client Signature"
                 value={form.clientSignatureText}
                 onChange={(val) => onFormChange({ ...form, clientSignatureText: val })}
               />
             </div>
           </div>
 
-          <div className="space-y-1.5">
-            <Label className="text-foreground/90">Contact name</Label>
-            <Input
-              required
-              autoComplete="name"
-              placeholder="Jordan Lee"
-              className="h-11 border-border/80 bg-background/60"
-              value={safeString(form.name)}
-              onChange={(e) => onFormChange({ ...form, name: e.target.value })}
-            />
+          {/* Contact Name */}
+          <div className="space-y-2">
+            <Label className="text-xs font-semibold text-foreground/90">Contact Name</Label>
+            <div className="relative">
+              <User className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground/70" />
+              <Input
+                required
+                autoComplete="name"
+                placeholder="Jordan Lee"
+                className="h-10 pl-9.5 text-xs font-medium border-border/70 bg-background/50 focus:bg-background transition-all"
+                value={safeString(form.name)}
+                onChange={(e) => onFormChange({ ...form, name: e.target.value })}
+              />
+            </div>
           </div>
 
-          <div className="space-y-1.5">
-            <Label className="text-foreground/90">Company</Label>
-            <Input
-              required
-              autoComplete="organization"
-              placeholder="Acme Industries"
-              className="h-11 border-border/80 bg-background/60"
-              value={safeString(form.company)}
-              onChange={(e) => onFormChange({ ...form, company: e.target.value })}
-            />
+          {/* Company */}
+          <div className="space-y-2">
+            <Label className="text-xs font-semibold text-foreground/90">Company Name</Label>
+            <div className="relative">
+              <Building2 className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground/70" />
+              <Input
+                required
+                autoComplete="organization"
+                placeholder="Acme Industries"
+                className="h-10 pl-9.5 text-xs font-medium border-border/70 bg-background/50 focus:bg-background transition-all"
+                value={safeString(form.company)}
+                onChange={(e) => onFormChange({ ...form, company: e.target.value })}
+              />
+            </div>
           </div>
 
-          <div className="space-y-1.5">
-            <Label className="text-foreground/90">Email</Label>
-            <Input
-              required
-              type="email"
-              autoComplete="email"
-              placeholder="hello@company.com"
-              className="h-11 border-border/80 bg-background/60"
-              value={safeString(form.email)}
-              onChange={(e) => onFormChange({ ...form, email: e.target.value })}
-            />
+          {/* Email */}
+          <div className="space-y-2">
+            <Label className="text-xs font-semibold text-foreground/90">Email Address</Label>
+            <div className="relative">
+              <Mail className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground/70" />
+              <Input
+                required
+                type="email"
+                autoComplete="email"
+                placeholder="hello@company.com"
+                className="h-10 pl-9.5 text-xs font-medium border-border/70 bg-background/50 focus:bg-background transition-all"
+                value={safeString(form.email)}
+                onChange={(e) => onFormChange({ ...form, email: e.target.value })}
+              />
+            </div>
           </div>
 
-          <div className="space-y-1.5">
-            <Label className="text-foreground/90">Phone</Label>
-            <Input
-              required
-              type="tel"
-              autoComplete="tel"
-              placeholder="+1 …"
-              className="h-11 border-border/80 bg-background/60"
-              value={safeString(form.phone)}
-              onChange={(e) => onFormChange({ ...form, phone: e.target.value })}
-            />
+          {/* Phone */}
+          <div className="space-y-2">
+            <Label className="text-xs font-semibold text-foreground/90">Phone Number</Label>
+            <div className="relative">
+              <Phone className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground/70" />
+              <Input
+                required
+                type="tel"
+                autoComplete="tel"
+                placeholder="+1 555 019 2831"
+                className="h-10 pl-9.5 text-xs font-medium border-border/70 bg-background/50 focus:bg-background transition-all"
+                value={safeString(form.phone)}
+                onChange={(e) => onFormChange({ ...form, phone: e.target.value })}
+              />
+            </div>
           </div>
 
-          <div className="space-y-1.5">
-            <Label className="text-foreground/90">
+          {/* Website */}
+          <div className="space-y-2">
+            <Label className="text-xs font-semibold text-foreground/90">
               Website <span className="font-normal text-muted-foreground">(optional)</span>
             </Label>
-            <Input
-              type="url"
-              autoComplete="url"
-              placeholder="https://"
-              className="h-11 border-border/80 bg-background/60"
-              value={safeString(form.website)}
-              onChange={(e) => onFormChange({ ...form, website: e.target.value })}
-            />
+            <div className="relative">
+              <Globe className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground/70" />
+              <Input
+                type="url"
+                autoComplete="url"
+                placeholder="https://example.com"
+                className="h-10 pl-9.5 text-xs font-medium border-border/70 bg-background/50 focus:bg-background transition-all"
+                value={safeString(form.website)}
+                onChange={(e) => onFormChange({ ...form, website: e.target.value })}
+              />
+            </div>
           </div>
 
-          <div className="space-y-1.5 sm:col-span-2">
-            <Label className="text-foreground/90">Address</Label>
-            <Input
-              required
-              autoComplete="street-address"
-              placeholder="Street, city, region"
-              className="h-11 border-border/80 bg-background/60"
-              value={safeString(form.address)}
-              onChange={(e) => onFormChange({ ...form, address: e.target.value })}
-            />
+          {/* Address */}
+          <div className="space-y-2 sm:col-span-2">
+            <Label className="text-xs font-semibold text-foreground/90">Physical / Billing Address</Label>
+            <div className="relative">
+              <MapPin className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground/70" />
+              <Input
+                required
+                autoComplete="street-address"
+                placeholder="123 Business Way, Suite 400, San Francisco, CA"
+                className="h-10 pl-9.5 text-xs font-medium border-border/70 bg-background/50 focus:bg-background transition-all"
+                value={safeString(form.address)}
+                onChange={(e) => onFormChange({ ...form, address: e.target.value })}
+              />
+            </div>
           </div>
 
-          <div className="flex items-end sm:col-span-2">
+          {/* Submit */}
+          <div className="flex items-center justify-end pt-2 sm:col-span-2">
             <Button
               type="submit"
               disabled={saving}
-              size="lg"
-              className="h-11 rounded-xl font-semibold shadow-md shadow-primary/15"
+              className="h-10 px-6 rounded-xl font-bold text-xs shadow-md shadow-primary/20 transition-all hover:scale-[1.01]"
             >
               {saving ? (
                 <>
                   <Loader2 className="mr-2 size-4 animate-spin" aria-hidden />
-                  Creating…
+                  Saving Client Record…
                 </>
               ) : (
-                "Create client"
+                "Create Client Profile"
               )}
             </Button>
           </div>
