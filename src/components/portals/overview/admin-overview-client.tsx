@@ -239,14 +239,14 @@ export function AdminOverviewClient() {
       </section>
       */}
 
-      {/* 🆕 Financial Performance Section */}
+      {/* 🆕 Financial Performance & Quick Actions Section */}
       <section>
         <div className="mb-3">
           <h2 className="dashboard-section-label">Financial Performance</h2>
           <p className="mt-1 text-sm text-muted-foreground">Real-time revenue vs expense tracking.</p>
         </div>
-        <div className="grid gap-6">
-          <Card className="border-border/60 shadow-xl overflow-hidden bg-background min-w-0">
+        <div className="grid gap-6 lg:grid-cols-3">
+          <Card className="lg:col-span-2 border-border/60 shadow-xl overflow-hidden bg-background min-w-0">
             <CardHeader className="pb-8">
               <div className="flex items-center justify-between">
                 <div>
@@ -266,6 +266,27 @@ export function AdminOverviewClient() {
                 xAxisKey="label"
               />
             </CardContent>
+          </Card>
+
+          <Card className="dashboard-stat-card border-border/60 shadow-xl flex flex-col justify-between p-6 bg-background">
+            <div>
+              <CardHeader className="p-0 pb-4">
+                <CardTitle className="text-base font-bold">Quick actions</CardTitle>
+                <CardDescription>Fast navigation to key administrative modules</CardDescription>
+              </CardHeader>
+              <CardContent className="p-0 grid gap-2.5">
+                {quickLinks.map((item) => (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className="inline-flex items-center justify-between rounded-xl border border-border/60 bg-muted/20 px-3.5 py-3 text-sm font-medium text-foreground transition-all hover:bg-primary/10 hover:border-primary/30 hover:text-primary group"
+                  >
+                    {item.label}
+                    <ArrowUpRight className="size-4 text-muted-foreground group-hover:text-primary transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" aria-hidden />
+                  </Link>
+                ))}
+              </CardContent>
+            </div>
           </Card>
         </div>
       </section>

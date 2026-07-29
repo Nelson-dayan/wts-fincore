@@ -49,6 +49,19 @@ export async function GET(req: Request) {
       paymentMatch.createdAt = { $gte: startDate };
     }
 
+    const isDaily = range === "this_month" || range === "last_30_days";
+
+    const timeSeriesGroup = isDaily
+      ? {
+          year: { $year: "$createdAt" },
+          month: { $month: "$createdAt" },
+          day: { $dayOfMonth: "$createdAt" },
+        }
+      : {
+          year: { $year: "$createdAt" },
+          month: { $month: "$createdAt" },
+        };
+
     const [
       users,
       clients,
@@ -61,8 +74,8 @@ export async function GET(req: Request) {
       activityLogs,
       expenseTotals,
       paymentTotals,
-      revenueMonthly,
-      expenseMonthly,
+      revenueSeries,
+      expenseSeries,
       overdueInvoices,
       expenseByCategoryData,
       topProjectsData,
@@ -94,10 +107,7 @@ export async function GET(req: Request) {
         { $match: paymentMatch },
         {
           $group: {
-            _id: {
-              year: { $year: "$createdAt" },
-              month: { $month: "$createdAt" }
-            },
+            _id: timeSeriesGroup,
             total: { $sum: "$receivedAmountBase" }
           }
         }
@@ -106,10 +116,7 @@ export async function GET(req: Request) {
         { $match: expenseMatch },
         {
           $group: {
-            _id: {
-              year: { $year: "$createdAt" },
-              month: { $month: "$createdAt" }
-            },
+            _id: timeSeriesGroup,
             total: { $sum: { $ifNull: ["$amountBase", { $ifNull: ["$baseAmount", "$amount"] }] } }
           }
         }
@@ -138,16 +145,7 @@ export async function GET(req: Request) {
           }
         },
         { $sort: { total: -1 } },
-        { $limit: 5 },
-        {
-          $lookup: {
-            from: "projects",
-            localField: "_id",
-            foreignField: "_id",
-            as: "project"
-          }
-        },
-        { $unwind: { path: "$project", preserveNullAndEmptyArrays: true } }
+        { $limit: 5 }
       ])
     ]);
 
@@ -156,36 +154,66 @@ export async function GET(req: Request) {
     const revenueTotalAmount = decimalToNumber(paymentTotals[0]?.totalRevenue);
     const feesTotalAmount = decimalToNumber(paymentTotals[0]?.totalFees);
 
-    // 2. Time Series
+    // 2. Time Series Mapping
     const revMap: Record<string, number> = {};
-    revenueMonthly.forEach(r => {
+    revenueSeries.forEach(r => {
       if (r._id?.year && r._id?.month) {
-        const key = `${r._id.year}-${String(r._id.month).padStart(2, "0")}`;
+        const key = isDaily
+          ? `${r._id.year}-${String(r._id.month).padStart(2, "0")}-${String(r._id.day).padStart(2, "0")}`
+          : `${r._id.year}-${String(r._id.month).padStart(2, "0")}`;
         revMap[key] = decimalToNumber(r.total);
       }
     });
 
     const expMap: Record<string, number> = {};
-    expenseMonthly.forEach(e => {
+    expenseSeries.forEach(e => {
       if (e._id?.year && e._id?.month) {
-        const key = `${e._id.year}-${String(e._id.month).padStart(2, "0")}`;
+        const key = isDaily
+          ? `${e._id.year}-${String(e._id.month).padStart(2, "0")}-${String(e._id.day).padStart(2, "0")}`
+          : `${e._id.year}-${String(e._id.month).padStart(2, "0")}`;
         expMap[key] = decimalToNumber(e.total);
       }
     });
 
     const now = new Date();
-    const monthCount = range === "this_month" ? 1 : range === "last_30_days" ? 1 : range === "ytd" ? (now.getMonth() + 1) : 6;
     const timeSeries: Array<{ key: string; label: string; revenue: number; expenses: number }> = [];
-    
-    for (let i = monthCount - 1; i >= 0; i--) {
-      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-      timeSeries.push({
-        key,
-        label: d.toLocaleString(undefined, { month: "short", year: "numeric" }),
-        revenue: revMap[key] || 0,
-        expenses: expMap[key] || 0,
-      });
+
+    if (range === "this_month") {
+      const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+      const currentDay = Math.min(now.getDate(), daysInMonth);
+      for (let day = 1; day <= currentDay; day++) {
+        const d = new Date(now.getFullYear(), now.getMonth(), day);
+        const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+        timeSeries.push({
+          key,
+          label: d.toLocaleDateString(undefined, { day: "numeric", month: "short" }),
+          revenue: revMap[key] || 0,
+          expenses: expMap[key] || 0,
+        });
+      }
+    } else if (range === "last_30_days") {
+      for (let i = 29; i >= 0; i--) {
+        const d = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
+        const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+        timeSeries.push({
+          key,
+          label: d.toLocaleDateString(undefined, { day: "numeric", month: "short" }),
+          revenue: revMap[key] || 0,
+          expenses: expMap[key] || 0,
+        });
+      }
+    } else {
+      const monthCount = range === "ytd" ? (now.getMonth() + 1) : 6;
+      for (let i = monthCount - 1; i >= 0; i--) {
+        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+        timeSeries.push({
+          key,
+          label: d.toLocaleString(undefined, { month: "short", year: "numeric" }),
+          revenue: revMap[key] || 0,
+          expenses: expMap[key] || 0,
+        });
+      }
     }
 
     // 4. Notifications (Actionable)
@@ -206,11 +234,15 @@ export async function GET(req: Request) {
     const projectsList = await ProjectModel.find({ _id: { $in: projectIds } }).select("name").lean();
     const projectMap = new Map(projectsList.map(p => [String(p._id), p.name]));
 
-    const topProjectsByExpense = topProjectsData.map(p => ({
-      projectId: String(p._id),
-      name: projectMap.get(String(p._id)) || `Project ${String(p._id).slice(-4)}`,
-      total: decimalToNumber(p.total)
-    }));
+    const topProjectsByExpense = topProjectsData.map(p => {
+      const rawName = projectMap.get(String(p._id)) || `Project ${String(p._id).slice(-4)}`;
+      const formattedName = rawName.toLowerCase().startsWith("project") ? rawName : `Project "${rawName}"`;
+      return {
+        projectId: String(p._id),
+        name: formattedName,
+        total: decimalToNumber(p.total)
+      };
+    });
 
     return apiSuccess({
       range,
