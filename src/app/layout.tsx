@@ -25,6 +25,10 @@ export const metadata: Metadata = {
     title: "WTS-FinCore",
   },
   applicationName: "WTS-FinCore",
+  icons: {
+    icon: "/icon-192.png",
+    apple: "/apple-touch-icon.png",
+  },
 };
 
 export const viewport: Viewport = {
