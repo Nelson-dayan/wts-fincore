@@ -1,7 +1,10 @@
-export const unstable_instant = { prefetch: 'static', unstable_disableValidation: true };
-
+import { Suspense } from "react";
 import { AdminClientsClient } from "@/components/portals/admin-clients-client";
 
 export default function AdminClientsPage() {
-  return <AdminClientsClient />;
+  return (
+    <Suspense fallback={<div className="h-64 flex items-center justify-center">Loading clients...</div>}>
+      <AdminClientsClient />
+    </Suspense>
+  );
 }

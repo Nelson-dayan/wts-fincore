@@ -1,5 +1,3 @@
-export const unstable_instant = { prefetch: 'static', unstable_disableValidation: true };
-
 import { Suspense } from "react";
 import { CreateRecordForm } from "@/components/portals/create-record-form";
 import { ResourceTableClient } from "@/components/portals/resource-table-client";

@@ -1,10 +1,9 @@
-import { unstable_noStore as noStore } from "next/cache";
 import { connectDB } from "@/lib/db/connect";
 import { CompanyModel } from "@/lib/db/models";
 
 /** Primary company logo from Admin → Company (same field as PDF branding). */
 export async function getPrimaryCompanyLogoForPortal(): Promise<string | null> {
-  noStore();
+  "use cache";
   try {
     await connectDB();
     const item = await CompanyModel.findOne({ isPrimary: true })

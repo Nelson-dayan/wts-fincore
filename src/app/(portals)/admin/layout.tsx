@@ -1,8 +1,4 @@
-export const unstable_instant = false;
-
-import { getServerSession } from "next-auth";
-import { redirect } from "next/navigation";
-import { authOptions } from "@/lib/auth/options";
+import { Suspense } from "react";
 import { PortalBrand } from "@/components/layout/portal-brand";
 import { getPrimaryCompanyLogoForPortal } from "@/lib/company/get-primary-company-logo";
 import { PortalMobileDrawer } from "@/components/layout/portal-mobile-drawer";
@@ -13,21 +9,25 @@ import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { CommandPalette } from "@/components/portals/command-palette";
 import { CommandPaletteTrigger } from "@/components/portals/command-palette-trigger";
 
-export default async function AdminPortalLayout({
+async function AdminPortalBrand() {
+  const brandLogoSrc = await getPrimaryCompanyLogoForPortal();
+  return <PortalBrand variant="admin" brandLogoSrc={brandLogoSrc} />;
+}
+
+export default function AdminPortalLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user) redirect("/login");
-  if (session.user.role !== "admin") redirect("/employee");
-
-  const brandLogoSrc = await getPrimaryCompanyLogoForPortal();
 
   return (
     <div className="flex min-h-dvh flex-col bg-background md:flex-row">
       <PortalMobileDrawer
-        brand={<PortalBrand variant="admin" brandLogoSrc={brandLogoSrc} />}
+        brand={
+          <Suspense fallback={<PortalBrand variant="admin" brandLogoSrc={null} />}>
+            <AdminPortalBrand />
+          </Suspense>
+        }
         actions={
           <>
             <ThemeToggle />
@@ -114,7 +114,9 @@ export default async function AdminPortalLayout({
       <aside className="hidden border-b border-border/60 bg-card/70 backdrop-blur md:sticky md:top-0 md:block md:h-dvh md:w-72 md:shrink-0 md:border-b-0">
         <div className="flex h-full flex-col gap-5 p-4 sm:p-5">
           <div className="flex items-center justify-between gap-3 md:justify-start">
-            <PortalBrand variant="admin" brandLogoSrc={brandLogoSrc} />
+            <Suspense fallback={<PortalBrand variant="admin" brandLogoSrc={null} />}>
+              <AdminPortalBrand />
+            </Suspense>
           </div>
 
           <nav className="space-y-4" aria-label="Admin">

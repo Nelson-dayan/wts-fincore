@@ -1,5 +1,3 @@
-export const unstable_instant = { prefetch: 'static', unstable_disableValidation: true };
-
 import { Suspense } from "react";
 import { AdminInvoicesCreateHelper } from "@/components/portals/admin-invoices-create-helper";
 import { AdminInvoicesPageClient } from "@/components/portals/admin-invoice-detail/admin-invoices-page-client";
