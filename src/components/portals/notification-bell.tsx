@@ -1,25 +1,27 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import { 
   Bell, 
   AlertTriangle, 
-  Clock, 
   FileText, 
   Receipt, 
   ShoppingBag, 
   DollarSign, 
+  FolderKanban,
+  UserCheck,
   Check, 
   ChevronRight,
   Sparkles,
-  X
+  X,
+  RefreshCw
 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 
 export interface NotificationItem {
   id: string;
-  type: "OVERDUE_INVOICE" | "PENDING_QUOTATION" | "OPEN_PO" | "HIGH_EXPENSE";
+  type: "OVERDUE_INVOICE" | "PENDING_QUOTATION" | "OPEN_PO" | "HIGH_EXPENSE" | "LOW_MARGIN_PROJECT" | "NEW_CLIENT";
   title: string;
   description: string;
   severity: "high" | "medium" | "info";
@@ -32,31 +34,31 @@ export function NotificationBell() {
   const [isOpen, setIsOpen] = useState(false);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [readIds, setReadIds] = useState<Set<string>>(new Set());
   const [filter, setFilter] = useState<"all" | "attention">("all");
   const popoverRef = useRef<HTMLDivElement>(null);
 
-  const fetchNotifications = async () => {
+  const fetchNotifications = useCallback(async () => {
     try {
+      setLoading(true);
       const res = await fetch("/api/admin/notifications");
       if (res.ok) {
         const data = await res.json();
         setNotifications(data.items || []);
       }
     } catch {
-      // Ignore background fetch errors
-    } finally {
+      // Ignore network errors
+    } fontinally: {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchNotifications();
-    const interval = setInterval(fetchNotifications, 60000); // refresh every minute
+    const interval = setInterval(fetchNotifications, 45000);
     return () => clearInterval(interval);
-  }, []);
+  }, [fetchNotifications]);
 
-  // Close popover when clicking outside
+  // Close popover on outside click
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (popoverRef.current && !popoverRef.current.contains(event.target as Node)) {
@@ -71,25 +73,54 @@ export function NotificationBell() {
     };
   }, [isOpen]);
 
-  const activeItems = notifications.filter((item) => !readIds.has(item.id));
-  const attentionItems = activeItems.filter((item) => item.severity === "high" || item.severity === "medium");
-  const displayItems = filter === "attention" ? attentionItems : activeItems;
+  const activeItems = notifications.filter((n) => !n.read);
+  const attentionItems = activeItems.filter((n) => n.severity === "high" || n.severity === "medium");
+  const displayItems = filter === "attention" 
+    ? notifications.filter((n) => n.severity === "high" || n.severity === "medium")
+    : notifications;
+
+  const markReadOnServer = async (notificationId?: string, markAll?: boolean) => {
+    try {
+      await fetch("/api/admin/notifications", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          notificationId,
+          markAll,
+          notificationIds: markAll ? notifications.map((n) => n.id) : undefined,
+        }),
+      });
+    } catch {
+      // Fallback
+    }
+  };
 
   const markAllRead = () => {
-    const allIds = new Set(notifications.map((n) => n.id));
-    setReadIds(allIds);
+    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+    markReadOnServer(undefined, true);
   };
 
   const markRead = (id: string) => {
-    setReadIds((prev) => new Set([...prev, id]));
+    setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
+    markReadOnServer(id, false);
   };
 
   const getIcon = (type: NotificationItem["type"], severity: NotificationItem["severity"]) => {
     if (severity === "high") return <AlertTriangle className="size-4 text-red-500 shrink-0" />;
-    if (type === "OVERDUE_INVOICE") return <Receipt className="size-4 text-amber-500 shrink-0" />;
-    if (type === "PENDING_QUOTATION") return <FileText className="size-4 text-blue-500 shrink-0" />;
-    if (type === "OPEN_PO") return <ShoppingBag className="size-4 text-emerald-500 shrink-0" />;
-    return <DollarSign className="size-4 text-purple-500 shrink-0" />;
+    switch (type) {
+      case "OVERDUE_INVOICE":
+        return <Receipt className="size-4 text-red-500 shrink-0" />;
+      case "PENDING_QUOTATION":
+        return <FileText className="size-4 text-amber-500 shrink-0" />;
+      case "OPEN_PO":
+        return <ShoppingBag className="size-4 text-emerald-500 shrink-0" />;
+      case "LOW_MARGIN_PROJECT":
+        return <FolderKanban className="size-4 text-purple-500 shrink-0" />;
+      case "NEW_CLIENT":
+        return <UserCheck className="size-4 text-blue-500 shrink-0" />;
+      default:
+        return <DollarSign className="size-4 text-teal-500 shrink-0" />;
+    }
   };
 
   const formatRelativeTime = (isoString: string) => {
@@ -122,7 +153,7 @@ export function NotificationBell() {
       >
         <Bell className="size-4 transition-transform group-hover:rotate-12" />
         
-        {/* Pulsing Badge if unread high-attention items exist */}
+        {/* Pulsing Badge if unread items exist */}
         {activeItems.length > 0 && (
           <span className="absolute -top-1 -right-1 flex size-4 items-center justify-center">
             <span className="absolute inline-flex size-full animate-ping rounded-full bg-red-400 opacity-75" />
@@ -143,20 +174,29 @@ export function NotificationBell() {
                 <Sparkles className="size-3.5" />
               </div>
               <div>
-                <h3 className="text-xs font-bold uppercase tracking-wider text-foreground">Need Attention</h3>
+                <h3 className="text-xs font-bold uppercase tracking-wider text-foreground">Notifications & Alerts</h3>
                 <p className="text-[10px] text-muted-foreground">
-                  {attentionItems.length} priority alert{attentionItems.length !== 1 ? "s" : ""}
+                  {activeItems.length} unread • {attentionItems.length} need attention
                 </p>
               </div>
             </div>
-            {activeItems.length > 0 && (
+            <div className="flex items-center gap-2">
               <button
-                onClick={markAllRead}
-                className="text-[11px] font-medium text-primary hover:underline flex items-center gap-1 transition-colors"
+                onClick={fetchNotifications}
+                className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                title="Refresh notifications"
               >
-                <Check className="size-3" /> Mark all read
+                <RefreshCw className={cn("size-3.5", loading && "animate-spin")} />
               </button>
-            )}
+              {activeItems.length > 0 && (
+                <button
+                  onClick={markAllRead}
+                  className="text-[11px] font-medium text-primary hover:underline flex items-center gap-1 transition-colors"
+                >
+                  <Check className="size-3" /> Mark read
+                </button>
+              )}
+            </div>
           </div>
 
           {/* Filter Tabs */}
@@ -168,7 +208,7 @@ export function NotificationBell() {
                 filter === "all" ? "bg-muted text-foreground font-semibold" : "text-muted-foreground hover:text-foreground"
               )}
             >
-              All ({activeItems.length})
+              All ({notifications.length})
             </button>
             <button
               onClick={() => setFilter("attention")}
@@ -183,11 +223,11 @@ export function NotificationBell() {
           </div>
 
           {/* Notifications List */}
-          <div className="max-h-[340px] overflow-y-auto divide-y divide-border/40">
-            {loading ? (
+          <div className="max-h-[360px] overflow-y-auto divide-y divide-border/40">
+            {loading && notifications.length === 0 ? (
               <div className="p-8 text-center text-xs text-muted-foreground flex flex-col items-center gap-2">
                 <div className="size-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-                Loading alerts...
+                Checking for system alerts...
               </div>
             ) : displayItems.length === 0 ? (
               <div className="p-8 text-center text-xs text-muted-foreground flex flex-col items-center gap-2">
@@ -201,10 +241,11 @@ export function NotificationBell() {
                   key={item.id}
                   className={cn(
                     "group relative flex items-start gap-3 p-3.5 text-xs transition-colors hover:bg-muted/40",
-                    item.severity === "high" && "bg-red-500/5 hover:bg-red-500/10"
+                    !item.read && "bg-primary/5 dark:bg-primary/10 font-medium",
+                    item.severity === "high" && !item.read && "bg-red-500/5 hover:bg-red-500/10"
                   )}
                 >
-                  <div className="mt-0.5 p-2 rounded-xl bg-background border border-border/60 shadow-xs">
+                  <div className="mt-0.5 p-2 rounded-xl bg-background border border-border/60 shadow-xs shrink-0">
                     {getIcon(item.type, item.severity)}
                   </div>
                   <div className="flex-1 min-w-0 pr-4">
@@ -240,13 +281,15 @@ export function NotificationBell() {
                       </Link>
                     </div>
                   </div>
-                  <button
-                    onClick={() => markRead(item.id)}
-                    className="absolute top-3 right-3 text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-100 transition-opacity p-0.5"
-                    title="Dismiss"
-                  >
-                    <X className="size-3.5" />
-                  </button>
+                  {!item.read && (
+                    <button
+                      onClick={() => markRead(item.id)}
+                      className="absolute top-3 right-3 text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-100 transition-opacity p-0.5"
+                      title="Mark as read"
+                    >
+                      <X className="size-3.5" />
+                    </button>
+                  )}
                 </div>
               ))
             )}
