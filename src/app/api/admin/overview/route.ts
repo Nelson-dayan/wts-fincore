@@ -268,11 +268,10 @@ export async function GET(req: Request) {
       const idStr = String(p._id);
       const matchedName = projectMap.get(idStr) || (allProjectsList[idx] ? (allProjectsList[idx].name || allProjectsList[idx].title) : null);
       const rawName = matchedName || fallbackNames[idx % fallbackNames.length];
-      const formattedName = rawName.toLowerCase().startsWith("project") ? rawName : `Project "${rawName}"`;
       
       return {
         projectId: idStr,
-        name: formattedName,
+        name: rawName,
         total: decimalToNumber(p.total)
       };
     });
