@@ -27,6 +27,8 @@ import { apiFetch } from "@/lib/api/client";
 import { cn } from "@/lib/utils/cn";
 
 
+import { AdminOverviewCharts } from "./admin-overview-charts";
+
 type Notification = {
   type: string;
   title: string;
@@ -57,6 +59,9 @@ type AdminOverview = {
   profitTotalAmount: number;
   timeSeries: TimeSeries[];
   notifications: Notification[];
+  expenseByMonth: Array<{ key: string; label: string; total: number }>;
+  expenseByCategory: Array<{ category: string; total: number }>;
+  topProjectsByExpense: Array<{ projectId: string; name: string; total: number }>;
 };
 
 const metricMeta: Record<string, { label: string; icon: LucideIcon }> = {
@@ -270,6 +275,18 @@ export function AdminOverviewClient() {
           </Card>
         </div>
       </section>
+
+      {/* 📊 Expense Insights Breakdown */}
+      {data && (
+        <AdminOverviewCharts
+          expenseTotalAmount={data.expenseTotalAmount}
+          expenseByMonth={data.expenseByMonth || []}
+          expenseByCategory={data.expenseByCategory || []}
+          topProjectsByExpense={data.topProjectsByExpense || []}
+          projects={data.projects}
+          expenses={data.expenses}
+        />
+      )}
 
       {/* 🔄 Original Sections Grid */}
       <div className="flex flex-col gap-9 md:gap-11">

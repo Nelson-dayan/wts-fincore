@@ -64,6 +64,8 @@ export async function GET(req: Request) {
       revenueMonthly,
       expenseMonthly,
       overdueInvoices,
+      expenseByCategoryData,
+      topProjectsData,
     ] = await Promise.all([
       UserModel.countDocuments(),
       ClientModel.countDocuments(),
@@ -76,7 +78,7 @@ export async function GET(req: Request) {
       ActivityLogModel.countDocuments(),
       ExpenseModel.aggregate([
         { $match: expenseMatch },
-        { $group: { _id: null, total: { $sum: "$amountBase" } } }
+        { $group: { _id: null, total: { $sum: { $ifNull: ["$amountBase", { $ifNull: ["$baseAmount", "$amount"] }] } } } }
       ]),
       PaymentModel.aggregate([
         { $match: paymentMatch },
@@ -108,7 +110,7 @@ export async function GET(req: Request) {
               year: { $year: "$createdAt" },
               month: { $month: "$createdAt" }
             },
-            total: { $sum: "$amountBase" }
+            total: { $sum: { $ifNull: ["$amountBase", { $ifNull: ["$baseAmount", "$amount"] }] } }
           }
         }
       ]),
@@ -116,7 +118,37 @@ export async function GET(req: Request) {
         status: { $in: ["SENT", "PARTIAL", "OVERDUE"] },
         dueDate: { $lt: today },
         isDeleted: false
-      }).select("invoiceNumber dueDate status").limit(5).lean()
+      }).select("invoiceNumber dueDate status").limit(5).lean(),
+      ExpenseModel.aggregate([
+        { $match: expenseMatch },
+        {
+          $group: {
+            _id: "$category",
+            total: { $sum: { $ifNull: ["$amountBase", { $ifNull: ["$baseAmount", "$amount"] }] } }
+          }
+        },
+        { $sort: { total: -1 } }
+      ]),
+      ExpenseModel.aggregate([
+        { $match: { ...expenseMatch, projectId: { $ne: null } } },
+        {
+          $group: {
+            _id: "$projectId",
+            total: { $sum: { $ifNull: ["$amountBase", { $ifNull: ["$baseAmount", "$amount"] }] } }
+          }
+        },
+        { $sort: { total: -1 } },
+        { $limit: 5 },
+        {
+          $lookup: {
+            from: "projects",
+            localField: "_id",
+            foreignField: "_id",
+            as: "project"
+          }
+        },
+        { $unwind: { path: "$project", preserveNullAndEmptyArrays: true } }
+      ])
     ]);
 
     // 1. Totals calculated inside DB
@@ -165,6 +197,17 @@ export async function GET(req: Request) {
       severity: inv.status === "OVERDUE" ? "high" : "medium"
     }));
 
+    const expenseByCategory = expenseByCategoryData.map(c => ({
+      category: c._id || "OTHER",
+      total: c.total || 0
+    }));
+
+    const topProjectsByExpense = topProjectsData.map(p => ({
+      projectId: String(p._id),
+      name: p.project?.name || p.project?.code || String(p._id),
+      total: p.total || 0
+    }));
+
     return apiSuccess({
       range,
       users,
@@ -183,8 +226,8 @@ export async function GET(req: Request) {
       timeSeries,
       notifications,
       expenseByMonth: timeSeries.map(t => ({ key: t.key, label: t.label, total: t.expenses })),
-      expenseByCategory: [],
-      topProjectsByExpense: []
+      expenseByCategory,
+      topProjectsByExpense
     });
   } catch (error) {
     console.error("Overview error:", error);
