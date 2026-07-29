@@ -17,3 +17,4 @@ export { CounterModel, SequenceReservationModel } from "./counter.model";
 export { AccountingPeriodModel } from "./accounting-period.model";
 export { LedgerEntryModel } from "./ledger-entry.model";
 export { UserNotificationReadModel } from "./user-notification-read.model";
+export { CustomNotificationModel } from "./custom-notification.model";

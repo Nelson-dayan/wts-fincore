@@ -7,20 +7,22 @@ import {
   ExpenseModel, 
   ProjectModel, 
   ClientModel,
-  UserNotificationReadModel 
+  UserNotificationReadModel,
+  CustomNotificationModel
 } from "@/lib/db/models";
 import { requireRole } from "@/lib/auth/require-role";
 import { decimalToNumber } from "@/lib/services/business/money";
 
 export interface NotificationItem {
   id: string;
-  type: "OVERDUE_INVOICE" | "PENDING_QUOTATION" | "OPEN_PO" | "HIGH_EXPENSE" | "LOW_MARGIN_PROJECT" | "NEW_CLIENT";
+  type: "OVERDUE_INVOICE" | "PENDING_QUOTATION" | "OPEN_PO" | "HIGH_EXPENSE" | "LOW_MARGIN_PROJECT" | "NEW_CLIENT" | "ANNOUNCEMENT";
   title: string;
   description: string;
   severity: "high" | "medium" | "info";
   timestamp: string;
   actionUrl: string;
   read: boolean;
+  createdByName?: string;
 }
 
 export async function GET() {
@@ -29,15 +31,45 @@ export async function GET() {
     await connectDB();
 
     const userId = session.user.id;
+    const userRole = session.user.role;
     const now = new Date();
 
-    // Fetch user-specific read notification IDs
-    const readRecords = await UserNotificationReadModel.find({ userId }).select("notificationId").lean();
-    const readSet = new Set(readRecords.map((r) => r.notificationId));
+    // Fetch user-specific read & dismissed records
+    const userStateRecords = await UserNotificationReadModel.find({ userId }).lean();
+    const readSet = new Set<string>();
+    const dismissedSet = new Set<string>();
 
-    const notifications: NotificationItem[] = [];
+    userStateRecords.forEach((r) => {
+      if (r.readAt) readSet.add(r.notificationId);
+      if (r.dismissed) dismissedSet.add(r.notificationId);
+    });
 
-    // 1. Overdue Invoices (High Priority - Need Attention)
+    const rawNotifications: NotificationItem[] = [];
+
+    // 1. Custom Broadcast / Announcement Notifications
+    const customAnnouncements = await CustomNotificationModel.find({
+      target: { $in: ["all", userRole] },
+    })
+      .sort({ createdAt: -1 })
+      .limit(10)
+      .lean();
+
+    customAnnouncements.forEach((c) => {
+      const notifId = `custom-${c._id}`;
+      rawNotifications.push({
+        id: notifId,
+        type: "ANNOUNCEMENT",
+        title: c.title,
+        description: c.description,
+        severity: c.severity || "info",
+        timestamp: c.createdAt ? new Date(c.createdAt).toISOString() : new Date().toISOString(),
+        actionUrl: c.actionUrl || "#",
+        read: readSet.has(notifId),
+        createdByName: c.createdByName || "Admin",
+      });
+    });
+
+    // 2. Overdue Invoices (High Priority - Need Attention)
     const overdueInvoices = await InvoiceModel.find({
       status: { $in: ["SENT", "PARTIAL", "OVERDUE"] },
       dueDate: { $lt: now },
@@ -51,11 +83,11 @@ export async function GET() {
     overdueInvoices.forEach((inv) => {
       const daysOverdue = Math.ceil((now.getTime() - new Date(inv.dueDate).getTime()) / (1000 * 3600 * 24));
       const notifId = `inv-${inv._id}`;
-      notifications.push({
+      rawNotifications.push({
         id: notifId,
         type: "OVERDUE_INVOICE",
         title: `Overdue Invoice #${inv.invoiceNumber}`,
-        description: `Overdue by ${daysOverdue} day${daysOverdue > 1 ? "s" : ""}. Total amount: ₹${decimalToNumber(inv.totalBase).toLocaleString()}.`,
+        description: `Overdue by ${daysOverdue} day${daysOverdue > 1 ? "s" : ""}. Total: ₹${decimalToNumber(inv.totalBase).toLocaleString()}.`,
         severity: "high",
         timestamp: inv.dueDate ? new Date(inv.dueDate).toISOString() : new Date().toISOString(),
         actionUrl: `/admin/invoices/${inv._id}`,
@@ -63,7 +95,7 @@ export async function GET() {
       });
     });
 
-    // 2. Pending Quotations needing client follow-up
+    // 3. Pending Quotations needing client follow-up
     const pendingQuotations = await QuotationModel.find({
       status: { $in: ["SENT", "DRAFT"] },
       isDeleted: false,
@@ -75,11 +107,11 @@ export async function GET() {
 
     pendingQuotations.forEach((q) => {
       const notifId = `q-${q._id}`;
-      notifications.push({
+      rawNotifications.push({
         id: notifId,
         type: "PENDING_QUOTATION",
-        title: `Quotation #${q.quotationNumber} awaiting action`,
-        description: `Status is ${q.status}. Total: ₹${decimalToNumber(q.totalBase).toLocaleString()}. Needs follow-up.`,
+        title: `Quotation #${q.quotationNumber} pending action`,
+        description: `Status is ${q.status}. Total: ₹${decimalToNumber(q.totalBase).toLocaleString()}.`,
         severity: "medium",
         timestamp: q.createdAt ? new Date(q.createdAt).toISOString() : new Date().toISOString(),
         actionUrl: `/admin/quotations/${q._id}`,
@@ -87,7 +119,7 @@ export async function GET() {
       });
     });
 
-    // 3. Open POs awaiting fulfillment
+    // 4. Open POs awaiting fulfillment
     const openPOs = await PurchaseOrderModel.find({
       status: { $in: ["SENT", "ISSUED"] },
       isDeleted: false,
@@ -99,7 +131,7 @@ export async function GET() {
 
     openPOs.forEach((po) => {
       const notifId = `po-${po._id}`;
-      notifications.push({
+      rawNotifications.push({
         id: notifId,
         type: "OPEN_PO",
         title: `Purchase Order #${po.poNumber} issued`,
@@ -111,7 +143,7 @@ export async function GET() {
       });
     });
 
-    // 4. Low Budget / High Expense Risk Projects
+    // 5. Active Projects Monitoring
     const activeProjects = await ProjectModel.find({ status: "active" })
       .select("name budget createdAt")
       .sort({ createdAt: -1 })
@@ -121,11 +153,11 @@ export async function GET() {
     activeProjects.forEach((proj) => {
       const notifId = `proj-${proj._id}`;
       const budgetNum = decimalToNumber(proj.budget);
-      notifications.push({
+      rawNotifications.push({
         id: notifId,
         type: "LOW_MARGIN_PROJECT",
         title: `Active Project: ${proj.name}`,
-        description: `Project active with budget ₹${budgetNum ? budgetNum.toLocaleString() : "TBD"}. Review resource & cost allocations.`,
+        description: `Project active with budget ₹${budgetNum ? budgetNum.toLocaleString() : "TBD"}. Review cost allocations.`,
         severity: "medium",
         timestamp: proj.createdAt ? new Date(proj.createdAt).toISOString() : new Date().toISOString(),
         actionUrl: `/admin/projects/${proj._id}`,
@@ -133,7 +165,7 @@ export async function GET() {
       });
     });
 
-    // 5. High Value Expenses logged in last 7 days
+    // 6. High Value Expenses logged in last 7 days
     const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
     const highExpenses = await ExpenseModel.find({
       createdAt: { $gte: weekAgo },
@@ -148,11 +180,11 @@ export async function GET() {
       const amt = decimalToNumber((ex as any).amountBase || (ex as any).amount);
       const notifId = `ex-${ex._id}`;
       if (amt >= 5000) {
-        notifications.push({
+        rawNotifications.push({
           id: notifId,
           type: "HIGH_EXPENSE",
           title: `High Expense: ${ex.title}`,
-          description: `Category: ${ex.category}. Amount logged: ₹${amt.toLocaleString()}.`,
+          description: `Category: ${ex.category}. Amount: ₹${amt.toLocaleString()}.`,
           severity: "info",
           timestamp: ex.createdAt ? new Date(ex.createdAt).toISOString() : new Date().toISOString(),
           actionUrl: `/admin/expenses`,
@@ -161,7 +193,7 @@ export async function GET() {
       }
     });
 
-    // 6. Recent Clients Onboarded
+    // 7. Recent Clients Onboarded
     const recentClients = await ClientModel.find({
       createdAt: { $gte: weekAgo },
     })
@@ -172,17 +204,20 @@ export async function GET() {
 
     recentClients.forEach((client) => {
       const notifId = `client-${client._id}`;
-      notifications.push({
+      rawNotifications.push({
         id: notifId,
         type: "NEW_CLIENT",
         title: `New Client Onboarded: ${client.name}`,
-        description: `${client.companyName ? `Company: ${client.companyName}. ` : ""}Ready for initial project setup and invoicing.`,
+        description: `${client.companyName ? `Company: ${client.companyName}. ` : ""}Ready for project setup.`,
         severity: "info",
         timestamp: client.createdAt ? new Date(client.createdAt).toISOString() : new Date().toISOString(),
         actionUrl: `/admin/clients/${client._id}`,
         read: readSet.has(notifId),
       });
     });
+
+    // Filter out notifications dismissed by THIS specific user
+    const notifications = rawNotifications.filter((n) => !dismissedSet.has(n.id));
 
     // Sort unread & high-severity first, then by timestamp
     notifications.sort((a, b) => {
@@ -195,6 +230,7 @@ export async function GET() {
     return NextResponse.json({
       items: notifications,
       unreadCount,
+      userRole,
     });
   } catch (error) {
     return NextResponse.json({ items: [], unreadCount: 0 });
@@ -208,9 +244,40 @@ export async function POST(req: Request) {
 
     const userId = session.user.id;
     const body = await req.json();
-    const { notificationId, markAll, notificationIds } = body;
+    const { action, notificationId, markAll, notificationIds, title, description, severity, target, actionUrl } = body;
 
-    if (markAll && Array.isArray(notificationIds)) {
+    // 1. Create Broadcast / Custom Notification (Admins Only)
+    if (action === "create") {
+      if (session.user.role !== "admin") {
+        return NextResponse.json({ message: "Only admins can broadcast notifications" }, { status: 403 });
+      }
+      if (!title || !description) {
+        return NextResponse.json({ message: "Title and description are required" }, { status: 400 });
+      }
+      const created = await CustomNotificationModel.create({
+        title: String(title).trim(),
+        description: String(description).trim(),
+        severity: severity || "info",
+        target: target || "all",
+        actionUrl: String(actionUrl || "").trim(),
+        createdBy: userId,
+        createdByName: session.user.name || "Admin",
+      });
+      return NextResponse.json({ success: true, item: created }, { status: 201 });
+    }
+
+    // 2. Dismiss Notification for THIS User (Per-User Delete)
+    if (action === "dismiss" && notificationId) {
+      await UserNotificationReadModel.updateOne(
+        { userId, notificationId },
+        { $set: { userId, notificationId, readAt: new Date(), dismissed: true } },
+        { upsert: true }
+      );
+      return NextResponse.json({ success: true, action: "dismissed" });
+    }
+
+    // 3. Mark All Read for THIS User
+    if ((action === "markAllRead" || markAll) && Array.isArray(notificationIds)) {
       const docs = notificationIds.map((id: string) => ({
         updateOne: {
           filter: { userId, notificationId: id },
@@ -224,10 +291,11 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: true });
     }
 
+    // 4. Mark Single Notification Read for THIS User
     if (notificationId) {
       await UserNotificationReadModel.updateOne(
         { userId, notificationId },
-        { $set: { userId, notificationId, readAt: new Date() } },
+        { $set: { userId, notificationId, readAt: new Date(), dismissed: false } },
         { upsert: true }
       );
       return NextResponse.json({ success: true });
@@ -235,6 +303,6 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ message: "Invalid request payload" }, { status: 400 });
   } catch (error) {
-    return NextResponse.json({ message: "Failed to mark notification read" }, { status: 500 });
+    return NextResponse.json({ message: "Failed to process notification action" }, { status: 500 });
   }
 }
