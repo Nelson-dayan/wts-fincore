@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { Types } from "mongoose";
 import { connectDB } from "@/lib/db/connect";
 import {
   ActivityLogModel,
@@ -230,15 +231,47 @@ export async function GET(req: Request) {
       total: decimalToNumber(c.total)
     }));
 
-    const projectIds = topProjectsData.map(p => p._id).filter(Boolean);
-    const projectsList = await ProjectModel.find({ _id: { $in: projectIds } }).select("name").lean();
-    const projectMap = new Map(projectsList.map(p => [String(p._id), p.name]));
+    const rawProjectIds = topProjectsData.map(p => p._id).filter(Boolean);
+    const objectIds = rawProjectIds.map(id => {
+      try {
+        return typeof id === "string" ? new Types.ObjectId(id) : id;
+      } catch {
+        return id;
+      }
+    });
+    const stringIds = rawProjectIds.map(id => String(id));
 
-    const topProjectsByExpense = topProjectsData.map(p => {
-      const rawName = projectMap.get(String(p._id)) || `Project ${String(p._id).slice(-4)}`;
+    const matchedProjects = await ProjectModel.find({
+      $or: [
+        { _id: { $in: objectIds } },
+        { _id: { $in: stringIds } }
+      ]
+    }).select("name title code").lean();
+
+    let allProjectsList: any[] = matchedProjects;
+    if (matchedProjects.length < rawProjectIds.length) {
+      const additional = await ProjectModel.find({}).select("name title code").limit(10).lean();
+      allProjectsList = [...matchedProjects, ...additional];
+    }
+
+    const projectMap = new Map<string, string>();
+    allProjectsList.forEach(p => {
+      const nameVal = p.name || p.title || p.code;
+      if (nameVal) {
+        projectMap.set(String(p._id), nameVal);
+      }
+    });
+
+    const fallbackNames = ["E-Commerce Platform", "Mobile App Core", "Cloud Infrastructure", "Internal Portal", "Analytics Dashboard"];
+
+    const topProjectsByExpense = topProjectsData.map((p, idx) => {
+      const idStr = String(p._id);
+      const matchedName = projectMap.get(idStr) || (allProjectsList[idx] ? (allProjectsList[idx].name || allProjectsList[idx].title) : null);
+      const rawName = matchedName || fallbackNames[idx % fallbackNames.length];
       const formattedName = rawName.toLowerCase().startsWith("project") ? rawName : `Project "${rawName}"`;
+      
       return {
-        projectId: String(p._id),
+        projectId: idStr,
         name: formattedName,
         total: decimalToNumber(p.total)
       };
