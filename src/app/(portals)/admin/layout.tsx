@@ -6,6 +6,7 @@ import { PortalNavLink } from "@/components/layout/portal-nav-link";
 import { PortalShell } from "@/components/layout/portal-shell";
 import { SignOutButton } from "@/components/portals/sign-out-button";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
+import { NotificationBell } from "@/components/portals/notification-bell";
 import { CommandPalette } from "@/components/portals/command-palette";
 import { CommandPaletteTrigger } from "@/components/portals/command-palette-trigger";
 
@@ -30,6 +31,7 @@ export default function AdminPortalLayout({
         }
         actions={
           <>
+            <NotificationBell />
             <ThemeToggle />
             <SignOutButton className="border-0 bg-transparent hover:bg-destructive/12" />
           </>
@@ -201,6 +203,7 @@ export default function AdminPortalLayout({
               <CommandPaletteTrigger />
             </div>
             <div className="flex items-center gap-2">
+              <NotificationBell />
               <ThemeToggle />
               <SignOutButton className="border-0 bg-transparent hover:bg-destructive/12" />
             </div>
