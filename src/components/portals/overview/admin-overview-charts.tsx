@@ -5,8 +5,23 @@ import { FolderKanban, TrendingUp, Wallet } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { DEFAULT_CURRENCY } from "@/lib/constants/finance";
 
-function formatCurrency(n: number) {
-  return n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+function safeNumber(v: unknown): number {
+  if (v == null) return 0;
+  if (typeof v === "number") return Number.isFinite(v) ? v : 0;
+  if (typeof v === "object") {
+    const obj = v as any;
+    if (obj.$numberDecimal != null) return Number.parseFloat(String(obj.$numberDecimal)) || 0;
+    if (obj.value != null) return safeNumber(obj.value);
+    if (typeof obj.toString === "function" && obj.toString !== Object.prototype.toString) {
+      return Number.parseFloat(obj.toString()) || 0;
+    }
+  }
+  return Number.parseFloat(String(v)) || 0;
+}
+
+function formatCurrency(n: unknown) {
+  const num = safeNumber(n);
+  return num.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 function BarRow({

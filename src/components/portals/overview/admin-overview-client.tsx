@@ -137,8 +137,9 @@ export function AdminOverviewClient() {
     return () => clearTimeout(timer);
   }, [range]);
 
-  const formatBase = (n: number) => {
-    return "₹" + n.toLocaleString(undefined, { maximumFractionDigits: 0 });
+  const formatBase = (n: unknown) => {
+    const num = typeof n === "number" ? n : Number.parseFloat(String((n as any)?.$numberDecimal ?? n ?? 0)) || 0;
+    return "₹" + num.toLocaleString(undefined, { maximumFractionDigits: 0 });
   };
 
   return (

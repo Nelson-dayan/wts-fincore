@@ -152,16 +152,16 @@ export async function GET(req: Request) {
     ]);
 
     // 1. Totals calculated inside DB
-    const expenseTotalAmount = expenseTotals[0]?.total || 0;
-    const revenueTotalAmount = paymentTotals[0]?.totalRevenue || 0;
-    const feesTotalAmount = paymentTotals[0]?.totalFees || 0;
+    const expenseTotalAmount = decimalToNumber(expenseTotals[0]?.total);
+    const revenueTotalAmount = decimalToNumber(paymentTotals[0]?.totalRevenue);
+    const feesTotalAmount = decimalToNumber(paymentTotals[0]?.totalFees);
 
     // 2. Time Series
     const revMap: Record<string, number> = {};
     revenueMonthly.forEach(r => {
       if (r._id?.year && r._id?.month) {
         const key = `${r._id.year}-${String(r._id.month).padStart(2, "0")}`;
-        revMap[key] = r.total;
+        revMap[key] = decimalToNumber(r.total);
       }
     });
 
@@ -169,7 +169,7 @@ export async function GET(req: Request) {
     expenseMonthly.forEach(e => {
       if (e._id?.year && e._id?.month) {
         const key = `${e._id.year}-${String(e._id.month).padStart(2, "0")}`;
-        expMap[key] = e.total;
+        expMap[key] = decimalToNumber(e.total);
       }
     });
 
@@ -199,13 +199,13 @@ export async function GET(req: Request) {
 
     const expenseByCategory = expenseByCategoryData.map(c => ({
       category: c._id || "OTHER",
-      total: c.total || 0
+      total: decimalToNumber(c.total)
     }));
 
     const topProjectsByExpense = topProjectsData.map(p => ({
       projectId: String(p._id),
       name: p.project?.name || p.project?.code || String(p._id),
-      total: p.total || 0
+      total: decimalToNumber(p.total)
     }));
 
     return apiSuccess({

@@ -1,5 +1,24 @@
 export function decimalToNumber(value: unknown): number {
   if (value == null) return 0;
+  if (typeof value === "number") return Number.isFinite(value) ? value : 0;
+  if (typeof value === "string") {
+    const parsed = Number.parseFloat(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+  if (typeof value === "object") {
+    const valObj = value as Record<string, unknown>;
+    if (valObj.$numberDecimal != null) {
+      const parsed = Number.parseFloat(String(valObj.$numberDecimal));
+      return Number.isFinite(parsed) ? parsed : 0;
+    }
+    if (valObj.value != null) {
+      return decimalToNumber(valObj.value);
+    }
+    if (typeof valObj.toString === "function" && valObj.toString !== Object.prototype.toString) {
+      const parsed = Number.parseFloat(valObj.toString());
+      return Number.isFinite(parsed) ? parsed : 0;
+    }
+  }
   const parsed = Number.parseFloat(String(value));
   return Number.isFinite(parsed) ? parsed : 0;
 }
