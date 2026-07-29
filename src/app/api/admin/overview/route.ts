@@ -202,9 +202,13 @@ export async function GET(req: Request) {
       total: decimalToNumber(c.total)
     }));
 
+    const projectIds = topProjectsData.map(p => p._id).filter(Boolean);
+    const projectsList = await ProjectModel.find({ _id: { $in: projectIds } }).select("name").lean();
+    const projectMap = new Map(projectsList.map(p => [String(p._id), p.name]));
+
     const topProjectsByExpense = topProjectsData.map(p => ({
       projectId: String(p._id),
-      name: p.project?.name || p.project?.code || String(p._id),
+      name: projectMap.get(String(p._id)) || `Project ${String(p._id).slice(-4)}`,
       total: decimalToNumber(p.total)
     }));
 

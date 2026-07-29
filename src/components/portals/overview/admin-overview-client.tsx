@@ -197,7 +197,7 @@ export function AdminOverviewClient() {
         )}
       </AnimatePresence>
 
-      {/* 🔄 Original Operations Summary Row */}
+      {/* 🔄 Operations Summary Row (Commented Out)
       <section className="grid gap-4 md:grid-cols-3">
         <Card className="dashboard-stat-card md:col-span-2">
           <CardHeader className="pb-2">
@@ -237,15 +237,16 @@ export function AdminOverviewClient() {
           </CardContent>
         </Card>
       </section>
+      */}
 
-      {/* 🆕 New Profitability Chart Section */}
+      {/* 🆕 Financial Performance Section */}
       <section>
         <div className="mb-3">
           <h2 className="dashboard-section-label">Financial Performance</h2>
           <p className="mt-1 text-sm text-muted-foreground">Real-time revenue vs expense tracking.</p>
         </div>
-        <div className="grid gap-6 lg:grid-cols-3">
-          <Card className="lg:col-span-2 border-border/60 shadow-xl overflow-hidden bg-background min-w-0">
+        <div className="grid gap-6">
+          <Card className="border-border/60 shadow-xl overflow-hidden bg-background min-w-0">
             <CardHeader className="pb-8">
               <div className="flex items-center justify-between">
                 <div>
@@ -265,14 +266,6 @@ export function AdminOverviewClient() {
                 xAxisKey="label"
               />
             </CardContent>
-          </Card>
-
-          <Card className="bg-primary text-primary-foreground border-none shadow-xl flex flex-col justify-center p-6 text-center">
-            <p className="text-[11px] uppercase font-bold tracking-[0.2em] opacity-80 mb-2">Net Profit (All Time)</p>
-            <h3 className="text-4xl font-black mb-4">{formatBase(data?.profitTotalAmount || 0)}</h3>
-            <div className="mt-auto pt-4 border-t border-white/20">
-              <p className="text-xs font-medium opacity-80">Margin: {((data?.profitTotalAmount || 0) / (data?.revenueTotalAmount || 1) * 100).toFixed(1)}%</p>
-            </div>
           </Card>
         </div>
       </section>
