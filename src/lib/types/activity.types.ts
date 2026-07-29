@@ -30,7 +30,8 @@ export const ACTIVITY_ACTIONS = [
   "INVOICE_REMINDER_SENT",
   "created_invoice",
   "updated_company_settings",
-  "created_expense"
+  "created_expense",
+  "deleted_expense"
 ] as const;
 
 export type ActivityAction = typeof ACTIVITY_ACTIONS[number];

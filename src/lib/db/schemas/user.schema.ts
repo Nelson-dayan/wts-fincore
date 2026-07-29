@@ -18,6 +18,8 @@ export const userSchema = new Schema<IUser>(
     phone: { type: String, default: "", alias: "phoneNumber" },
     isActive: { type: Boolean, default: true },
     signatureUrl: { type: String, default: "" },
+    resetPasswordToken: { type: String, default: null, select: false },
+    resetPasswordExpires: { type: Date, default: null, select: false },
   },
   { _id: true, versionKey: false, timestamps: true }
 );

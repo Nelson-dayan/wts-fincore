@@ -1,10 +1,19 @@
+import { Suspense } from "react";
 import { AdminInvoiceDetailClient } from "@/components/portals/admin-invoice-detail-client";
 
 interface PageProps {
   params: Promise<{ invoiceId: string }>;
 }
 
-export default async function AdminInvoiceDetailPage({ params }: PageProps) {
+async function InvoiceDetailsContent({ params }: PageProps) {
   const { invoiceId } = await params;
   return <AdminInvoiceDetailClient invoiceId={invoiceId} />;
+}
+
+export default function AdminInvoiceDetailPage({ params }: PageProps) {
+  return (
+    <Suspense fallback={<div className="h-64 flex items-center justify-center">Loading invoice details...</div>}>
+      <InvoiceDetailsContent params={params} />
+    </Suspense>
+  );
 }

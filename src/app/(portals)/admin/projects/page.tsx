@@ -1,5 +1,3 @@
-export const unstable_instant = { prefetch: 'static', unstable_disableValidation: true };
-
 import { Suspense } from "react";
 import { CreateProjectForm } from "@/components/portals/create-project-form";
 import { AdminProjectsClient } from "@/components/portals/admin-projects-client";

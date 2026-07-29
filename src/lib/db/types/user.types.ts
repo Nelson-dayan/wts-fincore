@@ -11,6 +11,8 @@ export interface IUser {
   phoneNumber?: string;
   isActive: boolean;
   signatureUrl?: string;
+  resetPasswordToken?: string | null;
+  resetPasswordExpires?: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }

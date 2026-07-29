@@ -20,12 +20,34 @@ function monthKey(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
     await requireRole(["admin"]);
     await connectDB();
 
+    const { searchParams } = new URL(req.url);
+    const range = searchParams.get("range") || "last_6_months";
+
     const today = new Date();
+    let startDate: Date | null = null;
+
+    if (range === "this_month") {
+      startDate = new Date(today.getFullYear(), today.getMonth(), 1);
+    } else if (range === "last_30_days") {
+      startDate = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
+    } else if (range === "ytd") {
+      startDate = new Date(today.getFullYear(), 0, 1);
+    } else if (range === "last_6_months") {
+      startDate = new Date(today.getFullYear(), today.getMonth() - 5, 1);
+    }
+
+    const expenseMatch: any = { isDeleted: { $ne: true } };
+    const paymentMatch: any = { status: "COMPLETED" };
+
+    if (startDate) {
+      expenseMatch.createdAt = { $gte: startDate };
+      paymentMatch.createdAt = { $gte: startDate };
+    }
 
     const [
       users,
@@ -37,8 +59,10 @@ export async function GET() {
       payments,
       expenses,
       activityLogs,
-      allExpensesLean,
-      allPaymentsLean,
+      expenseTotals,
+      paymentTotals,
+      revenueMonthly,
+      expenseMonthly,
       overdueInvoices,
     ] = await Promise.all([
       UserModel.countDocuments(),
@@ -48,10 +72,46 @@ export async function GET() {
       PurchaseOrderModel.countDocuments(),
       InvoiceModel.countDocuments(),
       PaymentModel.countDocuments(),
-      ExpenseModel.countDocuments(),
+      ExpenseModel.countDocuments({ isDeleted: { $ne: true } }),
       ActivityLogModel.countDocuments(),
-      ExpenseModel.find({}).select("amountBase category createdAt projectId").lean(),
-      PaymentModel.find({ status: "COMPLETED" }).select("receivedAmountBase feesBase createdAt invoiceId").lean(),
+      ExpenseModel.aggregate([
+        { $match: expenseMatch },
+        { $group: { _id: null, total: { $sum: "$amountBase" } } }
+      ]),
+      PaymentModel.aggregate([
+        { $match: paymentMatch },
+        { 
+          $group: { 
+            _id: null, 
+            totalRevenue: { $sum: "$receivedAmountBase" },
+            totalFees: { $sum: "$feesBase" } 
+          } 
+        }
+      ]),
+      PaymentModel.aggregate([
+        { $match: paymentMatch },
+        {
+          $group: {
+            _id: {
+              year: { $year: "$createdAt" },
+              month: { $month: "$createdAt" }
+            },
+            total: { $sum: "$receivedAmountBase" }
+          }
+        }
+      ]),
+      ExpenseModel.aggregate([
+        { $match: expenseMatch },
+        {
+          $group: {
+            _id: {
+              year: { $year: "$createdAt" },
+              month: { $month: "$createdAt" }
+            },
+            total: { $sum: "$amountBase" }
+          }
+        }
+      ]),
       InvoiceModel.find({
         status: { $in: ["SENT", "PARTIAL", "OVERDUE"] },
         dueDate: { $lt: today },
@@ -59,55 +119,41 @@ export async function GET() {
       }).select("invoiceNumber dueDate status").limit(5).lean()
     ]);
 
-    // 1. Expense Aggregation
-    const expenseTotalAmount = allExpensesLean.reduce(
-      (s, e) => s + decimalToNumber(e.amountBase || (e as any).amount),
-      0
-    );
+    // 1. Totals calculated inside DB
+    const expenseTotalAmount = expenseTotals[0]?.total || 0;
+    const revenueTotalAmount = paymentTotals[0]?.totalRevenue || 0;
+    const feesTotalAmount = paymentTotals[0]?.totalFees || 0;
 
-    // 2. Revenue Aggregation
-    const revenueTotalAmount = allPaymentsLean.reduce(
-      (s, p) => s + decimalToNumber(p.receivedAmountBase),
-      0
-    );
+    // 2. Time Series
+    const revMap: Record<string, number> = {};
+    revenueMonthly.forEach(r => {
+      if (r._id?.year && r._id?.month) {
+        const key = `${r._id.year}-${String(r._id.month).padStart(2, "0")}`;
+        revMap[key] = r.total;
+      }
+    });
 
-    const feesTotalAmount = allPaymentsLean.reduce(
-      (s, p) => s + decimalToNumber(p.feesBase),
-      0
-    );
+    const expMap: Record<string, number> = {};
+    expenseMonthly.forEach(e => {
+      if (e._id?.year && e._id?.month) {
+        const key = `${e._id.year}-${String(e._id.month).padStart(2, "0")}`;
+        expMap[key] = e.total;
+      }
+    });
 
-    // 3. Time Series (Last 6 Months)
     const now = new Date();
+    const monthCount = range === "this_month" ? 1 : range === "last_30_days" ? 1 : range === "ytd" ? (now.getMonth() + 1) : 6;
     const timeSeries: Array<{ key: string; label: string; revenue: number; expenses: number }> = [];
-    for (let i = 5; i >= 0; i--) {
+    
+    for (let i = monthCount - 1; i >= 0; i--) {
       const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
       timeSeries.push({
-        key: monthKey(d),
+        key,
         label: d.toLocaleString(undefined, { month: "short", year: "numeric" }),
-        revenue: 0,
-        expenses: 0,
+        revenue: revMap[key] || 0,
+        expenses: expMap[key] || 0,
       });
-    }
-    const monthIndex = new Map(timeSeries.map((m, idx) => [m.key, idx]));
-
-    for (const e of allExpensesLean) {
-      const c = e.createdAt ? new Date(e.createdAt as Date) : null;
-      if (!c || Number.isNaN(c.getTime())) continue;
-      const key = monthKey(c);
-      const idx = monthIndex.get(key);
-      if (idx !== undefined) {
-        timeSeries[idx].expenses += decimalToNumber(e.amountBase || (e as any).amount);
-      }
-    }
-
-    for (const p of allPaymentsLean) {
-      const c = p.createdAt ? new Date(p.createdAt as Date) : null;
-      if (!c || Number.isNaN(c.getTime())) continue;
-      const key = monthKey(c);
-      const idx = monthIndex.get(key);
-      if (idx !== undefined) {
-        timeSeries[idx].revenue += decimalToNumber(p.receivedAmountBase);
-      }
     }
 
     // 4. Notifications (Actionable)
@@ -120,6 +166,7 @@ export async function GET() {
     }));
 
     return apiSuccess({
+      range,
       users,
       clients,
       projects,
@@ -135,10 +182,9 @@ export async function GET() {
       profitTotalAmount: revenueTotalAmount - (expenseTotalAmount + feesTotalAmount),
       timeSeries,
       notifications,
-      // For backward compatibility with AdminOverviewCharts if needed
       expenseByMonth: timeSeries.map(t => ({ key: t.key, label: t.label, total: t.expenses })),
-      expenseByCategory: [], // Could aggregate if needed
-      topProjectsByExpense: [] // Could aggregate if needed
+      expenseByCategory: [],
+      topProjectsByExpense: []
     });
   } catch (error) {
     console.error("Overview error:", error);

@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
 import { requireRole } from "@/lib/auth/require-role";
 import { connectDB } from "@/lib/db/connect";
-import { ExpenseModel } from "@/lib/db/models";
+import { ExpenseModel, ProjectModel, ClientModel, CompanyModel } from "@/lib/db/models";
 import { authErrorResponse } from "@/lib/api/route-auth";
 import { parsePagination, parseSearch } from "@/lib/api/pagination";
 import { logActivity } from "@/lib/services/activity/log-activity.service";
 import { decimalToNumber } from "@/lib/services/business/money";
+import { normalizeToBase } from "@/lib/services/finance/forex.engine";
 import {
   assertEmployeeCanAccessProject,
   getEmployeeAssignedProjectIdStrings,
@@ -41,15 +42,32 @@ export async function GET(req: Request) {
     const url = new URL(req.url);
     const { page, limit, skip } = parsePagination(url.searchParams);
     const q = parseSearch(url.searchParams);
+    const projectId = url.searchParams.get("projectId");
 
     const parts: Record<string, unknown>[] = [];
+    // Filter out soft-deleted expenses
+    parts.push({ isDeleted: { $ne: true } });
+
     if (session.user.role === "employee") {
       const employeeProjectIds = await getEmployeeAssignedProjectIdStrings(session.user.id);
       if (employeeProjectIds.length === 0) {
         return NextResponse.json({ items: [], page, limit, total: 0, hasMore: false });
       }
-      parts.push({ projectId: { $in: employeeProjectIds } });
+      if (projectId) {
+        if (!employeeProjectIds.includes(projectId)) {
+          return NextResponse.json({ items: [], page, limit, total: 0, hasMore: false });
+        }
+        parts.push({ projectId });
+      } else {
+        parts.push({ projectId: { $in: employeeProjectIds } });
+      }
+    } else {
+      // Admin
+      if (projectId) {
+        parts.push({ projectId });
+      }
     }
+
     if (q) {
       parts.push({
         $or: [
@@ -58,8 +76,10 @@ export async function GET(req: Request) {
         ],
       });
     }
+
     const filter: Record<string, unknown> =
       parts.length === 0 ? {} : parts.length === 1 ? parts[0]! : { $and: parts };
+
     const [itemsRaw, total] = await Promise.all([
       ExpenseModel.find(filter)
         .select("title amount category projectId createdAt")
@@ -86,11 +106,14 @@ export async function POST(req: Request) {
       amount?: number;
       category?: string;
       projectId?: string;
+      note?: string;
     };
     const title = String(body.title ?? "").trim();
     const category = String(body.category ?? "").trim();
     const amount = Number(body.amount ?? 0);
     const projectId = String(body.projectId ?? "").trim();
+    const note = String(body.note ?? "").trim();
+
     if (!title || !category || amount <= 0) {
       return NextResponse.json(
         { message: "title, category and amount (>0) are required" },
@@ -112,11 +135,34 @@ export async function POST(req: Request) {
       }
     }
 
+    const project = await ProjectModel.findById(projectId).select("clientId currency").lean();
+    if (!project) {
+      return NextResponse.json({ message: "Project not found" }, { status: 400 });
+    }
+
+    const client = await ClientModel.findById(project.clientId).select("companyId").lean();
+    let companyId = client?.companyId;
+    if (!companyId) {
+      const primaryCompany = await CompanyModel.findOne({ isPrimary: true }).select("_id").lean();
+      companyId = primaryCompany?._id || "69c661683654f65d914b4abc";
+    }
+
+    const currency = project.currency || "INR";
+    const norm = normalizeToBase({ amount, currency });
+    const baseAmount = norm.amount;
+    const exchangeRate = norm.rate;
+
     const created = await ExpenseModel.create({
       title,
       amount,
       category,
+      currency,
+      baseAmount,
+      amountBase: baseAmount,
+      exchangeRate,
+      companyId,
       projectId,
+      note,
       createdBy: session.user.id,
     });
 

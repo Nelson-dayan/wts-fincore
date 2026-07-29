@@ -11,14 +11,15 @@ import {
   Users, 
   ShoppingCart, 
   Loader2,
-  ChevronRight
+  ChevronRight,
+  Wallet
 } from "lucide-react";
 import { usePortalConfig } from "@/components/portals/portal-config-context";
 import { cn } from "@/lib/utils/cn";
 
 type SearchResult = {
   id: string;
-  type: "Project" | "Invoice" | "Client" | "Purchase Order" | "Quotation";
+  type: "Project" | "Invoice" | "Client" | "Purchase Order" | "Quotation" | "Expense";
   title: string;
   subtitle: string;
   url: string;
@@ -34,7 +35,7 @@ export function CommandPalette() {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Toggle palette with CMD+K / CTRL+K
+  // Toggle palette with CMD+K / CTRL+K or custom event
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === "k") {
@@ -46,8 +47,14 @@ export function CommandPalette() {
       }
     };
 
+    const handleCustomOpen = () => setIsOpen(true);
+
     window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
+    window.addEventListener("open-command-palette", handleCustomOpen);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("open-command-palette", handleCustomOpen);
+    };
   }, []);
 
   // Focus input when opened
@@ -175,6 +182,7 @@ export function CommandPalette() {
                     Client: Users,
                     "Purchase Order": ShoppingCart,
                     Quotation: FileText,
+                    Expense: Wallet,
                   }[item.type] || FileText;
 
                   return (

@@ -1,6 +1,6 @@
 "use client";
 
-import { Loader2, Pencil, Trash2, X } from "lucide-react";
+import { KeyRound, Loader2, Pencil, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
@@ -56,6 +56,7 @@ type UsersTableRowProps = {
   onCancelEdit: () => void;
   onStartEdit: (user: AdminUser) => void;
   onDelete: (userId: string) => void;
+  onResetPassword?: (user: AdminUser) => void;
 };
 
 export function UsersTableRow({
@@ -68,6 +69,7 @@ export function UsersTableRow({
   onCancelEdit,
   onStartEdit,
   onDelete,
+  onResetPassword,
 }: UsersTableRowProps) {
   const isEditing = editingId === user._id;
 
@@ -161,19 +163,31 @@ export function UsersTableRow({
             </>
           ) : (
             <>
-              <Button size="sm" variant="outline" className="rounded-lg px-2.5" onClick={() => onStartEdit(user)}>
+              <Button size="sm" variant="outline" className="h-8 w-8 rounded-lg p-0" onClick={() => onStartEdit(user)} title="Edit user" aria-label="Edit user">
                 <Pencil className="size-3.5" aria-hidden />
-                <span className="sr-only sm:not-sr-only sm:ml-1.5 sm:text-xs">Edit</span>
               </Button>
+              {onResetPassword && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-8 w-8 rounded-lg p-0 text-amber-600 dark:text-amber-400 hover:bg-amber-500/10"
+                  onClick={() => onResetPassword(user)}
+                  title="Reset user password"
+                  aria-label="Reset user password"
+                >
+                  <KeyRound className="size-3.5" aria-hidden />
+                </Button>
+              )}
               <Button
                 size="sm"
                 variant="destructive"
-                className="rounded-lg px-2.5"
+                className="h-8 w-8 rounded-lg p-0"
                 onClick={() => onDelete(user._id)}
                 disabled={savingId === user._id}
+                title="Delete user"
+                aria-label="Delete user"
               >
                 <Trash2 className="size-3.5" aria-hidden />
-                <span className="sr-only sm:not-sr-only sm:ml-1.5 sm:text-xs">Delete</span>
               </Button>
             </>
           )}

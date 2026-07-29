@@ -40,7 +40,7 @@ export function CreateProjectForm() {
     "active" | "completed" | "on_hold"
   >("active");
   const [priority, setPriority] = useState<"low" | "medium" | "high">("medium");
-  const [assignedToUserId, setAssignedToUserId] = useState("");
+  const [assignedUserIds, setAssignedUserIds] = useState<string[]>([]);
   const [message, setMessage] = useState("");
   const [pending, setPending] = useState(false);
 
@@ -109,20 +109,23 @@ export function CreateProjectForm() {
       const response = await fetch("/api/admin/users?page=1&limit=50", {
         cache: "no-store",
       });
-      const payload = await readResponseJson<{ users?: UserOption[] }>(response);
+      const payload = await readResponseJson<{ users?: UserOption[]; items?: UserOption[] }>(response);
       if (alive) {
-        const rows = payload.users ?? [];
+        const rows = payload.items ?? payload.users ?? [];
         setUserOptions(rows);
-        if (!assignedToUserId && rows[0]?._id) {
-          setAssignedToUserId(rows[0]._id);
-        }
       }
     }
     loadUsers();
     return () => {
       alive = false;
     };
-  }, [assignedToUserId]);
+  }, []);
+
+  const toggleUserAssignment = (userId: string) => {
+    setAssignedUserIds((prev) =>
+      prev.includes(userId) ? prev.filter((id) => id !== userId) : [...prev, userId]
+    );
+  };
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -145,7 +148,7 @@ export function CreateProjectForm() {
           notes,
           startDate: startDate || undefined,
           targetEndDate: targetEndDate || undefined,
-          assignedTo: assignedToUserId ? [assignedToUserId] : [],
+          assignedTo: assignedUserIds,
         }),
       });
       const result = await readResponseJson<{ message?: string }>(response);
@@ -160,12 +163,25 @@ export function CreateProjectForm() {
   }
 
   return (
-    <Card className="mb-4 mt-10 border-border/80 md:mt-12">
-      <CardHeader>
-        <CardTitle className="text-base">Create project</CardTitle>
+    <Card className="glass-card mb-4 mt-6 border border-border/70 shadow-lg transition-all duration-300 hover:shadow-xl">
+      <div className="h-1 bg-linear-to-r from-primary via-indigo-500 to-sky-400" />
+      <CardHeader className="pb-3 pt-6 px-6">
+        <div className="flex items-center gap-3.5">
+          <div className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary ring-1 ring-primary/20 shadow-xs">
+            <Users className="size-5.5" aria-hidden />
+          </div>
+          <div>
+            <CardTitle className="text-lg font-bold tracking-tight text-foreground sm:text-xl">
+              Create New Project
+            </CardTitle>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              Define project budget, client assignment, timelines, and team permissions.
+            </p>
+          </div>
+        </div>
       </CardHeader>
-      <CardContent>
-        <form onSubmit={onSubmit} className="grid gap-3 sm:grid-cols-2">
+      <CardContent className="p-6 pt-2">
+        <form onSubmit={onSubmit} className="grid gap-5 sm:grid-cols-2">
           <div className="space-y-2 sm:col-span-2">
             <Label
               htmlFor="project-client-search"
@@ -423,21 +439,36 @@ export function CreateProjectForm() {
               onChange={(e) => setTargetEndDate(e.target.value)}
             />
           </div>
-          <div className="space-y-1 sm:col-span-2">
-            <Label htmlFor="project-assigned">Assigned To</Label>
-            <Select
-              id="project-assigned"
-              value={assignedToUserId}
-              onChange={(e) => setAssignedToUserId(e.target.value)}
-              options={
-                userOptions.length
-                  ? userOptions.map((user) => ({
-                    value: user._id,
-                    label: `${user.name} (${user.email})`,
-                  }))
-                  : [{ value: "", label: "No users found" }]
-              }
-            />
+          <div className="space-y-2 sm:col-span-2">
+            <Label className="text-sm font-medium">Assigned Team Members</Label>
+            <div className="flex flex-wrap gap-2 rounded-xl border border-border/70 bg-muted/20 p-3">
+              {userOptions.length === 0 ? (
+                <span className="text-xs text-muted-foreground">Loading employees...</span>
+              ) : (
+                userOptions.map((user) => {
+                  const isSelected = assignedUserIds.includes(user._id);
+                  return (
+                    <button
+                      key={user._id}
+                      type="button"
+                      onClick={() => toggleUserAssignment(user._id)}
+                      className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold transition-all ${
+                        isSelected
+                          ? "border-primary bg-primary/10 text-primary shadow-xs"
+                          : "border-border/70 bg-card text-muted-foreground hover:bg-accent hover:text-foreground"
+                      }`}
+                    >
+                      <div className={`h-2 w-2 rounded-full ${isSelected ? "bg-primary" : "bg-muted-foreground/40"}`} />
+                      {user.name} ({user.email})
+                      {isSelected && <Check className="ml-1 h-3.5 w-3.5" />}
+                    </button>
+                  );
+                })
+              )}
+            </div>
+            <p className="text-[11px] text-muted-foreground">
+              Selected employees will be automatically assigned with initial Finance Contributor permissions. You can customize per-module permissions in project details.
+            </p>
           </div>
           <div className="space-y-1 sm:col-span-2">
             <Label htmlFor="project-description">Description</Label>
@@ -457,11 +488,15 @@ export function CreateProjectForm() {
             />
           </div>
 
-          <div className="sm:col-span-2 flex items-center gap-3">
-            <Button type="submit" disabled={pending || !clientId}>
-              {pending ? "Saving..." : "Create Project"}
+          <div className="sm:col-span-2 flex items-center justify-end gap-3 pt-2">
+            {message ? <p className="text-xs font-medium text-emerald-600 dark:text-emerald-400">{message}</p> : null}
+            <Button
+              type="submit"
+              disabled={pending || !clientId}
+              className="h-10 px-6 rounded-xl font-bold text-xs shadow-md shadow-primary/20 transition-all hover:scale-[1.01]"
+            >
+              {pending ? "Creating Project…" : "Create Project"}
             </Button>
-            {message ? <p className="text-sm text-muted-foreground">{message}</p> : null}
           </div>
         </form>
       </CardContent>

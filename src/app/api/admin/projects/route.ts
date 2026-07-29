@@ -44,7 +44,7 @@ export async function GET(req: Request) {
     const projectIds = itemsRaw.map(p => p._id);
     const [invoices, expenses] = await Promise.all([
       InvoiceModel.find({ projectId: { $in: projectIds } }).select("_id projectId").lean(),
-      ExpenseModel.find({ projectId: { $in: projectIds } }).select("projectId amountBase").lean()
+      ExpenseModel.find({ projectId: { $in: projectIds }, isDeleted: { $ne: true } }).select("projectId amountBase").lean()
     ]);
 
     const invoiceToProject: Record<string, string> = {};
@@ -114,11 +114,32 @@ export async function POST(req: Request) {
       return NextResponse.json({ message: "Client not found" }, { status: 404 });
     }
     
+    const assignedUserIds: string[] = Array.isArray(body.assignedTo) && body.assignedTo.length > 0
+      ? body.assignedTo
+      : [session.user.id];
+
+    const defaultPermissions = {
+      quotations: { view: true, create: true, edit: true, delete: false },
+      purchaseOrders: { view: true, create: true, edit: true, delete: false },
+      invoices: { view: true, create: true, edit: true, delete: false },
+      expenses: { view: true, create: true, edit: true, delete: false },
+      projectDetails: { view: true, edit: true },
+    };
+
+    const assignedMembers = Array.isArray(body.assignedMembers) && body.assignedMembers.length > 0
+      ? body.assignedMembers
+      : assignedUserIds.map((uid) => ({
+          userId: uid,
+          rolePreset: "editor",
+          permissions: defaultPermissions,
+        }));
+
     const created = await ProjectModel.create({
       name,
       description: String(body.description ?? ""),
       clientId,
-      assignedTo: Array.isArray(body.assignedTo) ? body.assignedTo : [session.user.id],
+      assignedTo: assignedUserIds,
+      assignedMembers,
       status: body.status ?? "active",
       priority: body.priority ?? "medium",
       budget: body.budget,

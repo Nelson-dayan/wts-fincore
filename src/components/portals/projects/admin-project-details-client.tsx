@@ -16,7 +16,7 @@ import { AdminInvoicesCreateHelper } from "@/components/portals/admin-invoices-c
 import { SUPPORTED_CURRENCIES, DEFAULT_CURRENCY } from "@/lib/constants/finance";
 import { usePortalConfig } from "@/components/portals/portal-config-context";
 import { useSaveFeedback } from "@/lib/hooks/use-save-feedback";
-
+import { ProjectTeamPermissions } from "./project-team-permissions";
 
 type ProjectDetailsPayload = {
   project?: {
@@ -27,6 +27,7 @@ type ProjectDetailsPayload = {
     priority: "low" | "medium" | "high";
     budget?: unknown;
     clientId: string;
+    assignedMembers?: any[];
     currency?: string;
     category?: string;
     clientReference?: string;
@@ -172,6 +173,7 @@ export function AdminProjectDetailsClient({
   });
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
+  const [allUsers, setAllUsers] = useState<Array<{ _id: string; name: string; email: string; role: string }>>([]);
 
   const load = useCallback(async () => {
     const response = await fetch(`${apiPrefix}/projects/${encodeURIComponent(projectId)}`, {
@@ -212,7 +214,20 @@ export function AdminProjectDetailsClient({
 
   useEffect(() => {
     load().catch((e) => setError(e instanceof Error ? e.message : "Failed to load details"));
-  }, [load]);
+
+    if (allowProjectMutations) {
+      fetch(`${apiPrefix}/users?limit=100`)
+        .then((res) => res.json())
+        .then((data) => {
+          if (Array.isArray(data.items)) {
+            setAllUsers(data.items);
+          } else if (Array.isArray(data.users)) {
+            setAllUsers(data.users);
+          }
+        })
+        .catch(() => {});
+    }
+  }, [load, allowProjectMutations, apiPrefix]);
 
   async function saveProject(): Promise<boolean> {
     setSaving(true);
@@ -334,11 +349,11 @@ export function AdminProjectDetailsClient({
                     <select
                       value={form.status}
                       onChange={(e) => setForm({ ...form, status: e.target.value as any })}
-                      className="rounded-full border border-dashed border-primary/30 bg-primary/5 text-primary px-3 py-0.5 text-xs font-semibold focus:outline-none cursor-pointer appearance-none"
+                      className="rounded-full border border-dashed border-primary/30 bg-primary/5 text-primary px-3 py-0.5 text-xs font-semibold focus:outline-none cursor-pointer appearance-none bg-slate-950 text-slate-50 dark:bg-slate-950 dark:text-slate-50"
                     >
-                      <option value="active">Active</option>
-                      <option value="completed">Completed</option>
-                      <option value="on_hold">On Hold</option>
+                      <option value="active" className="bg-slate-950 text-slate-50 dark:bg-slate-950 dark:text-slate-50">Active</option>
+                      <option value="completed" className="bg-slate-950 text-slate-50 dark:bg-slate-950 dark:text-slate-50">Completed</option>
+                      <option value="on_hold" className="bg-slate-950 text-slate-50 dark:bg-slate-950 dark:text-slate-50">On Hold</option>
                     </select>
                   ) : (
                     <Badge
@@ -449,10 +464,10 @@ export function AdminProjectDetailsClient({
                     <select
                       value={form.currency}
                       onChange={(e) => setForm({ ...form, currency: e.target.value })}
-                      className="bg-transparent border-none p-0 m-0 font-semibold focus:outline-none cursor-pointer appearance-none text-2xl text-foreground"
+                      className="bg-transparent border-none p-0 m-0 font-semibold focus:outline-none cursor-pointer appearance-none text-2xl text-foreground bg-slate-950 text-slate-50 dark:bg-slate-950 dark:text-slate-50"
                     >
                       {SUPPORTED_CURRENCIES.map((c) => (
-                        <option key={c.value} value={c.value}>{c.value}</option>
+                        <option key={c.value} value={c.value} className="bg-slate-950 text-slate-50 dark:bg-slate-950 dark:text-slate-50">{c.value}</option>
                       ))}
                     </select>
                     <input
@@ -463,15 +478,6 @@ export function AdminProjectDetailsClient({
                       placeholder="0.00"
                     />
                   </div>
-                  <label className="flex items-center gap-1.5 cursor-pointer text-[10px] text-muted-foreground select-none">
-                    <input
-                      type="checkbox"
-                      checked={form.fixCurrency}
-                      onChange={(e) => setForm({ ...form, fixCurrency: e.target.checked })}
-                      className="size-3 rounded border-input text-primary focus:ring-ring"
-                    />
-                    Fix Currency
-                  </label>
                 </div>
               ) : (
                 <p className="mt-2 text-2xl font-semibold tracking-tight">
@@ -489,11 +495,11 @@ export function AdminProjectDetailsClient({
                 <select
                   value={form.priority}
                   onChange={(e) => setForm({ ...form, priority: e.target.value as any })}
-                  className="mt-2 bg-transparent border-b border-dashed border-muted-foreground/30 focus:border-solid focus:border-primary text-2xl font-semibold capitalize tracking-tight focus:outline-none w-full p-0 cursor-pointer appearance-none"
+                  className="mt-2 bg-transparent border-b border-dashed border-muted-foreground/30 focus:border-solid focus:border-primary text-2xl font-semibold capitalize tracking-tight focus:outline-none w-full p-0 cursor-pointer appearance-none bg-slate-950 text-slate-50 dark:bg-slate-950 dark:text-slate-50"
                 >
-                  <option value="low">Low</option>
-                  <option value="medium">Medium</option>
-                  <option value="high">High</option>
+                  <option value="low" className="bg-slate-950 text-slate-50 dark:bg-slate-950 dark:text-slate-50">Low</option>
+                  <option value="medium" className="bg-slate-950 text-slate-50 dark:bg-slate-950 dark:text-slate-50">Medium</option>
+                  <option value="high" className="bg-slate-950 text-slate-50 dark:bg-slate-950 dark:text-slate-50">High</option>
                 </select>
               ) : (
                 <p className="mt-2 text-2xl font-semibold capitalize tracking-tight">
@@ -615,6 +621,15 @@ export function AdminProjectDetailsClient({
                   </div>
                 </div>
               </div>
+
+              {allowProjectMutations && (
+                <ProjectTeamPermissions
+                  projectId={projectId}
+                  initialMembers={data.project?.assignedMembers || []}
+                  allUsers={allUsers}
+                  onUpdate={load}
+                />
+              )}
             </div>
 
             {/* Right Sidebar */}
@@ -670,11 +685,17 @@ export function AdminProjectDetailsClient({
                     Category
                   </h3>
                   {editing ? (
-                    <input
+                    <Select
+                      id="project-category"
                       value={form.category}
                       onChange={(e) => setForm({ ...form, category: e.target.value })}
-                      className="bg-transparent border-b border-dashed border-muted-foreground/30 focus:border-solid focus:border-primary text-sm focus:outline-none w-full p-0"
-                      placeholder="e.g. Fixed Price"
+                      className="mt-1 bg-background text-foreground border-border/70 dark:bg-slate-900"
+                      options={[
+                        { value: "Fixed Price", label: "Fixed Price" },
+                        { value: "Retainer", label: "Retainer" },
+                        { value: "Time & Materials", label: "Time & Materials" },
+                        { value: "Other", label: "Other" },
+                      ]}
                     />
                   ) : (
                     <p className="text-sm">
@@ -692,6 +713,9 @@ export function AdminProjectDetailsClient({
         <Button size="sm" className="" onClick={() => setPaymentModalOpen(true)}>
           Record Payment
         </Button>
+        <Link href={`${pathPrefix}/expenses?projectId=${projectId}`}>
+          <Button size="sm">Add Expense</Button>
+        </Link>
         <Link href={`${pathPrefix}/quotations?projectId=${projectId}#quotation-builder`}>
           <Button size="sm">Create quotation</Button>
         </Link>
@@ -704,7 +728,7 @@ export function AdminProjectDetailsClient({
         <Link href={`${pathPrefix}/invoices?projectId=${projectId}`}>
           <Button size="sm" variant="outline">Invoices</Button>
         </Link>
-        <Link href={`${pathPrefix}/expenses`}>
+        <Link href={`${pathPrefix}/expenses?projectId=${projectId}`}>
           <Button size="sm" variant="outline">Expenses</Button>
         </Link>
       </div>

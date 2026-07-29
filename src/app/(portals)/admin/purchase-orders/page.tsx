@@ -1,5 +1,3 @@
-export const unstable_instant = { prefetch: 'static', unstable_disableValidation: true };
-
 import { Suspense } from "react";
 import { DashboardPageHeader } from "@/components/dashboard/page-header";
 import { AdminPurchaseOrdersPageClient } from "@/components/portals/admin-purchase-orders-page-client";

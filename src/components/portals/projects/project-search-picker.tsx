@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Loader2, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -29,6 +29,22 @@ export function ProjectSearchPicker({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedLabel, setSelectedLabel] = useState("");
+  const [fetchingInitial, setFetchingInitial] = useState(false);
+
+  useEffect(() => {
+    if (value && !selectedLabel && !fetchingInitial) {
+      setFetchingInitial(true);
+      apiFetch<{ project?: { name: string } }>(`/api/admin/projects/${value}`)
+        .then((res) => {
+          if (res?.project?.name) {
+            setSelectedLabel(res.project.name);
+          }
+        })
+        .catch(() => {
+          // ignore or fallback
+        });
+    }
+  }, [value, selectedLabel, fetchingInitial]);
 
   const search = useCallback(async () => {
     const q = query.trim();
@@ -74,6 +90,7 @@ export function ProjectSearchPicker({
     setSelectedLabel("");
     setResults([]);
     setError(null);
+    setFetchingInitial(false);
   }
 
   const hasSelection = Boolean(value.trim());
