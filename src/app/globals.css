@@ -711,3 +711,10 @@ p {
     transparent 75%
   );
 }
+
+/* Ensure standard select options render with a premium dark background across all browsers and platforms */
+select option {
+  background-color: #0c0a09 !important; /* Stone 950 / Slate 950 */
+  color: #fafafa !important; /* Stone 50 */
+}
+
