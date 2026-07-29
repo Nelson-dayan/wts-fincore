@@ -9,8 +9,6 @@ import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { EmployeePortalProviders } from "@/components/portals/employee-portal-providers";
 import { PortalUserBadge } from "@/components/layout/portal-user-badge";
 
-export const dynamic = "force-dynamic";
-
 async function EmployeePortalBrand() {
   const brandLogoSrc = await getPrimaryCompanyLogoForPortal();
   return <PortalBrand variant="employee" brandLogoSrc={brandLogoSrc} />;

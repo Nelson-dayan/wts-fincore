@@ -9,8 +9,6 @@ import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { CommandPalette } from "@/components/portals/command-palette";
 import { CommandPaletteTrigger } from "@/components/portals/command-palette-trigger";
 
-export const dynamic = "force-dynamic";
-
 async function AdminPortalBrand() {
   const brandLogoSrc = await getPrimaryCompanyLogoForPortal();
   return <PortalBrand variant="admin" brandLogoSrc={brandLogoSrc} />;
