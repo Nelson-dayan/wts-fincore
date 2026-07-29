@@ -1,4 +1,4 @@
-# Sec-DocuTrade UI Style Guide
+# WTS-FinCore UI Style Guide
 
 This document serves as the central reference for the project's design system and component architecture.
 

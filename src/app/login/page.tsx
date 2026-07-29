@@ -4,7 +4,7 @@ import Login from "@/components/login/Login";
 
 export const metadata: Metadata = {
   title: "Sign in",
-  description: "Sign in to your Sec DocuTrade account",
+  description: "Sign in to your WTS-FinCore account",
 };
 
 export default function LoginPage() {

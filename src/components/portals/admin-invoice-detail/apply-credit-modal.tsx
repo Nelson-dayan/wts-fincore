@@ -247,7 +247,7 @@ export function ApplyCreditModal({
                 <span className="text-xs font-bold text-foreground">🔒 Booking Safe Ledger Adjustments...</span>
               </div>
               <p className="text-[9px] text-muted-foreground leading-normal pl-6">
-                DocuTrade double-charge guards are checking allocations to prevent balance duplicate entries.
+                WTS-FinCore double-charge guards are checking allocations to prevent balance duplicate entries.
               </p>
             </div>
           )}

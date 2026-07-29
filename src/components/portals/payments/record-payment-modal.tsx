@@ -1241,7 +1241,7 @@ export function RecordPaymentModal({
                   <span className="text-xs font-bold text-foreground">🔒 Securing Ledger &amp; Verifying Idempotency...</span>
                 </div>
                 <p className="text-[10px] text-muted-foreground leading-normal pl-6">
-                  Establishing safe transaction handshake. DocuTrade double-charge guards are fully active to lock ledger safety.
+                  Establishing safe transaction handshake. WTS-FinCore double-charge guards are fully active to lock ledger safety.
                 </p>
               </div>
             )}

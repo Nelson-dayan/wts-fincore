@@ -12,7 +12,7 @@ export function AuthBrand() {
       </span>
       <span className="flex flex-col items-start leading-none">
         <span className="text-[13px] font-semibold tracking-tight">
-          Sec DocuTrade
+          WTS-FinCore
         </span>
         <span className="mt-0.5 text-[10px] font-medium text-muted-foreground">
           Secure workspace

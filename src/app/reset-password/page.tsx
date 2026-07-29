@@ -22,7 +22,7 @@ export default function ResetPasswordPage() {
         <CardHeader className="text-center sm:text-left">
           <CardTitle>Set new password</CardTitle>
           <CardDescription>
-            Choose a strong, unique password for your Sec DocuTrade account.
+            Choose a strong, unique password for your WTS-FinCore account.
           </CardDescription>
         </CardHeader>
         <CardContent>

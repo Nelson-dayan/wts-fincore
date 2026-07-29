@@ -40,7 +40,7 @@ export default async function Login() {
           {/* <div className="relative py-0.5">
             <div className="absolute inset-x-0 top-1/2 h-px -translate-y-1/2 bg-border/80" />
             <p className="relative mx-auto w-max bg-background/90 px-2.5 text-center text-[11px] text-muted-foreground backdrop-blur-sm dark:bg-background/75">
-              New to DocuTrade?
+              New to WTS-FinCore?
             </p>
           </div>
           <Link

@@ -12,7 +12,7 @@ import {
 
 export const metadata: Metadata = {
   title: "Forgot Password",
-  description: "Request a password reset for your Sec DocuTrade account",
+  description: "Request a password reset for your WTS-FinCore account",
 };
 
 export default function ForgotPasswordPage() {

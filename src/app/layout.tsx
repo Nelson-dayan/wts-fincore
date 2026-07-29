@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { SessionProvider } from "@/components/providers/session-provider";
 import { ThemeProvider } from "@/components/theme/theme-provider";
+import { PwaRegister } from "@/components/providers/pwa-register";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -15,8 +16,15 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: { default: "Sec DocuTrade", template: "%s · Sec DocuTrade" },
-  description: "Secure workspace access",
+  title: { default: "WTS-FinCore", template: "%s · WTS-FinCore" },
+  description: "WTS-FinCore - Financial Core & Trade Management System",
+  manifest: "/manifest.webmanifest",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "WTS-FinCore",
+  },
+  applicationName: "WTS-FinCore",
 };
 
 export const viewport: Viewport = {
@@ -58,7 +66,10 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <head>
-        <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
+        <script
+          suppressHydrationWarning
+          dangerouslySetInnerHTML={{ __html: themeInitScript }}
+        />
       </head>
       <body className="min-h-dvh flex flex-col bg-background text-foreground antialiased" suppressHydrationWarning>
         <ThemeProvider
@@ -67,7 +78,10 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <SessionProvider>{children}</SessionProvider>
+          <SessionProvider>
+            {children}
+            <PwaRegister />
+          </SessionProvider>
         </ThemeProvider>
       </body>
     </html>

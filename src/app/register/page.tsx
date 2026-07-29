@@ -13,7 +13,7 @@ import { ArrowLeft } from "lucide-react";
 
 export const metadata: Metadata = {
   title: "Create account",
-  description: "Register for Sec DocuTrade",
+  description: "Register for WTS-FinCore",
 };
 
 export default function RegisterPage() {

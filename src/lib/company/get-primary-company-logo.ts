@@ -3,7 +3,6 @@ import { CompanyModel } from "@/lib/db/models";
 
 /** Primary company logo from Admin → Company (same field as PDF branding). */
 export async function getPrimaryCompanyLogoForPortal(): Promise<string | null> {
-  "use cache";
   try {
     await connectDB();
     const item = await CompanyModel.findOne({ isPrimary: true })
