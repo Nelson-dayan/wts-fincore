@@ -8,6 +8,7 @@ const FALLBACK_EXCHANGE_RATES: Record<string, number> = {
   AED: 22.6,
   RM: 18.2,
   SGD: 62.5,
+  AUD: 54.5,
 };
 
 export async function GET(req: Request) {

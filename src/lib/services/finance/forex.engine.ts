@@ -16,7 +16,8 @@ export const STATIC_FX_RATES: FXRates = {
   USD: 83.0,
   AED: 22.6,
   RM: 18.2,
-  SGD: 62.5
+  SGD: 62.5,
+  AUD: 54.5,
 };
 
 export type RateSource = "LIVE_API" | "FALLBACK_STATIC" | "MANUAL_OVERRIDE";

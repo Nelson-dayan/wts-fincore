@@ -8,6 +8,7 @@ export const SUPPORTED_CURRENCIES = [
   { value: "AED", label: "AED" },
   { value: "USD", label: "USD" },
   { value: "SGD", label: "SGD" },
+  { value: "AUD", label: "AUD" },
 ] as const;
 
 export const SUPPORTED_CURRENCY_VALUES = SUPPORTED_CURRENCIES.map(c => c.value);

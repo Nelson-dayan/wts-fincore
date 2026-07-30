@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import { 
   Bell, 
@@ -36,6 +37,7 @@ export interface NotificationItem {
 }
 
 export function NotificationBell() {
+  const [mounted, setMounted] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
@@ -51,6 +53,10 @@ export function NotificationBell() {
   const [newTarget, setNewTarget] = useState<"all" | "admin" | "employee">("all");
   const [newActionUrl, setNewActionUrl] = useState("");
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const fetchNotifications = useCallback(async () => {
     try {
@@ -79,8 +85,7 @@ export function NotificationBell() {
     function handleClickOutside(event: MouseEvent) {
       if (
         popoverRef.current && 
-        !popoverRef.current.contains(event.target as Node) &&
-        !isModalOpen
+        !popoverRef.current.contains(event.target as Node)
       ) {
         setIsOpen(false);
       }
@@ -91,7 +96,19 @@ export function NotificationBell() {
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
     };
-  }, [isOpen, isModalOpen]);
+  }, [isOpen]);
+
+  // Handle ESC key for modal
+  useEffect(() => {
+    if (!isModalOpen) return;
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape" && !submitting) {
+        setIsModalOpen(false);
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isModalOpen, submitting]);
 
   const activeItems = notifications.filter((n) => !n.read);
   const highPriorityItems = notifications.filter((n) => n.severity === "high");
@@ -266,11 +283,15 @@ export function NotificationBell() {
               <div className="flex items-center gap-1.5">
                 {userRole === "admin" && (
                   <button
-                    onClick={() => setIsModalOpen(true)}
-                    className="flex items-center gap-1 px-2 py-1 rounded-lg bg-primary text-primary-foreground text-[10px] font-bold shadow-xs hover:bg-primary/90 transition-all"
+                    onClick={() => {
+                      setIsModalOpen(true);
+                      setIsOpen(false);
+                    }}
+                    className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-primary text-primary-foreground text-[11px] font-bold shadow-xs hover:bg-primary/90 transition-all"
                     title="Send announcement to users"
                   >
-                    <Plus className="size-3" /> Add Notification
+                    <Plus className="size-3.5" />
+                    <span>Broadcast</span>
                   </button>
                 )}
                 <button
@@ -285,7 +306,7 @@ export function NotificationBell() {
                     onClick={markAllRead}
                     className="text-[11px] font-medium text-primary hover:underline flex items-center gap-1 transition-colors pl-1"
                   >
-                    <Check className="size-3" /> Mark read
+                    <Check className="size-3.5" /> Mark read
                   </button>
                 )}
               </div>
@@ -427,10 +448,17 @@ export function NotificationBell() {
         )}
       </div>
 
-      {/* Broadcast Custom Notification Modal */}
-      {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-md animate-in fade-in duration-200">
-          <div className="w-full max-w-md rounded-2xl border border-border bg-card p-6 shadow-2xl space-y-4">
+      {/* Broadcast Custom Notification Modal using createPortal onto document.body */}
+      {isModalOpen && mounted && createPortal(
+        <div 
+          className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200"
+          onClick={(e) => {
+            if (e.target === e.currentTarget && !submitting) {
+              setIsModalOpen(false);
+            }
+          }}
+        >
+          <div className="w-full max-w-md rounded-2xl border border-border bg-card p-6 shadow-2xl space-y-4 animate-in zoom-in-95 duration-200 relative z-10">
             <div className="flex items-center justify-between border-b border-border/60 pb-3">
               <div className="flex items-center gap-2">
                 <div className="flex items-center justify-center size-8 rounded-xl bg-primary/10 text-primary">
@@ -532,7 +560,8 @@ export function NotificationBell() {
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   );

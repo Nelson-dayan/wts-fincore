@@ -32,6 +32,12 @@ test("Scenario 3: SGD -> INR conversion to base normalization", () => {
   assert.ok(floatEquals(result.amount, 6250));
 });
 
+test("Scenario 3b: AUD -> INR conversion to base normalization", () => {
+  const result = normalizeToBase({ amount: 100, currency: "AUD" });
+  assert.equal(result.rate, 54.5);
+  assert.ok(floatEquals(result.amount, 5450));
+});
+
 // 4. RM -> USD Cross-Rate via Base INR
 test("Scenario 4: RM -> USD cross-rate via relative base rates", () => {
   const result = convertCurrency({ amount: 100, fromCurrency: "RM", toCurrency: "USD" });
