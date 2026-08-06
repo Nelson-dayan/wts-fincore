@@ -210,7 +210,9 @@ export default function AdminPortalLayout({
           </div>
         </header>
         <div className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
-          {children}
+          <Suspense fallback={<div className="h-64 flex items-center justify-center text-sm text-muted-foreground">Loading...</div>}>
+            {children}
+          </Suspense>
         </div>
       </PortalShell>
       <CommandPalette />

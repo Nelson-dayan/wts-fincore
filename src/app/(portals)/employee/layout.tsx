@@ -113,7 +113,9 @@ export default function EmployeePortalLayout({
           </div>
         </header>
         <div className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
-          <EmployeePortalProviders>{children}</EmployeePortalProviders>
+          <Suspense fallback={<div className="h-64 flex items-center justify-center text-sm text-muted-foreground">Loading...</div>}>
+            <EmployeePortalProviders>{children}</EmployeePortalProviders>
+          </Suspense>
         </div>
       </PortalShell>
     </div>
