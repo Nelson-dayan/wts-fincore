@@ -18,3 +18,6 @@ export { AccountingPeriodModel } from "./accounting-period.model";
 export { LedgerEntryModel } from "./ledger-entry.model";
 export { UserNotificationReadModel } from "./user-notification-read.model";
 export { CustomNotificationModel } from "./custom-notification.model";
+export { ContactModel } from "./contact.model";
+export { ProjectContactAssignmentModel } from "./project-contact-assignment.model";
+

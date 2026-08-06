@@ -16,6 +16,7 @@ import { DEFAULT_CURRENCY } from "@/lib/constants/finance";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ClientProfileCard } from "@/components/portals/admin-client-details/client-profile-card";
+import { ClientContactsCard } from "@/components/portals/admin-client-details/client-contacts-card";
 import { SectionTable } from "@/components/portals/admin-client-details/section-table";
 import { ClientStatementModal } from "@/components/portals/admin-client-details/client-statement-modal";
 import type { ClientDetailsPayload, ClientProfileForm } from "@/components/portals/admin-client-details/types";
@@ -209,6 +210,10 @@ export function AdminClientDetailsClient({ clientId }: { clientId: string }) {
         onDelete={() => setDeleteConfirmOpen(true)}
         onOpenStatement={() => setStatementOpen(true)}
       />
+
+      <div className="mb-6">
+        <ClientContactsCard clientId={clientId} clientName={clientName} />
+      </div>
 
       <Card className="mb-6 border-border/70 bg-card/90 shadow-(--shadow-premium) backdrop-blur-[2px]">
         <CardHeader className="pb-2">

@@ -17,6 +17,7 @@ import { SUPPORTED_CURRENCIES, DEFAULT_CURRENCY } from "@/lib/constants/finance"
 import { usePortalConfig } from "@/components/portals/portal-config-context";
 import { useSaveFeedback } from "@/lib/hooks/use-save-feedback";
 import { ProjectTeamPermissions } from "./project-team-permissions";
+import { ProjectContactsCard } from "./project-contacts-card";
 
 type ProjectDetailsPayload = {
   project?: {
@@ -621,6 +622,12 @@ export function AdminProjectDetailsClient({
                   </div>
                 </div>
               </div>
+
+              <ProjectContactsCard
+                projectId={projectId}
+                projectName={data.project?.name}
+                clientId={data.project?.clientId}
+              />
 
               {allowProjectMutations && (
                 <ProjectTeamPermissions
