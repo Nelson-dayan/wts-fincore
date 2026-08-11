@@ -16,18 +16,19 @@ import {
   Wallet,
   AlertCircle,
   TrendingUp,
-  ArrowRight
+  ArrowRight,
+  DollarSign,
+  TrendingDown,
+  Sparkles,
+  ChevronRight
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import dynamic from "next/dynamic";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { DashboardPageHeader } from "@/components/dashboard/page-header";
 import { apiFetch } from "@/lib/api/client";
 import { cn } from "@/lib/utils/cn";
-
-
 import { AdminOverviewCharts } from "./admin-overview-charts";
+import { DateRangeSelector, DateRangeOption } from "@/components/dashboard/date-range-selector";
 
 type Notification = {
   type: string;
@@ -65,15 +66,15 @@ type AdminOverview = {
 };
 
 const metricMeta: Record<string, { label: string; icon: LucideIcon }> = {
-  users: { label: "Users", icon: Users },
-  clients: { label: "Clients", icon: Building2 },
-  projects: { label: "Projects", icon: FolderKanban },
-  activityLogs: { label: "Activity logs", icon: Activity },
-  quotations: { label: "Quotations", icon: FileText },
-  purchaseOrders: { label: "Purchase orders", icon: ClipboardList },
-  invoices: { label: "Invoices", icon: Receipt },
-  payments: { label: "Payments", icon: CreditCard },
-  expenses: { label: "Expenses", icon: Wallet },
+  users: { label: "Total System Users", icon: Users },
+  clients: { label: "Active Client Accounts", icon: Building2 },
+  projects: { label: "Enterprise Projects", icon: FolderKanban },
+  activityLogs: { label: "System Audit Logs", icon: Activity },
+  quotations: { label: "Commercial Proposals", icon: FileText },
+  purchaseOrders: { label: "Purchase Orders", icon: ClipboardList },
+  invoices: { label: "Client Invoices", icon: Receipt },
+  payments: { label: "Settled Payments", icon: CreditCard },
+  expenses: { label: "Operational Expenses", icon: Wallet },
 };
 
 const sections: Array<{
@@ -84,34 +85,44 @@ const sections: Array<{
 }> = [
   {
     id: "organization",
-    title: "Organization",
-    description: "Team, client, project and audit coverage.",
+    title: "Organization & Directory",
+    description: "User access, client accounts, project portfolios, and compliance audit logs.",
     keys: ["users", "clients", "projects", "activityLogs"],
   },
   {
     id: "commercial",
-    title: "Commercial and billing",
-    description: "Pipeline and money movement across documents.",
+    title: "Commercial & Financial Operations",
+    description: "Quotations, purchase orders, invoices, and expense distribution.",
     keys: ["quotations", "purchaseOrders", "invoices", "payments", "expenses"],
   },
 ];
 
-const quickLinks: Array<{ href: string; label: string }> = [
-  { href: "/admin/projects", label: "Projects" },
-  { href: "/admin/quotations", label: "Quotations" },
-  { href: "/admin/invoices", label: "Invoices" },
-  { href: "/admin/expenses", label: "Expenses" },
+const quickLinks: Array<{ href: string; label: string; icon: LucideIcon }> = [
+  { href: "/admin/projects", label: "Projects Directory", icon: FolderKanban },
+  { href: "/admin/quotations", label: "Quotations & Proposals", icon: FileText },
+  { href: "/admin/invoices", label: "Invoices & Billing", icon: Receipt },
+  { href: "/admin/expenses", label: "Operational Expenses", icon: Wallet },
 ];
 
 const RevenueAreaChart = dynamic(() => import("@/components/charts/revenue-area-chart"), { 
   ssr: false,
-  loading: () => <div className="h-[280px] w-full flex items-center justify-center text-muted-foreground text-xs uppercase font-bold tracking-widest">Loading Analytics...</div>
+  loading: () => (
+    <div className="h-[280px] w-full flex items-center justify-center text-muted-foreground text-xs uppercase font-mono tracking-wider">
+      Loading Financial Analytics...
+    </div>
+  )
 });
-
-import { DateRangeSelector, DateRangeOption } from "@/components/dashboard/date-range-selector";
 
 function formatCount(n: number): string {
   return n.toLocaleString();
+}
+
+function formatCurrencyAmount(amount: number) {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "AED",
+    maximumFractionDigits: 0,
+  }).format(amount);
 }
 
 export function AdminOverviewClient() {
@@ -119,43 +130,134 @@ export function AdminOverviewClient() {
   const [data, setData] = useState<AdminOverview | null>(null);
   const [error, setError] = useState<string>("");
   const [loading, setLoading] = useState(true);
-  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    const timer = setTimeout(() => setMounted(true), 100);
     async function load() {
       try {
         const payload = await apiFetch<AdminOverview>(`/api/admin/overview?range=${range}`);
         setData(payload);
       } catch (e) {
-        setError(e instanceof Error ? e.message : "Failed to load");
+        setError(e instanceof Error ? e.message : "Failed to load overview data");
       } finally {
         setLoading(false);
       }
     }
     load();
-    return () => clearTimeout(timer);
   }, [range]);
 
   const formatBase = (n: unknown) => {
     const num = typeof n === "number" ? n : Number.parseFloat(String((n as any)?.$numberDecimal ?? n ?? 0)) || 0;
-    return "₹" + num.toLocaleString(undefined, { maximumFractionDigits: 0 });
+    return formatCurrencyAmount(num);
   };
 
   return (
-    <div className="animate-fade-in space-y-9">
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <DashboardPageHeader eyebrow="Admin" title="Dashboard" />
+    <div className="space-y-8 animate-in fade-in-50 duration-300">
+      {/* Top Title & Range Filter */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-border/60 pb-5">
+        <div>
+          <div className="flex items-center gap-2 text-xs font-mono font-semibold uppercase tracking-wider text-muted-foreground">
+            <span>Executive Command Center</span>
+            <span>•</span>
+            <span className="text-emerald-500 font-bold">Live Synced</span>
+          </div>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl mt-1">
+            Enterprise Overview
+          </h1>
+        </div>
         <DateRangeSelector value={range} onChange={setRange} />
       </div>
 
       {error && (
-        <div className="mb-6 rounded-xl border border-destructive/40 bg-destructive/5 p-4 text-sm text-destructive">
+        <div className="rounded-xl border border-destructive/40 bg-destructive/10 p-4 text-sm font-medium text-destructive">
           {error}
         </div>
       )}
 
-      {/* 🆕 Needs Attention Section */}
+      {/* Top Executive KPI Metric Summary Cards */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {/* Total Revenue */}
+        <Card className="bg-card border-border/80 shadow-xs relative overflow-hidden">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Total Revenue
+            </CardTitle>
+            <div className="flex size-8 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-500">
+              <TrendingUp className="size-4" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold font-mono tabular-nums text-foreground">
+              {loading ? "..." : formatCurrencyAmount(data?.revenueTotalAmount ?? 0)}
+            </div>
+            <div className="mt-1 flex items-center gap-1.5 text-[11px] text-emerald-500 font-medium">
+              <Sparkles className="size-3" />
+              <span>Invoiced Revenue Stream</span>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Total Expenses */}
+        <Card className="bg-card border-border/80 shadow-xs relative overflow-hidden">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Total Expenses
+            </CardTitle>
+            <div className="flex size-8 items-center justify-center rounded-lg bg-rose-500/10 text-rose-500">
+              <TrendingDown className="size-4" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold font-mono tabular-nums text-foreground">
+              {loading ? "..." : formatCurrencyAmount(data?.expenseTotalAmount ?? 0)}
+            </div>
+            <div className="mt-1 flex items-center gap-1.5 text-[11px] text-muted-foreground font-medium">
+              <span>Operational & Project Costs</span>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Net Profit Margin */}
+        <Card className="bg-card border-border/80 shadow-xs relative overflow-hidden">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Net Profit
+            </CardTitle>
+            <div className="flex size-8 items-center justify-center rounded-lg bg-blue-500/10 text-blue-500">
+              <DollarSign className="size-4" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold font-mono tabular-nums text-foreground">
+              {loading ? "..." : formatCurrencyAmount(data?.profitTotalAmount ?? 0)}
+            </div>
+            <div className="mt-1 flex items-center gap-1.5 text-[11px] text-blue-500 font-medium">
+              <span>Net Profit Margin</span>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Active Projects */}
+        <Card className="bg-card border-border/80 shadow-xs relative overflow-hidden">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Active Projects
+            </CardTitle>
+            <div className="flex size-8 items-center justify-center rounded-lg bg-indigo-500/10 text-indigo-500">
+              <FolderKanban className="size-4" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold font-mono tabular-nums text-foreground">
+              {loading ? "..." : formatCount(data?.projects ?? 0)}
+            </div>
+            <div className="mt-1 flex items-center gap-1.5 text-[11px] text-muted-foreground font-medium">
+              <span>Ongoing Deliverables</span>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Needs Attention Section */}
       <AnimatePresence>
         {data && data.notifications.length > 0 && (
           <motion.section 
@@ -163,31 +265,31 @@ export function AdminOverviewClient() {
             animate={{ height: "auto", opacity: 1 }}
             className="overflow-hidden"
           >
-            <div className="mb-3 flex items-center gap-2 text-amber-600 dark:text-amber-400">
-              <AlertCircle className="w-3.5 h-3.5" />
-              <h2 className="text-[10px] font-black uppercase tracking-[0.2em]">Needs Attention</h2>
+            <div className="mb-3 flex items-center gap-2 text-amber-500">
+              <AlertCircle className="size-4" />
+              <h2 className="text-xs font-bold uppercase tracking-wider">Operational Action Required ({data.notifications.length})</h2>
             </div>
-            <div className="grid gap-3">
-              {data.notifications.map((notif, idx) => (
+            <div className="grid gap-2.5 sm:grid-cols-2">
+              {data.notifications.slice(0, 4).map((notif, idx) => (
                 <Link key={idx} href={notif.actionUrl}>
                   <Card className={cn(
-                    "group transition-all hover:border-primary/40 hover:shadow-md border-l-4",
+                    "group transition-all hover:border-primary/50 hover:shadow-sm border-l-4 bg-card",
                     notif.severity === "high" ? "border-l-red-500" : "border-l-amber-500"
                   )}>
-                    <CardContent className="flex items-center justify-between p-4">
-                      <div className="flex gap-4 items-center">
+                    <CardContent className="flex items-center justify-between p-3.5">
+                      <div className="flex gap-3 items-center min-w-0">
                         <div className={cn(
-                          "p-2 rounded-full",
+                          "size-8 rounded-lg flex items-center justify-center shrink-0",
                           notif.severity === "high" ? "bg-red-500/10 text-red-500" : "bg-amber-500/10 text-amber-500"
                         )}>
-                          <AlertCircle className="w-4 h-4" />
+                          <AlertCircle className="size-4" />
                         </div>
-                        <div>
-                          <p className="font-bold text-sm">{notif.title}</p>
-                          <p className="text-xs text-muted-foreground">{notif.description}</p>
+                        <div className="min-w-0">
+                          <p className="font-semibold text-xs text-foreground truncate">{notif.title}</p>
+                          <p className="text-[11px] text-muted-foreground truncate">{notif.description}</p>
                         </div>
                       </div>
-                      <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:translate-x-1 transition-transform" />
+                      <ChevronRight className="size-4 shrink-0 text-muted-foreground group-hover:translate-x-0.5 transition-transform" />
                     </CardContent>
                   </Card>
                 </Link>
@@ -197,65 +299,23 @@ export function AdminOverviewClient() {
         )}
       </AnimatePresence>
 
-      {/* 🔄 Operations Summary Row (Commented Out)
-      <section className="grid gap-4 md:grid-cols-3">
-        <Card className="dashboard-stat-card md:col-span-2">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base font-semibold">Operations summary</CardTitle>
-          </CardHeader>
-          <CardContent className="grid gap-3 sm:grid-cols-3">
-            <div className="rounded-xl border border-border/60 bg-background/65 px-3 py-3">
-              <p className="text-xs uppercase tracking-wide text-muted-foreground">Active projects</p>
-              <p className="mt-1 text-2xl font-semibold tabular-nums">{formatCount(data?.projects ?? 0)}</p>
-            </div>
-            <div className="rounded-xl border border-border/60 bg-background/65 px-3 py-3">
-              <p className="text-xs uppercase tracking-wide text-muted-foreground">Open invoices</p>
-              <p className="mt-1 text-2xl font-semibold tabular-nums">{formatCount(data?.invoices ?? 0)}</p>
-            </div>
-            <div className="rounded-xl border border-border/60 bg-background/65 px-3 py-3">
-              <p className="text-xs uppercase tracking-wide text-muted-foreground">Payments logged</p>
-              <p className="mt-1 text-2xl font-semibold tabular-nums">{formatCount(data?.payments ?? 0)}</p>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="dashboard-stat-card">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base font-semibold">Quick actions</CardTitle>
-          </CardHeader>
-          <CardContent className="grid gap-2">
-            {quickLinks.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className="inline-flex items-center justify-between rounded-lg border border-border/65 bg-background/65 px-3 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-accent/60"
-              >
-                {item.label}
-                <ArrowUpRight className="size-3.5 text-muted-foreground" aria-hidden />
-              </Link>
-            ))}
-          </CardContent>
-        </Card>
-      </section>
-      */}
-
-      {/* 🆕 Financial Performance & Quick Actions Section */}
-      <section>
-        <div className="mb-3">
-          <h2 className="dashboard-section-label">Financial Performance</h2>
-          <p className="mt-1 text-sm text-muted-foreground">Real-time revenue vs expense tracking.</p>
+      {/* Financial Trend Analytics & Quick Links */}
+      <section className="space-y-3">
+        <div>
+          <h2 className="text-base font-bold text-foreground">Financial Performance & Analytics</h2>
+          <p className="text-xs text-muted-foreground">Historical revenue streams versus operational expense outflow.</p>
         </div>
         <div className="grid gap-6 lg:grid-cols-3">
-          <Card className="lg:col-span-2 border-border/60 shadow-xl overflow-hidden bg-background min-w-0">
-            <CardHeader className="pb-8">
+          <Card className="lg:col-span-2 border-border/80 shadow-xs bg-card overflow-hidden min-w-0">
+            <CardHeader className="pb-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <CardTitle className="text-base font-bold">Business Profitability</CardTitle>
-                  <CardDescription>Revenue vs Expenses trend</CardDescription>
+                  <CardTitle className="text-sm font-bold">Profitability & Cash Flow</CardTitle>
+                  <CardDescription className="text-xs">Revenue vs Expenses trend timeline</CardDescription>
                 </div>
-                <div className="flex items-center gap-4 text-[10px] font-bold uppercase tracking-widest">
-                  <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-primary" /> Revenue</div>
-                  <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-red-500" /> Expenses</div>
+                <div className="flex items-center gap-4 text-[10px] font-mono font-bold uppercase tracking-wider">
+                  <div className="flex items-center gap-1.5"><div className="size-2 rounded-full bg-primary" /> Revenue</div>
+                  <div className="flex items-center gap-1.5"><div className="size-2 rounded-full bg-red-500" /> Expenses</div>
                 </div>
               </div>
             </CardHeader>
@@ -268,30 +328,37 @@ export function AdminOverviewClient() {
             </CardContent>
           </Card>
 
-          <Card className="dashboard-stat-card border-border/60 shadow-xl flex flex-col justify-between p-6 bg-background">
+          {/* Quick Actions Shortcuts */}
+          <Card className="border-border/80 shadow-xs bg-card flex flex-col justify-between p-5">
             <div>
-              <CardHeader className="p-0 pb-4">
-                <CardTitle className="text-base font-bold">Quick actions</CardTitle>
-                <CardDescription>Fast navigation to key administrative modules</CardDescription>
+              <CardHeader className="p-0 pb-3">
+                <CardTitle className="text-sm font-bold">Quick Actions</CardTitle>
+                <CardDescription className="text-xs">Direct access to core workflows</CardDescription>
               </CardHeader>
-              <CardContent className="p-0 grid gap-2.5">
-                {quickLinks.map((item) => (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    className="inline-flex items-center justify-between rounded-xl border border-border/60 bg-muted/20 px-3.5 py-3 text-sm font-medium text-foreground transition-all hover:bg-primary/10 hover:border-primary/30 hover:text-primary group"
-                  >
-                    {item.label}
-                    <ArrowUpRight className="size-4 text-muted-foreground group-hover:text-primary transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" aria-hidden />
-                  </Link>
-                ))}
+              <CardContent className="p-0 grid gap-2">
+                {quickLinks.map((item) => {
+                  const Icon = item.icon;
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      className="inline-flex items-center justify-between rounded-xl border border-border/60 bg-muted/20 px-3.5 py-2.5 text-xs font-medium text-foreground transition-all hover:bg-primary/10 hover:border-primary/40 hover:text-primary group"
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <Icon className="size-3.5 text-muted-foreground group-hover:text-primary transition-colors" />
+                        <span>{item.label}</span>
+                      </div>
+                      <ArrowUpRight className="size-3.5 text-muted-foreground group-hover:text-primary transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" aria-hidden />
+                    </Link>
+                  );
+                })}
               </CardContent>
             </div>
           </Card>
         </div>
       </section>
 
-      {/* 📊 Expense Insights Breakdown */}
+      {/* Expense Insights Breakdown Charts */}
       {data && (
         <AdminOverviewCharts
           expenseTotalAmount={data.expenseTotalAmount}
@@ -303,41 +370,38 @@ export function AdminOverviewClient() {
         />
       )}
 
-      {/* 🔄 Original Sections Grid */}
-      <div className="flex flex-col gap-9 md:gap-11">
+      {/* Categorized Entity Counts */}
+      <div className="space-y-6">
         {sections.map((section) => (
           <section key={section.id} aria-labelledby={`dash-section-${section.id}`}>
             <div className="mb-3">
-              <h2 id={`dash-section-${section.id}`} className="dashboard-section-label">
+              <h2 id={`dash-section-${section.id}`} className="text-base font-bold text-foreground">
                 {section.title}
               </h2>
-              <p className="mt-1 text-sm text-muted-foreground">{section.description}</p>
+              <p className="text-xs text-muted-foreground">{section.description}</p>
             </div>
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               {section.keys.map((key) => {
                 const meta = metricMeta[key];
                 if (!meta) return null;
                 const Icon = meta.icon;
                 const count = data?.[key as keyof AdminOverview] ?? 0;
                 return (
-                  <Card key={key} className="dashboard-stat-card">
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 pt-5">
-                      <CardTitle className="text-[13px] font-medium text-muted-foreground">
+                  <Card key={key} className="bg-card border-border/80 shadow-xs hover:border-border transition-colors">
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 pt-4 px-4">
+                      <CardTitle className="text-xs font-semibold text-muted-foreground">
                         {meta.label}
                       </CardTitle>
-                      <span
-                        className="flex size-9 items-center justify-center rounded-xl bg-primary/10 text-primary ring-1 ring-primary/15"
-                        aria-hidden
-                      >
-                        <Icon className="size-4 opacity-90" strokeWidth={1.75} />
-                      </span>
+                      <div className="flex size-7 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                        <Icon className="size-3.5" />
+                      </div>
                     </CardHeader>
-                    <CardContent>
-                      <p className="text-3xl font-semibold tabular-nums tracking-tight text-foreground">
+                    <CardContent className="px-4 pb-4">
+                      <p className="text-2xl font-bold font-mono tabular-nums text-foreground">
                         {data != null ? formatCount(Number(count)) : "—"}
                       </p>
-                      <p className="mt-1.5 text-xs text-muted-foreground">
-                        {count === 0 ? "No records right now" : "Updated from live data"}
+                      <p className="mt-1 text-[11px] text-muted-foreground">
+                        {count === 0 ? "No records found" : "Active database entries"}
                       </p>
                     </CardContent>
                   </Card>

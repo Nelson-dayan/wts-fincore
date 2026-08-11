@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { connection } from "next/server";
 import { AdminInvoicesCreateHelper } from "@/components/portals/admin-invoices-create-helper";
 import { AdminInvoicesPageClient } from "@/components/portals/admin-invoice-detail/admin-invoices-page-client";
 
@@ -7,6 +8,7 @@ interface PageProps {
 }
 
 async function InvoicesContent({ searchParams }: { searchParams: Promise<{ projectId?: string }> }) {
+  await connection();
   const params = await searchParams;
   const projectId = params.projectId ? String(params.projectId) : "";
   const endpoint = projectId

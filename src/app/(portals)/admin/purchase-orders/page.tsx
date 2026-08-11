@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { connection } from "next/server";
 import { DashboardPageHeader } from "@/components/dashboard/page-header";
 import { AdminPurchaseOrdersPageClient } from "@/components/portals/admin-purchase-orders-page-client";
 
@@ -7,6 +8,7 @@ interface PageProps {
 }
 
 async function PurchaseOrdersContent({ searchParams }: { searchParams: Promise<{ projectId?: string }> }) {
+  await connection();
   const params = await searchParams;
   const projectId = params.projectId ? String(params.projectId) : "";
   const endpoint = projectId

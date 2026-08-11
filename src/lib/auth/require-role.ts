@@ -3,7 +3,9 @@ import { authOptions } from "@/lib/auth/options";
 import { headers } from "next/headers";
 
 export async function requireSession() {
-  await headers(); // Cleanly signal dynamic context to Next.js to prevent static prerendering issues
+  try {
+    await headers();
+  } catch {}
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) {
     throw new Error("UNAUTHORIZED");

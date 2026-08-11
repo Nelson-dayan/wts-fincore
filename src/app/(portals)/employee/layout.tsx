@@ -9,16 +9,19 @@ import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { EmployeePortalProviders } from "@/components/portals/employee-portal-providers";
 import { PortalUserBadge } from "@/components/layout/portal-user-badge";
 
+import { connection } from "next/server";
+
 async function EmployeePortalBrand() {
   const brandLogoSrc = await getPrimaryCompanyLogoForPortal();
   return <PortalBrand variant="employee" brandLogoSrc={brandLogoSrc} />;
 }
 
-export default function EmployeePortalLayout({
+export default async function EmployeePortalLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  await connection();
   return (
     <div className="flex min-h-dvh flex-col bg-background md:flex-row">
       <PortalMobileDrawer

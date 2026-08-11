@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { Suspense } from "react";
 import { Geist, Geist_Mono } from "next/font/google";
 import { SessionProvider } from "@/components/providers/session-provider";
 import { ThemeProvider } from "@/components/theme/theme-provider";
@@ -82,10 +83,12 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <SessionProvider>
-            {children}
-            <PwaRegister />
-          </SessionProvider>
+          <Suspense fallback={null}>
+            <SessionProvider>
+              {children}
+              <PwaRegister />
+            </SessionProvider>
+          </Suspense>
         </ThemeProvider>
       </body>
     </html>

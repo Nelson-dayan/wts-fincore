@@ -1,6 +1,9 @@
+import { Suspense } from "react";
+import { connection } from "next/server";
 import { ResourceTableClient } from "@/components/portals/resource-table-client";
 
-export default function AdminActivityPage() {
+async function ActivityContent() {
+  await connection();
   return (
     <ResourceTableClient
       title="Activity Logs"
@@ -14,5 +17,13 @@ export default function AdminActivityPage() {
         { key: "createdAt", label: "Created At" },
       ]}
     />
+  );
+}
+
+export default function AdminActivityPage() {
+  return (
+    <Suspense fallback={<div className="h-64 flex items-center justify-center text-xs text-muted-foreground">Loading activity logs...</div>}>
+      <ActivityContent />
+    </Suspense>
   );
 }

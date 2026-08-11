@@ -3,11 +3,7 @@
 import { useEffect, useState } from "react";
 import { 
   TrendingUp, 
-  TrendingDown, 
   BarChart3, 
-  Briefcase,
-  PieChart,
-  Target,
   ArrowUpRight,
   ArrowDownRight
 } from "lucide-react";
@@ -17,6 +13,8 @@ import { DashboardPageHeader } from "@/components/dashboard/page-header";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils/cn";
+import { formatCurrency } from "@/lib/utils/formatters";
+import { StatusBadge } from "@/components/ui/status-badge";
 
 type ProfitabilityItem = {
   id: string;
@@ -64,10 +62,8 @@ export function AdminProfitabilityClient() {
   const [data, setData] = useState<ReportData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    const timer = setTimeout(() => setMounted(true), 100);
     async function load() {
       setLoading(true);
       try {
@@ -82,17 +78,10 @@ export function AdminProfitabilityClient() {
       }
     }
     load();
-    return () => clearTimeout(timer);
   }, [range]);
 
   const formatBase = (n: number) => {
-    return "₹" + n.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 });
-  };
-
-  const formatCompact = (n: number) => {
-    if (n >= 1000000) return "₹" + (n / 1000000).toFixed(1) + "M";
-    if (n >= 1000) return "₹" + (n / 1000).toFixed(0) + "k";
-    return "₹" + n;
+    return formatCurrency(n, "AED");
   };
 
   if (loading) {
@@ -110,7 +99,7 @@ export function AdminProfitabilityClient() {
   }
 
   if (error) {
-    return <div className="p-8 text-center text-destructive font-medium border rounded-2xl bg-destructive/5">{error}</div>;
+    return <div className="p-8 text-center text-destructive font-semibold border rounded-2xl bg-destructive/10 text-xs">{error}</div>;
   }
 
   const sortedItems = [...(data?.items || [])].sort((a, b) => b.profit - a.profit);
@@ -118,10 +107,10 @@ export function AdminProfitabilityClient() {
 
   return (
     <motion.div 
-      initial={{ opacity: 0, y: 20 }}
+      initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5 }}
-      className="space-y-8 pb-20"
+      transition={{ duration: 0.3 }}
+      className="space-y-6 pb-12"
     >
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <DashboardPageHeader 
@@ -132,7 +121,7 @@ export function AdminProfitabilityClient() {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {[
           { 
             label: "Total Revenue", 
@@ -144,66 +133,58 @@ export function AdminProfitabilityClient() {
           { 
             label: "Total Expenses", 
             value: (data?.totals.expenses || 0) + (data?.totals.fees || 0), 
-            sub: "Burn & Fees", 
+            sub: "Burn & Operations", 
             icon: ArrowDownRight, 
             color: "red" 
           },
           { 
             label: "Net Profit", 
             value: data?.totals.profit, 
-            sub: `${((data?.totals.profit || 0) / (data?.totals.revenue || 1) * 100).toFixed(1)}% Margin`, 
+            sub: `${((data?.totals.profit || 0) / (data?.totals.revenue || 1) * 100).toFixed(1)}% Net Margin`, 
             icon: TrendingUp, 
-            color: "emerald",
-            colSpan: "md:col-span-2"
+            color: "emerald"
           }
         ].map((kpi, idx) => (
-          <motion.div
+          <Card 
             key={kpi.label}
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: idx * 0.1 }}
+            className="overflow-hidden border-border/80 bg-card shadow-xs relative"
           >
-            <Card className={cn(
-              "overflow-hidden border-none shadow-lg relative h-full",
-              kpi.color === "primary" ? "bg-primary text-primary-foreground" :
-              kpi.color === "red" ? "bg-red-600 text-white" :
-              "bg-emerald-600 text-white"
-            )}>
-              <div className="absolute top-0 right-0 p-4 opacity-20">
-                <kpi.icon className="w-12 h-12" />
+            <div className="p-5 flex items-start justify-between">
+              <div className="space-y-1">
+                <p className="text-xs font-mono font-semibold uppercase tracking-wider text-muted-foreground">{kpi.label}</p>
+                <p className="text-2xl font-bold font-mono tabular-nums tracking-tight text-foreground">
+                  {formatCurrency(kpi.value || 0, "AED")}
+                </p>
+                <p className="text-xs font-medium text-muted-foreground">{kpi.sub}</p>
               </div>
-              <CardHeader className="pb-2">
-                <CardDescription className="text-[10px] uppercase font-bold tracking-widest text-white/70">{kpi.label}</CardDescription>
-                <CardTitle className={cn(
-                  "font-black tracking-tight",
-                  kpi.colSpan ? "text-4xl" : "text-2xl"
-                )}>{formatBase(kpi.value || 0)}</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-[10px] font-bold uppercase tracking-wider text-white/60">
-                  {kpi.sub}
-                </div>
-              </CardContent>
-            </Card>
-          </motion.div>
+              <div className={cn(
+                "flex size-10 items-center justify-center rounded-xl border",
+                kpi.color === "primary" ? "bg-primary/10 text-primary border-primary/20" :
+                kpi.color === "red" ? "bg-rose-500/10 text-rose-500 border-rose-500/20" :
+                "bg-emerald-500/10 text-emerald-500 border-emerald-500/20"
+              )}>
+                <kpi.icon className="size-5" />
+              </div>
+            </div>
+          </Card>
         ))}
       </div>
 
       {/* Charts Area */}
       <div className="grid gap-6 lg:grid-cols-3">
         {/* Revenue Area Chart */}
-        <Card className="lg:col-span-2 border-border/60 shadow-xl overflow-hidden min-w-0">
-          <CardHeader className="flex flex-row items-center justify-between pb-8">
+        <Card className="lg:col-span-2 border-border/80 bg-card shadow-xs overflow-hidden min-w-0">
+          <CardHeader className="flex flex-row items-center justify-between pb-6 border-b border-border/60 bg-muted/20 dark:bg-muted/10">
             <div>
               <CardTitle className="text-base font-bold">Revenue vs Expenses</CardTitle>
-              <CardDescription>Monthly growth trends over last 6 months</CardDescription>
+              <CardDescription className="text-xs">Monthly growth trends over selected time period</CardDescription>
             </div>
-            <div className="flex items-center gap-4 text-[10px] font-bold uppercase tracking-widest">
-              <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-primary" /> Revenue</div>
-              <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-red-500" /> Expenses</div>
+            <div className="flex items-center gap-4 text-xs font-semibold">
+              <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-full bg-primary" /> Revenue</div>
+              <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-full bg-rose-500" /> Expenses</div>
             </div>
           </CardHeader>
-          <CardContent className="h-[300px] w-full relative">
+          <CardContent className="h-[280px] w-full pt-4 relative">
             <RevenueAreaChart 
               data={data?.timeSeries || []} 
               formatCurrency={formatBase}
@@ -213,12 +194,12 @@ export function AdminProfitabilityClient() {
         </Card>
 
         {/* Top Projects Bar Chart */}
-        <Card className="border-border/60 shadow-xl overflow-hidden min-w-0">
-          <CardHeader>
+        <Card className="border-border/80 bg-card shadow-xs overflow-hidden min-w-0">
+          <CardHeader className="border-b border-border/60 bg-muted/20 dark:bg-muted/10">
             <CardTitle className="text-base font-bold">Top Performing Projects</CardTitle>
-            <CardDescription>By net profit contribution</CardDescription>
+            <CardDescription className="text-xs">By net profit contribution</CardDescription>
           </CardHeader>
-          <CardContent className="h-[300px] w-full relative">
+          <CardContent className="h-[280px] w-full pt-4 relative">
             <ProjectsBarChart 
               data={topProfitItems} 
               formatCurrency={formatBase}
@@ -228,94 +209,88 @@ export function AdminProfitabilityClient() {
       </div>
 
       {/* Main Table */}
-      <Card className="border-border/60 shadow-xl overflow-hidden">
-        <CardHeader className="bg-muted/10 border-b">
+      <Card className="border-border/80 bg-card shadow-xs overflow-hidden">
+        <CardHeader className="border-b border-border/60 bg-muted/20 px-6 py-4 dark:bg-muted/10">
           <div className="flex items-center justify-between">
             <div>
-              <CardTitle className="text-lg">Individual Project Performance</CardTitle>
-              <CardDescription>Profit/Loss breakdown per workstream</CardDescription>
+              <CardTitle className="text-base font-bold">Individual Project Performance</CardTitle>
+              <CardDescription className="text-xs">Profit/Loss breakdown per workstream</CardDescription>
             </div>
-            <div className="p-2 bg-background border rounded-lg text-muted-foreground">
-              <BarChart3 className="w-5 h-5" />
+            <div className="p-2 bg-background border border-border/80 rounded-lg text-muted-foreground">
+              <BarChart3 className="size-4" />
             </div>
           </div>
         </CardHeader>
         <CardContent className="p-0">
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-muted/30 border-b">
-                <tr className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground">
-                  <th className="px-6 py-4 text-left">Project</th>
-                  <th className="px-6 py-4 text-right">Revenue</th>
-                  <th className="px-6 py-4 text-right">Expenses</th>
-                  <th className="px-6 py-4 text-right">Profit</th>
-                  <th className="px-6 py-4 text-center">Margin</th>
-                  <th className="px-6 py-4 text-center">Efficiency</th>
+            <table className="w-full min-w-[50rem] text-left text-xs">
+              <thead>
+                <tr className="border-b border-border/80 bg-muted/30 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground dark:bg-muted/15">
+                  <th className="px-5 py-3">Project</th>
+                  <th className="px-5 py-3 text-right">Revenue</th>
+                  <th className="px-5 py-3 text-right">Expenses</th>
+                  <th className="px-5 py-3 text-right">Profit</th>
+                  <th className="px-5 py-3 text-center">Margin</th>
+                  <th className="px-5 py-3 text-center">Efficiency</th>
                 </tr>
               </thead>
-              <tbody className="divide-y">
-                <AnimatePresence mode="popLayout">
-                  {sortedItems.map((item, idx) => (
-                    <motion.tr 
-                      key={item.id} 
-                      layout
-                      initial={{ opacity: 0, x: -10 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: idx * 0.05 }}
-                      className="hover:bg-muted/20 transition-colors group cursor-pointer"
-                      onClick={() => window.location.href = `/admin/projects/${item.id}`}
-                    >
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center font-bold text-xs uppercase">
-                            {item.name.slice(0, 2)}
-                          </div>
-                          <div>
-                            <p className="font-bold text-foreground group-hover:text-primary transition-colors">{item.name}</p>
-                            <p className="text-[10px] text-muted-foreground uppercase tracking-wide">{item.status.replace('_', ' ')}</p>
+              <tbody className="divide-y divide-border/60">
+                {sortedItems.map((item) => (
+                  <tr 
+                    key={item.id} 
+                    className="bg-card hover:bg-muted/30 transition-colors cursor-pointer dark:hover:bg-muted/15"
+                    onClick={() => window.location.href = `/admin/projects/${item.id}`}
+                  >
+                    <td className="px-5 py-3.5">
+                      <div className="flex items-center gap-3">
+                        <div className="size-8 rounded-lg bg-primary/10 text-primary border border-primary/20 flex items-center justify-center font-bold text-xs uppercase">
+                          {item.name.slice(0, 2)}
+                        </div>
+                        <div>
+                          <p className="font-semibold text-xs text-foreground hover:text-primary transition-colors">{item.name}</p>
+                          <div className="mt-0.5">
+                            <StatusBadge status={item.status} size="sm" />
                           </div>
                         </div>
-                      </td>
-                      <td className="px-6 py-4 text-right font-medium tabular-nums">
-                        {formatBase(item.revenue)}
-                      </td>
-                      <td className="px-6 py-4 text-right text-red-500 font-medium tabular-nums">
-                        {formatBase(item.totalCost)}
-                      </td>
-                      <td className={cn(
-                        "px-6 py-4 text-right font-black tabular-nums",
-                        item.profit >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600"
+                      </div>
+                    </td>
+                    <td className="px-5 py-3.5 text-right font-mono font-bold tabular-nums text-foreground">
+                      {formatCurrency(item.revenue, "AED")}
+                    </td>
+                    <td className="px-5 py-3.5 text-right text-rose-500 font-mono font-bold tabular-nums">
+                      {formatCurrency(item.totalCost, "AED")}
+                    </td>
+                    <td className={cn(
+                      "px-5 py-3.5 text-right font-mono font-bold tabular-nums",
+                      item.profit >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-500 dark:text-rose-400"
+                    )}>
+                      {formatCurrency(item.profit, "AED")}
+                    </td>
+                    <td className="px-5 py-3.5 text-center">
+                      <span className={cn(
+                        "px-2 py-0.5 rounded-md text-[10px] font-mono font-semibold tabular-nums border",
+                        item.profitMargin > 30 ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20" : 
+                        item.profitMargin > 10 ? "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20" : 
+                        "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20"
                       )}>
-                        {formatBase(item.profit)}
-                      </td>
-                      <td className="px-6 py-4 text-center">
-                        <span className={cn(
-                          "px-2 py-1 rounded-full text-[10px] font-bold tabular-nums",
-                          item.profitMargin > 30 ? "bg-emerald-500/10 text-emerald-600" : 
-                          item.profitMargin > 10 ? "bg-blue-500/10 text-blue-600" : 
-                          "bg-red-500/10 text-red-600"
-                        )}>
-                          {item.profitMargin.toFixed(1)}%
-                        </span>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex items-center justify-center">
-                          <div className="w-24 h-1.5 bg-muted rounded-full overflow-hidden">
-                            <motion.div 
-                              initial={{ width: 0 }}
-                              animate={{ width: `${Math.max(0, Math.min(100, item.profitMargin))}%` }}
-                              transition={{ duration: 1, delay: 0.5 }}
-                              className={cn(
-                                "h-full transition-colors",
-                                item.profitMargin > 20 ? "bg-emerald-500" : "bg-primary"
-                              )} 
-                            />
-                          </div>
+                        {item.profitMargin.toFixed(1)}%
+                      </span>
+                    </td>
+                    <td className="px-5 py-3.5">
+                      <div className="flex items-center justify-center">
+                        <div className="w-24 h-1.5 bg-muted rounded-full overflow-hidden">
+                          <div 
+                            className={cn(
+                              "h-full transition-all",
+                              item.profitMargin > 20 ? "bg-emerald-500" : "bg-primary"
+                            )} 
+                            style={{ width: `${Math.max(0, Math.min(100, item.profitMargin))}%` }}
+                          />
                         </div>
-                      </td>
-                    </motion.tr>
-                  ))}
-                </AnimatePresence>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>

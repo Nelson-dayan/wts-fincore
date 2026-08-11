@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { connection } from "next/server";
 import { CreateProjectForm } from "@/components/portals/create-project-form";
 import { AdminProjectsClient } from "@/components/portals/admin-projects-client";
 
@@ -7,6 +8,7 @@ interface PageProps {
 }
 
 async function ProjectsContent({ searchParams }: { searchParams: Promise<{ clientId?: string }> }) {
+  await connection();
   const params = await searchParams;
   const clientId = params.clientId ? String(params.clientId) : "";
   return <AdminProjectsClient initialClientId={clientId} />;

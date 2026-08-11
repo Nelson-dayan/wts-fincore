@@ -1,29 +1,47 @@
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils/cn";
 
+export interface DashboardPageHeaderProps {
+  title: string;
+  description?: ReactNode;
+  eyebrow?: string;
+  actions?: ReactNode;
+  children?: ReactNode;
+  className?: string;
+}
+
 export function DashboardPageHeader({
   title,
   description,
   eyebrow,
+  actions,
+  children,
   className,
-}: {
-  title: string;
-  description?: ReactNode;
-  /** Small label above the title (e.g. "Admin overview"). */
-  eyebrow?: string;
-  className?: string;
-}) {
+}: DashboardPageHeaderProps) {
   return (
-    <header className={cn("dashboard-page-hero", className)}>
-      {eyebrow ? <p className="dashboard-page-hero__eyebrow">{eyebrow}</p> : null}
-      <h1 className="font-brand text-2xl font-semibold tracking-tight text-foreground md:text-[1.75rem]">
-        {title}
-      </h1>
-      {description != null && description !== "" ? (
-        <div className="mt-3 max-w-3xl text-[0.9375rem] leading-relaxed text-muted-foreground md:text-[0.96875rem]">
-          {description}
+    <header className={cn("flex flex-col gap-4 pb-6 sm:flex-row sm:items-center sm:justify-between", className)}>
+      <div className="space-y-1">
+        {eyebrow ? (
+          <p className="text-xs font-mono font-semibold uppercase tracking-wider text-primary">
+            {eyebrow}
+          </p>
+        ) : null}
+        <h1 className="text-2xl font-bold tracking-tight text-foreground md:text-3xl">
+          {title}
+        </h1>
+        {description != null && description !== "" ? (
+          <div className="text-xs text-muted-foreground sm:text-sm max-w-2xl">
+            {description}
+          </div>
+        ) : null}
+      </div>
+
+      {(actions || children) && (
+        <div className="flex flex-wrap items-center gap-2.5 shrink-0 sm:pt-0">
+          {actions}
+          {children}
         </div>
-      ) : null}
+      )}
     </header>
   );
 }

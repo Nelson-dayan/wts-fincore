@@ -6,13 +6,14 @@ import { DashboardPageHeader } from "@/components/dashboard/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { apiFetch } from "@/lib/api/client";
-import { ApiResponse } from "@/lib/types/api.types";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-
+import { Search, ChevronLeft, ChevronRight, Eye, Trash2, ExternalLink } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/utils/cn";
 
 type Row = Record<string, unknown> & { _id?: string };
 
-/** The specific shape of the data property returned by the API */
 type ResourceData = {
   items?: Row[];
   users?: Row[];
@@ -23,7 +24,6 @@ type ResourceData = {
   hasMore?: boolean;
 };
 
-
 interface ResourceTableClientProps {
   title: string;
   description: string;
@@ -31,56 +31,90 @@ interface ResourceTableClientProps {
   columns: Array<{ key: string; label: string }>;
   singleItem?: boolean;
   searchable?: boolean;
-  /**
-   * Base path for row detail links (serializable from Server Components).
-   * e.g. `/admin/purchase-orders` → link `/admin/purchase-orders/{_id}`.
-   */
   rowDetailPathPrefix?: string;
-  /** Appended to row detail links, e.g. `#section` to scroll after open. */
   rowDetailHash?: string;
-  /**
-   * Extra links per row; `{id}` is replaced with the row’s `_id` (URL-encoded).
-   * e.g. `{ label: "Invoice", hrefPattern: "/admin/invoices/new?poId={id}" }`
-   */
   extraRowLinks?: Array<{ label: string; hrefPattern: string }>;
-  /** Shown in the table body when the API returns zero rows (not an error). */
   emptyMessage?: string;
-  /** When false, skips the top DashboardPageHeader (use when the page supplies its own). */
   showPageHeader?: boolean;
-  /** Increment to refetch the list with the same endpoint (e.g. after creating a row elsewhere on the page). */
   refreshKey?: number;
-  /** Optional callback to handle row deletion. If provided, a Delete button is shown. */
   onDelete?: (id: string) => Promise<void>;
-  /** Optional callback to handle row viewing. If provided, a View button is shown. */
   onView?: (id: string) => void;
-  /** Optional dictionary of custom cell rendering functions */
   customCellRenders?: Record<string, (value: any, row: any) => React.ReactNode>;
 }
 
-function formatCell(value: unknown): string {
-  if (value == null || value === "") return "-";
-  if (typeof value === "boolean") return value ? "Yes" : "No";
+function renderStatusBadge(statusStr: string) {
+  const val = statusStr.toLowerCase();
+  let colorClasses = "bg-muted text-muted-foreground border-border";
+
+  if (val === "paid" || val === "approved" || val === "completed" || val === "active") {
+    colorClasses = "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20";
+  } else if (val === "partial" || val === "pending" || val === "sent" || val === "in_progress") {
+    colorClasses = "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20";
+  } else if (val === "overdue" || val === "rejected" || val === "cancelled" || val === "inactive") {
+    colorClasses = "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20";
+  } else if (val === "draft" || val === "new") {
+    colorClasses = "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20";
+  }
+
+  return (
+    <span className={cn("inline-flex items-center rounded-md border px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wide", colorClasses)}>
+      {statusStr}
+    </span>
+  );
+}
+
+function formatCell(value: unknown, key = ""): React.ReactNode {
+  if (value == null || value === "") return <span className="text-muted-foreground">—</span>;
+  if (typeof value === "boolean") {
+    return (
+      <span className={cn("inline-flex items-center rounded-md px-2 py-0.5 text-xs font-semibold", value ? "bg-emerald-500/10 text-emerald-500" : "bg-muted text-muted-foreground")}>
+        {value ? "Yes" : "No"}
+      </span>
+    );
+  }
+
+  if (key.toLowerCase().includes("status") && typeof value === "string") {
+    return renderStatusBadge(value);
+  }
+
+  if (typeof value === "number" || (typeof value === "string" && !isNaN(Number(value)) && (key.toLowerCase().includes("total") || key.toLowerCase().includes("amount") || key.toLowerCase().includes("price")))) {
+    const num = Number(value);
+    return (
+      <span className="font-mono font-bold tabular-nums text-foreground">
+        {new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(num)}
+      </span>
+    );
+  }
+
   if (typeof value === "string") {
     const maybeDate = Date.parse(value);
     if (!Number.isNaN(maybeDate) && value.includes("T")) {
-      return new Date(value).toLocaleString();
+      return (
+        <span className="font-mono text-xs text-muted-foreground tabular-nums">
+          {new Date(value).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" })}
+        </span>
+      );
     }
-    return value;
+    return <span className="text-foreground font-medium">{value}</span>;
   }
+
   if (typeof value === "object" && value !== null) {
     const obj = value as Record<string, any>;
-    if (obj.invoiceNumber) return String(obj.invoiceNumber);
-    if (obj.name) return String(obj.name);
-    if (obj.email) return String(obj.email);
-    
+    if (obj.invoiceNumber) return <span className="font-bold text-foreground">{String(obj.invoiceNumber)}</span>;
+    if (obj.name) return <span className="font-medium text-foreground">{String(obj.name)}</span>;
+    if (obj.email) return <span className="text-muted-foreground">{String(obj.email)}</span>;
+
     const decimalLike = value as { $numberDecimal?: string; toString?: () => string };
-    if (decimalLike.$numberDecimal) return decimalLike.$numberDecimal;
+    if (decimalLike.$numberDecimal) {
+      return <span className="font-mono font-bold tabular-nums">{decimalLike.$numberDecimal}</span>;
+    }
     if (typeof decimalLike.toString === "function") {
       const parsed = decimalLike.toString();
-      if (parsed !== "[object Object]") return parsed;
+      if (parsed !== "[object Object]") return <span>{parsed}</span>;
     }
   }
-  return String(value);
+
+  return <span>{String(value)}</span>;
 }
 
 export function ResourceTableClient({
@@ -93,8 +127,7 @@ export function ResourceTableClient({
   rowDetailPathPrefix,
   rowDetailHash = "",
   extraRowLinks,
-  emptyMessage =
-    "No records match yet. Adjust search or add new data — the table updates after the list loads.",
+  emptyMessage = "No records matching current criteria.",
   showPageHeader = true,
   refreshKey = 0,
   onDelete,
@@ -106,7 +139,6 @@ export function ResourceTableClient({
   const [rows, setRows] = useState<Row[]>([]);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
-  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [query, setQuery] = useState("");
@@ -134,7 +166,6 @@ export function ResourceTableClient({
             : []
           : data.items ?? data.users ?? [];
 
-
         if (alive) {
           setRows(loadedRows);
           setTotal(data.total ?? loadedRows.length);
@@ -156,61 +187,72 @@ export function ResourceTableClient({
     };
   }, [endpoint, singleItem, page, query, refreshKey]);
 
+  const totalPages = Math.max(1, Math.ceil(total / limit));
+
   return (
-    <div className="animate-fade-in">
+    <div className="space-y-6 animate-in fade-in-50">
       {showPageHeader ? <DashboardPageHeader title={title} description={description} /> : null}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">
-            {title} ({total})
-          </CardTitle>
+      
+      <Card className="bg-card border-border/80 shadow-xs overflow-hidden">
+        <CardHeader className="border-b border-border/60 bg-muted/20 px-6 py-4 dark:bg-muted/10">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <CardTitle className="text-base font-bold flex items-center gap-2 text-foreground">
+              <span>{title}</span>
+              <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-semibold text-primary font-mono">
+                {total}
+              </span>
+            </CardTitle>
+
+            {!singleItem && searchable ? (
+              <div className="relative w-full sm:w-72">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
+                <Input
+                  value={query}
+                  onChange={(e) => {
+                    setPage(1);
+                    setQuery(e.target.value);
+                  }}
+                  placeholder={`Search ${title.toLowerCase()}...`}
+                  className="h-8 pl-9 text-xs bg-background rounded-lg border-border/80"
+                />
+              </div>
+            ) : null}
+          </div>
         </CardHeader>
-        <CardContent>
-          {!singleItem && searchable ? (
-            <div className="mb-3">
-              <input
-                value={query}
-                onChange={(e) => {
-                  setPage(1);
-                  setQuery(e.target.value);
-                }}
-                placeholder={`Search ${title.toLowerCase()}...`}
-                className="h-9 w-full rounded-lg border border-border bg-background px-3 text-sm"
-              />
-            </div>
-          ) : null}
+
+        <CardContent className="p-0">
           {error ? (
-            <div className="rounded-xl border border-destructive/40 bg-destructive/5 p-4 text-sm text-destructive">
+            <div className="m-6 rounded-xl border border-destructive/40 bg-destructive/10 p-4 text-sm font-medium text-destructive">
               {error}
             </div>
           ) : loading ? (
             <div className="overflow-x-auto" aria-busy="true">
-              <table className="w-full min-w-190 text-left text-sm">
-                <thead className="text-muted-foreground">
-                  <tr>
+              <table className="w-full min-w-[50rem] text-left text-xs">
+                <thead>
+                  <tr className="border-b border-border/80 bg-muted/30 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground dark:bg-muted/15">
                     {columns.map((column) => (
-                      <th key={column.key} className="py-2 pr-3">
+                      <th key={column.key} className="px-5 py-3">
                         {column.label}
                       </th>
                     ))}
                     {hasActionsCol ? (
-                      <th className="py-2 pr-3 text-right">
+                      <th className="px-5 py-3 text-right">
                         <span className="sr-only">Actions</span>
                       </th>
                     ) : null}
                   </tr>
                 </thead>
-                <tbody>
-                  {Array.from({ length: 8 }).map((_, ri) => (
-                    <tr key={ri} className="border-t border-border/70">
+                <tbody className="divide-y divide-border/60">
+                  {Array.from({ length: 6 }).map((_, ri) => (
+                    <tr key={ri} className="bg-card">
                       {columns.map((column) => (
-                        <td key={column.key} className="py-2.5 pr-3">
-                          <Skeleton className="h-4 w-full max-w-32" />
+                        <td key={column.key} className="px-5 py-3.5">
+                          <Skeleton className="h-4 w-full max-w-[8rem]" />
                         </td>
                       ))}
                       {hasActionsCol ? (
-                        <td className="py-2.5 pr-3 text-right">
-                          <Skeleton className="ml-auto h-8 w-14" />
+                        <td className="px-5 py-3.5 text-right">
+                          <Skeleton className="ml-auto h-7 w-12 rounded-lg" />
                         </td>
                       ) : null}
                     </tr>
@@ -220,27 +262,25 @@ export function ResourceTableClient({
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full min-w-190 text-left text-sm">
-                <thead className="text-muted-foreground">
-                  <tr>
+              <table className="w-full min-w-[50rem] text-left text-xs">
+                <thead>
+                  <tr className="border-b border-border/80 bg-muted/30 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground dark:bg-muted/15">
                     {columns.map((column) => (
-                      <th key={column.key} className="py-2 pr-3">
+                      <th key={column.key} className="px-5 py-3">
                         {column.label}
                       </th>
                     ))}
                     {hasActionsCol ? (
-                      <th className="py-2 pr-3 text-right">
-                        <span className="sr-only">Actions</span>
-                      </th>
+                      <th className="px-5 py-3 text-right">Actions</th>
                     ) : null}
                   </tr>
                 </thead>
-                <tbody>
+                <tbody className="divide-y divide-border/60">
                   {rows.length === 0 ? (
-                    <tr className="border-t border-border/70">
+                    <tr>
                       <td
                         colSpan={columns.length + (hasActionsCol ? 1 : 0)}
-                        className="text-muted-foreground py-10 px-2 text-center text-sm leading-relaxed"
+                        className="text-muted-foreground py-12 px-6 text-center text-xs leading-relaxed"
                       >
                         {emptyMessage}
                       </td>
@@ -249,74 +289,91 @@ export function ResourceTableClient({
                     rows.map((row, index) => (
                       <tr
                         key={String(row._id ?? index)}
-                        className="border-t border-border/70"
+                        className="bg-card transition-colors hover:bg-muted/30 dark:hover:bg-muted/15"
                       >
                         {columns.map((column) => (
-                          <td key={column.key} className="py-2 pr-3">
+                          <td key={column.key} className="px-5 py-3.5 align-middle">
                             {customCellRenders && customCellRenders[column.key]
                               ? customCellRenders[column.key](row[column.key], row)
-                              : formatCell(row[column.key])}
+                              : formatCell(row[column.key], column.key)}
                           </td>
                         ))}
                         {hasActionsCol ? (
-                          <td className="py-2 pr-3 text-right">
+                          <td className="whitespace-nowrap px-5 py-3.5 text-right align-middle">
                             {row._id ? (
-                              <span className="inline-flex flex-wrap items-center justify-end gap-x-3 gap-y-1">
+                              <div className="flex flex-nowrap items-center justify-end gap-1.5">
                                 {detailPrefix ? (
-                                  <Link
-                                    href={`${detailPrefix}/${encodeURIComponent(String(row._id))}${rowDetailHash}`}
-                                    className="text-primary text-sm font-medium underline-offset-4 hover:underline"
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-7.5 px-2 text-xs font-semibold gap-1 hover:bg-primary/10 hover:text-primary rounded-md"
+                                    asChild
                                   >
-                                    Open
-                                  </Link>
+                                    <Link href={`${detailPrefix}/${encodeURIComponent(String(row._id))}${rowDetailHash}`}>
+                                      <Eye className="size-3.5" />
+                                      <span>Open</span>
+                                    </Link>
+                                  </Button>
                                 ) : null}
                                 {(extraRowLinks ?? []).map((link) => {
-                                  let href = link.hrefPattern;
-                                  // Replace {id} with _id
-                                  href = href.replace("{id}", encodeURIComponent(String(row._id || "")));
-                                  
-                                  // Replace other {field} placeholders
+                                  let href = link.hrefPattern.replace("{id}", encodeURIComponent(String(row._id || "")));
                                   const matches = href.match(/\{([^}]+)\}/g);
                                   if (matches) {
-                                    matches.forEach(match => {
+                                    matches.forEach((match) => {
                                       const field = match.slice(1, -1);
                                       if (field !== "id" && row[field]) {
-                                        const val = typeof row[field] === 'object' && row[field] !== null 
-                                          ? (row[field] as any)._id || row[field]
-                                          : row[field];
+                                        const val =
+                                          typeof row[field] === "object" && row[field] !== null
+                                            ? (row[field] as any)._id || row[field]
+                                            : row[field];
                                         href = href.replace(match, encodeURIComponent(String(val || "")));
                                       }
                                     });
                                   }
 
                                   return (
-                                    <Link
+                                    <Button
                                       key={link.label}
-                                      href={href}
-                                      className="text-primary text-sm font-medium underline-offset-4 hover:underline"
+                                      type="button"
+                                      variant="outline"
+                                      size="sm"
+                                      className="h-7.5 px-2 text-xs font-semibold gap-1 border-border/80 rounded-md"
+                                      asChild
                                     >
-                                      {link.label}
-                                    </Link>
+                                      <Link href={href}>
+                                        <ExternalLink className="size-3.5" />
+                                        <span>{link.label}</span>
+                                      </Link>
+                                    </Button>
                                   );
                                 })}
                                 {onView ? (
-                                  <button
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-7.5 px-2 text-xs font-semibold gap-1 hover:bg-primary/10 hover:text-primary rounded-md"
                                     onClick={() => onView(String(row._id))}
-                                    className="text-primary text-sm font-medium underline-offset-4 hover:underline"
                                   >
-                                    View
-                                  </button>
+                                    <Eye className="size-3.5" />
+                                    <span>View</span>
+                                  </Button>
                                 ) : null}
                                 {onDelete ? (
-                                  <button
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-7.5 w-7.5 p-0 text-destructive hover:bg-destructive/10 rounded-md"
                                     disabled={confirmDeleteId === String(row._id) && isDeleting}
                                     onClick={() => setConfirmDeleteId(String(row._id))}
-                                    className="text-destructive text-sm font-medium underline-offset-4 hover:underline disabled:opacity-50"
+                                    title="Delete record"
                                   >
-                                    {confirmDeleteId === String(row._id) && isDeleting ? "..." : "Delete"}
-                                  </button>
+                                    <Trash2 className="size-3.5" />
+                                  </Button>
                                 ) : null}
-                              </span>
+                              </div>
                             ) : (
                               "—"
                             )}
@@ -329,27 +386,40 @@ export function ResourceTableClient({
               </table>
             </div>
           )}
+
           {!singleItem ? (
-            <div className="mt-4 flex items-center justify-between text-sm">
-              <button
-                className="rounded-md border border-border px-3 py-1.5 disabled:opacity-50"
-                disabled={loading || page <= 1}
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-              >
-                Previous
-              </button>
-              <span className="text-muted-foreground">
-                Page {page} of {Math.max(1, Math.ceil(total / limit))}
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-t border-border/60 bg-muted/20 px-6 py-3.5 dark:bg-muted/10">
+              <span className="text-xs text-muted-foreground font-mono">
+                Showing <strong className="text-foreground">{total === 0 ? 0 : (page - 1) * limit + 1}</strong> - <strong className="text-foreground">{Math.min(page * limit, total)}</strong> of <strong className="text-foreground">{total}</strong>
               </span>
-              <button
-                className="rounded-md border border-border px-3 py-1.5 disabled:opacity-50"
-                disabled={loading || page >= Math.max(1, Math.ceil(total / limit))}
-                onClick={() =>
-                  setPage((p) => Math.min(Math.ceil(total / limit), p + 1))
-                }
-              >
-                Next
-              </button>
+
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={loading || page <= 1}
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  className="h-7.5 px-2.5 text-xs gap-1 rounded-md"
+                >
+                  <ChevronLeft className="size-3.5" />
+                  Prev
+                </Button>
+                <span className="text-xs font-mono font-semibold text-muted-foreground px-1">
+                  {page} / {totalPages}
+                </span>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={loading || page >= totalPages}
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  className="h-7.5 px-2.5 text-xs gap-1 rounded-md"
+                >
+                  Next
+                  <ChevronRight className="size-3.5" />
+                </Button>
+              </div>
             </div>
           ) : null}
         </CardContent>

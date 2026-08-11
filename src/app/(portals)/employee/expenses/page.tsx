@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { connection } from "next/server";
 import { CreateRecordForm } from "@/components/portals/create-record-form";
 import { ResourceTableClient } from "@/components/portals/resource-table-client";
 import { AdminExpensesCreateHelper } from "@/components/portals/admin-expenses-create-helper";
@@ -8,6 +9,7 @@ interface PageProps {
 }
 
 async function ExpensesContent({ searchParams }: { searchParams: Promise<{ projectId?: string }> }) {
+  await connection();
   const params = await searchParams;
   const projectId = params.projectId ? String(params.projectId) : "";
   const endpoint = projectId
