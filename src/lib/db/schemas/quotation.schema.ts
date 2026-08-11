@@ -47,6 +47,7 @@ const quotationBrandingSchema = new Schema(
 export const quotationSchema = new Schema(
   {
     quotationNumber: { type: String, required: true, unique: true, index: true },
+    companyId: { type: Types.ObjectId, ref: "Company", index: true },
     projectId: { type: Types.ObjectId, ref: "Project", required: true, index: true },
     createdBy: { type: Types.ObjectId, ref: "User", required: true, index: true },
     documentInfo: { type: documentInfoSchema, required: true },

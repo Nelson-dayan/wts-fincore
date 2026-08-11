@@ -6,6 +6,7 @@ import { DEFAULT_CURRENCY, SUPPORTED_CURRENCY_VALUES } from "@/lib/constants/fin
 export const purchaseOrderSchema = new Schema(
   {
     poNumber: { type: String, required: true, unique: true, index: true },
+    companyId: { type: Types.ObjectId, ref: "Company", index: true },
     projectId: { type: Types.ObjectId, ref: "Project", required: true, index: true },
     quotationId: { type: Types.ObjectId, ref: "Quotation", required: true, index: true },
     type: { type: String, enum: ["client", "internal"], required: true, index: true },

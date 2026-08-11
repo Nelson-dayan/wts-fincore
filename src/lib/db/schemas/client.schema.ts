@@ -36,6 +36,11 @@ export const clientSchema = new Schema(
       ref: "Company",
       index: true,
     },
+    parentCompanyId: {
+      type: Types.ObjectId,
+      ref: "Company",
+      index: true,
+    },
     createdBy: { type: Types.ObjectId, ref: "User", required: true, index: true },
   },
   schemaOptions

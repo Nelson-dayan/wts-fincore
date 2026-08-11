@@ -35,6 +35,7 @@ export const projectSchema = new Schema(
   {
     name: { type: String, required: true, trim: true, index: true },
     description: { type: String, default: "" },
+    companyId: { type: Types.ObjectId, ref: "Company", index: true },
     clientId: { type: Types.ObjectId, ref: "Client", required: true, index: true },
     assignedTo: [{ type: Types.ObjectId, ref: "User", index: true }],
     assignedMembers: { type: [projectMemberSchema], default: [] },

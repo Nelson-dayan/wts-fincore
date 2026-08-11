@@ -73,6 +73,8 @@ export async function POST(req: Request) {
       state?: string;
       city?: string;
       zipCode?: string;
+      companyId?: string;
+      parentCompanyId?: string;
     };
     const name = String(body.name ?? "").trim();
     const company = String(body.company ?? "").trim();
@@ -109,6 +111,8 @@ export async function POST(req: Request) {
       state: String(body.state ?? "").trim(),
       city: String(body.city ?? "").trim(),
       zipCode: String(body.zipCode ?? "").trim(),
+      companyId: body.companyId ? body.companyId : undefined,
+      parentCompanyId: body.parentCompanyId ? body.parentCompanyId : undefined,
       createdBy: session.user.id,
     });
 

@@ -9,6 +9,7 @@ import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { NotificationBell } from "@/components/portals/notification-bell";
 import { CommandPalette } from "@/components/portals/command-palette";
 import { CommandPaletteTrigger } from "@/components/portals/command-palette-trigger";
+import { CompanySwitcher } from "@/components/companies/company-switcher";
 
 async function AdminPortalBrand() {
   const brandLogoSrc = await getPrimaryCompanyLogoForPortal();
@@ -54,6 +55,9 @@ export default function AdminPortalLayout({
               </PortalNavLink>
               <PortalNavLink href="/admin/projects" match="prefix" className="w-full justify-start">
                 Projects
+              </PortalNavLink>
+              <PortalNavLink href="/admin/settings/companies" match="prefix" className="w-full justify-start">
+                Companies
               </PortalNavLink>
               <PortalNavLink href="/admin/settings/company" match="prefix" className="w-full justify-start">
                 Settings
@@ -202,7 +206,8 @@ export default function AdminPortalLayout({
             <div className="flex-1 max-w-md">
               <CommandPaletteTrigger />
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3">
+              <CompanySwitcher />
               <NotificationBell />
               <ThemeToggle />
               <SignOutButton className="border-0 bg-transparent hover:bg-destructive/12" />

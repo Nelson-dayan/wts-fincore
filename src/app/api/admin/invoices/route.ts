@@ -14,6 +14,8 @@ import {
   getEmployeeAssignedProjectIdStrings,
 } from "@/lib/auth/employee-resource-access";
 
+import { CompanyHierarchyService } from "@/lib/services/business/company-hierarchy.service";
+
 export async function GET(req: Request) {
   try {
     const session = await requireRole(["admin", "employee"]);
@@ -23,9 +25,15 @@ export async function GET(req: Request) {
     const q = parseSearch(url.searchParams);
     const projectId = String(url.searchParams.get("projectId") ?? "").trim();
     const poId = String(url.searchParams.get("poId") ?? "").trim();
+    const targetCompanyId = req.headers.get("x-company-id") || url.searchParams.get("companyId");
+    const scopeMode = (req.headers.get("x-scope-mode") || url.searchParams.get("scopeMode")) as "single" | "group" || "single";
+
+    const companyContext = await CompanyHierarchyService.resolveCompanyContext(targetCompanyId, scopeMode);
+
     const filter: Record<string, unknown> = {
       lifecycleStatus: { $ne: "DRAFT_HIDDEN" },
-      isDeleted: { $ne: true }
+      isDeleted: { $ne: true },
+      companyId: { $in: companyContext.allowedCompanyIds },
     };
     if (q) filter.invoiceNumber = { $regex: q, $options: "i" };
 
