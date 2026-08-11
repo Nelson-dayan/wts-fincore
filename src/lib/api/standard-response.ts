@@ -35,10 +35,30 @@ export function apiError(message: string, status = 500, details?: any) {
   }, { status });
 }
 
+export function isNextInternalError(error: unknown): boolean {
+  if (typeof error === "object" && error !== null) {
+    const digest = String((error as any).digest || "");
+    const name = String((error as any).name || "");
+    if (
+      digest === "HANGING_PROMISE_REJECTION" ||
+      digest === "DYNAMIC_SERVER_USAGE" ||
+      digest.startsWith("NEXT_") ||
+      name === "DynamicServerError"
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
 /**
  * Wraps existing auth error logic into the standard format
  */
 export function standardAuthError(error: unknown, fallbackMessage = "Unauthorized access") {
+  if (isNextInternalError(error)) {
+    throw error;
+  }
+
   if (error instanceof Error) {
     if (error.message === "UNAUTHORIZED") {
       return apiError("Unauthorized", 401);

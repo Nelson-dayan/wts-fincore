@@ -18,7 +18,7 @@ export async function GET(req: Request) {
     };
     const [items, total] = await Promise.all([
       ProjectModel.find(filter)
-      .select("name status priority budget updatedAt")
+      .select("name status priority budget currency updatedAt")
       .sort({ updatedAt: -1 })
       .skip(skip)
       .limit(limit)

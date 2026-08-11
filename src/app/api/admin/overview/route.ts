@@ -15,6 +15,7 @@ import {
 import { requireRole } from "@/lib/auth/require-role";
 import { decimalToNumber } from "@/lib/services/business/money";
 import { apiSuccess, apiError } from "@/lib/api/response";
+import { isNextInternalError } from "@/lib/api/standard-response";
 
 
 function monthKey(d: Date) {
@@ -298,6 +299,7 @@ export async function GET(req: Request) {
       topProjectsByExpense
     });
   } catch (error) {
+    if (isNextInternalError(error)) throw error;
     console.error("Overview error:", error);
     return apiError("Failed to load admin overview", 500);
   }

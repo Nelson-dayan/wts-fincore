@@ -2,6 +2,7 @@ import { requireRole } from "@/lib/auth/require-role";
 import { connectDB } from "@/lib/db/connect";
 import { fetchChronologicalTimeline } from "@/lib/services/orchestration";
 import { apiSuccess, apiError } from "@/lib/api/response";
+import { isNextInternalError } from "@/lib/api/standard-response";
 import mongoose from "mongoose";
 
 export async function GET(req: Request) {
@@ -27,6 +28,7 @@ export async function GET(req: Request) {
       timeline
     });
   } catch (error: any) {
+    if (isNextInternalError(error)) throw error;
     console.error("TIMELINE FETCH ERROR:", error);
     return apiError(error.message || "Failed to fetch timeline logs", 500);
   }

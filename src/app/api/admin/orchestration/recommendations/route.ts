@@ -3,6 +3,7 @@ import { connectDB } from "@/lib/db/connect";
 import { assessTransitions } from "@/lib/services/orchestration";
 import { QuotationModel, PurchaseOrderModel, InvoiceModel, ProjectModel } from "@/lib/db/models";
 import { apiSuccess, apiError } from "@/lib/api/response";
+import { isNextInternalError } from "@/lib/api/standard-response";
 import mongoose from "mongoose";
 
 export async function GET(req: Request) {
@@ -54,6 +55,7 @@ export async function GET(req: Request) {
       recommendations
     });
   } catch (error: any) {
+    if (isNextInternalError(error)) throw error;
     console.error("RECOMMENDATIONS FETCH ERROR:", error);
     return apiError(error.message || "Failed to fetch recommendations", 500);
   }

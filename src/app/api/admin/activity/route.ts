@@ -3,7 +3,7 @@ import { connectDB } from "@/lib/db/connect";
 import { ActivityLogModel } from "@/lib/db/models";
 import { apiSuccess, apiError } from "@/lib/api/response";
 import { parsePagination, parseSearch } from "@/lib/api/pagination";
-
+import { isNextInternalError } from "@/lib/api/standard-response";
 
 export async function GET(req: Request) {
   try {
@@ -32,6 +32,7 @@ export async function GET(req: Request) {
     ]);
     return apiSuccess({ items, page, limit, total, hasMore: skip + items.length < total });
   } catch (error) {
+    if (isNextInternalError(error)) throw error;
     console.error("Activity API Error:", error);
     return apiError("Failed to load activity logs", 500);
   }

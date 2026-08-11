@@ -3,6 +3,7 @@ import { connectDB } from "@/lib/db/connect";
 import { CompanyModel } from "@/lib/db/models";
 import { getTreasuryDashboardProjection } from "@/lib/services/projections";
 import { apiSuccess, apiError } from "@/lib/api/response";
+import { isNextInternalError } from "@/lib/api/standard-response";
 
 export async function GET(req: Request) {
   try {
@@ -22,6 +23,7 @@ export async function GET(req: Request) {
       projection
     });
   } catch (error: any) {
+    if (isNextInternalError(error)) throw error;
     console.error("TREASURY PROJECTION ERROR:", error);
     return apiError(error.message || "Failed to load treasury read-model projection.", 500);
   }

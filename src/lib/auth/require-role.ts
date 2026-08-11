@@ -1,11 +1,9 @@
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth/options";
-import { headers } from "next/headers";
+import { connection } from "next/server";
 
 export async function requireSession() {
-  try {
-    await headers();
-  } catch {}
+  await connection();
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) {
     throw new Error("UNAUTHORIZED");
