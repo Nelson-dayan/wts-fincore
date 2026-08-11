@@ -43,9 +43,16 @@ export class CompanyHierarchyService {
   static async getCompanyTree(): Promise<CompanyTreeNode[]> {
     await connectDB();
     
-    const companies = await CompanyModel.find({ isActive: true, deletedAt: null })
+    let companies = await CompanyModel.find({ isActive: true, deletedAt: null })
       .select("name code kind parentCompanyId taxId baseCurrency branding isActive isPrimary")
       .lean();
+
+    if (companies.length === 0) {
+      await this.resolveCompanyContext();
+      companies = await CompanyModel.find({ isActive: true, deletedAt: null })
+        .select("name code kind parentCompanyId taxId baseCurrency branding isActive isPrimary")
+        .lean();
+    }
 
     const companyMap = new Map<string, CompanyTreeNode>();
     const roots: CompanyTreeNode[] = [];
@@ -132,7 +139,23 @@ export class CompanyHierarchyService {
     }
 
     if (!companyDoc) {
-      throw new Error("Company context required. No active companies exist in the system.");
+      companyDoc = await CompanyModel.findOne({ deletedAt: null }).lean();
+      if (companyDoc && !companyDoc.isActive) {
+        await CompanyModel.updateOne({ _id: companyDoc._id }, { $set: { isActive: true } });
+        companyDoc.isActive = true;
+      }
+    }
+
+    if (!companyDoc) {
+      const created = await CompanyModel.create({
+        name: "Default Company",
+        code: "MAIN",
+        kind: "operating",
+        baseCurrency: "AED",
+        isActive: true,
+        isPrimary: true,
+      });
+      companyDoc = created.toObject();
     }
 
     const companyId = companyDoc._id;
