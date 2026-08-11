@@ -23,6 +23,7 @@ import { StatusBadge } from "@/components/ui/status-badge";
 type ProjectRow = {
   _id: string;
   name: string;
+  currency?: string;
   status: "lead" | "in_progress" | "completed" | "on_hold";
   priority: "low" | "medium" | "high";
   budget?: number;
@@ -179,13 +180,13 @@ export function AdminProjectsClient({ initialClientId = "" }: { initialClientId?
                         <StatusBadge status={project.status} />
                       </td>
                       <td className="px-4 py-3.5 text-right font-mono font-bold tabular-nums text-foreground">
-                        {formatCurrency(project.revenue, "AED")}
+                        {formatCurrency(project.revenue, project.currency || "AED")}
                       </td>
                       <td className={cn(
                         "px-4 py-3.5 text-right font-mono font-bold tabular-nums",
                         project.profit >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-500 dark:text-rose-400"
                       )}>
-                        {formatCurrency(project.profit, "AED")}
+                        {formatCurrency(project.profit, project.currency || "AED")}
                       </td>
                       <td className="px-4 py-3.5 text-center">
                         <div className="flex items-center justify-center gap-1.5">

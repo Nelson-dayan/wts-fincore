@@ -20,6 +20,7 @@ type ProfitabilityItem = {
   id: string;
   name: string;
   status: string;
+  currency?: string;
   revenue: number;
   expenses: number;
   fees: number;
@@ -255,16 +256,16 @@ export function AdminProfitabilityClient() {
                       </div>
                     </td>
                     <td className="px-5 py-3.5 text-right font-mono font-bold tabular-nums text-foreground">
-                      {formatCurrency(item.revenue, "AED")}
+                      {formatCurrency(item.revenue, item.currency || "AED")}
                     </td>
                     <td className="px-5 py-3.5 text-right text-rose-500 font-mono font-bold tabular-nums">
-                      {formatCurrency(item.totalCost, "AED")}
+                      {formatCurrency(item.totalCost, item.currency || "AED")}
                     </td>
                     <td className={cn(
                       "px-5 py-3.5 text-right font-mono font-bold tabular-nums",
                       item.profit >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-500 dark:text-rose-400"
                     )}>
-                      {formatCurrency(item.profit, "AED")}
+                      {formatCurrency(item.profit, item.currency || "AED")}
                     </td>
                     <td className="px-5 py-3.5 text-center">
                       <span className={cn(

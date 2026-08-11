@@ -16,6 +16,7 @@ import { AdminInvoicesCreateHelper } from "@/components/portals/admin-invoices-c
 import { SUPPORTED_CURRENCIES, DEFAULT_CURRENCY } from "@/lib/constants/finance";
 import { usePortalConfig } from "@/components/portals/portal-config-context";
 import { useSaveFeedback } from "@/lib/hooks/use-save-feedback";
+import { formatCurrency } from "@/lib/utils/formatters";
 import { ProjectTeamPermissions } from "./project-team-permissions";
 import { ProjectContactsCard } from "./project-contacts-card";
 
@@ -62,6 +63,7 @@ type ProjectDetailsPayload = {
     _id: string;
     title: string;
     amount: number;
+    currency?: string;
     category: string;
     createdAt: string;
   }>;
@@ -90,10 +92,6 @@ function normalizeBudget(value: unknown): string {
     }
   }
   return "";
-}
-
-function formatCurrency(n: number) {
-  return n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 function SectionTable({
@@ -747,7 +745,7 @@ export function AdminProjectDetailsClient({
               Revenue (Base)
             </p>
             <p className="text-2xl font-bold text-foreground">
-              ₹{formatCurrency(data.financials?.totalReceivedBase ?? 0)}
+              {formatCurrency(data.financials?.totalReceivedBase ?? 0, (data.project as any)?.currency || "AED")}
             </p>
           </CardContent>
         </Card>
@@ -758,7 +756,7 @@ export function AdminProjectDetailsClient({
               Expenses & Fees (Base)
             </p>
             <p className="text-2xl font-bold text-red-600">
-              ₹{formatCurrency((data.financials?.totalExpensesBase ?? 0) + (data.financials?.totalFeesBase ?? 0))}
+              {formatCurrency((data.financials?.totalExpensesBase ?? 0) + (data.financials?.totalFeesBase ?? 0), (data.project as any)?.currency || "AED")}
             </p>
           </CardContent>
         </Card>
@@ -769,7 +767,7 @@ export function AdminProjectDetailsClient({
               Net Profit (Base)
             </p>
             <p className="text-3xl font-bold text-green-700 dark:text-green-400">
-              ₹{formatCurrency(data.financials?.profitBase ?? 0)}
+              {formatCurrency(data.financials?.profitBase ?? 0, (data.project as any)?.currency || "AED")}
             </p>
           </CardContent>
         </Card>
@@ -787,7 +785,7 @@ export function AdminProjectDetailsClient({
         rows={(data.payments ?? []).map((p) => ({
           ...p,
           receivedAt: new Date(String(p.receivedAt)).toLocaleDateString(),
-          amountDisplay: `${p.currency} ${formatCurrency(p.amount)}`,
+          amountDisplay: formatCurrency(p.amount, p.currency || (data.project as any)?.currency || "AED"),
           accountDisplay: (p.accountId as any)?.name || "-",
         }))}
       />
@@ -836,13 +834,13 @@ export function AdminProjectDetailsClient({
         title="Expenses"
         columns={[
           { key: "title", label: "Title" },
-          { key: "amount", label: `Amount (${DEFAULT_CURRENCY})` },
+          { key: "amount", label: "Amount" },
           { key: "category", label: "Category" },
           { key: "createdAt", label: "Created At" },
         ]}
         rows={(data.expenses ?? []).map((ex) => ({
           ...ex,
-          amount: formatCurrency(ex.amount),
+          amount: formatCurrency(ex.amount, ex.currency || (data.project as any)?.currency || "AED"),
           createdAt: new Date(String(ex.createdAt)).toLocaleString(),
         }))}
       />

@@ -49,6 +49,14 @@ export async function PATCH(
       return NextResponse.json({ error: "Quotation not found" }, { status: 404 });
     }
 
+    if (quotation.status === status) {
+      return NextResponse.json({
+        success: true,
+        message: `Quotation is already ${status}.`,
+        quotation,
+      });
+    }
+
     quotation.status = status;
     if (clientNote) {
       quotation.internalNotes = quotation.internalNotes

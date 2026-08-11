@@ -34,7 +34,7 @@ export async function GET(req: Request) {
 
     // 1. Fetch Projects (only necessary fields)
     const projects = await ProjectModel.find({})
-      .select("name status budget createdAt")
+      .select("name status budget currency createdAt")
       .sort({ createdAt: -1 })
       .lean();
 
@@ -169,6 +169,7 @@ export async function GET(req: Request) {
         id,
         name: p.name,
         status: p.status,
+        currency: p.currency || "AED",
         revenue,
         expenses: expenseCosts,
         fees: gatewayFees,

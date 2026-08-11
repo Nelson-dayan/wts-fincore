@@ -24,10 +24,7 @@ import { readResponseJson } from "@/lib/http/read-response-json";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { SaveSuccessToast } from "@/components/ui/save-success-toast";
 import { useSaveFeedback } from "@/lib/hooks/use-save-feedback";
-
-function formatCurrency(n: number) {
-  return n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
+import { formatCurrency } from "@/lib/utils/formatters";
 
 const EMPTY_FORM: ClientProfileForm = {
   name: "",
@@ -222,13 +219,12 @@ export function AdminClientDetailsClient({ clientId }: { clientId: string }) {
             Expenses (all projects)
           </CardTitle>
           <CardDescription>
-            Total recorded expenses linked to this client’s projects ({DEFAULT_CURRENCY}).
+            Total recorded expenses linked to this client’s projects.
           </CardDescription>
         </CardHeader>
         <CardContent>
           <p className="text-3xl font-semibold tabular-nums tracking-tight text-foreground">
-            {formatCurrency(data.expenseTotalAll ?? 0)}
-            <span className="ml-2 text-lg font-medium text-muted-foreground">{DEFAULT_CURRENCY}</span>
+            {formatCurrency(data.expenseTotalAll ?? 0, data.client?.currency || "AED")}
           </p>
         </CardContent>
       </Card>
@@ -240,12 +236,12 @@ export function AdminClientDetailsClient({ clientId }: { clientId: string }) {
           { key: "name", label: "Name" },
           { key: "status", label: "Status" },
           { key: "priority", label: "Priority" },
-          { key: "expenseTotal", label: `Expenses (${DEFAULT_CURRENCY})` },
+          { key: "expenseTotal", label: "Expenses" },
           { key: "createdAt", label: "Created At" },
         ]}
         rows={(data.projects ?? []).map((project) => ({
           ...project,
-          expenseTotal: formatCurrency(project.expenseTotal ?? 0),
+          expenseTotal: formatCurrency(project.expenseTotal ?? 0, data.client?.currency || "AED"),
           createdAt: new Date(project.createdAt).toLocaleString(),
         }))}
         actionHref={`/admin/projects?clientId=${clientId}`}
@@ -326,14 +322,14 @@ export function AdminClientDetailsClient({ clientId }: { clientId: string }) {
         icon={Wallet}
         columns={[
           { key: "title", label: "Title" },
-          { key: "amount", label: `Amount (${DEFAULT_CURRENCY})` },
+          { key: "amount", label: "Amount" },
           { key: "category", label: "Category" },
           { key: "projectName", label: "Project" },
           { key: "createdAt", label: "Created At" },
         ]}
         rows={(data.expenses ?? []).map((row) => ({
           ...row,
-          amount: formatCurrency(row.amount),
+          amount: formatCurrency(row.amount, (row as any).currency || data.client?.currency || "AED"),
           createdAt: new Date(String(row.createdAt)).toLocaleString(),
         }))}
         actionHref="/admin/expenses"
