@@ -55,8 +55,14 @@ export function LoginForm() {
     const session = await readResponseJson<{ user?: { role?: string } }>(sessionRes);
     const role = session?.user?.role as string | undefined;
 
-    if (role === "admin") router.push("/admin");
-    else router.push("/employee");
+    const callbackUrl = searchParams?.get("callbackUrl");
+    if (callbackUrl && callbackUrl.startsWith("/") && !callbackUrl.startsWith("//")) {
+      router.push(callbackUrl);
+    } else if (role === "admin") {
+      router.push("/admin");
+    } else {
+      router.push("/employee");
+    }
     router.refresh();
   }
 
