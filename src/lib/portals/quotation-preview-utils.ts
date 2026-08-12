@@ -1,3 +1,5 @@
+import { isImageSrc } from "@/lib/utils/is-image-src";
+
 export type QuotationBrandingState = {
   useCompanyLogo: boolean;
   useCompanySignature: boolean;
@@ -21,11 +23,14 @@ export function resolveQuotationLogoSrc(
   companySnapshot: { logoText?: string; logoUrl?: string }
 ): string | null {
   if (branding.useCompanyLogo) {
-    const fromCompany = String(companySnapshot.logoText ?? companySnapshot.logoUrl ?? "").trim();
-    return fromCompany || null;
+    const candidates = [companySnapshot.logoUrl, companySnapshot.logoText];
+    for (const cand of candidates) {
+      if (isImageSrc(cand)) return cand!.trim();
+    }
+    return null;
   }
   const custom = String(branding.customLogoText ?? "").trim();
-  return custom || null;
+  return isImageSrc(custom) ? custom : null;
 }
 
 export function resolveCompanySignatureSrc(
@@ -34,9 +39,10 @@ export function resolveCompanySignatureSrc(
 ): string | null {
   if (branding.useCompanySignature) {
     const c = String(companySnapshot.signatureText ?? "").trim();
-    return c || null;
+    return isImageSrc(c) ? c : null;
   }
-  return String(branding.customSignatureText ?? "").trim() || null;
+  const custom = String(branding.customSignatureText ?? "").trim();
+  return isImageSrc(custom) ? custom : null;
 }
 
 export function resolveClientSignatureSrc(
@@ -44,7 +50,7 @@ export function resolveClientSignatureSrc(
   clientSnapshot: { signatureText?: string }
 ): string | null {
   const c = String(clientSnapshot.signatureText ?? "").trim();
-  if (!c) return null;
+  if (!isImageSrc(c)) return null;
   /* Explicit false hides; true/undefined (legacy drafts) shows when a signature image exists. */
   if (branding.showClientSignature === false) return null;
   return c;

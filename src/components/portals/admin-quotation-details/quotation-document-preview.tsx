@@ -1,5 +1,6 @@
 "use client";
 
+import { isImageSrc } from "@/lib/utils/is-image-src";
 import type { QuotationBrandingState } from "@/lib/portals/quotation-preview-utils";
 import {
   resolveClientSignatureSrc,
@@ -154,7 +155,7 @@ export function QuotationDocumentPreview({
             <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-zinc-500">
               Bill to
             </p>
-            {clientSnapshot.logoText ? (
+            {isImageSrc(clientSnapshot.logoText) ? (
               // eslint-disable-next-line @next/next/no-img-element -- data URLs
               <img
                 src={clientSnapshot.logoText}

@@ -4,6 +4,7 @@ import { authErrorResponse } from "@/lib/api/route-auth";
 import { connectDB } from "@/lib/db/connect";
 import { CompanyModel } from "@/lib/db/models";
 import { logActivity } from "@/lib/services/activity/log-activity.service";
+import { isImageSrc } from "@/lib/utils/is-image-src";
 
 export async function GET(
   req: Request,
@@ -62,14 +63,51 @@ export async function PATCH(
 
     if (body.branding) {
       updates.branding = {
-        ...current.branding,
+        ...(current.branding || {}),
         ...body.branding,
       };
-      if (body.branding.logoText) updates.logoText = String(body.branding.logoText);
-      if (body.branding.signatureText) updates.signatureText = String(body.branding.signatureText);
+
+      // Resolve logo image: prioritize valid image sources
+      const rawLogoCandidates = [
+        body.branding.logoUrl,
+        body.branding.logoText,
+        body.logoText,
+      ];
+      const logoImg = rawLogoCandidates.find((c) => typeof c === "string" && isImageSrc(c));
+
+      if (logoImg) {
+        updates.branding.logoUrl = logoImg;
+        updates.branding.logoText = logoImg;
+        updates.logoText = logoImg;
+      } else if (body.branding.logoUrl !== undefined) {
+        updates.branding.logoUrl = String(body.branding.logoUrl);
+        if (isImageSrc(current.logoText) && !isImageSrc(body.branding.logoUrl)) {
+          // Keep base64 image in logoText if body doesn't supply a new image
+          updates.branding.logoUrl = current.logoText;
+        }
+      }
+
+      // Resolve signature image: prioritize valid image sources
+      const rawSigCandidates = [
+        body.branding.signatureUrl,
+        body.branding.signatureText,
+        body.signatureText,
+      ];
+      const sigImg = rawSigCandidates.find((c) => typeof c === "string" && isImageSrc(c));
+
+      if (sigImg) {
+        updates.branding.signatureUrl = sigImg;
+        updates.branding.signatureText = sigImg;
+        updates.signatureText = sigImg;
+      } else if (body.branding.signatureUrl !== undefined) {
+        updates.branding.signatureUrl = String(body.branding.signatureUrl);
+        if (isImageSrc(current.signatureText) && !isImageSrc(body.branding.signatureUrl)) {
+          updates.branding.signatureUrl = current.signatureText;
+        }
+      }
     }
-    if (body.logoText !== undefined) updates.logoText = String(body.logoText);
-    if (body.signatureText !== undefined) updates.signatureText = String(body.signatureText);
+    if (body.logoText !== undefined && isImageSrc(body.logoText)) updates.logoText = String(body.logoText);
+    if (body.signatureText !== undefined && isImageSrc(body.signatureText)) updates.signatureText = String(body.signatureText);
 
     const updated = await CompanyModel.findByIdAndUpdate(
       companyId,

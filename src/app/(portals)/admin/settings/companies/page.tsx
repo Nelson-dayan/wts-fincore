@@ -28,6 +28,7 @@ import {
 import { cn } from "@/lib/utils/cn";
 import { UploadCard } from "@/components/ui/upload-card";
 import { Dropdown } from "@/components/ui/select";
+import { isImageSrc } from "@/lib/utils/is-image-src";
 
 export interface CompanyItem {
   _id: string;
@@ -45,6 +46,8 @@ export interface CompanyItem {
   contactName?: string;
   isActive?: boolean;
   isPrimary?: boolean;
+  logoText?: string;
+  signatureText?: string;
   branding?: {
     logoUrl?: string;
     logoText?: string;
@@ -242,6 +245,18 @@ export default function CompaniesManagementPage() {
         : comp.parentCompanyId
       : "";
 
+    const logoImg = [
+      comp.branding?.logoUrl,
+      comp.logoText,
+      comp.branding?.logoText,
+    ].find((val) => typeof val === "string" && isImageSrc(val)) || "";
+
+    const sigImg = [
+      comp.branding?.signatureUrl,
+      comp.signatureText,
+      comp.branding?.signatureText,
+    ].find((val) => typeof val === "string" && isImageSrc(val)) || "";
+
     setFormData({
       name: comp.name || "",
       code: comp.code || "",
@@ -255,10 +270,10 @@ export default function CompaniesManagementPage() {
       website: comp.website || "",
       contactName: comp.contactName || "",
       isPrimary: !!comp.isPrimary,
-      logoUrl: comp.branding?.logoUrl || "",
-      logoText: comp.branding?.logoText || "",
-      signatureUrl: comp.branding?.signatureUrl || "",
-      signatureText: comp.branding?.signatureText || "",
+      logoUrl: logoImg,
+      logoText: logoImg,
+      signatureUrl: sigImg,
+      signatureText: sigImg,
       companySealUrl: comp.branding?.companySealUrl || "",
       invoicePrefix: comp.branding?.invoicePrefix || `${comp.code}-INV`,
       quotationPrefix: comp.branding?.quotationPrefix || `${comp.code}-QT`,
@@ -290,9 +305,9 @@ export default function CompaniesManagementPage() {
       isPrimary: formData.isPrimary,
       branding: {
         logoUrl: formData.logoUrl,
-        logoText: formData.logoText,
+        logoText: formData.logoUrl,
         signatureUrl: formData.signatureUrl,
-        signatureText: formData.signatureText,
+        signatureText: formData.signatureUrl,
         companySealUrl: formData.companySealUrl,
         invoicePrefix: formData.invoicePrefix,
         quotationPrefix: formData.quotationPrefix,
@@ -300,6 +315,8 @@ export default function CompaniesManagementPage() {
         invoiceFooter: formData.invoiceFooter,
         bankDetailsText: formData.bankDetailsText,
       },
+      logoText: formData.logoUrl,
+      signatureText: formData.signatureUrl,
     };
 
     try {
@@ -1370,13 +1387,13 @@ export default function CompaniesManagementPage() {
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 border-t border-border/40 pt-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 border-t border-border/40 pt-4">
                       <div className="space-y-2">
                         <UploadCard
                           compact={true}
                           label="Company Logo"
                           value={formData.logoUrl}
-                          onChange={(val) => setFormData((prev) => ({ ...prev, logoUrl: val }))}
+                          onChange={(val) => setFormData((prev) => ({ ...prev, logoUrl: val, logoText: val }))}
                           placeholder="Upload logo (PNG, JPG, SVG)"
                         />
                         <div>
@@ -1386,7 +1403,7 @@ export default function CompaniesManagementPage() {
                           <input
                             type="text"
                             value={formData.logoUrl}
-                            onChange={(e) => setFormData({ ...formData, logoUrl: e.target.value })}
+                            onChange={(e) => setFormData((prev) => ({ ...prev, logoUrl: e.target.value, logoText: e.target.value }))}
                             className="w-full rounded-lg border border-border/80 bg-background px-2.5 py-1.5 text-xs text-foreground"
                             placeholder="https://... or data:image/png..."
                           />
@@ -1396,7 +1413,29 @@ export default function CompaniesManagementPage() {
                       <div className="space-y-2">
                         <UploadCard
                           compact={true}
-                          label="Company Seal / Stamp"
+                          label="Authorized Signature"
+                          value={formData.signatureUrl}
+                          onChange={(val) => setFormData((prev) => ({ ...prev, signatureUrl: val, signatureText: val }))}
+                          placeholder="Upload authorized signature"
+                        />
+                        <div>
+                          <label className="block text-[11px] font-medium text-muted-foreground mb-1">
+                            Direct Signature URL / Base64 (Optional)
+                          </label>
+                          <input
+                            type="text"
+                            value={formData.signatureUrl}
+                            onChange={(e) => setFormData((prev) => ({ ...prev, signatureUrl: e.target.value, signatureText: e.target.value }))}
+                            className="w-full rounded-lg border border-border/80 bg-background px-2.5 py-1.5 text-xs text-foreground"
+                            placeholder="https://... signature image"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <UploadCard
+                          compact={true}
+                          label="Company Stamp / Seal"
                           value={formData.companySealUrl}
                           onChange={(val) => setFormData((prev) => ({ ...prev, companySealUrl: val }))}
                           placeholder="Upload official stamp or seal image"
@@ -1409,7 +1448,7 @@ export default function CompaniesManagementPage() {
                             type="text"
                             value={formData.companySealUrl}
                             onChange={(e) =>
-                              setFormData({ ...formData, companySealUrl: e.target.value })
+                              setFormData((prev) => ({ ...prev, companySealUrl: e.target.value }))
                             }
                             className="w-full rounded-lg border border-border/80 bg-background px-2.5 py-1.5 text-xs text-foreground"
                             placeholder="https://... official stamp image"

@@ -7,6 +7,7 @@ import { Select } from "@/components/ui/select";
 import { SUPPORTED_CURRENCIES } from "@/lib/constants/finance";
 import { cn } from "@/lib/utils/cn";
 import { UploadCard } from "@/components/ui/upload-card";
+import { isImageSrc } from "@/lib/utils/is-image-src";
 import type { ClientDetailsPayload, ClientProfileForm } from "./types";
 
 function DetailTile({
@@ -243,10 +244,10 @@ export function ClientProfileCard({
             <div className="sm:col-span-2 grid gap-4 sm:grid-cols-2">
               <div className="overflow-hidden rounded-xl border border-border/50 bg-muted/15 p-4 dark:bg-muted/10">
                 <p className="mb-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Client logo</p>
-                {data.client?.clientLogoText || data.client?.clientLogoUrl ? (
+                {isImageSrc(data.client?.clientLogoText) || isImageSrc(data.client?.clientLogoUrl) ? (
                   // eslint-disable-next-line @next/next/no-img-element -- data URLs / legacy URLs
                   <img
-                    src={data.client.clientLogoText || data.client.clientLogoUrl}
+                    src={(isImageSrc(data.client?.clientLogoText) ? data.client?.clientLogoText : data.client?.clientLogoUrl) || ""}
                     alt="Client logo"
                     className="h-24 max-w-55 rounded-lg border border-border/60 bg-background/80 object-contain shadow-sm transition-transform duration-200 hover:scale-[1.02]"
                   />
@@ -256,10 +257,10 @@ export function ClientProfileCard({
               </div>
               <div className="overflow-hidden rounded-xl border border-border/50 bg-muted/15 p-4 dark:bg-muted/10">
                 <p className="mb-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Client signature</p>
-                {data.client?.clientSignatureText ? (
+                {isImageSrc(data.client?.clientSignatureText) ? (
                   // eslint-disable-next-line @next/next/no-img-element -- data URL
                   <img
-                    src={data.client.clientSignatureText}
+                    src={data.client?.clientSignatureText || ""}
                     alt="Client signature"
                     className="h-24 max-w-65 rounded-lg border border-border/60 bg-background/80 object-contain object-left shadow-sm transition-transform duration-200 hover:scale-[1.02]"
                   />

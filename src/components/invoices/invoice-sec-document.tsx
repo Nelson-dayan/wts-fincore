@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { isImageSrc } from "@/lib/utils/is-image-src";
 
 export type InvoiceDocLine = {
   number: number;
@@ -179,7 +180,7 @@ export function InvoiceSecDocument({
         <header className="mb-5 flex items-start justify-between">
           <div className="flex flex-col gap-2">
             <div className="flex gap-3">
-            {companySnapshot.logoUrl ? (
+            {isImageSrc(companySnapshot.logoUrl) ? (
               /* eslint-disable-next-line @next/next/no-img-element */
               <img src={companySnapshot.logoUrl} alt="" className="h-16 w-auto max-w-34 object-contain" />
             ) : (
@@ -385,7 +386,7 @@ export function InvoiceSecDocument({
     >
       <header className="mb-4 flex flex-col gap-4 pb-2 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex gap-3">
-          {companySnapshot.logoUrl ? (
+          {isImageSrc(companySnapshot.logoUrl) ? (
             /* eslint-disable-next-line @next/next/no-img-element */
             <img
               src={companySnapshot.logoUrl}

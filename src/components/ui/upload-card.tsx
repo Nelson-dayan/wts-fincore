@@ -10,6 +10,8 @@ import {
 
 import { readFileAsPdfSafeDataUrl } from "@/lib/portals/read-file-as-pdf-safe-data-url";
 
+import { isImageSrc } from "@/lib/utils/is-image-src";
+
 type UploadCardProps = {
   label: string;
   value?: string;
@@ -158,7 +160,7 @@ export function UploadCard({
               </div>
             </div>
           </div>
-        ) : value ? (
+        ) : isImageSrc(value) ? (
           <>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
@@ -235,7 +237,7 @@ export function UploadCard({
           ) : (
             <>
               <UploadCloud className="h-3.5 w-3.5" />
-              {value ? "Replace Asset" : "Upload Asset"}
+              {isImageSrc(value) ? "Replace Asset" : "Upload Asset"}
             </>
           )}
         </button>

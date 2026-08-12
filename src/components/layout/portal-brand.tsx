@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { LayoutDashboard, Sparkles } from "lucide-react";
+import { isImageSrc } from "@/lib/utils/is-image-src";
 
 export function PortalBrand({
   variant,
@@ -14,7 +15,7 @@ export function PortalBrand({
   const title = variant === "admin" ? "Admin" : "Workspace";
   const subtitle = variant === "admin" ? "Command center" : "Your hub";
   const logo = typeof brandLogoSrc === "string" ? brandLogoSrc.trim() : "";
-  const showBrandLogo = Boolean(logo);
+  const showBrandLogo = isImageSrc(logo);
 
   return (
     <Link
