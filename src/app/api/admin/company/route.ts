@@ -5,15 +5,30 @@ import { CompanyModel } from "@/lib/db/models";
 import { authErrorResponse } from "@/lib/api/route-auth";
 import { logActivity } from "@/lib/services/activity/log-activity.service";
 import { isImageSrc } from "@/lib/utils/is-image-src";
+import { CompanyHierarchyService } from "@/lib/services/business/company-hierarchy.service";
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
     await requireRole(["admin", "employee"]);
     await connectDB();
-    const item = await CompanyModel.findOne({ isPrimary: true })
-      .sort({ updatedAt: -1 })
-      .lean();
-    return NextResponse.json({ item });
+
+    const url = new URL(req.url);
+    const targetCompanyId = req.headers.get("x-company-id") || url.searchParams.get("companyId");
+    const scopeMode = (req.headers.get("x-scope-mode") || url.searchParams.get("scopeMode")) as "single" | "group" || "single";
+
+    const context = await CompanyHierarchyService.resolveCompanyContext(targetCompanyId, scopeMode);
+    
+    let resolvedCompanyId = context.companyId;
+    if (scopeMode === "group") {
+      const primaryCompany = await CompanyModel.findOne({ isPrimary: true, deletedAt: null }).lean();
+      if (primaryCompany) {
+        resolvedCompanyId = primaryCompany._id.toString();
+      }
+    }
+
+    const item = await CompanyModel.findById(resolvedCompanyId).lean();
+
+    return NextResponse.json({ item, context });
   } catch (error) {
     return authErrorResponse(error, "Failed to load company settings");
   }
@@ -24,18 +39,16 @@ export async function PATCH(req: Request) {
     const session = await requireRole(["admin"]);
     await connectDB();
     const body = await req.json();
+    const url = new URL(req.url);
 
-    const current = await CompanyModel.findOne({ isPrimary: true }).lean();
-    let companyId = current?._id;
+    const targetCompanyId = body._id || body.companyId || req.headers.get("x-company-id") || url.searchParams.get("companyId");
+    const context = await CompanyHierarchyService.resolveCompanyContext(targetCompanyId, "single");
+    const companyId = context.companyId;
+
+    const current = await CompanyModel.findById(companyId).lean();
 
     if (!current) {
-      const created = await CompanyModel.create({
-        name: String(body.name ?? "My Company").trim(),
-        code: String(body.code ?? "COMP").trim().toUpperCase(),
-        kind: body.kind || "operating",
-        isPrimary: true,
-      });
-      companyId = created._id;
+      return NextResponse.json({ message: "Company entity not found" }, { status: 404 });
     }
 
     const updates: Record<string, any> = {};
@@ -98,15 +111,15 @@ export async function PATCH(req: Request) {
     const updated = await CompanyModel.findByIdAndUpdate(
       companyId,
       { $set: updates },
-      { returnDocument: "after" }
-    );
+      { new: true, runValidators: true }
+    ).lean();
 
     await logActivity({
       userId: session.user.id,
       action: "updated_company_settings",
-      entityType: "company_settings",
-      entityId: String(updated?._id ?? ""),
-      message: "Updated company settings and branding",
+      entityType: "company",
+      entityId: String(companyId),
+      message: `Updated company settings for ${updated?.name || updates.name || "company"}`,
     });
 
     return NextResponse.json({ item: updated });

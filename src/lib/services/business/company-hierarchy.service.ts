@@ -33,6 +33,7 @@ export interface CompanyContextResult {
     kind: string;
     parentCompanyId: string | null;
     baseCurrency: string;
+    isPrimary: boolean;
   };
 }
 
@@ -176,6 +177,7 @@ export class CompanyHierarchyService {
         kind: companyDoc.kind || "operating",
         parentCompanyId: companyDoc.parentCompanyId ? companyDoc.parentCompanyId.toString() : null,
         baseCurrency: companyDoc.baseCurrency || "AED",
+        isPrimary: Boolean(companyDoc.isPrimary),
       },
     };
   }

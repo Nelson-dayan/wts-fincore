@@ -143,43 +143,96 @@ export function CompanySwitcher() {
               </div>
             </div>
 
-            {/* List of Companies */}
-            <div className="max-h-60 overflow-y-auto space-y-1 pr-1">
-              {companies.map((comp) => {
-                const isSelected = activeCompany?._id === comp._id;
-                const isChild = !!comp.parentCompanyId;
+            {/* Mode Specific Body */}
+            {scopeMode === "single" ? (
+              /* Single Co Mode: Render all available companies to pick a single active scope */
+              <div className="max-h-60 overflow-y-auto space-y-1 pr-1">
+                <div className="px-2 py-1 text-[10px] font-semibold text-muted-foreground uppercase">
+                  Select Single Entity Context
+                </div>
+                {companies.map((comp) => {
+                  const isSelected = activeCompany?._id === comp._id;
+                  const isChild = !!comp.parentCompanyId;
 
-                return (
-                  <button
-                    key={comp._id}
-                    type="button"
-                    onClick={() => handleSelectCompany(comp)}
-                    className={cn(
-                      "flex w-full items-center justify-between rounded-lg px-2.5 py-1.5 text-left text-xs transition-all",
-                      isChild && "pl-5 border-l-2 border-primary/20",
-                      isSelected
-                        ? "bg-primary/10 font-semibold text-primary"
-                        : "hover:bg-muted/60 text-foreground"
-                    )}
-                  >
-                    <div className="flex flex-col min-w-0 pr-2">
-                      <div className="flex items-center gap-1.5 truncate">
-                        <span className="truncate">{comp.name}</span>
-                        {comp.isPrimary && (
-                          <span className="rounded bg-emerald-500/10 px-1 py-0.2 text-[9px] font-semibold text-emerald-600 dark:text-emerald-400">
-                            Primary
-                          </span>
-                        )}
+                  return (
+                    <button
+                      key={comp._id}
+                      type="button"
+                      onClick={() => handleSelectCompany(comp)}
+                      className={cn(
+                        "flex w-full items-center justify-between rounded-lg px-2.5 py-1.5 text-left text-xs transition-all",
+                        isChild && "pl-5 border-l-2 border-primary/20",
+                        isSelected
+                          ? "bg-primary/10 font-semibold text-primary"
+                          : "hover:bg-muted/60 text-foreground"
+                      )}
+                    >
+                      <div className="flex flex-col min-w-0 pr-2">
+                        <div className="flex items-center gap-1.5 truncate">
+                          <span className="truncate">{comp.name}</span>
+                          {comp.isPrimary && (
+                            <span className="rounded bg-emerald-500/10 px-1 py-0.2 text-[9px] font-semibold text-emerald-600 dark:text-emerald-400">
+                              Primary
+                            </span>
+                          )}
+                        </div>
+                        <span className="text-[10px] text-muted-foreground font-mono">
+                          [{comp.code}] {comp.kind.toUpperCase()} • {comp.baseCurrency}
+                        </span>
                       </div>
-                      <span className="text-[10px] text-muted-foreground font-mono">
-                        [{comp.code}] {comp.kind.toUpperCase()} • {comp.baseCurrency}
-                      </span>
-                    </div>
-                    {isSelected && <Check className="h-4 w-4 shrink-0 text-primary" />}
-                  </button>
-                );
-              })}
-            </div>
+                      {isSelected && <Check className="h-4 w-4 shrink-0 text-primary" />}
+                    </button>
+                  );
+                })}
+              </div>
+            ) : (
+              /* Group View Mode: Show Group View Banner & Parent Company selection only */
+              <div className="p-2 space-y-2 text-left">
+                <div className="rounded-lg border border-primary/30 bg-primary/10 p-2.5">
+                  <div className="flex items-center gap-1.5 font-semibold text-xs text-primary mb-1">
+                    <Network className="h-4 w-4 shrink-0" />
+                    Enterprise Group Scope Active
+                  </div>
+                  <p className="text-[11px] text-muted-foreground leading-relaxed">
+                    Automatically consolidates and loads data across the selected Parent Group and all its sub-entities.
+                  </p>
+                </div>
+
+                <div className="space-y-1">
+                  <div className="px-1 text-[10px] font-semibold text-muted-foreground uppercase">
+                    Select Group Parent Entity
+                  </div>
+                  {companies
+                    .filter((c) => !c.parentCompanyId || c.kind === "holding" || c.isPrimary)
+                    .map((comp) => {
+                      const isSelected = activeCompany?._id === comp._id;
+                      const subCount = companies.filter((c) => c.parentCompanyId === comp._id).length;
+
+                      return (
+                        <button
+                          key={comp._id}
+                          type="button"
+                          onClick={() => handleSelectCompany(comp)}
+                          className={cn(
+                            "flex w-full items-center justify-between rounded-lg px-2.5 py-2 text-left text-xs transition-all",
+                            isSelected
+                              ? "bg-primary/15 border border-primary/40 font-semibold text-primary"
+                              : "hover:bg-muted/60 text-foreground border border-transparent"
+                          )}
+                        >
+                          <div className="flex flex-col min-w-0 pr-2">
+                            <span className="truncate font-medium">{comp.name}</span>
+                            <span className="text-[10px] text-muted-foreground">
+                              Parent Group • {subCount > 0 ? `${subCount} Sub-Entities Included` : "Headquarter Entity"}
+                            </span>
+                          </div>
+                          {isSelected && <Check className="h-4 w-4 shrink-0 text-primary" />}
+                        </button>
+                      );
+                    })}
+                </div>
+              </div>
+            )}
 
             <div className="mt-2 border-t border-border/50 pt-2 px-1 text-center">
               <a

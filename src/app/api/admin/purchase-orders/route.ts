@@ -31,6 +31,8 @@ function jsonBodyError() {
   );
 }
 
+import { CompanyHierarchyService } from "@/lib/services/business/company-hierarchy.service";
+
 export async function GET(req: Request) {
   try {
     const session = await requireRole(["admin", "employee"]);
@@ -40,7 +42,22 @@ export async function GET(req: Request) {
     const q = parseSearch(url.searchParams);
     const projectId = String(url.searchParams.get("projectId") ?? "").trim();
     const quotationId = String(url.searchParams.get("quotationId") ?? "").trim();
+    const targetCompanyId = req.headers.get("x-company-id") || url.searchParams.get("companyId");
+    const scopeMode = (req.headers.get("x-scope-mode") || url.searchParams.get("scopeMode")) as "single" | "group" || "single";
+
+    const companyContext = await CompanyHierarchyService.resolveCompanyContext(targetCompanyId, scopeMode);
+
     const filter: Record<string, unknown> = {};
+    if (companyContext.activeCompany?.isPrimary) {
+      filter.$or = [
+        { companyId: { $in: companyContext.allowedCompanyIds } },
+        { companyId: { $exists: false } },
+        { companyId: null },
+      ];
+    } else {
+      filter.companyId = { $in: companyContext.allowedCompanyIds };
+    }
+
     if (q) filter.poNumber = { $regex: q, $options: "i" };
 
     if (session.user.role === "employee") {

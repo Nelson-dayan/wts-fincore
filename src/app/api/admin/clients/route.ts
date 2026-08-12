@@ -6,6 +6,8 @@ import { authErrorResponse } from "@/lib/api/route-auth";
 import { parsePagination, parseSearch } from "@/lib/api/pagination";
 import { logActivity } from "@/lib/services/activity/log-activity.service";
 
+import { CompanyHierarchyService } from "@/lib/services/business/company-hierarchy.service";
+
 export async function GET(req: Request) {
   try {
     await requireRole(["admin"]);
@@ -13,15 +15,37 @@ export async function GET(req: Request) {
     const url = new URL(req.url);
     const { page, limit, skip } = parsePagination(url.searchParams);
     const q = parseSearch(url.searchParams);
-    const filter = q
-      ? {
-          $or: [
-            { name: { $regex: q, $options: "i" } },
-            { company: { $regex: q, $options: "i" } },
-            { email: { $regex: q, $options: "i" } },
-          ],
-        }
-      : {};
+    const targetCompanyId = req.headers.get("x-company-id") || url.searchParams.get("companyId");
+    const scopeMode = (req.headers.get("x-scope-mode") || url.searchParams.get("scopeMode")) as "single" | "group" || "single";
+
+    const companyContext = await CompanyHierarchyService.resolveCompanyContext(targetCompanyId, scopeMode);
+
+    const filter: Record<string, unknown> = {};
+    if (companyContext.activeCompany?.isPrimary) {
+      filter.$or = [
+        { companyId: { $in: companyContext.allowedCompanyIds } },
+        { companyId: { $exists: false } },
+        { companyId: null },
+      ];
+    } else {
+      filter.companyId = { $in: companyContext.allowedCompanyIds };
+    }
+
+    if (q) {
+      const qCond = {
+        $or: [
+          { name: { $regex: q, $options: "i" } },
+          { company: { $regex: q, $options: "i" } },
+          { email: { $regex: q, $options: "i" } },
+        ],
+      };
+      if (filter.$or) {
+        filter.$and = [{ $or: filter.$or as any[] }, qCond];
+        delete filter.$or;
+      } else {
+        filter.$or = qCond.$or;
+      }
+    }
     const [itemsRaw, total] = await Promise.all([
       ClientModel.find(filter)
       .select("name company email phone website address billingAddress shippingAddress taxId currency paymentTerms country state city zipCode notes clientLogoText clientSignatureText createdAt")
@@ -54,6 +78,10 @@ export async function POST(req: Request) {
   try {
     const session = await requireRole(["admin"]);
     await connectDB();
+    const url = new URL(req.url);
+    const targetCompanyId = req.headers.get("x-company-id") || url.searchParams.get("companyId");
+    const companyContext = await CompanyHierarchyService.resolveCompanyContext(targetCompanyId, "single");
+
     const body = (await req.json()) as {
       name?: string;
       company?: string;
@@ -111,7 +139,7 @@ export async function POST(req: Request) {
       state: String(body.state ?? "").trim(),
       city: String(body.city ?? "").trim(),
       zipCode: String(body.zipCode ?? "").trim(),
-      companyId: body.companyId ? body.companyId : undefined,
+      companyId: body.companyId ? body.companyId : companyContext.companyId,
       parentCompanyId: body.parentCompanyId ? body.parentCompanyId : undefined,
       createdBy: session.user.id,
     });

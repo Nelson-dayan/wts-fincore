@@ -16,6 +16,7 @@ import {
   MapPin,
   CheckCircle2,
   Sparkles,
+  Network,
 } from "lucide-react";
 import { DashboardPageHeader } from "@/components/dashboard/page-header";
 import { Button } from "@/components/ui/button";
@@ -104,10 +105,14 @@ export function AdminCompanyClient() {
   const [pending, setPending] = useState(false);
   const [loadingInitial, setLoadingInitial] = useState(true);
   const [bootError, setBootError] = useState("");
+  const [scopeMode, setScopeMode] = useState<"single" | "group">("single");
 
   const isChanged = JSON.stringify(form) !== JSON.stringify(initialForm);
 
   async function loadPrimary(opts?: { quiet?: boolean }) {
+    const currentScope = (localStorage.getItem("scopeMode") as "single" | "group") || "single";
+    setScopeMode(currentScope);
+
     if (!opts?.quiet) {
       setLoadingInitial(true);
       setBootError("");
@@ -170,6 +175,15 @@ export function AdminCompanyClient() {
 
   useEffect(() => {
     loadPrimary();
+
+    const handleContextChange = () => {
+      loadPrimary();
+    };
+
+    window.addEventListener("companyContextChanged", handleContextChange);
+    return () => {
+      window.removeEventListener("companyContextChanged", handleContextChange);
+    };
   }, []);
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -260,6 +274,15 @@ export function AdminCompanyClient() {
                     <span className="inline-flex items-center rounded-full border border-primary/20 bg-primary/10 px-2.5 py-0.5 text-[10px] font-semibold text-primary">
                       {form.isPrimary ? "Primary Headquarter" : "Operating Unit"}
                     </span>
+                    {scopeMode === "group" ? (
+                      <span className="inline-flex items-center gap-1 rounded-full border border-amber-500/30 bg-amber-500/10 px-2.5 py-0.5 text-[10px] font-semibold text-amber-600 dark:text-amber-400">
+                        <Network className="h-3 w-3" /> Group View (Primary Corporate Settings)
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 rounded-full border border-blue-500/30 bg-blue-500/10 px-2.5 py-0.5 text-[10px] font-semibold text-blue-600 dark:text-blue-400">
+                        <Building2 className="h-3 w-3" /> Single Entity Context
+                      </span>
+                    )}
                   </div>
 
                   <h1 className="text-2xl lg:text-3xl font-bold tracking-tight text-foreground">

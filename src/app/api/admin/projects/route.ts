@@ -14,6 +14,8 @@ import { parsePagination, parseSearch } from "@/lib/api/pagination";
 import { logActivity } from "@/lib/services/activity/log-activity.service";
 import { decimalToNumber } from "@/lib/services/business/money";
 
+import { CompanyHierarchyService } from "@/lib/services/business/company-hierarchy.service";
+
 export async function GET(req: Request) {
   try {
     const session = await requireRole(["admin", "employee"]);
@@ -22,8 +24,22 @@ export async function GET(req: Request) {
     const { page, limit, skip } = parsePagination(url.searchParams);
     const q = parseSearch(url.searchParams);
     const clientId = String(url.searchParams.get("clientId") ?? "").trim();
-    
+    const targetCompanyId = req.headers.get("x-company-id") || url.searchParams.get("companyId");
+    const scopeMode = (req.headers.get("x-scope-mode") || url.searchParams.get("scopeMode")) as "single" | "group" || "single";
+
+    const companyContext = await CompanyHierarchyService.resolveCompanyContext(targetCompanyId, scopeMode);
+
     const filter: Record<string, unknown> = {};
+    if (companyContext.activeCompany?.isPrimary) {
+      filter.$or = [
+        { companyId: { $in: companyContext.allowedCompanyIds } },
+        { companyId: { $exists: false } },
+        { companyId: null },
+      ];
+    } else {
+      filter.companyId = { $in: companyContext.allowedCompanyIds };
+    }
+
     if (q) filter.name = { $regex: q, $options: "i" };
     if (clientId) filter.clientId = clientId;
     if (session.user.role === "employee") {
@@ -134,8 +150,13 @@ export async function POST(req: Request) {
           permissions: defaultPermissions,
         }));
 
+    const url = new URL(req.url);
+    const targetCompanyId = req.headers.get("x-company-id") || url.searchParams.get("companyId");
+    const companyContext = await CompanyHierarchyService.resolveCompanyContext(targetCompanyId, "single");
+
     const created = await ProjectModel.create({
       name,
+      companyId: companyContext.companyId,
       description: String(body.description ?? ""),
       clientId,
       assignedTo: assignedUserIds,

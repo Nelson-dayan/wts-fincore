@@ -34,6 +34,8 @@ async function AdminPortalBrand() {
   return <PortalBrand variant="admin" brandLogoSrc={brandLogoSrc} />;
 }
 
+import { CompanyContextInterceptor } from "@/components/providers/company-context-interceptor";
+
 export default async function AdminPortalLayout({
   children,
 }: {
@@ -42,6 +44,7 @@ export default async function AdminPortalLayout({
   await connection();
   return (
     <div className="flex min-h-dvh flex-col bg-background md:flex-row font-sans text-foreground antialiased">
+      <CompanyContextInterceptor />
       {/* Mobile Navigation Drawer */}
       <PortalMobileDrawer
         brand={
