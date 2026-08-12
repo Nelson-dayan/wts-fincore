@@ -19,6 +19,7 @@ export function CompanySwitcher() {
   const [companies, setCompanies] = useState<CompanyOption[]>([]);
   const [activeCompany, setActiveCompany] = useState<CompanyOption | null>(null);
   const [scopeMode, setScopeMode] = useState<"single" | "group">("single");
+  const [canAccessGroupView, setCanAccessGroupView] = useState(true);
   const [loading, setLoading] = useState(true);
   const [isPending, startTransition] = useTransition();
 
@@ -34,6 +35,14 @@ export function CompanySwitcher() {
 
         const data = await res.json();
         setCompanies(data.companies || []);
+
+        if (data.canAccessGroupView !== undefined) {
+          setCanAccessGroupView(data.canAccessGroupView);
+          if (!data.canAccessGroupView && storedScope === "group") {
+            setScopeMode("single");
+            localStorage.setItem("scopeMode", "single");
+          }
+        }
 
         if (data.context?.activeCompany) {
           setActiveCompany(data.context.activeCompany);
@@ -113,34 +122,41 @@ export function CompanySwitcher() {
                   <ShieldCheck className="h-3 w-3" /> Encrypted Context
                 </span>
               </div>
-              <div className="grid grid-cols-2 gap-1 rounded-lg border border-border/50 bg-muted/40 p-1">
-                <button
-                  type="button"
-                  onClick={() => handleToggleScopeMode("single")}
-                  className={cn(
-                    "flex items-center justify-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium transition-all",
-                    scopeMode === "single"
-                      ? "bg-background text-foreground shadow-sm font-semibold"
-                      : "text-muted-foreground hover:text-foreground"
-                  )}
-                >
-                  <Layers className="h-3 w-3" />
-                  Single Co.
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleToggleScopeMode("group")}
-                  className={cn(
-                    "flex items-center justify-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium transition-all",
-                    scopeMode === "group"
-                      ? "bg-background text-primary shadow-sm font-semibold"
-                      : "text-muted-foreground hover:text-foreground"
-                  )}
-                >
-                  <Network className="h-3 w-3" />
-                  Group View
-                </button>
-              </div>
+              {canAccessGroupView ? (
+                <div className="grid grid-cols-2 gap-1 rounded-lg border border-border/50 bg-muted/40 p-1">
+                  <button
+                    type="button"
+                    onClick={() => handleToggleScopeMode("single")}
+                    className={cn(
+                      "flex items-center justify-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium transition-all",
+                      scopeMode === "single"
+                        ? "bg-background text-foreground shadow-sm font-semibold"
+                        : "text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    <Layers className="h-3 w-3" />
+                    Single Co.
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleToggleScopeMode("group")}
+                    className={cn(
+                      "flex items-center justify-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium transition-all",
+                      scopeMode === "group"
+                        ? "bg-background text-primary shadow-sm font-semibold"
+                        : "text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    <Network className="h-3 w-3" />
+                    Group View
+                  </button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-1.5 rounded-lg border border-border/50 bg-muted/40 p-2 text-[11px] text-muted-foreground">
+                  <Layers className="h-3.5 w-3.5 text-primary" />
+                  <span>Operating Entity Context Locked</span>
+                </div>
+              )}
             </div>
 
             {/* Mode Specific Body */}

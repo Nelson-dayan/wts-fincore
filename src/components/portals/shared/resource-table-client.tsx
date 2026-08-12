@@ -98,6 +98,25 @@ function formatCell(value: unknown, key = ""): React.ReactNode {
     return <span className="text-foreground font-medium">{value}</span>;
   }
 
+  if (key.toLowerCase().includes("company")) {
+    if (typeof value === "string" && value) {
+      return (
+        <span className="inline-flex items-center gap-1 rounded-md bg-primary/10 border border-primary/20 px-2 py-0.5 text-[11px] font-semibold text-primary">
+          {value}
+        </span>
+      );
+    }
+    if (typeof value === "object" && value !== null) {
+      const obj = value as Record<string, any>;
+      const name = obj.name || obj.companyName || obj.code || "Company";
+      return (
+        <span className="inline-flex items-center gap-1 rounded-md bg-primary/10 border border-primary/20 px-2 py-0.5 text-[11px] font-semibold text-primary">
+          {name}
+        </span>
+      );
+    }
+  }
+
   if (typeof value === "object" && value !== null) {
     const obj = value as Record<string, any>;
     if (obj.invoiceNumber) return <span className="font-bold text-foreground">{String(obj.invoiceNumber)}</span>;

@@ -35,6 +35,14 @@ export interface CompanyContextResult {
     baseCurrency: string;
     isPrimary: boolean;
   };
+  availableIssuingCompanies: Array<{
+    _id: string;
+    name: string;
+    code: string;
+    kind: string;
+    isPrimary: boolean;
+    baseCurrency: string;
+  }>;
 }
 
 export class CompanyHierarchyService {
@@ -166,6 +174,23 @@ export class CompanyHierarchyService {
       allowedCompanyIds = await this.getDescendantCompanyIds(companyId.toString());
     }
 
+    const availableIssuingCompaniesDocs = await CompanyModel.find({
+      _id: { $in: allowedCompanyIds },
+      isActive: true,
+      deletedAt: null,
+    })
+      .select("_id name code kind isPrimary baseCurrency")
+      .lean();
+
+    const availableIssuingCompanies = availableIssuingCompaniesDocs.map((c) => ({
+      _id: c._id.toString(),
+      name: c.name,
+      code: c.code || "COMP",
+      kind: c.kind || "operating",
+      isPrimary: Boolean(c.isPrimary),
+      baseCurrency: c.baseCurrency || "AED",
+    }));
+
     return {
       companyId,
       scopeMode,
@@ -179,6 +204,7 @@ export class CompanyHierarchyService {
         baseCurrency: companyDoc.baseCurrency || "AED",
         isPrimary: Boolean(companyDoc.isPrimary),
       },
+      availableIssuingCompanies,
     };
   }
 }

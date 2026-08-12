@@ -16,6 +16,7 @@ import {
   UserCheck, 
   FolderKanban, 
   Building2, 
+  Network,
   Settings, 
   FileText, 
   ShoppingBag, 
@@ -83,12 +84,12 @@ export default async function AdminPortalLayout({
                 <span>Projects</span>
               </PortalNavLink>
               <PortalNavLink href="/admin/settings/companies" match="prefix" className="w-full justify-start gap-2.5">
-                <Building2 className="size-4 shrink-0" />
-                <span>Company Tree</span>
+                <Network className="size-4 shrink-0 text-primary" />
+                <span>Corporate Hierarchy</span>
               </PortalNavLink>
-              <PortalNavLink href="/admin/settings/company" match="prefix" className="w-full justify-start gap-2.5">
-                <Settings className="size-4 shrink-0" />
-                <span>Settings</span>
+              <PortalNavLink href="/admin/settings/company" match="exact" className="w-full justify-start gap-2.5">
+                <Building2 className="size-4 shrink-0" />
+                <span>Company Profile</span>
               </PortalNavLink>
             </div>
           </div>
@@ -177,9 +178,13 @@ export default async function AdminPortalLayout({
                     <FolderKanban className="size-4 shrink-0" />
                     <span>Projects</span>
                   </PortalNavLink>
-                  <PortalNavLink href="/admin/settings/company" match="prefix" className="w-full justify-start gap-2.5">
-                    <Settings className="size-4 shrink-0" />
-                    <span>Settings</span>
+                  <PortalNavLink href="/admin/settings/companies" match="prefix" className="w-full justify-start gap-2.5">
+                    <Network className="size-4 shrink-0 text-primary" />
+                    <span>Corporate Hierarchy</span>
+                  </PortalNavLink>
+                  <PortalNavLink href="/admin/settings/company" match="exact" className="w-full justify-start gap-2.5">
+                    <Building2 className="size-4 shrink-0" />
+                    <span>Company Profile</span>
                   </PortalNavLink>
                 </div>
               </div>

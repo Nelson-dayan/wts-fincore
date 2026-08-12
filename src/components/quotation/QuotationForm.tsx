@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ImageUp, Plus, Save, Trash2, Sparkles, Building2, CheckCircle2 } from "lucide-react";
+import { ImageUp, Plus, Save, Trash2, Sparkles, Building2, CheckCircle2, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -277,8 +277,8 @@ export function QuotationForm({
               />
             </div>
           </div>
-          {/* Company Hierarchy Auto-Fill Selector (Group View Only) */}
-          {scopeMode === "group" && companies.length > 0 && (
+          {/* Company Context Selector & Single Co. Lock */}
+          {scopeMode === "group" && companies.length > 0 ? (
             <div className="rounded-xl border border-primary/25 bg-primary/5 p-3.5 grid gap-2 transition-all shadow-xs">
               <div className="flex items-center justify-between">
                 <Label htmlFor="company-autofill-select" className="text-xs font-semibold text-primary flex items-center gap-1.5">
@@ -306,6 +306,23 @@ export function QuotationForm({
                   })),
                 ]}
               />
+            </div>
+          ) : (
+            <div className="rounded-xl border border-border/60 bg-muted/20 p-3.5 grid gap-1.5 transition-all">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+                  <Building2 className="h-3.5 w-3.5 text-primary" /> Issuing Company Context
+                </span>
+                <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-muted-foreground bg-background border px-2 py-0.5 rounded-full shadow-2xs">
+                  <Lock className="h-3 w-3 text-muted-foreground" /> Single Entity Context Locked
+                </span>
+              </div>
+              <div className="text-sm font-semibold text-foreground flex items-center gap-2">
+                {data.companyName || "Active Corporate Unit"}
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                Document ownership is tied to your active company context. Switch company from navbar to issue for a different entity.
+              </p>
             </div>
           )}
 
