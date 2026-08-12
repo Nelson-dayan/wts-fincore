@@ -345,15 +345,15 @@ export function AdminProjectDetailsClient({
                   )}
 
                   {editing ? (
-                    <select
+                    <Select
                       value={form.status}
-                      onChange={(e) => setForm({ ...form, status: e.target.value as any })}
-                      className="rounded-full border border-dashed border-primary/30 bg-primary/5 text-primary px-3 py-0.5 text-xs font-semibold focus:outline-none cursor-pointer appearance-none bg-slate-950 text-slate-50 dark:bg-slate-950 dark:text-slate-50"
-                    >
-                      <option value="active" className="bg-slate-950 text-slate-50 dark:bg-slate-950 dark:text-slate-50">Active</option>
-                      <option value="completed" className="bg-slate-950 text-slate-50 dark:bg-slate-950 dark:text-slate-50">Completed</option>
-                      <option value="on_hold" className="bg-slate-950 text-slate-50 dark:bg-slate-950 dark:text-slate-50">On Hold</option>
-                    </select>
+                      onValueChange={(val) => setForm({ ...form, status: val as any })}
+                      options={[
+                        { value: "active", label: "Active" },
+                        { value: "completed", label: "Completed" },
+                        { value: "on_hold", label: "On Hold" },
+                      ]}
+                    />
                   ) : (
                     <Badge
                       variant="outline"
@@ -460,15 +460,14 @@ export function AdminProjectDetailsClient({
               {editing ? (
                 <div className="mt-2 space-y-1">
                   <div className="flex items-baseline gap-1 text-2xl font-semibold tracking-tight">
-                    <select
+                    <Select
                       value={form.currency}
-                      onChange={(e) => setForm({ ...form, currency: e.target.value })}
-                      className="bg-transparent border-none p-0 m-0 font-semibold focus:outline-none cursor-pointer appearance-none text-2xl text-foreground bg-slate-950 text-slate-50 dark:bg-slate-950 dark:text-slate-50"
-                    >
-                      {SUPPORTED_CURRENCIES.map((c) => (
-                        <option key={c.value} value={c.value} className="bg-slate-950 text-slate-50 dark:bg-slate-950 dark:text-slate-50">{c.value}</option>
-                      ))}
-                    </select>
+                      onValueChange={(val) => setForm({ ...form, currency: val })}
+                      options={SUPPORTED_CURRENCIES.map((c) => ({
+                        value: c.value,
+                        label: c.value,
+                      }))}
+                    />
                     <input
                       type="number"
                       value={form.budget}
@@ -491,15 +490,15 @@ export function AdminProjectDetailsClient({
                 Priority
               </p>
               {editing ? (
-                <select
+                <Select
                   value={form.priority}
-                  onChange={(e) => setForm({ ...form, priority: e.target.value as any })}
-                  className="mt-2 bg-transparent border-b border-dashed border-muted-foreground/30 focus:border-solid focus:border-primary text-2xl font-semibold capitalize tracking-tight focus:outline-none w-full p-0 cursor-pointer appearance-none bg-slate-950 text-slate-50 dark:bg-slate-950 dark:text-slate-50"
-                >
-                  <option value="low" className="bg-slate-950 text-slate-50 dark:bg-slate-950 dark:text-slate-50">Low</option>
-                  <option value="medium" className="bg-slate-950 text-slate-50 dark:bg-slate-950 dark:text-slate-50">Medium</option>
-                  <option value="high" className="bg-slate-950 text-slate-50 dark:bg-slate-950 dark:text-slate-50">High</option>
-                </select>
+                  onValueChange={(val) => setForm({ ...form, priority: val as any })}
+                  options={[
+                    { value: "low", label: "Low" },
+                    { value: "medium", label: "Medium" },
+                    { value: "high", label: "High" },
+                  ]}
+                />
               ) : (
                 <p className="mt-2 text-2xl font-semibold capitalize tracking-tight">
                   {data.project?.priority || "-"}

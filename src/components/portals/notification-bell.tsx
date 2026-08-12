@@ -24,6 +24,7 @@ import {
   Sparkles
 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
+import { Select } from "@/components/ui/select";
 
 export interface NotificationItem {
   id: string;
@@ -481,28 +482,28 @@ export function NotificationBell() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                 <div className="space-y-1.5">
                   <label className="text-xs font-semibold text-foreground">Priority Level</label>
-                  <select
+                  <Select
                     value={newSeverity}
-                    onChange={(e) => setNewSeverity(e.target.value as any)}
-                    className="w-full rounded-xl border border-border/80 bg-background px-3 py-2 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
-                  >
-                    <option value="info">Info (Blue)</option>
-                    <option value="medium">Action Needed (Amber)</option>
-                    <option value="high">Urgent / High (Red)</option>
-                  </select>
+                    onValueChange={(val) => setNewSeverity(val as any)}
+                    options={[
+                      { value: "info", label: "Info (Blue)" },
+                      { value: "medium", label: "Action Needed (Amber)" },
+                      { value: "high", label: "Urgent / High (Red)" },
+                    ]}
+                  />
                 </div>
 
                 <div className="space-y-1.5">
                   <label className="text-xs font-semibold text-foreground">Target Audience</label>
-                  <select
+                  <Select
                     value={newTarget}
-                    onChange={(e) => setNewTarget(e.target.value as any)}
-                    className="w-full rounded-xl border border-border/80 bg-background px-3 py-2 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
-                  >
-                    <option value="all">Everyone (All Roles)</option>
-                    <option value="admin">Admins Only</option>
-                    <option value="employee">Employees Only</option>
-                  </select>
+                    onValueChange={(val) => setNewTarget(val as any)}
+                    options={[
+                      { value: "all", label: "Everyone (All Roles)" },
+                      { value: "admin", label: "Admins Only" },
+                      { value: "employee", label: "Employees Only" },
+                    ]}
+                  />
                 </div>
               </div>
 

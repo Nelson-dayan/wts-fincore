@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { UploadCard } from "@/components/ui/upload-card";
+import { Dropdown } from "@/components/ui/select";
 
 export interface CompanyItem {
   _id: string;
@@ -1211,62 +1212,64 @@ export default function CompaniesManagementPage() {
 
                       <div>
                         <label className="block font-medium mb-1 text-foreground">Entity Kind *</label>
-                        <select
+                        <Dropdown
                           value={formData.kind}
-                          onChange={(e) => {
-                            const newKind = e.target.value as any;
+                          onValueChange={(val) => {
+                            const newKind = val as any;
                             setFormData({
                               ...formData,
                               kind: newKind,
                               parentCompanyId: newKind === "holding" ? "" : formData.parentCompanyId,
                             });
                           }}
-                          className="w-full rounded-lg border border-border/80 bg-background px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                        >
-                          <option value="holding">Holding Group (Parent)</option>
-                          <option value="operating">Operating Company</option>
-                          <option value="branch">Branch (Regional Office)</option>
-                          <option value="division">Division / Subsidiary</option>
-                        </select>
+                          options={[
+                            { value: "holding", label: "Holding Group (Parent)", badge: "HOLDING", description: "Top-level parent corporate entity" },
+                            { value: "operating", label: "Operating Company", badge: "OPERATING", description: "Main business operating unit" },
+                            { value: "branch", label: "Branch (Regional Office)", badge: "BRANCH", description: "Regional branch office" },
+                            { value: "division", label: "Division / Subsidiary", badge: "DIVISION", description: "Sub-entity or business unit" },
+                          ]}
+                        />
                       </div>
 
                       <div>
                         <label className="block font-medium mb-1 text-foreground">
                           Parent Entity {formData.kind === "holding" && "(N/A for Holding)"}
                         </label>
-                        <select
+                        <Dropdown
                           disabled={formData.kind === "holding"}
                           value={formData.parentCompanyId}
-                          onChange={(e) => setFormData({ ...formData, parentCompanyId: e.target.value })}
-                          className="w-full rounded-lg border border-border/80 bg-background px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50"
-                        >
-                          <option value="">None (Top-Level Parent)</option>
-                          {companies
-                            .filter((c) => c._id !== editingCompany?._id)
-                            .map((c) => (
-                              <option key={c._id} value={c._id}>
-                                {c.name} ({c.code}) - {c.kind.toUpperCase()}
-                              </option>
-                            ))}
-                        </select>
+                          onValueChange={(val) => setFormData({ ...formData, parentCompanyId: val })}
+                          placeholder="None (Top-Level Parent)"
+                          searchable={true}
+                          options={[
+                            { value: "", label: "None (Top-Level Parent)" },
+                            ...companies
+                              .filter((c) => c._id !== editingCompany?._id)
+                              .map((c) => ({
+                                value: c._id,
+                                label: `${c.name} (${c.code})`,
+                                badge: c.kind.toUpperCase(),
+                              })),
+                          ]}
+                        />
                       </div>
 
                       <div>
                         <label className="block font-medium mb-1 text-foreground">Base Currency *</label>
-                        <select
+                        <Dropdown
                           value={formData.baseCurrency}
-                          onChange={(e) => setFormData({ ...formData, baseCurrency: e.target.value })}
-                          className="w-full rounded-lg border border-border/80 bg-background px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                        >
-                          <option value="AED">AED - UAE Dirham</option>
-                          <option value="USD">USD - US Dollar</option>
-                          <option value="EUR">EUR - Euro</option>
-                          <option value="GBP">GBP - British Pound</option>
-                          <option value="INR">INR - Indian Rupee</option>
-                          <option value="AUD">AUD - Australian Dollar</option>
-                          <option value="SAR">SAR - Saudi Riyal</option>
-                          <option value="QAR">QAR - Qatari Riyal</option>
-                        </select>
+                          onValueChange={(val) => setFormData({ ...formData, baseCurrency: val })}
+                          options={[
+                            { value: "AED", label: "AED - UAE Dirham" },
+                            { value: "USD", label: "USD - US Dollar" },
+                            { value: "EUR", label: "EUR - Euro" },
+                            { value: "GBP", label: "GBP - British Pound" },
+                            { value: "INR", label: "INR - Indian Rupee" },
+                            { value: "AUD", label: "AUD - Australian Dollar" },
+                            { value: "SAR", label: "SAR - Saudi Riyal" },
+                            { value: "QAR", label: "QAR - Qatari Riyal" },
+                          ]}
+                        />
                       </div>
 
                       <div>

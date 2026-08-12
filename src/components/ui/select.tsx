@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { createPortal } from "react-dom";
 import { ChevronDown, Check, Search, X } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 
@@ -50,7 +51,11 @@ export function Select({
   const [isOpen, setIsOpen] = React.useState(false);
   const [internalValue, setInternalValue] = React.useState(defaultValue);
   const [searchQuery, setSearchQuery] = React.useState("");
+  const [mounted, setMounted] = React.useState(false);
+
   const containerRef = React.useRef<HTMLDivElement>(null);
+  const buttonRef = React.useRef<HTMLButtonElement>(null);
+  const popoverRef = React.useRef<HTMLDivElement>(null);
   const searchInputRef = React.useRef<HTMLInputElement>(null);
 
   const currentValue = controlledValue !== undefined ? controlledValue : internalValue;
@@ -59,10 +64,91 @@ export function Select({
     return options.find((opt) => opt.value === currentValue);
   }, [options, currentValue]);
 
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // Calculate and update dynamic popover position without triggering React re-renders
+  const updatePosition = React.useCallback(() => {
+    if (!buttonRef.current || !popoverRef.current) return;
+
+    const rect = buttonRef.current.getBoundingClientRect();
+
+    // Auto-close if trigger button is scrolled out of viewport
+    if (
+      rect.bottom < 0 ||
+      rect.top > window.innerHeight ||
+      rect.right < 0 ||
+      rect.left > window.innerWidth
+    ) {
+      setIsOpen(false);
+      return;
+    }
+
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const spaceAbove = rect.top;
+    const estimatedHeight = Math.min(options.length * 36 + 60, 280);
+
+    const shouldOpenUp = spaceBelow < estimatedHeight && spaceAbove > spaceBelow;
+    const width = Math.max(rect.width, 100);
+
+    const popover = popoverRef.current;
+    popover.style.position = "fixed";
+    popover.style.left = `${rect.left}px`;
+    popover.style.width = `${width}px`;
+    popover.style.zIndex = "9999";
+
+    if (shouldOpenUp) {
+      popover.style.top = "auto";
+      popover.style.bottom = `${window.innerHeight - rect.top + 6}px`;
+      popover.style.maxHeight = `${Math.max(spaceAbove - 16, 120)}px`;
+    } else {
+      popover.style.bottom = "auto";
+      popover.style.top = `${rect.bottom + 6}px`;
+      popover.style.maxHeight = `${Math.max(spaceBelow - 16, 120)}px`;
+    }
+  }, [options.length]);
+
+  React.useEffect(() => {
+    if (!isOpen) return;
+
+    let animationFrameId: number;
+
+    const handleScrollOrResize = (e: Event) => {
+      // If scrolling inside the popover options list itself, ignore!
+      if (popoverRef.current && popoverRef.current.contains(e.target as Node)) {
+        return;
+      }
+      cancelAnimationFrame(animationFrameId);
+      animationFrameId = requestAnimationFrame(() => {
+        updatePosition();
+      });
+    };
+
+    updatePosition();
+    const timer = setTimeout(() => updatePosition(), 10);
+
+    window.addEventListener("resize", handleScrollOrResize);
+    window.addEventListener("scroll", handleScrollOrResize, true);
+
+    return () => {
+      clearTimeout(timer);
+      cancelAnimationFrame(animationFrameId);
+      window.removeEventListener("resize", handleScrollOrResize);
+      window.removeEventListener("scroll", handleScrollOrResize, true);
+    };
+  }, [isOpen, updatePosition]);
+
   // Handle outside clicks to close dropdown
   React.useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+      const target = event.target as Node;
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(target) &&
+        popoverRef.current &&
+        !popoverRef.current.contains(target)
+      ) {
         setIsOpen(false);
       }
     }
@@ -118,10 +204,95 @@ export function Select({
     );
   }, [options, searchQuery]);
 
+  const popoverContent = isOpen && (
+    <div
+      ref={popoverRef}
+      className={cn(
+        "overflow-hidden rounded-xl border border-border/80 bg-popover text-popover-foreground shadow-2xl backdrop-blur-md animate-in fade-in-50 zoom-in-95 duration-150 flex flex-col",
+        popoverClassName
+      )}
+    >
+      {/* Search Box (Shown if searchable and options > 5) */}
+      {searchable && options.length > 5 && (
+        <div className="p-2 border-b border-border/60 bg-muted/30 shrink-0">
+          <div className="relative flex items-center">
+            <Search className="absolute left-2.5 h-3.5 w-3.5 text-muted-foreground" />
+            <input
+              ref={searchInputRef}
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search options..."
+              className="h-8 w-full rounded-lg bg-background pl-8 pr-7 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary border border-border/40"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery("")}
+                className="absolute right-2 text-muted-foreground hover:text-foreground"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Options List */}
+      <div className="overflow-y-auto p-1 custom-scrollbar space-y-0.5 min-h-0 flex-1">
+        {filteredOptions.length === 0 ? (
+          <div className="px-3 py-4 text-center text-xs text-muted-foreground">
+            No matching options found
+          </div>
+        ) : (
+          filteredOptions.map((opt) => {
+            const isSelected = opt.value === currentValue;
+            return (
+              <button
+                key={opt.value}
+                type="button"
+                disabled={opt.disabled}
+                onClick={() => handleSelect(opt.value)}
+                className={cn(
+                  "flex w-full items-center justify-between rounded-lg px-3 py-2 text-xs font-medium transition-colors text-left cursor-pointer",
+                  isSelected
+                    ? "bg-primary/10 text-primary font-semibold"
+                    : "text-foreground hover:bg-muted/70 hover:text-foreground",
+                  opt.disabled && "opacity-40 cursor-not-allowed"
+                )}
+              >
+                <div className="flex items-center gap-2 min-w-0 pr-2">
+                  {opt.icon && <span className="shrink-0">{opt.icon}</span>}
+                  <div className="truncate">
+                    <div className="truncate flex items-center gap-1.5">
+                      <span>{opt.label}</span>
+                      {opt.badge && (
+                        <span className="rounded-md bg-muted px-1.5 py-0.5 text-[9px] font-bold uppercase text-muted-foreground">
+                          {opt.badge}
+                        </span>
+                      )}
+                    </div>
+                    {opt.description && (
+                      <div className="text-[10px] text-muted-foreground font-normal truncate mt-0.5">
+                        {opt.description}
+                      </div>
+                    )}
+                  </div>
+                </div>
+                {isSelected && <Check className="h-3.5 w-3.5 shrink-0 text-primary" />}
+              </button>
+            );
+          })
+        )}
+      </div>
+    </div>
+  );
+
   return (
     <div ref={containerRef} className={cn("relative w-full text-left", className)} {...props}>
       {/* Trigger Button */}
       <button
+        ref={buttonRef}
         type="button"
         id={id}
         name={name}
@@ -167,89 +338,8 @@ export function Select({
         />
       </button>
 
-      {/* Dropdown Popover */}
-      {isOpen && (
-        <div
-          className={cn(
-            "absolute left-0 top-full z-50 mt-1.5 max-h-72 w-full overflow-hidden rounded-xl border border-border/80 bg-popover/95 text-popover-foreground shadow-2xl backdrop-blur-md animate-in fade-in-50 zoom-in-95 duration-150 flex flex-col",
-            popoverClassName
-          )}
-        >
-          {/* Search Box (Shown if searchable and options > 5) */}
-          {searchable && options.length > 5 && (
-            <div className="p-2 border-b border-border/60 bg-muted/30">
-              <div className="relative flex items-center">
-                <Search className="absolute left-2.5 h-3.5 w-3.5 text-muted-foreground" />
-                <input
-                  ref={searchInputRef}
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search options..."
-                  className="h-8 w-full rounded-lg bg-background pl-8 pr-7 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary border border-border/40"
-                />
-                {searchQuery && (
-                  <button
-                    type="button"
-                    onClick={() => setSearchQuery("")}
-                    className="absolute right-2 text-muted-foreground hover:text-foreground"
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Options List */}
-          <div className="overflow-y-auto p-1 max-h-60 custom-scrollbar space-y-0.5">
-            {filteredOptions.length === 0 ? (
-              <div className="px-3 py-4 text-center text-xs text-muted-foreground">
-                No matching options found
-              </div>
-            ) : (
-              filteredOptions.map((opt) => {
-                const isSelected = opt.value === currentValue;
-                return (
-                  <button
-                    key={opt.value}
-                    type="button"
-                    disabled={opt.disabled}
-                    onClick={() => handleSelect(opt.value)}
-                    className={cn(
-                      "flex w-full items-center justify-between rounded-lg px-3 py-2 text-xs font-medium transition-colors text-left cursor-pointer",
-                      isSelected
-                        ? "bg-primary/10 text-primary font-semibold"
-                        : "text-foreground hover:bg-muted/70 hover:text-foreground",
-                      opt.disabled && "opacity-40 cursor-not-allowed"
-                    )}
-                  >
-                    <div className="flex items-center gap-2 min-w-0 pr-2">
-                      {opt.icon && <span className="shrink-0">{opt.icon}</span>}
-                      <div className="truncate">
-                        <div className="truncate flex items-center gap-1.5">
-                          <span>{opt.label}</span>
-                          {opt.badge && (
-                            <span className="rounded-md bg-muted px-1.5 py-0.5 text-[9px] font-bold uppercase text-muted-foreground">
-                              {opt.badge}
-                            </span>
-                          )}
-                        </div>
-                        {opt.description && (
-                          <div className="text-[10px] text-muted-foreground font-normal truncate mt-0.5">
-                            {opt.description}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                    {isSelected && <Check className="h-3.5 w-3.5 shrink-0 text-primary" />}
-                  </button>
-                );
-              })
-            )}
-          </div>
-        </div>
-      )}
+      {/* Render popover via Portal to document.body to prevent clipping by overflow-hidden */}
+      {mounted && popoverContent ? createPortal(popoverContent, document.body) : null}
     </div>
   );
 }

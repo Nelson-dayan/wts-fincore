@@ -671,15 +671,14 @@ export function RecordPaymentModal({
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label className="text-xs">From Currency</Label>
-                      <select 
-                        className="h-10 text-sm bg-card border border-border rounded-lg px-3 w-full text-foreground focus:ring-1 focus:ring-primary focus:outline-none"
+                      <Select 
                         value={paymentCurrency}
-                        onChange={e => setPaymentCurrency(e.target.value)}
-                      >
-                        {SUPPORTED_CURRENCIES.map(c => (
-                          <option key={c.value} value={c.value}>{c.label}</option>
-                        ))}
-                      </select>
+                        onValueChange={val => setPaymentCurrency(val)}
+                        options={SUPPORTED_CURRENCIES.map(c => ({
+                          value: c.value,
+                          label: c.label,
+                        }))}
+                      />
                     </div>
                     <div className="space-y-2">
                       <Label className="text-xs">To Currency (Locked)</Label>
@@ -870,32 +869,28 @@ export function RecordPaymentModal({
                             />
                           </div>
                           <div className="col-span-2">
-                            <select 
-                              className="h-8 text-xs bg-card border border-border rounded-md px-1 w-full text-foreground focus:ring-1 focus:ring-primary focus:outline-none font-bold"
+                            <Select 
                               value={fee.currency}
-                              onChange={e => updateFeeRow(idx, { currency: e.target.value })}
-                            >
-                              {(isDifferentCurrency 
+                              onValueChange={val => updateFeeRow(idx, { currency: val })}
+                              options={(isDifferentCurrency 
                                 ? Array.from(new Set([paymentCurrency, accountCurrency]))
                                 : [accountCurrency]
-                              ).map(cur => (
-                                <option key={cur} value={cur}>{cur}</option>
-                              ))}
-                            </select>
+                              ).map(cur => ({ value: cur, label: cur }))}
+                            />
                           </div>
                           <div className="col-span-2">
-                            <select 
-                              className="h-8 text-xs bg-card border border-border rounded-md px-1 w-full text-foreground focus:ring-1 focus:ring-primary focus:outline-none"
+                            <Select 
                               value={fee.category}
-                              onChange={e => updateFeeRow(idx, { category: e.target.value as any })}
-                            >
-                              <option value="GATEWAY_FEE">Gateway</option>
-                              <option value="TDS">TDS</option>
-                              <option value="BANK_CHARGE">Bank</option>
-                              <option value="FOREX">Forex</option>
-                              <option value="GST_ON_FEE">GST</option>
-                              <option value="OTHER">Other</option>
-                            </select>
+                              onValueChange={val => updateFeeRow(idx, { category: val as any })}
+                              options={[
+                                { value: "GATEWAY_FEE", label: "Gateway" },
+                                { value: "TDS", label: "TDS" },
+                                { value: "BANK_CHARGE", label: "Bank" },
+                                { value: "FOREX", label: "Forex" },
+                                { value: "GST_ON_FEE", label: "GST" },
+                                { value: "OTHER", label: "Other" },
+                              ]}
+                            />
                           </div>
                           <div className="col-span-1 text-center">
                             <button 
