@@ -1,22 +1,32 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import {
   Building2,
   Plus,
   Network,
   Layers,
   ChevronRight,
-  Shield,
-  FileText,
-  DollarSign,
+  ChevronDown,
   Globe,
   Trash2,
   Edit2,
-  Check,
   CheckCircle2,
+  GitBranch,
+  MoreHorizontal,
+  FileText,
+  Building,
+  ShieldCheck,
+  Maximize2,
+  Minimize2,
+  Briefcase,
+  Store,
+  Sparkles,
+  Info,
+  ExternalLink,
 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
+import { UploadCard } from "@/components/ui/upload-card";
 
 export interface CompanyItem {
   _id: string;
@@ -57,16 +67,24 @@ export default function CompaniesManagementPage() {
   const [tree, setTree] = useState<TreeNode[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"tree" | "list">("tree");
+  const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
   const [editingCompany, setEditingCompany] = useState<CompanyItem | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [modalTab, setModalTab] = useState<"general" | "branding">("general");
   const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
+  const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  // Dropdown states
+  const [addDropdownOpen, setAddDropdownOpen] = useState(false);
+  const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
+
+  const addDropdownRef = useRef<HTMLDivElement>(null);
 
   // Form State
   const [formData, setFormData] = useState({
     name: "",
     code: "",
-    kind: "operating",
+    kind: "operating" as "holding" | "operating" | "branch" | "division",
     parentCompanyId: "",
     taxId: "",
     baseCurrency: "AED",
@@ -94,8 +112,23 @@ export default function CompaniesManagementPage() {
       const res = await fetch("/api/admin/companies/tree");
       if (res.ok) {
         const data = await res.json();
-        setTree(data.tree || []);
-        setCompanies(data.companies || []);
+        const treeData: TreeNode[] = data.tree || [];
+        const flatData: CompanyItem[] = data.companies || [];
+        setTree(treeData);
+        setCompanies(flatData);
+
+        // By default, expand all nodes that have children
+        const initialExpanded = new Set<string>();
+        const collectNodeIds = (nodes: TreeNode[]) => {
+          for (const node of nodes) {
+            if (node.children && node.children.length > 0) {
+              initialExpanded.add(node._id);
+              collectNodeIds(node.children);
+            }
+          }
+        };
+        collectNodeIds(treeData);
+        setExpandedNodes(initialExpanded);
       }
     } catch (err) {
       console.error("Failed to load companies:", err);
@@ -108,13 +141,73 @@ export default function CompaniesManagementPage() {
     fetchCompanyData();
   }, []);
 
-  const openModalForCreate = (parentId: string = "") => {
+  // Close dropdowns on outside click
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (addDropdownRef.current && !addDropdownRef.current.contains(e.target as Node)) {
+        setAddDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  // Expand / Collapse Handlers
+  const toggleNodeExpand = (nodeId: string) => {
+    setExpandedNodes((prev) => {
+      const next = new Set(prev);
+      if (next.has(nodeId)) {
+        next.delete(nodeId);
+      } else {
+        next.add(nodeId);
+      }
+      return next;
+    });
+  };
+
+  const handleExpandAll = () => {
+    const allIds = new Set<string>();
+    const collect = (nodes: TreeNode[]) => {
+      for (const n of nodes) {
+        if (n.children && n.children.length > 0) {
+          allIds.add(n._id);
+          collect(n.children);
+        }
+      }
+    };
+    collect(tree);
+    setExpandedNodes(allIds);
+  };
+
+  const handleCollapseAll = () => {
+    setExpandedNodes(new Set());
+  };
+
+  // Open Modal Handlers
+  const openModalForCreate = (
+    kind: "holding" | "operating" | "branch" | "division" = "operating",
+    parentId: string = ""
+  ) => {
     setEditingCompany(null);
+    setModalTab("general");
+    
+    // Auto-select logical parent if not provided
+    let defaultParent = parentId;
+    if (!defaultParent && kind !== "holding") {
+      if (kind === "operating") {
+        const holding = companies.find((c) => c.kind === "holding");
+        if (holding) defaultParent = holding._id;
+      } else if (kind === "branch" || kind === "division") {
+        const operating = companies.find((c) => c.kind === "operating" || c.isPrimary);
+        if (operating) defaultParent = operating._id;
+      }
+    }
+
     setFormData({
       name: "",
       code: "",
-      kind: parentId ? "branch" : "operating",
-      parentCompanyId: parentId,
+      kind,
+      parentCompanyId: kind === "holding" ? "" : defaultParent,
       taxId: "",
       baseCurrency: "AED",
       address: "",
@@ -122,7 +215,7 @@ export default function CompaniesManagementPage() {
       phone: "",
       website: "",
       contactName: "",
-      isPrimary: false,
+      isPrimary: companies.length === 0,
       logoUrl: "",
       logoText: "",
       signatureUrl: "",
@@ -134,11 +227,14 @@ export default function CompaniesManagementPage() {
       invoiceFooter: "",
       bankDetailsText: "",
     });
+    setAddDropdownOpen(false);
+    setActiveMenuId(null);
     setIsModalOpen(true);
   };
 
-  const openModalForEdit = (comp: CompanyItem) => {
+  const openModalForEdit = (comp: CompanyItem, tab: "general" | "branding" = "general") => {
     setEditingCompany(comp);
+    setModalTab(tab);
     const pId = comp.parentCompanyId
       ? typeof comp.parentCompanyId === "object"
         ? comp.parentCompanyId._id
@@ -169,6 +265,7 @@ export default function CompaniesManagementPage() {
       invoiceFooter: comp.branding?.invoiceFooter || "",
       bankDetailsText: comp.branding?.bankDetailsText || "",
     });
+    setActiveMenuId(null);
     setIsModalOpen(true);
   };
 
@@ -181,7 +278,7 @@ export default function CompaniesManagementPage() {
       name: formData.name,
       code: formData.code,
       kind: formData.kind,
-      parentCompanyId: formData.parentCompanyId || null,
+      parentCompanyId: formData.kind === "holding" ? null : formData.parentCompanyId || null,
       taxId: formData.taxId,
       baseCurrency: formData.baseCurrency,
       address: formData.address,
@@ -221,103 +318,336 @@ export default function CompaniesManagementPage() {
         throw new Error(errData.error || "Failed to save company");
       }
 
-      setMessage(`Company successfully ${editingCompany ? "updated" : "created"}!`);
+      setMessage({
+        type: "success",
+        text: `Company "${formData.name}" successfully ${editingCompany ? "updated" : "created"}!`,
+      });
       setIsModalOpen(false);
       await fetchCompanyData();
     } catch (err: any) {
-      setMessage(err.message || "An error occurred while saving company.");
+      setMessage({
+        type: "error",
+        text: err.message || "An error occurred while saving company.",
+      });
     } finally {
       setSaving(false);
     }
   };
 
   const handleDeleteCompany = async (id: string, name: string) => {
-    if (!confirm(`Are you sure you want to soft-delete "${name}"?`)) return;
+    if (!confirm(`Are you sure you want to delete company "${name}"?`)) return;
 
     try {
       const res = await fetch(`/api/admin/companies/${id}`, { method: "DELETE" });
       if (res.ok) {
-        setMessage(`Company "${name}" soft-deleted successfully.`);
+        setMessage({
+          type: "success",
+          text: `Company "${name}" deleted successfully.`,
+        });
         await fetchCompanyData();
+      } else {
+        const err = await res.json();
+        alert(err.error || "Failed to delete company.");
       }
     } catch (err) {
       console.error(err);
+    } finally {
+      setActiveMenuId(null);
     }
   };
 
-  const renderTreeNode = (node: TreeNode, depth: number = 0) => {
+  // Executive Summary Metrics (Derived from real data)
+  const totalCompanies = companies.length;
+  const holdingCount = companies.filter((c) => c.kind === "holding").length;
+  const operatingCount = companies.filter((c) => c.kind === "operating").length;
+  const branchCount = companies.filter((c) => c.kind === "branch" || c.kind === "division").length;
+  const activeCount = companies.filter((c) => c.isActive !== false).length;
+
+  const uniqueCurrencies = Array.from(
+    new Set(companies.map((c) => c.baseCurrency).filter(Boolean))
+  ) as string[];
+
+  // Helper function to resolve parent name
+  const getParentName = (parentId?: any) => {
+    if (!parentId) return "None (Holding Parent)";
+    const pId = typeof parentId === "object" ? parentId._id : parentId;
+    const parentComp = companies.find((c) => c._id === pId);
+    return parentComp ? `${parentComp.name} (${parentComp.code})` : "Parent Entity";
+  };
+
+  // Recursive Tree Node Component with Enterprise Connector Lines
+  const TreeNodeCard = ({
+    node,
+    depth = 0,
+    isLast = false,
+    hasParent = false,
+  }: {
+    node: TreeNode;
+    depth?: number;
+    isLast?: boolean;
+    hasParent?: boolean;
+  }) => {
+    const hasChildren = node.children && node.children.length > 0;
+    const isExpanded = expandedNodes.has(node._id);
+    const isMenuOpen = activeMenuId === node._id;
+
+    // Entity Icon & Color Styling
+    const getKindConfig = (kind: string) => {
+      switch (kind) {
+        case "holding":
+          return {
+            label: "HOLDING",
+            icon: Globe,
+            badgeStyle: "bg-purple-500/10 text-purple-400 border-purple-500/20",
+            iconBoxStyle: "bg-purple-500/10 text-purple-400 border-purple-500/20",
+            isTopOwner: true,
+          };
+        case "operating":
+          return {
+            label: "OPERATING",
+            icon: Briefcase,
+            badgeStyle: "bg-blue-500/10 text-blue-400 border-blue-500/20",
+            iconBoxStyle: "bg-blue-500/10 text-blue-400 border-blue-500/20",
+            isTopOwner: false,
+          };
+        case "branch":
+          return {
+            label: "BRANCH",
+            icon: GitBranch,
+            badgeStyle: "bg-amber-500/10 text-amber-400 border-amber-500/20",
+            iconBoxStyle: "bg-amber-500/10 text-amber-400 border-amber-500/20",
+            isTopOwner: false,
+          };
+        default:
+          return {
+            label: "DIVISION",
+            icon: Store,
+            badgeStyle: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
+            iconBoxStyle: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
+            isTopOwner: false,
+          };
+      }
+    };
+
+    const kindConfig = getKindConfig(node.kind);
+    const IconComponent = kindConfig.icon;
+
     return (
-      <div key={node._id} className="space-y-2">
+      <div className="relative group/node">
+        {/* Child Node Tree Connector Lines */}
+        {hasParent && (
+          <div className="absolute -left-6 sm:-left-8 top-0 bottom-0 pointer-events-none">
+            {/* Vertical stem line to next sibling */}
+            <div
+              className={cn(
+                "absolute left-0 w-0.5 bg-border/60",
+                isLast ? "top-0 h-7" : "top-0 bottom-0"
+              )}
+            />
+            {/* Horizontal branch arm curving to node card */}
+            <div className="absolute left-0 top-7 w-6 sm:w-8 h-0.5 bg-border/60 rounded-bl-sm" />
+            {/* Node dot connector junction */}
+            <div className="absolute left-[22px] sm:left-[30px] top-[25px] h-1.5 w-1.5 rounded-full bg-primary/70 ring-2 ring-background" />
+          </div>
+        )}
+
+        {/* Horizontal Node Card */}
         <div
           className={cn(
-            "group flex items-center justify-between rounded-xl border bg-card p-4 shadow-sm transition-all hover:border-primary/50 hover:shadow-md",
-            depth > 0 && "ml-6 border-l-4 border-l-primary/60"
+            "relative flex flex-col md:flex-row items-start md:items-center justify-between gap-4 rounded-xl border border-border/60 bg-card p-4 shadow-xs transition-all hover:border-border hover:bg-card/90 hover:shadow-sm",
+            depth === 0 && "border-border/80 bg-card/95"
           )}
         >
-          <div className="flex items-center gap-3.5">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-              <Building2 className="h-5 w-5" />
+          {/* Left Column: Expand button, Icon, Metadata */}
+          <div className="flex items-start md:items-center gap-3 min-w-0 flex-1">
+            {/* Expand / Collapse Control */}
+            {hasChildren ? (
+              <button
+                type="button"
+                onClick={() => toggleNodeExpand(node._id)}
+                aria-expanded={isExpanded}
+                className="mt-1 md:mt-0 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-border/60 bg-muted/40 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                title={isExpanded ? "Collapse children" : "Expand children"}
+              >
+                {isExpanded ? (
+                  <ChevronDown className="h-4 w-4" />
+                ) : (
+                  <ChevronRight className="h-4 w-4" />
+                )}
+              </button>
+            ) : (
+              <div className="w-7 shrink-0" />
+            )}
+
+            {/* Entity Icon Container */}
+            <div
+              className={cn(
+                "flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border shadow-xs",
+                kindConfig.iconBoxStyle
+              )}
+            >
+              <IconComponent className="h-5 w-5" />
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h3 className="font-semibold text-foreground">{node.name}</h3>
-                <span className="font-mono text-xs font-bold uppercase rounded bg-muted px-1.5 py-0.5 text-muted-foreground">
+
+            {/* Main Info */}
+            <div className="min-w-0 flex-1 space-y-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <h3 className="font-semibold text-foreground text-sm sm:text-base tracking-tight truncate">
+                  {node.name}
+                </h3>
+                <span className="font-mono text-[11px] font-bold uppercase rounded bg-muted/80 px-1.5 py-0.5 text-muted-foreground border border-border/40">
                   {node.code}
                 </span>
+
+                {/* Entity Kind Badge */}
                 <span
                   className={cn(
-                    "rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider",
-                    node.kind === "holding" && "bg-purple-500/10 text-purple-600 dark:text-purple-400",
-                    node.kind === "operating" && "bg-blue-500/10 text-blue-600 dark:text-blue-400",
-                    node.kind === "branch" && "bg-amber-500/10 text-amber-600 dark:text-amber-400",
-                    node.kind === "division" && "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                    "rounded-md border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider",
+                    kindConfig.badgeStyle
                   )}
                 >
-                  {node.kind}
+                  {kindConfig.label}
                 </span>
+
+                {/* Top Parent Badge */}
+                {depth === 0 && node.kind === "holding" && (
+                  <span className="rounded-md border border-purple-500/30 bg-purple-500/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-purple-400">
+                    PARENT
+                  </span>
+                )}
+
+                {/* Primary HQ Indicator */}
                 {node.isPrimary && (
-                  <span className="flex items-center gap-1 text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full">
-                    <CheckCircle2 className="h-3 w-3" /> Primary Headquarter
+                  <span className="flex items-center gap-1 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-400">
+                    <CheckCircle2 className="h-3 w-3" /> PRIMARY HQ
                   </span>
                 )}
               </div>
-              <p className="mt-0.5 text-xs text-muted-foreground">
-                Base Currency: <span className="font-semibold text-foreground">{node.baseCurrency}</span> • Tax ID:{" "}
-                <span className="font-mono">{node.taxId || "N/A"}</span>
-              </p>
+
+              {/* Sub Metadata Row */}
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                <span>
+                  Base Currency:{" "}
+                  <strong className="font-semibold text-foreground">{node.baseCurrency}</strong>
+                </span>
+                <span className="text-border">•</span>
+                <span>
+                  Tax ID:{" "}
+                  <span className="font-mono text-foreground/80">
+                    {node.taxId || "Not Registered"}
+                  </span>
+                </span>
+                {node.branding?.invoicePrefix && (
+                  <>
+                    <span className="text-border">•</span>
+                    <span>
+                      Prefix:{" "}
+                      <span className="font-mono text-muted-foreground">
+                        {node.branding.invoicePrefix}
+                      </span>
+                    </span>
+                  </>
+                )}
+              </div>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => openModalForCreate(node._id)}
-              className="flex items-center gap-1 rounded-lg border border-border px-2.5 py-1.5 text-xs font-medium text-muted-foreground hover:border-primary/40 hover:bg-muted hover:text-foreground transition-colors"
-            >
-              <Plus className="h-3.5 w-3.5 text-primary" /> Add Branch
-            </button>
-            <button
-              type="button"
-              onClick={() => openModalForEdit(node)}
-              className="flex items-center gap-1 rounded-lg border border-border px-2.5 py-1.5 text-xs font-medium text-muted-foreground hover:border-primary/40 hover:bg-muted hover:text-foreground transition-colors"
-            >
-              <Edit2 className="h-3.5 w-3.5" /> Edit
-            </button>
-            {!node.isPrimary && (
+          {/* Right Column: Operational Metrics & Contextual Action Menu */}
+          <div className="flex items-center justify-between md:justify-end gap-6 w-full md:w-auto border-t md:border-t-0 border-border/40 pt-3 md:pt-0">
+            {/* Operational Metrics */}
+            <div className="flex items-center gap-5 text-center text-xs">
+              <div>
+                <div className="font-semibold text-foreground text-sm">
+                  {node.children ? node.children.length : 0}
+                </div>
+                <div className="text-[10px] text-muted-foreground uppercase font-medium">
+                  {node.kind === "holding" ? "Subsidiaries" : "Branches"}
+                </div>
+              </div>
+              <div className="h-6 w-px bg-border/40" />
+              <div>
+                <div className="font-semibold text-foreground text-sm">{node.baseCurrency}</div>
+                <div className="text-[10px] text-muted-foreground uppercase font-medium">
+                  Currency
+                </div>
+              </div>
+              <div className="h-6 w-px bg-border/40" />
+              <div>
+                <span className="inline-flex items-center rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-400 border border-emerald-500/20">
+                  Active
+                </span>
+              </div>
+            </div>
+
+            {/* Contextual Action Menu (•••) */}
+            <div className="relative">
               <button
                 type="button"
-                onClick={() => handleDeleteCompany(node._id, node.name)}
-                className="flex items-center gap-1 rounded-lg border border-destructive/30 px-2 py-1.5 text-xs font-medium text-destructive hover:bg-destructive/10 transition-colors"
+                onClick={() => setActiveMenuId(isMenuOpen ? null : node._id)}
+                className="flex h-8 w-8 items-center justify-center rounded-lg border border-border/60 bg-muted/30 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                aria-label="Actions menu"
               >
-                <Trash2 className="h-3.5 w-3.5" />
+                <MoreHorizontal className="h-4 w-4" />
               </button>
-            )}
+
+              {isMenuOpen && (
+                <div className="absolute right-0 top-9 z-30 w-48 rounded-xl border border-border/80 bg-card p-1.5 shadow-xl space-y-0.5 animate-in fade-in-50 zoom-in-95">
+                  <button
+                    type="button"
+                    onClick={() => openModalForEdit(node, "general")}
+                    className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-muted transition-colors text-left"
+                  >
+                    <Edit2 className="h-3.5 w-3.5 text-muted-foreground" /> Edit Company
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => openModalForCreate("branch", node._id)}
+                    className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-muted transition-colors text-left"
+                  >
+                    <Plus className="h-3.5 w-3.5 text-primary" /> Add Branch / Child
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => openModalForEdit(node, "branding")}
+                    className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-muted transition-colors text-left"
+                  >
+                    <FileText className="h-3.5 w-3.5 text-blue-400" /> Manage Branding
+                  </button>
+
+                  {!node.isPrimary && (
+                    <>
+                      <div className="my-1 border-t border-border/60" />
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteCompany(node._id, node.name)}
+                        className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs font-medium text-destructive hover:bg-destructive/10 transition-colors text-left"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" /> Delete Company
+                      </button>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
-        {node.children && node.children.length > 0 && (
-          <div className="space-y-2">
-            {node.children.map((child) => renderTreeNode(child, depth + 1))}
+        {/* Children Container with Vertical Tree Connection Stem */}
+        {hasChildren && isExpanded && (
+          <div className="relative ml-6 sm:ml-8 pl-6 sm:pl-8 space-y-3 pt-3">
+            {/* Vertical stem from parent card down through children */}
+            <div className="absolute left-0 top-0 bottom-6 w-0.5 bg-border/60" />
+            {node.children.map((childNode, idx) => (
+              <TreeNodeCard
+                key={childNode._id}
+                node={childNode}
+                depth={depth + 1}
+                isLast={idx === node.children.length - 1}
+                hasParent={true}
+              />
+            ))}
           </div>
         )}
       </div>
@@ -325,309 +655,814 @@ export default function CompaniesManagementPage() {
   };
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
+    <div className="space-y-6 pb-12">
+      {/* 1. Page Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-2">
-            <Network className="h-6 w-6 text-primary" /> Company Hierarchy & Branding
+          <h1 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-2.5">
+            <Network className="h-6 w-6 text-primary shrink-0" /> Company Hierarchy & Branding
           </h1>
-          <p className="text-sm text-muted-foreground">
+          <p className="mt-1 text-sm text-muted-foreground">
             Manage your parent holding group, operating companies, international branches, and custom document branding.
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => openModalForCreate("")}
-          className="flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/20 transition-all hover:bg-primary/90"
-        >
-          <Plus className="h-4 w-4" /> Add Company
-        </button>
+
+        {/* Primary Action Button with Creation Type Dropdown */}
+        <div className="relative shrink-0" ref={addDropdownRef}>
+          <div className="inline-flex rounded-xl bg-primary shadow-lg shadow-primary/20 transition-all hover:bg-primary/90">
+            <button
+              type="button"
+              onClick={() => openModalForCreate("operating")}
+              className="flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-primary-foreground"
+            >
+              <Plus className="h-4 w-4" /> Add Company
+            </button>
+            <button
+              type="button"
+              onClick={() => setAddDropdownOpen(!addDropdownOpen)}
+              className="border-l border-primary-foreground/20 px-2.5 py-2.5 text-primary-foreground hover:bg-primary-foreground/10 rounded-r-xl transition-colors"
+              aria-label="More creation options"
+            >
+              <ChevronDown className="h-4 w-4" />
+            </button>
+          </div>
+
+          {addDropdownOpen && (
+            <div className="absolute right-0 top-12 z-30 w-56 rounded-xl border border-border/80 bg-card p-1.5 shadow-xl space-y-1 animate-in fade-in-50 zoom-in-95">
+              <button
+                type="button"
+                onClick={() => openModalForCreate("holding")}
+                className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-medium text-foreground hover:bg-muted transition-colors text-left"
+              >
+                <Globe className="h-4 w-4 text-purple-400" />
+                <div>
+                  <div className="font-semibold">Holding Company</div>
+                  <div className="text-[10px] text-muted-foreground">Parent ownership entity</div>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => openModalForCreate("operating")}
+                className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-medium text-foreground hover:bg-muted transition-colors text-left"
+              >
+                <Briefcase className="h-4 w-4 text-blue-400" />
+                <div>
+                  <div className="font-semibold">Operating Company</div>
+                  <div className="text-[10px] text-muted-foreground">Primary operational entity</div>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => openModalForCreate("branch")}
+                className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-medium text-foreground hover:bg-muted transition-colors text-left"
+              >
+                <GitBranch className="h-4 w-4 text-amber-400" />
+                <div>
+                  <div className="font-semibold">Regional Branch</div>
+                  <div className="text-[10px] text-muted-foreground">Subordinate local unit</div>
+                </div>
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
+      {/* Alert Message */}
       {message && (
-        <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4 text-sm font-medium text-emerald-600 dark:text-emerald-400">
-          {message}
+        <div
+          className={cn(
+            "flex items-center justify-between rounded-xl border p-4 text-sm font-medium transition-all",
+            message.type === "success"
+              ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-400"
+              : "border-destructive/30 bg-destructive/10 text-destructive"
+          )}
+        >
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="h-4 w-4 shrink-0" />
+            <span>{message.text}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setMessage(null)}
+            className="text-xs opacity-70 hover:opacity-100"
+          >
+            Dismiss
+          </button>
         </div>
       )}
 
-      {/* Tabs */}
-      <div className="flex items-center justify-between border-b border-border pb-2">
-        <div className="flex items-center gap-2">
+      {/* 2. Executive Summary Bar (Real Data) */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
+        <div className="rounded-xl border border-border/60 bg-card p-4 shadow-xs">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-medium text-muted-foreground">Total Companies</span>
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
+              <Building2 className="h-4 w-4" />
+            </div>
+          </div>
+          <div className="mt-2 text-2xl font-bold text-foreground">{totalCompanies}</div>
+          <p className="mt-1 text-[11px] text-muted-foreground truncate">
+            {holdingCount} holding · {operatingCount} operating · {branchCount} branch
+          </p>
+        </div>
+
+        <div className="rounded-xl border border-border/60 bg-card p-4 shadow-xs">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-medium text-muted-foreground">Total Branches</span>
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-500/10 text-amber-400">
+              <GitBranch className="h-4 w-4" />
+            </div>
+          </div>
+          <div className="mt-2 text-2xl font-bold text-foreground">{branchCount}</div>
+          <p className="mt-1 text-[11px] text-muted-foreground truncate">
+            Across {operatingCount + holdingCount} parent entities
+          </p>
+        </div>
+
+        <div className="rounded-xl border border-border/60 bg-card p-4 shadow-xs">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-medium text-muted-foreground">Currencies</span>
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-500/10 text-blue-400">
+              <Globe className="h-4 w-4" />
+            </div>
+          </div>
+          <div className="mt-2 text-2xl font-bold text-foreground">{uniqueCurrencies.length}</div>
+          <p className="mt-1 text-[11px] text-muted-foreground truncate">
+            {uniqueCurrencies.length > 0 ? uniqueCurrencies.join(", ") : "AED"} currencies
+          </p>
+        </div>
+
+        <div className="rounded-xl border border-border/60 bg-card p-4 shadow-xs">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-medium text-muted-foreground">Active Companies</span>
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-400">
+              <ShieldCheck className="h-4 w-4" />
+            </div>
+          </div>
+          <div className="mt-2 text-2xl font-bold text-foreground">{activeCount}</div>
+          <p className="mt-1 text-[11px] text-muted-foreground truncate">
+            {activeCount === totalCompanies
+              ? "All companies operational"
+              : `${activeCount} of ${totalCompanies} active`}
+          </p>
+        </div>
+      </div>
+
+      {/* 3. View Switcher & Hierarchy Controls */}
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/60 pb-3">
+        <div className="flex items-center gap-1.5 bg-muted/40 p-1 rounded-xl border border-border/60">
           <button
             type="button"
             onClick={() => setActiveTab("tree")}
             className={cn(
-              "flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors",
+              "flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-medium transition-all",
               activeTab === "tree"
-                ? "bg-primary text-primary-foreground font-semibold"
-                : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                ? "bg-card text-foreground font-semibold shadow-xs border border-border/40"
+                : "text-muted-foreground hover:text-foreground"
             )}
           >
-            <Network className="h-4 w-4" /> Visual Tree
+            <Network className="h-3.5 w-3.5 text-primary" /> Hierarchy View
           </button>
           <button
             type="button"
             onClick={() => setActiveTab("list")}
             className={cn(
-              "flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors",
+              "flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-medium transition-all",
               activeTab === "list"
-                ? "bg-primary text-primary-foreground font-semibold"
-                : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                ? "bg-card text-foreground font-semibold shadow-xs border border-border/40"
+                : "text-muted-foreground hover:text-foreground"
             )}
           >
-            <Layers className="h-4 w-4" /> Flat Table List ({companies.length})
+            <Layers className="h-3.5 w-3.5 text-blue-400" /> Table View ({companies.length})
           </button>
         </div>
+
+        {/* Tree Expand / Collapse Controls (Only visible in Hierarchy View) */}
+        {activeTab === "tree" && (
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleExpandAll}
+              className="flex items-center gap-1.5 rounded-lg border border-border/60 bg-card px-2.5 py-1.5 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+            >
+              <Maximize2 className="h-3.5 w-3.5" /> Expand All
+            </button>
+            <button
+              type="button"
+              onClick={handleCollapseAll}
+              className="flex items-center gap-1.5 rounded-lg border border-border/60 bg-card px-2.5 py-1.5 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+            >
+              <Minimize2 className="h-3.5 w-3.5" /> Collapse All
+            </button>
+          </div>
+        )}
       </div>
 
-      {/* Content */}
+      {/* 4. Hierarchy Tree / Flat Table Content */}
       {loading ? (
-        <div className="flex h-48 items-center justify-center text-sm text-muted-foreground">
-          Loading company hierarchy...
+        /* Loading Skeleton */
+        <div className="space-y-4">
+          {[1, 2, 3].map((i) => (
+            <div
+              key={i}
+              className="h-20 w-full animate-pulse rounded-xl border border-border/40 bg-card/40 p-4"
+            />
+          ))}
         </div>
       ) : activeTab === "tree" ? (
         <div className="space-y-4">
           {tree.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
-              No active companies found. Click "Add Company" to create your first holding or operating entity.
+            /* 17. Empty State */
+            <div className="rounded-2xl border border-dashed border-border/80 bg-card/40 p-12 text-center space-y-4">
+              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                <Network className="h-6 w-6" />
+              </div>
+              <div className="max-w-md mx-auto space-y-1">
+                <h3 className="text-base font-semibold text-foreground">
+                  No corporate hierarchy configured
+                </h3>
+                <p className="text-xs text-muted-foreground">
+                  Create your holding group or operating entity to establish your enterprise corporate structure.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => openModalForCreate("holding")}
+                className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground shadow-md hover:bg-primary/90 transition-all"
+              >
+                <Plus className="h-4 w-4" /> Create Holding Company
+              </button>
             </div>
           ) : (
-            tree.map((node) => renderTreeNode(node))
+            <div className="space-y-4 pt-1">
+              {tree.map((rootNode) => (
+                <TreeNodeCard key={rootNode._id} node={rootNode} depth={0} />
+              ))}
+            </div>
           )}
         </div>
       ) : (
-        <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
-          <table className="w-full text-left text-xs">
-            <thead className="border-b border-border bg-muted/40 font-semibold uppercase text-muted-foreground">
-              <tr>
-                <th className="px-4 py-3">Code & Name</th>
-                <th className="px-4 py-3">Kind</th>
-                <th className="px-4 py-3">Currency</th>
-                <th className="px-4 py-3">Tax ID</th>
-                <th className="px-4 py-3">Prefixes</th>
-                <th className="px-4 py-3 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {companies.map((comp) => (
-                <tr key={comp._id} className="hover:bg-muted/20">
-                  <td className="px-4 py-3">
-                    <div className="font-semibold text-foreground">{comp.name}</div>
-                    <div className="font-mono text-[11px] text-primary">{comp.code}</div>
-                  </td>
-                  <td className="px-4 py-3 capitalize">{comp.kind}</td>
-                  <td className="px-4 py-3 font-semibold">{comp.baseCurrency}</td>
-                  <td className="px-4 py-3 font-mono">{comp.taxId || "-"}</td>
-                  <td className="px-4 py-3 font-mono text-[11px] text-muted-foreground">
-                    Inv: {comp.branding?.invoicePrefix || `${comp.code}-INV`}
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <button
-                      type="button"
-                      onClick={() => openModalForEdit(comp)}
-                      className="rounded-md border border-border px-2 py-1 font-medium hover:bg-muted"
-                    >
-                      Edit
-                    </button>
-                  </td>
+        /* 14. Flat Table View */
+        <div className="overflow-hidden rounded-xl border border-border/60 bg-card shadow-xs">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="border-b border-border/60 bg-muted/40 font-semibold uppercase text-muted-foreground tracking-wider">
+                <tr>
+                  <th className="px-4 py-3.5">Company & Code</th>
+                  <th className="px-4 py-3.5">Type</th>
+                  <th className="px-4 py-3.5">Parent Entity</th>
+                  <th className="px-4 py-3.5">Currency</th>
+                  <th className="px-4 py-3.5">Tax Registration</th>
+                  <th className="px-4 py-3.5">Primary HQ</th>
+                  <th className="px-4 py-3.5">Branding Prefixes</th>
+                  <th className="px-4 py-3.5 text-right">Actions</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-border/40">
+                {companies.map((comp) => (
+                  <tr key={comp._id} className="hover:bg-muted/20 transition-colors">
+                    <td className="px-4 py-3.5">
+                      <div className="font-semibold text-foreground">{comp.name}</div>
+                      <div className="font-mono text-[11px] text-primary">{comp.code}</div>
+                    </td>
+                    <td className="px-4 py-3.5">
+                      <span
+                        className={cn(
+                          "rounded-md border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider",
+                          comp.kind === "holding" && "bg-purple-500/10 text-purple-400 border-purple-500/20",
+                          comp.kind === "operating" && "bg-blue-500/10 text-blue-400 border-blue-500/20",
+                          comp.kind === "branch" && "bg-amber-500/10 text-amber-400 border-amber-500/20",
+                          comp.kind === "division" && "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+                        )}
+                      >
+                        {comp.kind}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3.5 font-medium text-muted-foreground">
+                      {getParentName(comp.parentCompanyId)}
+                    </td>
+                    <td className="px-4 py-3.5 font-semibold text-foreground">
+                      {comp.baseCurrency}
+                    </td>
+                    <td className="px-4 py-3.5 font-mono text-muted-foreground">
+                      {comp.taxId || "N/A"}
+                    </td>
+                    <td className="px-4 py-3.5">
+                      {comp.isPrimary ? (
+                        <span className="inline-flex items-center gap-1 rounded-md bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-400 border border-emerald-500/20">
+                          <CheckCircle2 className="h-3 w-3" /> Yes
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground">-</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3.5 font-mono text-[11px] text-muted-foreground">
+                      Inv: {comp.branding?.invoicePrefix || `${comp.code}-INV`}
+                    </td>
+                    <td className="px-4 py-3.5 text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        <button
+                          type="button"
+                          onClick={() => openModalForEdit(comp, "general")}
+                          className="rounded-lg border border-border/60 px-2.5 py-1 text-xs font-medium hover:bg-muted transition-colors"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => openModalForEdit(comp, "branding")}
+                          className="rounded-lg border border-border/60 px-2.5 py-1 text-xs font-medium text-blue-400 hover:bg-muted transition-colors"
+                        >
+                          Branding
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
-      {/* Modal for Creating / Editing */}
+      {/* 12. Brand Identity & Document Branding Section */}
+      <div className="mt-8 border-t border-border/60 pt-6 space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+          <div>
+            <h2 className="text-lg font-bold text-foreground flex items-center gap-2">
+              <FileText className="h-5 w-5 text-primary" /> Brand Identity & Document Prefixes
+            </h2>
+            <p className="text-xs text-muted-foreground">
+              Configure logos, digital signatures, company seals, and serial prefixes for invoices, quotations, and POs per entity.
+            </p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {companies.map((comp) => {
+            const hasLogo = !!(comp.branding?.logoUrl || comp.branding?.logoText);
+            const hasSeal = !!comp.branding?.companySealUrl;
+            const hasFooter = !!comp.branding?.invoiceFooter;
+
+            return (
+              <div
+                key={comp._id}
+                className="rounded-xl border border-border/60 bg-card p-4 space-y-3 shadow-xs hover:border-border transition-colors"
+              >
+                <div className="flex items-center justify-between border-b border-border/40 pb-2.5">
+                  <div className="flex items-center gap-2">
+                    <div className="font-semibold text-foreground text-sm">{comp.name}</div>
+                    <span className="font-mono text-[10px] font-bold rounded bg-muted px-1.5 py-0.5 text-muted-foreground">
+                      {comp.code}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => openModalForEdit(comp, "branding")}
+                    className="text-xs font-semibold text-primary hover:underline"
+                  >
+                    Edit
+                  </button>
+                </div>
+
+                <div className="space-y-2 text-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground">Logo / Header:</span>
+                    <span
+                      className={cn(
+                        "font-medium px-2 py-0.5 rounded text-[10px]",
+                        hasLogo
+                          ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+                          : "bg-muted text-muted-foreground"
+                      )}
+                    >
+                      {hasLogo ? "Configured" : "Not Set"}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground">Invoice Prefix:</span>
+                    <span className="font-mono font-semibold text-foreground">
+                      {comp.branding?.invoicePrefix || `${comp.code}-INV`}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground">Quotation Prefix:</span>
+                    <span className="font-mono font-semibold text-foreground">
+                      {comp.branding?.quotationPrefix || `${comp.code}-QT`}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground">Company Seal:</span>
+                    <span
+                      className={cn(
+                        "font-medium px-2 py-0.5 rounded text-[10px]",
+                        hasSeal
+                          ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+                          : "bg-muted text-muted-foreground"
+                      )}
+                    >
+                      {hasSeal ? "Uploaded" : "Not Set"}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* 13. Hierarchy Architecture Overview Card */}
+      <div className="mt-8 rounded-xl border border-border/60 bg-muted/20 p-4 sm:p-5 space-y-3">
+        <div className="flex items-center gap-2">
+          <Info className="h-4 w-4 text-primary" />
+          <h3 className="font-semibold text-foreground text-sm">Hierarchy Architecture Overview</h3>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
+          <div className="space-y-1">
+            <span className="font-bold text-purple-400 uppercase text-[10px] tracking-wider block">
+              Holding Group
+            </span>
+            <p className="text-muted-foreground leading-relaxed">
+              Top-level parent holding company. Owns and controls operational entities across regions.
+            </p>
+          </div>
+
+          <div className="space-y-1">
+            <span className="font-bold text-blue-400 uppercase text-[10px] tracking-wider block">
+              Operating Entity
+            </span>
+            <p className="text-muted-foreground leading-relaxed">
+              Primary business unit handling trade, invoices, and direct commercial contracts.
+            </p>
+          </div>
+
+          <div className="space-y-1">
+            <span className="font-bold text-amber-400 uppercase text-[10px] tracking-wider block">
+              Regional Branch
+            </span>
+            <p className="text-muted-foreground leading-relaxed">
+              Local operating office or branch subordinate to an operating company.
+            </p>
+          </div>
+
+          <div className="space-y-1">
+            <span className="font-bold text-emerald-400 uppercase text-[10px] tracking-wider block">
+              Primary HQ
+            </span>
+            <p className="text-muted-foreground leading-relaxed">
+              Main global headquarters designated for default consolidated transactions.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* 16. Modal for Creating / Editing Companies & Branding */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 overflow-y-auto">
-          <div className="w-full max-w-2xl rounded-2xl border border-border bg-card p-6 shadow-2xl space-y-5 my-8">
-            <div className="flex items-center justify-between border-b border-border pb-3">
-              <h2 className="text-lg font-bold text-foreground">
-                {editingCompany ? `Edit Company: ${editingCompany.name}` : "Create New Company"}
-              </h2>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-xs p-3 sm:p-5 overflow-hidden">
+          <div className="w-full max-w-3xl max-h-[92vh] flex flex-col rounded-2xl border border-border bg-card shadow-2xl animate-in fade-in-50 zoom-in-95 my-auto overflow-hidden">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between border-b border-border/60 px-6 py-4 shrink-0 bg-card">
+              <div>
+                <h2 className="text-lg font-bold text-foreground">
+                  {editingCompany ? `Edit Entity: ${editingCompany.name}` : "Create Corporate Entity"}
+                </h2>
+                <p className="text-xs text-muted-foreground">
+                  Define entity type, parent relationships, currency, and custom document branding.
+                </p>
+              </div>
               <button
                 type="button"
                 onClick={() => setIsModalOpen(false)}
-                className="text-muted-foreground hover:text-foreground text-sm font-semibold"
+                className="rounded-lg p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground text-sm font-semibold transition-colors"
               >
                 ✕
               </button>
             </div>
 
-            <form onSubmit={handleSaveCompany} className="space-y-4 text-xs">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block font-medium mb-1">Company Name *</label>
-                  <input
-                    type="text"
-                    required
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                    placeholder="e.g. Docutrade Holding LLC"
-                  />
-                </div>
+            {/* Modal Navigation Tabs */}
+            <div className="flex items-center gap-2 border-b border-border/40 px-6 py-2.5 shrink-0 bg-muted/20">
+              <button
+                type="button"
+                onClick={() => setModalTab("general")}
+                className={cn(
+                  "rounded-lg px-3.5 py-1.5 text-xs font-semibold transition-colors flex items-center gap-1.5",
+                  modalTab === "general"
+                    ? "bg-primary text-primary-foreground shadow-sm"
+                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                )}
+              >
+                <Building2 className="h-3.5 w-3.5" />
+                General & Hierarchy
+              </button>
+              <button
+                type="button"
+                onClick={() => setModalTab("branding")}
+                className={cn(
+                  "rounded-lg px-3.5 py-1.5 text-xs font-semibold transition-colors flex items-center gap-1.5",
+                  modalTab === "branding"
+                    ? "bg-primary text-primary-foreground shadow-sm"
+                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                )}
+              >
+                <FileText className="h-3.5 w-3.5" />
+                Branding & Document Prefixes
+              </button>
+            </div>
 
-                <div>
-                  <label className="block font-medium mb-1">Unique Company Code (3-6 chars) *</label>
-                  <input
-                    type="text"
-                    required
-                    maxLength={8}
-                    value={formData.code}
-                    onChange={(e) => setFormData({ ...formData, code: e.target.value.toUpperCase() })}
-                    className="w-full font-mono rounded-lg border border-border bg-background px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-primary uppercase"
-                    placeholder="e.g. DXB, IND, UK"
-                  />
-                </div>
+            {/* Form Content */}
+            <form onSubmit={handleSaveCompany} className="flex flex-col flex-1 overflow-hidden">
+              <div className="flex-1 overflow-y-auto p-6 space-y-4 text-xs">
+                {modalTab === "general" ? (
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block font-medium mb-1 text-foreground">Company Name *</label>
+                        <input
+                          type="text"
+                          required
+                          value={formData.name}
+                          onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                          className="w-full rounded-lg border border-border/80 bg-background px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                          placeholder="e.g. Docutrade Middle East LLC"
+                        />
+                      </div>
 
-                <div>
-                  <label className="block font-medium mb-1">Entity Kind</label>
-                  <select
-                    value={formData.kind}
-                    onChange={(e) => setFormData({ ...formData, kind: e.target.value as any })}
-                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                  >
-                    <option value="holding">Holding Group (Parent)</option>
-                    <option value="operating">Operating Company</option>
-                    <option value="branch">Branch (Regional office)</option>
-                    <option value="division">Division / Subsidiary</option>
-                  </select>
-                </div>
+                      <div>
+                        <label className="block font-medium mb-1 text-foreground">
+                          Unique Code (3-8 Chars) *
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          maxLength={8}
+                          value={formData.code}
+                          onChange={(e) =>
+                            setFormData({ ...formData, code: e.target.value.toUpperCase() })
+                          }
+                          className="w-full font-mono rounded-lg border border-border/80 bg-background px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-primary uppercase"
+                          placeholder="e.g. SDT-DXB"
+                        />
+                      </div>
 
-                <div>
-                  <label className="block font-medium mb-1">Parent Company</label>
-                  <select
-                    value={formData.parentCompanyId}
-                    onChange={(e) => setFormData({ ...formData, parentCompanyId: e.target.value })}
-                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                  >
-                    <option value="">None (Top-Level Holding)</option>
-                    {companies
-                      .filter((c) => c._id !== editingCompany?._id)
-                      .map((c) => (
-                        <option key={c._id} value={c._id}>
-                          {c.name} ({c.code})
-                        </option>
-                      ))}
-                  </select>
-                </div>
+                      <div>
+                        <label className="block font-medium mb-1 text-foreground">Entity Kind *</label>
+                        <select
+                          value={formData.kind}
+                          onChange={(e) => {
+                            const newKind = e.target.value as any;
+                            setFormData({
+                              ...formData,
+                              kind: newKind,
+                              parentCompanyId: newKind === "holding" ? "" : formData.parentCompanyId,
+                            });
+                          }}
+                          className="w-full rounded-lg border border-border/80 bg-background px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                        >
+                          <option value="holding">Holding Group (Parent)</option>
+                          <option value="operating">Operating Company</option>
+                          <option value="branch">Branch (Regional Office)</option>
+                          <option value="division">Division / Subsidiary</option>
+                        </select>
+                      </div>
 
-                <div>
-                  <label className="block font-medium mb-1">Base Currency</label>
-                  <select
-                    value={formData.baseCurrency}
-                    onChange={(e) => setFormData({ ...formData, baseCurrency: e.target.value })}
-                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                  >
-                    <option value="AED">AED - UAE Dirham</option>
-                    <option value="USD">USD - US Dollar</option>
-                    <option value="INR">INR - Indian Rupee</option>
-                    <option value="EUR">EUR - Euro</option>
-                    <option value="GBP">GBP - British Pound</option>
-                  </select>
-                </div>
+                      <div>
+                        <label className="block font-medium mb-1 text-foreground">
+                          Parent Entity {formData.kind === "holding" && "(N/A for Holding)"}
+                        </label>
+                        <select
+                          disabled={formData.kind === "holding"}
+                          value={formData.parentCompanyId}
+                          onChange={(e) => setFormData({ ...formData, parentCompanyId: e.target.value })}
+                          className="w-full rounded-lg border border-border/80 bg-background px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50"
+                        >
+                          <option value="">None (Top-Level Parent)</option>
+                          {companies
+                            .filter((c) => c._id !== editingCompany?._id)
+                            .map((c) => (
+                              <option key={c._id} value={c._id}>
+                                {c.name} ({c.code}) - {c.kind.toUpperCase()}
+                              </option>
+                            ))}
+                        </select>
+                      </div>
 
-                <div>
-                  <label className="block font-medium mb-1">Tax Registration / TRN / VAT ID</label>
-                  <input
-                    type="text"
-                    value={formData.taxId}
-                    onChange={(e) => setFormData({ ...formData, taxId: e.target.value })}
-                    className="w-full font-mono rounded-lg border border-border bg-background px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                    placeholder="e.g. 100459827000003"
-                  />
-                </div>
+                      <div>
+                        <label className="block font-medium mb-1 text-foreground">Base Currency *</label>
+                        <select
+                          value={formData.baseCurrency}
+                          onChange={(e) => setFormData({ ...formData, baseCurrency: e.target.value })}
+                          className="w-full rounded-lg border border-border/80 bg-background px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                        >
+                          <option value="AED">AED - UAE Dirham</option>
+                          <option value="USD">USD - US Dollar</option>
+                          <option value="EUR">EUR - Euro</option>
+                          <option value="GBP">GBP - British Pound</option>
+                          <option value="INR">INR - Indian Rupee</option>
+                          <option value="AUD">AUD - Australian Dollar</option>
+                          <option value="SAR">SAR - Saudi Riyal</option>
+                          <option value="QAR">QAR - Qatari Riyal</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block font-medium mb-1 text-foreground">
+                          Tax Registration / TRN / VAT ID
+                        </label>
+                        <input
+                          type="text"
+                          value={formData.taxId}
+                          onChange={(e) => setFormData({ ...formData, taxId: e.target.value })}
+                          className="w-full font-mono rounded-lg border border-border/80 bg-background px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                          placeholder="e.g. 100234567800003"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 border-t border-border/40 pt-3">
+                      <div>
+                        <label className="block font-medium mb-1 text-foreground">Official Email</label>
+                        <input
+                          type="email"
+                          value={formData.email}
+                          onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                          className="w-full rounded-lg border border-border/80 bg-background px-3 py-2 text-foreground"
+                          placeholder="contact@company.com"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block font-medium mb-1 text-foreground">Phone Number</label>
+                        <input
+                          type="text"
+                          value={formData.phone}
+                          onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                          className="w-full rounded-lg border border-border/80 bg-background px-3 py-2 text-foreground"
+                          placeholder="+971 4 123 4567"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 border-t border-border/40 pt-3">
+                      <input
+                        type="checkbox"
+                        id="isPrimaryCheck"
+                        checked={formData.isPrimary}
+                        onChange={(e) => setFormData({ ...formData, isPrimary: e.target.checked })}
+                        className="rounded border-border text-primary focus:ring-primary h-4 w-4"
+                      />
+                      <label
+                        htmlFor="isPrimaryCheck"
+                        className="font-semibold text-foreground cursor-pointer"
+                      >
+                        Set as Primary Headquarter Entity
+                      </label>
+                    </div>
+                  </div>
+                ) : (
+                  /* Branding Tab */
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div>
+                        <label className="block font-medium mb-1 text-foreground">
+                          Invoice Prefix
+                        </label>
+                        <input
+                          type="text"
+                          value={formData.invoicePrefix}
+                          onChange={(e) =>
+                            setFormData({ ...formData, invoicePrefix: e.target.value })
+                          }
+                          className="w-full font-mono rounded-lg border border-border/80 bg-background px-2.5 py-1.5 text-foreground"
+                          placeholder="e.g. SDT-INV-"
+                        />
+                      </div>
+                      <div>
+                        <label className="block font-medium mb-1 text-foreground">
+                          Quotation Prefix
+                        </label>
+                        <input
+                          type="text"
+                          value={formData.quotationPrefix}
+                          onChange={(e) =>
+                            setFormData({ ...formData, quotationPrefix: e.target.value })
+                          }
+                          className="w-full font-mono rounded-lg border border-border/80 bg-background px-2.5 py-1.5 text-foreground"
+                          placeholder="e.g. SDT-QT-"
+                        />
+                      </div>
+                      <div>
+                        <label className="block font-medium mb-1 text-foreground">PO Prefix</label>
+                        <input
+                          type="text"
+                          value={formData.poPrefix}
+                          onChange={(e) => setFormData({ ...formData, poPrefix: e.target.value })}
+                          className="w-full font-mono rounded-lg border border-border/80 bg-background px-2.5 py-1.5 text-foreground"
+                          placeholder="e.g. SDT-PO-"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 border-t border-border/40 pt-4">
+                      <div className="space-y-2">
+                        <UploadCard
+                          compact={true}
+                          label="Company Logo"
+                          value={formData.logoUrl}
+                          onChange={(val) => setFormData((prev) => ({ ...prev, logoUrl: val }))}
+                          placeholder="Upload logo (PNG, JPG, SVG)"
+                        />
+                        <div>
+                          <label className="block text-[11px] font-medium text-muted-foreground mb-1">
+                            Direct Logo URL / Base64 (Optional)
+                          </label>
+                          <input
+                            type="text"
+                            value={formData.logoUrl}
+                            onChange={(e) => setFormData({ ...formData, logoUrl: e.target.value })}
+                            className="w-full rounded-lg border border-border/80 bg-background px-2.5 py-1.5 text-xs text-foreground"
+                            placeholder="https://... or data:image/png..."
+                          />
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <UploadCard
+                          compact={true}
+                          label="Company Seal / Stamp"
+                          value={formData.companySealUrl}
+                          onChange={(val) => setFormData((prev) => ({ ...prev, companySealUrl: val }))}
+                          placeholder="Upload official stamp or seal image"
+                        />
+                        <div>
+                          <label className="block text-[11px] font-medium text-muted-foreground mb-1">
+                            Direct Seal URL / Base64 (Optional)
+                          </label>
+                          <input
+                            type="text"
+                            value={formData.companySealUrl}
+                            onChange={(e) =>
+                              setFormData({ ...formData, companySealUrl: e.target.value })
+                            }
+                            className="w-full rounded-lg border border-border/80 bg-background px-2.5 py-1.5 text-xs text-foreground"
+                            placeholder="https://... official stamp image"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-3 border-t border-border/40 pt-3">
+                      <div>
+                        <label className="block font-medium mb-1 text-foreground">
+                          Invoice Footer / Terms
+                        </label>
+                        <textarea
+                          rows={2}
+                          value={formData.invoiceFooter}
+                          onChange={(e) =>
+                            setFormData({ ...formData, invoiceFooter: e.target.value })
+                          }
+                          className="w-full rounded-lg border border-border/80 bg-background px-2.5 py-1.5 text-foreground"
+                          placeholder="Thank you for your business. Payment due within 30 days."
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block font-medium mb-1 text-foreground">
+                          Bank Details Text
+                        </label>
+                        <textarea
+                          rows={2}
+                          value={formData.bankDetailsText}
+                          onChange={(e) =>
+                            setFormData({ ...formData, bankDetailsText: e.target.value })
+                          }
+                          className="w-full rounded-lg border border-border/80 bg-background px-2.5 py-1.5 text-foreground"
+                          placeholder="Bank Name: Emirates NBD | IBAN: AE0000000000000000000"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
 
-              {/* Branding Section */}
-              <div className="border-t border-border pt-3 space-y-3">
-                <h3 className="font-semibold text-primary text-xs uppercase tracking-wider flex items-center gap-1.5">
-                  <FileText className="h-4 w-4" /> Enterprise Branding & Document Prefixes
-                </h3>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div>
-                    <label className="block font-medium mb-1">Invoice Prefix</label>
-                    <input
-                      type="text"
-                      value={formData.invoicePrefix}
-                      onChange={(e) => setFormData({ ...formData, invoicePrefix: e.target.value })}
-                      className="w-full font-mono rounded-lg border border-border bg-background px-2.5 py-1.5"
-                      placeholder="e.g. DXB-INV-"
-                    />
-                  </div>
-                  <div>
-                    <label className="block font-medium mb-1">Quotation Prefix</label>
-                    <input
-                      type="text"
-                      value={formData.quotationPrefix}
-                      onChange={(e) => setFormData({ ...formData, quotationPrefix: e.target.value })}
-                      className="w-full font-mono rounded-lg border border-border bg-background px-2.5 py-1.5"
-                      placeholder="e.g. DXB-QT-"
-                    />
-                  </div>
-                  <div>
-                    <label className="block font-medium mb-1">PO Prefix</label>
-                    <input
-                      type="text"
-                      value={formData.poPrefix}
-                      onChange={(e) => setFormData({ ...formData, poPrefix: e.target.value })}
-                      className="w-full font-mono rounded-lg border border-border bg-background px-2.5 py-1.5"
-                      placeholder="e.g. DXB-PO-"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block font-medium mb-1">Logo URL / Data Text</label>
-                    <input
-                      type="text"
-                      value={formData.logoUrl}
-                      onChange={(e) => setFormData({ ...formData, logoUrl: e.target.value })}
-                      className="w-full rounded-lg border border-border bg-background px-2.5 py-1.5"
-                      placeholder="https://... or data:image/png..."
-                    />
-                  </div>
-                  <div>
-                    <label className="block font-medium mb-1">Company Seal Stamp URL</label>
-                    <input
-                      type="text"
-                      value={formData.companySealUrl}
-                      onChange={(e) => setFormData({ ...formData, companySealUrl: e.target.value })}
-                      className="w-full rounded-lg border border-border bg-background px-2.5 py-1.5"
-                      placeholder="https://... official stamp image"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2 border-t border-border pt-3">
-                <input
-                  type="checkbox"
-                  id="isPrimaryCheck"
-                  checked={formData.isPrimary}
-                  onChange={(e) => setFormData({ ...formData, isPrimary: e.target.checked })}
-                  className="rounded border-border text-primary focus:ring-primary h-4 w-4"
-                />
-                <label htmlFor="isPrimaryCheck" className="font-semibold text-foreground cursor-pointer">
-                  Set as Primary Headquarter Company
-                </label>
-              </div>
-
-              <div className="flex items-center justify-end gap-2 border-t border-border pt-4">
+              {/* Modal Footer Buttons */}
+              <div className="flex items-center justify-end gap-2 border-t border-border/60 px-6 py-3.5 shrink-0 bg-muted/30">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="rounded-xl border border-border px-4 py-2 text-xs font-semibold text-muted-foreground hover:bg-muted"
+                  className="rounded-xl border border-border/60 px-4 py-2 text-xs font-semibold text-muted-foreground hover:bg-muted transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={saving}
-                  className="rounded-xl bg-primary px-5 py-2 text-xs font-semibold text-primary-foreground shadow-md hover:bg-primary/90"
+                  className="rounded-xl bg-primary px-5 py-2 text-xs font-semibold text-primary-foreground shadow-md hover:bg-primary/90 transition-all disabled:opacity-50"
                 >
                   {saving ? "Saving..." : "Save Company"}
                 </button>

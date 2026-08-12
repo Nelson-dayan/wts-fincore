@@ -1,6 +1,7 @@
 "use client";
 
-import { ImageUp, Plus, Save, Trash2 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { ImageUp, Plus, Save, Trash2, Sparkles, Building2, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -41,6 +42,60 @@ export function QuotationForm({
   onCancelEdit,
   isCurrencyLocked = false,
 }: QuotationFormProps) {
+  const [companies, setCompanies] = useState<any[]>([]);
+  const [selectedCompanyId, setSelectedCompanyId] = useState<string>("");
+  const [autoFillNotice, setAutoFillNotice] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function fetchCompanyHierarchy() {
+      try {
+        const res = await fetch("/api/admin/companies/tree");
+        if (!res.ok) return;
+        const json = await res.json();
+        if (json.companies && Array.isArray(json.companies)) {
+          setCompanies(json.companies);
+        }
+      } catch (err) {
+        console.error("Failed to load companies for quotation auto-fill:", err);
+      }
+    }
+    fetchCompanyHierarchy();
+  }, []);
+
+  const handleAutoFillCompany = (companyId: string) => {
+    setSelectedCompanyId(companyId);
+    if (!companyId) return;
+
+    const comp = companies.find((c) => c._id === companyId);
+    if (!comp) return;
+
+    const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+    const randomSuffix = Math.random().toString(36).substring(2, 6).toUpperCase();
+    const prefix = comp.branding?.quotationPrefix || "QT-";
+    const generatedRef = `${prefix}${dateStr}-${randomSuffix}`;
+
+    const addressParts = [
+      comp.name,
+      comp.address,
+      comp.email ? `Email: ${comp.email}` : null,
+      comp.phone ? `Tel: ${comp.phone}` : null,
+      comp.taxId ? `TRN/Tax ID: ${comp.taxId}` : null,
+    ].filter(Boolean);
+
+    patch({
+      companyName: comp.name,
+      companyAddress: addressParts.join("\n"),
+      logo: comp.branding?.logoUrl || comp.logoUrl || data.logo,
+      currency: comp.baseCurrency || data.currency || "AED",
+      refNo: generatedRef,
+      contactEmail: comp.email || data.contactEmail,
+      contactPhone: comp.phone || data.contactPhone,
+      paymentMilestone: comp.branding?.invoiceFooter || data.paymentMilestone,
+    });
+
+    setAutoFillNotice(`Auto-filled details & branding from "${comp.name}" (${comp.code})`);
+    setTimeout(() => setAutoFillNotice(null), 4500);
+  };
 
   const patch = (partial: Partial<QuotationData>) => {
     onChange({ ...data, ...partial });
@@ -175,6 +230,38 @@ export function QuotationForm({
               />
             </div>
           </div>
+          {/* Company Hierarchy Auto-Fill Selector */}
+          {companies.length > 0 && (
+            <div className="rounded-xl border border-primary/25 bg-primary/5 p-3.5 grid gap-2 transition-all shadow-xs">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="company-autofill-select" className="text-xs font-semibold text-primary flex items-center gap-1.5">
+                  <Sparkles className="h-3.5 w-3.5 text-primary animate-pulse" /> Auto-Fill Company Details & Branding
+                </Label>
+                {autoFillNotice && (
+                  <span className="text-[11px] font-medium text-emerald-600 dark:text-emerald-400 flex items-center gap-1 animate-in fade-in-50">
+                    <CheckCircle2 className="h-3.5 w-3.5" /> {autoFillNotice}
+                  </span>
+                )}
+              </div>
+              <Dropdown
+                id="company-autofill-select"
+                value={selectedCompanyId}
+                onValueChange={(val) => handleAutoFillCompany(val)}
+                placeholder="-- Select Corporate Entity to Auto-Fill --"
+                searchable={true}
+                options={[
+                  { value: "", label: "-- Select Corporate Entity to Auto-Fill --" },
+                  ...companies.map((c) => ({
+                    value: c._id,
+                    label: `${c.name} [${c.code}]`,
+                    badge: c.kind,
+                    description: `Currency: ${c.baseCurrency} ${c.taxId ? `• Tax/TRN ID: ${c.taxId}` : ""}`,
+                  })),
+                ]}
+              />
+            </div>
+          )}
+
           <div className="grid gap-2">
             <Label htmlFor="qg-company">Company name</Label>
             <Input

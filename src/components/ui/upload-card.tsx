@@ -15,6 +15,7 @@ type UploadCardProps = {
   value?: string;
   onChange: (value: string) => void;
   placeholder?: string;
+  compact?: boolean;
 };
 
 export function UploadCard({
@@ -22,6 +23,7 @@ export function UploadCard({
   value,
   onChange,
   placeholder = "Upload image",
+  compact = false,
 }: UploadCardProps) {
   const inputRef =
     React.useRef<HTMLInputElement>(null);
@@ -112,10 +114,10 @@ export function UploadCard({
 
   return (
     <div
-      className={`group overflow-hidden rounded-[28px] border bg-background shadow-sm transition-all duration-300
+      className={`group overflow-hidden ${compact ? "rounded-xl" : "rounded-[28px]"} border bg-background shadow-sm transition-all duration-300
       ${isDragging
           ? "scale-[1.01] border-primary shadow-2xl shadow-primary/10"
-          : "border-border/50 hover:-translate-y-1 hover:border-primary/30 hover:shadow-xl"
+          : "border-border/50 hover:border-primary/30 hover:shadow-md"
         }`}
     >
       {/* Preview Area */}
@@ -128,7 +130,7 @@ export function UploadCard({
           setIsDragging(false)
         }
         onDrop={handleDrop}
-        className={`relative flex h-[240px] items-center justify-center overflow-hidden transition-all duration-300
+        className={`relative flex ${compact ? "h-[110px]" : "h-[240px]"} items-center justify-center overflow-hidden transition-all duration-300
         ${isDragging
             ? "bg-primary/5"
             : "bg-gradient-to-br from-muted/40 via-background to-muted/20"
@@ -139,14 +141,10 @@ export function UploadCard({
 
         {/* Uploading Skeleton */}
         {isUploading ? (
-          <div className="relative z-10 flex w-full max-w-[260px] flex-col items-center gap-6">
-
-            {/* Skeleton Preview */}
-            <div className="h-24 w-24 animate-pulse rounded-3xl bg-muted" />
-
-            <div className="w-full space-y-3">
-              <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
-
+          <div className="relative z-10 flex w-full max-w-[200px] flex-col items-center gap-3">
+            <div className={`${compact ? "h-12 w-12" : "h-24 w-24"} animate-pulse rounded-2xl bg-muted`} />
+            <div className="w-full space-y-2">
+              <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
                 <div
                   className="h-full rounded-full bg-primary transition-all duration-200"
                   style={{
@@ -154,22 +152,10 @@ export function UploadCard({
                   }}
                 />
               </div>
-
-              <div className="flex items-center justify-between text-xs text-muted-foreground">
-                <span>
-                  Uploading asset...
-                </span>
-
-                <span>
-                  {progress}%
-                </span>
+              <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+                <span>Uploading...</span>
+                <span>{progress}%</span>
               </div>
-            </div>
-
-            <div className="flex items-center gap-2 text-sm font-medium text-primary">
-              <Loader2 className="h-4 w-4 animate-spin" />
-
-              Processing file
             </div>
           </div>
         ) : value ? (
@@ -178,58 +164,47 @@ export function UploadCard({
             <img
               src={value}
               alt={label}
-              className="relative z-10 max-h-[130px] max-w-[80%] object-contain transition-transform duration-300 group-hover:scale-105"
+              className={`relative z-10 ${compact ? "max-h-[85px]" : "max-h-[130px]"} max-w-[85%] object-contain transition-transform duration-300 group-hover:scale-105`}
             />
 
             <div className="absolute inset-0 bg-black/0 transition-colors duration-300 group-hover:bg-black/5" />
           </>
         ) : (
-          <div className="relative z-10 flex flex-col items-center gap-5 text-center">
-
+          <div className={`relative z-10 flex flex-col items-center ${compact ? "gap-2" : "gap-5"} text-center p-2`}>
             <div
-              className={`flex h-24 w-24 items-center justify-center rounded-[28px] border bg-background shadow-sm transition-all duration-300
-              ${isDragging
-                  ? "border-primary bg-primary/5"
-                  : "border-border/50"
-                }`}
+              className={`flex items-center justify-center border bg-background shadow-sm transition-all duration-300 ${
+                compact ? "h-10 w-10 rounded-xl" : "h-24 w-24 rounded-[28px]"
+              } ${isDragging ? "border-primary bg-primary/5" : "border-border/50"}`}
             >
               <ImagePlus
-                className={`h-11 w-11 transition-colors duration-300
-                ${isDragging
-                    ? "text-primary"
-                    : "text-muted-foreground"
-                  }`}
+                className={`${compact ? "h-5 w-5" : "h-11 w-11"} transition-colors duration-300 ${
+                  isDragging ? "text-primary" : "text-muted-foreground"
+                }`}
               />
             </div>
 
             <div>
-              <h4 className="text-lg font-semibold">
-                {isDragging
-                  ? "Drop file here"
-                  : label}
+              <h4 className={`${compact ? "text-xs" : "text-lg"} font-semibold`}>
+                {isDragging ? "Drop file here" : label}
               </h4>
-
-              <p className="mt-2 text-sm text-muted-foreground">
-                {isDragging
-                  ? "Release to upload asset"
-                  : placeholder}
-              </p>
+              {!compact && (
+                <p className="mt-2 text-sm text-muted-foreground">
+                  {isDragging ? "Release to upload asset" : placeholder}
+                </p>
+              )}
             </div>
           </div>
         )}
       </div>
 
       {/* Bottom */}
-      <div className="space-y-4 p-5">
-
+      <div className={`${compact ? "space-y-2 p-2.5" : "space-y-4 p-5"}`}>
         <div className="flex items-center justify-between">
-
           <div>
-            <p className="text-sm font-semibold">
+            <p className={`${compact ? "text-xs" : "text-sm"} font-semibold`}>
               {label}
             </p>
-
-            <p className="text-xs text-muted-foreground">
+            <p className="text-[10px] text-muted-foreground">
               PNG, JPG, SVG • Max 2MB
             </p>
           </div>
@@ -238,9 +213,9 @@ export function UploadCard({
             <button
               type="button"
               onClick={() => onChange("")}
-              className="flex h-10 w-10 items-center justify-center rounded-xl border border-border/50 bg-background text-muted-foreground transition hover:border-destructive/30 hover:bg-destructive/5 hover:text-destructive"
+              className={`flex ${compact ? "h-7 w-7 rounded-lg" : "h-10 w-10 rounded-xl"} items-center justify-center border border-border/50 bg-background text-muted-foreground transition hover:border-destructive/30 hover:bg-destructive/5 hover:text-destructive`}
             >
-              <Trash2 className="h-4 w-4" />
+              <Trash2 className={`${compact ? "h-3.5 w-3.5" : "h-4 w-4"}`} />
             </button>
           )}
         </div>
@@ -249,23 +224,18 @@ export function UploadCard({
         <button
           type="button"
           disabled={isUploading}
-          onClick={() =>
-            inputRef.current?.click()
-          }
-          className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl border border-border/50 bg-muted/30 text-sm font-medium transition hover:border-primary/40 hover:bg-primary/5 hover:text-primary disabled:pointer-events-none disabled:opacity-50"
+          onClick={() => inputRef.current?.click()}
+          className={`flex ${compact ? "h-8 rounded-lg text-xs" : "h-12 rounded-2xl text-sm"} w-full items-center justify-center gap-2 border border-border/50 bg-muted/30 font-medium transition hover:border-primary/40 hover:bg-primary/5 hover:text-primary disabled:pointer-events-none disabled:opacity-50`}
         >
           {isUploading ? (
             <>
-              <Loader2 className="h-4 w-4 animate-spin" />
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
               Uploading...
             </>
           ) : (
             <>
-              <UploadCloud className="h-4 w-4" />
-
-              {value
-                ? "Replace Asset"
-                : "Upload Asset"}
+              <UploadCloud className="h-3.5 w-3.5" />
+              {value ? "Replace Asset" : "Upload Asset"}
             </>
           )}
         </button>
