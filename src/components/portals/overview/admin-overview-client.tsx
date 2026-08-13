@@ -29,6 +29,7 @@ import { apiFetch } from "@/lib/api/client";
 import { cn } from "@/lib/utils/cn";
 import { AdminOverviewCharts } from "./admin-overview-charts";
 import { DateRangeSelector, DateRangeOption } from "@/components/dashboard/date-range-selector";
+import { GroupManagementLensBanner } from "@/components/companies/group-management-lens-banner";
 
 type Notification = {
   type: string;
@@ -166,6 +167,8 @@ export function AdminOverviewClient() {
         </div>
         <DateRangeSelector value={range} onChange={setRange} />
       </div>
+
+      <GroupManagementLensBanner />
 
       {error && (
         <div className="rounded-xl border border-destructive/40 bg-destructive/10 p-4 text-sm font-medium text-destructive">

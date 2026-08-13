@@ -36,22 +36,23 @@ export function PortalMobileDrawer({
 
   return (
     <>
-      <header className="sticky top-0 z-40 border-b border-border/60 bg-card/70 backdrop-blur md:hidden">
-        <div className="mx-auto flex w-full items-center justify-between gap-3 px-4 py-3">
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className="size-9 rounded-xl"
-            onClick={() => setOpen(true)}
-            aria-label="Open menu"
-          >
-            <Menu className="size-4.5" aria-hidden />
-          </Button>
+      <header className="sticky top-0 z-40 border-b border-border/60 bg-card/80 backdrop-blur md:hidden">
+        <div className="mx-auto flex w-full items-center justify-between gap-2 px-3 py-2.5">
+          <div className="flex items-center gap-2 min-w-0">
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="size-9 rounded-xl shrink-0"
+              onClick={() => setOpen(true)}
+              aria-label="Open menu"
+            >
+              <Menu className="size-4.5" aria-hidden />
+            </Button>
+            <div className="min-w-0 flex-1 truncate">{brand}</div>
+          </div>
 
-          <div className="min-w-0 flex-1">{brand}</div>
-
-          <div className="flex items-center gap-2">{actions}</div>
+          <div className="flex items-center gap-1 shrink-0">{actions}</div>
         </div>
       </header>
 
@@ -66,17 +67,18 @@ export function PortalMobileDrawer({
 
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-50 w-72 border-r border-border/60 bg-card/85 p-4 shadow-2xl backdrop-blur transition-transform duration-250 ease-out md:hidden",
+          "fixed inset-y-0 left-0 z-50 w-72 border-r border-border/60 bg-card/95 p-4 shadow-2xl backdrop-blur transition-transform duration-250 ease-out md:hidden flex flex-col justify-between",
           open ? "translate-x-0" : "-translate-x-full"
         )}
         aria-label="Mobile portal navigation"
       >
-        <div className="mb-4 flex items-center justify-end">
+        <div className="mb-4 flex items-center justify-between border-b border-border/50 pb-3">
+          <div className="min-w-0 flex-1">{brand}</div>
           <Button
             type="button"
             variant="ghost"
             size="icon"
-            className="size-9 rounded-xl"
+            className="size-9 rounded-xl shrink-0"
             onClick={() => setOpen(false)}
             aria-label="Close menu"
           >
@@ -85,7 +87,7 @@ export function PortalMobileDrawer({
         </div>
 
         <div
-          className="flex h-[calc(100%-3.25rem)] flex-col gap-5 overflow-y-auto pr-1"
+          className="flex flex-1 flex-col gap-5 overflow-y-auto pr-1"
           onClick={(event) => {
             const target = event.target as HTMLElement;
             if (target.closest("a")) setOpen(false);

@@ -677,28 +677,29 @@ export default function CompaniesManagementPage() {
       {/* 1. Page Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-2.5">
-            <Network className="h-6 w-6 text-primary shrink-0" /> Company Hierarchy & Branding
+          <h1 className="text-lg sm:text-2xl font-bold tracking-tight text-foreground flex items-center gap-2 flex-wrap">
+            <Network className="h-5 w-5 sm:h-6 sm:w-6 text-primary shrink-0" />
+            <span>Company Hierarchy & Branding</span>
           </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <p className="mt-1 text-xs sm:text-sm text-muted-foreground">
             Manage your parent holding group, operating companies, international branches, and custom document branding.
           </p>
         </div>
 
         {/* Primary Action Button with Creation Type Dropdown */}
-        <div className="relative shrink-0" ref={addDropdownRef}>
-          <div className="inline-flex rounded-xl bg-primary shadow-lg shadow-primary/20 transition-all hover:bg-primary/90">
+        <div className="relative shrink-0 w-full sm:w-auto" ref={addDropdownRef}>
+          <div className="inline-flex w-full sm:w-auto rounded-xl bg-primary shadow-md shadow-primary/20 transition-all hover:bg-primary/90 justify-between">
             <button
               type="button"
               onClick={() => openModalForCreate("operating")}
-              className="flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-primary-foreground"
+              className="flex items-center justify-center gap-2 flex-1 sm:flex-initial px-4 py-2 text-xs sm:text-sm font-semibold text-primary-foreground"
             >
               <Plus className="h-4 w-4" /> Add Company
             </button>
             <button
               type="button"
               onClick={() => setAddDropdownOpen(!addDropdownOpen)}
-              className="border-l border-primary-foreground/20 px-2.5 py-2.5 text-primary-foreground hover:bg-primary-foreground/10 rounded-r-xl transition-colors"
+              className="border-l border-primary-foreground/20 px-3 py-2 text-primary-foreground hover:bg-primary-foreground/10 rounded-r-xl transition-colors shrink-0"
               aria-label="More creation options"
             >
               <ChevronDown className="h-4 w-4" />

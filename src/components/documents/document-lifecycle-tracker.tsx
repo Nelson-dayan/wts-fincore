@@ -81,8 +81,8 @@ export function DocumentLifecycleTracker({
           </p>
         </div>
 
-        {/* Status Pill */}
-        <div className="flex items-center gap-2">
+        {/* Status Pill & Action Ownership */}
+        <div className="flex items-center gap-2 flex-wrap">
           {isDeclined ? (
             <span className="inline-flex items-center gap-1.5 rounded-full bg-destructive/10 px-3 py-1 text-xs font-semibold text-destructive">
               <XCircle className="h-3.5 w-3.5" />
@@ -96,12 +96,17 @@ export function DocumentLifecycleTracker({
           ) : upperStatus === "PAID" || upperStatus === "APPROVED" || upperStatus === "CONVERTED" ? (
             <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
               <CheckCircle2 className="h-3.5 w-3.5" />
-              {upperStatus}
+              {upperStatus} • Complete
             </span>
           ) : (
             <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
               <Clock className="h-3.5 w-3.5 animate-pulse" />
-              {upperStatus}
+              {upperStatus} • {
+                upperStatus === "DRAFT" ? "Waiting for Author" :
+                upperStatus === "SENT" ? (type === "quotation" ? "Waiting for Client" : "Waiting for Approval") :
+                upperStatus === "ISSUED" ? "Waiting for Finance" :
+                upperStatus === "SUBMITTED" ? "Waiting for Manager" : "In Progress"
+              }
             </span>
           )}
         </div>
