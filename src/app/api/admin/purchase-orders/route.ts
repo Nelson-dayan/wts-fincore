@@ -31,32 +31,41 @@ function jsonBodyError() {
   );
 }
 
+import { authorizeResource } from "@/lib/auth/authorization";
 import { CompanyHierarchyService } from "@/lib/services/business/company-hierarchy.service";
 
 export async function GET(req: Request) {
   try {
-    const session = await requireRole(["admin", "employee"]);
-    await connectDB();
     const url = new URL(req.url);
+    const targetCompanyId = req.headers.get("x-company-id") || url.searchParams.get("companyId") || undefined;
+    const scopeMode = (req.headers.get("x-scope-mode") || url.searchParams.get("scopeMode")) as "single" | "group" || "single";
+    const projectId = String(url.searchParams.get("projectId") ?? "").trim() || undefined;
+
+    const auth = await authorizeResource({
+      permission: "purchaseOrders.view",
+      companyId: targetCompanyId,
+      projectId,
+      requestedScopeMode: scopeMode,
+    });
+
+    if (!auth.authorized) {
+      return NextResponse.json({ message: auth.reason || "Unauthorized to view purchase orders", code: auth.code }, { status: 403 });
+    }
+
+    const session = auth.session;
+    const companyContext = auth.context;
+    await connectDB();
     const { page, limit, skip } = parsePagination(url.searchParams);
     const q = parseSearch(url.searchParams);
-    const projectId = String(url.searchParams.get("projectId") ?? "").trim();
     const quotationId = String(url.searchParams.get("quotationId") ?? "").trim();
-    const targetCompanyId = req.headers.get("x-company-id") || url.searchParams.get("companyId");
-    const scopeMode = (req.headers.get("x-scope-mode") || url.searchParams.get("scopeMode")) as "single" | "group" || "single";
 
-    const companyContext = await CompanyHierarchyService.resolveCompanyContext(targetCompanyId, scopeMode);
-
-    const filter: Record<string, unknown> = {};
-    if (companyContext.activeCompany?.isPrimary) {
-      filter.$or = [
+    const filter: Record<string, unknown> = {
+      $or: [
         { companyId: { $in: companyContext.allowedCompanyIds } },
         { companyId: { $exists: false } },
         { companyId: null },
-      ];
-    } else {
-      filter.companyId = { $in: companyContext.allowedCompanyIds };
-    }
+      ],
+    };
 
     if (q) filter.poNumber = { $regex: q, $options: "i" };
 
@@ -145,7 +154,6 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   try {
-    const session = await requireRole(["admin", "employee"]);
     await connectDB();
 
     const ct = (req.headers.get("content-type") ?? "").toLowerCase();
@@ -228,22 +236,24 @@ export async function POST(req: Request) {
       }
     }
 
-    const quotation = await QuotationModel.findById(quotationId).select("projectId").lean();
+    const quotation = await QuotationModel.findById(quotationId).select("projectId companyId").lean();
     if (!quotation?.projectId) {
       return NextResponse.json({ message: "Quotation not found" }, { status: 404 });
     }
     const projectId = String(quotation.projectId);
+    const targetCompanyId = (quotation as any).companyId ? String((quotation as any).companyId) : undefined;
 
-    if (session.user.role === "employee") {
-      try {
-        await assertEmployeeCanAccessProject(session.user.id, projectId);
-      } catch (e) {
-        if (e instanceof Error && e.message === "FORBIDDEN") {
-          return NextResponse.json({ message: "Forbidden" }, { status: 403 });
-        }
-        throw e;
-      }
+    const auth = await authorizeResource({
+      permission: "purchaseOrders.create",
+      projectId,
+      companyId: targetCompanyId,
+    });
+
+    if (!auth.authorized) {
+      return NextResponse.json({ message: auth.reason || "Unauthorized to create purchase order", code: auth.code }, { status: 403 });
     }
+
+    const session = auth.session;
 
     const { poNumber, seqValue, year } = await generatePONumber(session.user.id);
     const { id } = await createPurchaseOrder({

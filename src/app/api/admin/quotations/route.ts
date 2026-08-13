@@ -18,31 +18,40 @@ import { getEmployeeAssignedProjectIdStrings } from "@/lib/auth/employee-resourc
 import { updateSequenceReservationEntity } from "@/lib/services/business/counter.service";
 
 
+import { authorizeResource } from "@/lib/auth/authorization";
 import { CompanyHierarchyService } from "@/lib/services/business/company-hierarchy.service";
 
 export async function GET(req: Request) {
   try {
-    const session = await requireRole(["admin", "employee"]);
-    await connectDB();
     const url = new URL(req.url);
+    const targetCompanyId = req.headers.get("x-company-id") || url.searchParams.get("companyId") || undefined;
+    const scopeMode = (req.headers.get("x-scope-mode") || url.searchParams.get("scopeMode")) as "single" | "group" || "single";
+    const projectId = String(url.searchParams.get("projectId") ?? "").trim() || undefined;
+
+    const auth = await authorizeResource({
+      permission: "quotations.view",
+      companyId: targetCompanyId,
+      projectId,
+      requestedScopeMode: scopeMode,
+    });
+
+    if (!auth.authorized) {
+      return apiError(auth.reason || "Unauthorized to view quotations", 403, auth.code);
+    }
+
+    const session = auth.session;
+    const companyContext = auth.context;
+    await connectDB();
     const { page, limit, skip } = parsePagination(url.searchParams);
     const q = parseSearch(url.searchParams);
-    const projectId = String(url.searchParams.get("projectId") ?? "").trim();
-    const targetCompanyId = req.headers.get("x-company-id") || url.searchParams.get("companyId");
-    const scopeMode = (req.headers.get("x-scope-mode") || url.searchParams.get("scopeMode")) as "single" | "group" || "single";
 
-    const companyContext = await CompanyHierarchyService.resolveCompanyContext(targetCompanyId, scopeMode);
-
-    const filter: Record<string, unknown> = {};
-    if (companyContext.activeCompany?.isPrimary) {
-      filter.$or = [
+    const filter: Record<string, unknown> = {
+      $or: [
         { companyId: { $in: companyContext.allowedCompanyIds } },
         { companyId: { $exists: false } },
         { companyId: null },
-      ];
-    } else {
-      filter.companyId = { $in: companyContext.allowedCompanyIds };
-    }
+      ],
+    };
 
     if (q) filter.quotationNumber = { $regex: q, $options: "i" };
 
@@ -128,7 +137,6 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   try {
-    const session = await requireRole(["admin"]);
     await connectDB();
     const body = (await req.json()) as {
       projectId?: string;
@@ -183,6 +191,22 @@ export async function POST(req: Request) {
     if (!projectId) {
       return apiError("projectId is required", 400);
     }
+
+    const url = new URL(req.url);
+    const targetCompanyId = req.headers.get("x-company-id") || url.searchParams.get("companyId") || undefined;
+
+    const auth = await authorizeResource({
+      permission: "quotations.create",
+      projectId,
+      companyId: targetCompanyId,
+    });
+
+    if (!auth.authorized) {
+      return apiError(auth.reason || "Unauthorized to create quotation", 403, auth.code);
+    }
+
+    const session = auth.session;
+    const companyContext = auth.context;
 
     const docDate = body.documentInfo?.date
       ? new Date(body.documentInfo.date)
@@ -240,14 +264,10 @@ export async function POST(req: Request) {
         ? new Date(String(quotationInfo.confirmDate))
         : undefined;
 
-    const url = new URL(req.url);
-    const targetCompanyId = req.headers.get("x-company-id") || url.searchParams.get("companyId");
-    const companyContext = await CompanyHierarchyService.resolveCompanyContext(targetCompanyId, "single");
-
     const branding = body.branding ?? {};
     const created = await QuotationModel.create({
       quotationNumber,
-      companyId: companyContext.companyId,
+      companyId: companyContext.activeCompanyId,
       projectId: new mongoose.Types.ObjectId(projectId),
       createdBy: new mongoose.Types.ObjectId(session.user.id),
       documentInfo: {

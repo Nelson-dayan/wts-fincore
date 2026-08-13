@@ -64,29 +64,27 @@ function formatQuotation(quotation: Record<string, unknown>) {
   };
 }
 
+import { authorizeResource } from "@/lib/auth/authorization";
+
 export async function GET(_req: Request, ctx: RouteCtx) {
   try {
-    const session = await requireRole(["admin", "employee"]);
-    await connectDB();
     const { quotationId } = await ctx.params;
-    if (session.user.role === "employee") {
-      try {
-        await assertEmployeeCanAccessQuotation(session.user.id, quotationId);
-      } catch (e) {
-        if (e instanceof Error && e.message === "FORBIDDEN") {
-          return apiError("Forbidden", 403);
-        }
-        if (e instanceof Error && e.message === "NOT_FOUND") {
-          return apiError("Quotation not found", 404);
-        }
-        throw e;
-      }
-    }
+    await connectDB();
     const raw = await QuotationModel.findById(quotationId)
       .populate("projectId", "name fixCurrency currency")
       .lean();
     if (!raw) {
       return apiError("Quotation not found", 404);
+    }
+
+    const auth = await authorizeResource({
+      permission: "quotations.view",
+      projectId: String((raw as any).projectId?._id || (raw as any).projectId || ""),
+      companyId: (raw as any).companyId ? String((raw as any).companyId) : undefined,
+    });
+
+    if (!auth.authorized) {
+      return apiError(auth.reason || "Forbidden", 403, auth.code);
     }
     const row = raw as Record<string, unknown>;
     const proj = row.projectId as unknown;
@@ -117,22 +115,9 @@ export async function GET(_req: Request, ctx: RouteCtx) {
 
 export async function PATCH(req: Request, ctx: RouteCtx) {
   try {
-    const session = await requireRole(["admin", "employee"]);
-    await connectDB();
     const { quotationId } = await ctx.params;
-    if (session.user.role === "employee") {
-      try {
-        await assertEmployeeCanAccessQuotation(session.user.id, quotationId);
-      } catch (e) {
-        if (e instanceof Error && e.message === "FORBIDDEN") {
-          return apiError("Forbidden", 403);
-        }
-        if (e instanceof Error && e.message === "NOT_FOUND") {
-          return apiError("Quotation not found", 404);
-        }
-        throw e;
-      }
-    }
+    await connectDB();
+
     const existing = await QuotationModel.findById(quotationId).lean();
     if (!existing) {
       return apiError("Quotation not found", 404);
@@ -174,16 +159,24 @@ export async function PATCH(req: Request, ctx: RouteCtx) {
     const nextProjectId = String(
       body.projectId !== undefined ? body.projectId : existing.projectId
     ).trim();
-    if (session.user.role === "employee") {
-      try {
-        await assertEmployeeCanAccessProject(session.user.id, nextProjectId);
-      } catch (e) {
-        if (e instanceof Error && e.message === "FORBIDDEN") {
-          return apiError("Forbidden", 403);
-        }
-        throw e;
-      }
+
+    const targetStatus = body.status;
+    const auth = await authorizeResource({
+      permission: targetStatus === "approved" ? "quotations.approve" : targetStatus === "sent" ? "quotations.send" : "quotations.edit",
+      projectId: nextProjectId,
+      companyId: (existing as any).companyId ? String((existing as any).companyId) : undefined,
+      workflowTransition: targetStatus && targetStatus !== existing.status ? {
+        resourceType: "quotation",
+        fromState: String(existing.status),
+        toState: targetStatus,
+      } : undefined,
+    });
+
+    if (!auth.authorized) {
+      return apiError(auth.reason || "Unauthorized to update quotation", 403, auth.code);
     }
+
+    const session = auth.session;
     const shouldRefreshSnapshots =
       Boolean(body.refreshSnapshots) ||
       (body.projectId !== undefined &&
@@ -420,23 +413,25 @@ export async function PATCH(req: Request, ctx: RouteCtx) {
 
 export async function DELETE(_req: Request, ctx: RouteCtx) {
   try {
-    const session = await requireRole(["admin", "employee"]);
-    await connectDB();
     const { quotationId } = await ctx.params;
+    await connectDB();
 
-    if (session.user.role === "employee") {
-      try {
-        await assertEmployeeCanAccessQuotation(session.user.id, quotationId);
-      } catch (e) {
-        if (e instanceof Error && e.message === "FORBIDDEN") {
-          return apiError("Forbidden", 403);
-        }
-        if (e instanceof Error && e.message === "NOT_FOUND") {
-          return apiError("Quotation not found", 404);
-        }
-        throw e;
-      }
+    const existing = await QuotationModel.findById(quotationId).lean();
+    if (!existing) {
+      return apiError("Quotation not found", 404);
     }
+
+    const auth = await authorizeResource({
+      permission: "quotations.delete",
+      projectId: String(existing.projectId),
+      companyId: (existing as any).companyId ? String((existing as any).companyId) : undefined,
+    });
+
+    if (!auth.authorized) {
+      return apiError(auth.reason || "Unauthorized to delete quotation", 403, auth.code);
+    }
+
+    const session = auth.session;
 
     const poCount = await PurchaseOrderModel.countDocuments({
       quotationId: new mongoose.Types.ObjectId(quotationId),

@@ -12,6 +12,8 @@ import {
   getEmployeeAssignedProjectIdStrings,
 } from "@/lib/auth/employee-resource-access";
 
+import { authorizeResource } from "@/lib/auth/authorization";
+
 function formatExpenseRow(row: Record<string, unknown>) {
   const proj = row.projectId as unknown;
   let projectId = "";
@@ -37,16 +39,35 @@ function formatExpenseRow(row: Record<string, unknown>) {
 
 export async function GET(req: Request) {
   try {
-    const session = await requireRole(["admin", "employee"]);
-    await connectDB();
     const url = new URL(req.url);
+    const targetCompanyId = req.headers.get("x-company-id") || url.searchParams.get("companyId") || undefined;
+    const projectId = url.searchParams.get("projectId") || undefined;
+
+    const auth = await authorizeResource({
+      permission: "expenses.view",
+      projectId,
+      companyId: targetCompanyId,
+    });
+
+    if (!auth.authorized) {
+      return NextResponse.json({ message: auth.reason || "Unauthorized to view expenses", code: auth.code }, { status: 403 });
+    }
+
+    const session = auth.session;
+    const companyContext = auth.context;
+    await connectDB();
     const { page, limit, skip } = parsePagination(url.searchParams);
     const q = parseSearch(url.searchParams);
-    const projectId = url.searchParams.get("projectId");
 
     const parts: Record<string, unknown>[] = [];
-    // Filter out soft-deleted expenses
     parts.push({ isDeleted: { $ne: true } });
+    parts.push({
+      $or: [
+        { companyId: { $in: companyContext.allowedCompanyIds } },
+        { companyId: { $exists: false } },
+        { companyId: null },
+      ],
+    });
 
     if (session.user.role === "employee") {
       const employeeProjectIds = await getEmployeeAssignedProjectIdStrings(session.user.id);
@@ -61,11 +82,8 @@ export async function GET(req: Request) {
       } else {
         parts.push({ projectId: { $in: employeeProjectIds } });
       }
-    } else {
-      // Admin
-      if (projectId) {
-        parts.push({ projectId });
-      }
+    } else if (projectId) {
+      parts.push({ projectId });
     }
 
     if (q) {
@@ -99,7 +117,6 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   try {
-    const session = await requireRole(["admin", "employee"]);
     await connectDB();
     const body = (await req.json()) as {
       title?: string;
@@ -124,28 +141,36 @@ export async function POST(req: Request) {
       return NextResponse.json({ message: "projectId is required" }, { status: 400 });
     }
 
-    if (session.user.role === "employee") {
-      try {
-        await assertEmployeeCanAccessProject(session.user.id, projectId);
-      } catch (e) {
-        if (e instanceof Error && e.message === "FORBIDDEN") {
-          return NextResponse.json({ message: "Forbidden" }, { status: 403 });
-        }
-        throw e;
-      }
-    }
-
-    const project = await ProjectModel.findById(projectId).select("clientId currency").lean();
+    const project = await ProjectModel.findById(projectId).select("companyId clientId currency").lean();
     if (!project) {
       return NextResponse.json({ message: "Project not found" }, { status: 400 });
     }
 
-    const client = await ClientModel.findById(project.clientId).select("companyId").lean();
-    let companyId = client?.companyId;
-    if (!companyId) {
-      const primaryCompany = await CompanyModel.findOne({ isPrimary: true }).select("_id").lean();
-      companyId = primaryCompany?._id || "69c661683654f65d914b4abc";
+    let resolvedCompanyId = (project as any).companyId ? String((project as any).companyId) : undefined;
+    if (!resolvedCompanyId && project.clientId) {
+      const client = await ClientModel.findById(project.clientId).select("companyId").lean();
+      if (client?.companyId) {
+        resolvedCompanyId = String(client.companyId);
+      }
     }
+
+    const url = new URL(req.url);
+    const targetCompanyId = req.headers.get("x-company-id") || url.searchParams.get("companyId") || resolvedCompanyId;
+
+    const auth = await authorizeResource({
+      permission: "expenses.create",
+      projectId,
+      companyId: targetCompanyId,
+    });
+
+    if (!auth.authorized) {
+      return NextResponse.json({ message: auth.reason || "Unauthorized to create expense", code: auth.code }, { status: 403 });
+    }
+
+    const session = auth.session;
+    const companyContext = auth.context;
+
+    const companyId = resolvedCompanyId || companyContext.activeCompanyId;
 
     const currency = project.currency || "INR";
     const norm = normalizeToBase({ amount, currency });

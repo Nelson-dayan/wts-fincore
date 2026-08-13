@@ -8,6 +8,8 @@
     "build": "next build",
     "start": "next start",
     "seed": "npx tsx scripts/seed.ts",
+    "test:security": "npx tsx scripts/security-authorization-matrix-test.ts",
+    "verify": "npm run test:security && npx tsc --noEmit && npm run build",
     "lint": "eslint"
   },
   "dependencies": {

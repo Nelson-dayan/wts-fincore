@@ -14,21 +14,33 @@ import {
   getEmployeeAssignedProjectIdStrings,
 } from "@/lib/auth/employee-resource-access";
 
+import { authorizeResource } from "@/lib/auth/authorization";
 import { CompanyHierarchyService } from "@/lib/services/business/company-hierarchy.service";
 
 export async function GET(req: Request) {
   try {
-    const session = await requireRole(["admin", "employee"]);
-    await connectDB();
     const url = new URL(req.url);
+    const targetCompanyId = req.headers.get("x-company-id") || url.searchParams.get("companyId") || undefined;
+    const scopeMode = (req.headers.get("x-scope-mode") || url.searchParams.get("scopeMode")) as "single" | "group" || "single";
+    const projectId = String(url.searchParams.get("projectId") ?? "").trim() || undefined;
+
+    const auth = await authorizeResource({
+      permission: "invoices.view",
+      companyId: targetCompanyId,
+      projectId,
+      requestedScopeMode: scopeMode,
+    });
+
+    if (!auth.authorized) {
+      return NextResponse.json({ message: auth.reason || "Unauthorized to view invoices", code: auth.code }, { status: 403 });
+    }
+
+    const session = auth.session;
+    const companyContext = auth.context;
+    await connectDB();
     const { page, limit, skip } = parsePagination(url.searchParams);
     const q = parseSearch(url.searchParams);
-    const projectId = String(url.searchParams.get("projectId") ?? "").trim();
     const poId = String(url.searchParams.get("poId") ?? "").trim();
-    const targetCompanyId = req.headers.get("x-company-id") || url.searchParams.get("companyId");
-    const scopeMode = (req.headers.get("x-scope-mode") || url.searchParams.get("scopeMode")) as "single" | "group" || "single";
-
-    const companyContext = await CompanyHierarchyService.resolveCompanyContext(targetCompanyId, scopeMode);
 
     const filter: Record<string, unknown> = {
       lifecycleStatus: { $ne: "DRAFT_HIDDEN" },
@@ -162,19 +174,21 @@ export async function POST(req: Request) {
       return NextResponse.json({ message: "poId is required" }, { status: 400 });
     }
 
-    if (session.user.role === "employee") {
-      try {
-        await assertEmployeeCanAccessPurchaseOrder(session.user.id, poId);
-      } catch (e) {
-        if (isIdempotencyEnabled) await saveIdempotencyFailed(idempotencyKey!, userId);
-        if (e instanceof Error && e.message === "FORBIDDEN") {
-          return NextResponse.json({ message: "Forbidden" }, { status: 403 });
-        }
-        if (e instanceof Error && e.message === "NOT_FOUND") {
-          return NextResponse.json({ message: "Purchase order not found" }, { status: 404 });
-        }
-        throw e;
-      }
+    const po = await PurchaseOrderModel.findById(poId).select("projectId companyId").lean();
+    if (!po?.projectId) {
+      if (isIdempotencyEnabled) await saveIdempotencyFailed(idempotencyKey!, userId);
+      return NextResponse.json({ message: "Purchase order not found" }, { status: 404 });
+    }
+
+    const auth = await authorizeResource({
+      permission: "invoices.create",
+      projectId: String(po.projectId),
+      companyId: (po as any).companyId ? String((po as any).companyId) : undefined,
+    });
+
+    if (!auth.authorized) {
+      if (isIdempotencyEnabled) await saveIdempotencyFailed(idempotencyKey!, userId);
+      return NextResponse.json({ message: auth.reason || "Unauthorized to create invoice", code: auth.code }, { status: 403 });
     }
 
     const { id, invoiceNumber, projectId } = await createInvoiceForPurchaseOrder({

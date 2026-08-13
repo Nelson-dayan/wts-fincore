@@ -12,6 +12,8 @@ import { aedAmountInWords } from "@/lib/invoice/aed-amount-words";
 import { assertEmployeeCanAccessInvoice } from "@/lib/auth/employee-resource-access";
 import { assertPeriodNotLocked } from "@/lib/services/business/period-lock.service";
 
+import { authorizeResource } from "@/lib/auth/authorization";
+
 type Ctx = { params: Promise<{ invoiceId: string }> };
 
 function toDecimal128(value: number): mongoose.Types.Decimal128 {
@@ -21,28 +23,24 @@ function toDecimal128(value: number): mongoose.Types.Decimal128 {
 
 export async function GET(_req: Request, ctx: Ctx) {
   try {
-    const session = await requireRole(["admin", "employee"]);
-    await connectDB();
     const { invoiceId } = await ctx.params;
     if (!mongoose.Types.ObjectId.isValid(invoiceId)) {
       return apiError("Invalid invoice id", 400);
     }
-    if (session.user.role === "employee") {
-      try {
-        await assertEmployeeCanAccessInvoice(session.user.id, invoiceId);
-      } catch (e) {
-        if (e instanceof Error && e.message === "FORBIDDEN") {
-          return NextResponse.json({ message: "Forbidden" }, { status: 403 });
-        }
-        if (e instanceof Error && e.message === "NOT_FOUND") {
-          return NextResponse.json({ message: "Invoice not found" }, { status: 404 });
-        }
-        throw e;
-      }
-    }
+    await connectDB();
     const raw = await InvoiceModel.findById(invoiceId).populate("projectId", "fixCurrency").lean();
     if (!raw) {
       return apiError("Invoice not found", 404);
+    }
+
+    const auth = await authorizeResource({
+      permission: "invoices.view",
+      projectId: String(raw.projectId),
+      companyId: (raw as any).companyId ? String((raw as any).companyId) : undefined,
+    });
+
+    if (!auth.authorized) {
+      return NextResponse.json({ message: auth.reason || "Forbidden", code: auth.code }, { status: 403 });
     }
     const row = raw as unknown as Record<string, unknown>;
     const formatted = formatInvoiceForApi(row);
@@ -55,38 +53,16 @@ export async function GET(_req: Request, ctx: Ctx) {
 
 export async function PATCH(req: Request, ctx: Ctx) {
   try {
-    const session = await requireRole(["admin", "employee"]);
-    await connectDB();
     const { invoiceId } = await ctx.params;
     if (!mongoose.Types.ObjectId.isValid(invoiceId)) {
       return apiError("Invalid invoice id", 400);
     }
-
-    if (session.user.role === "employee") {
-      try {
-        await assertEmployeeCanAccessInvoice(session.user.id, invoiceId);
-      } catch (e) {
-        if (e instanceof Error && e.message === "FORBIDDEN") {
-          return NextResponse.json({ message: "Forbidden" }, { status: 403 });
-        }
-        if (e instanceof Error && e.message === "NOT_FOUND") {
-          return NextResponse.json({ message: "Invoice not found" }, { status: 404 });
-        }
-        throw e;
-      }
-    }
+    await connectDB();
 
     const inv = await InvoiceModel.findById(invoiceId);
     if (!inv) {
       return apiError("Invoice not found", 404);
     }
-
-    const existingDate = (inv.documentInfo as any)?.date;
-    if (existingDate) {
-      await assertPeriodNotLocked(existingDate);
-    }
-
-    const previousStatus = inv.status;
 
     const body = (await req.json()) as {
       invoiceNumber?: string;
@@ -110,6 +86,37 @@ export async function PATCH(req: Request, ctx: Ctx) {
       extras?: Record<string, unknown>;
       branding?: Record<string, unknown>;
     };
+
+    let requiredPermission: "invoices.issue" | "invoices.send" | "invoices.markPaid" | "invoices.void" | "invoices.edit" = "invoices.edit";
+    const nextStatusRaw = body.status ? String(body.status).toUpperCase() : undefined;
+    if (nextStatusRaw === "ISSUED") requiredPermission = "invoices.issue";
+    else if (nextStatusRaw === "SENT") requiredPermission = "invoices.send";
+    else if (nextStatusRaw === "PAID") requiredPermission = "invoices.markPaid";
+    else if (nextStatusRaw === "CANCELLED" || nextStatusRaw === "VOID") requiredPermission = "invoices.void";
+
+    const auth = await authorizeResource({
+      permission: requiredPermission,
+      projectId: String(inv.projectId),
+      companyId: (inv as any).companyId ? String((inv as any).companyId) : undefined,
+      workflowTransition: nextStatusRaw && nextStatusRaw !== inv.status ? {
+        resourceType: "invoice",
+        fromState: String(inv.status),
+        toState: nextStatusRaw,
+      } : undefined,
+    });
+
+    if (!auth.authorized) {
+      return NextResponse.json({ message: auth.reason || "Unauthorized to update invoice", code: auth.code }, { status: 403 });
+    }
+
+    const session = auth.session;
+
+    const existingDate = (inv.documentInfo as any)?.date;
+    if (existingDate) {
+      await assertPeriodNotLocked(existingDate);
+    }
+
+    const previousStatus = inv.status;
 
     if (body.invoiceType !== undefined) {
       const t = String(body.invoiceType).toLowerCase();
@@ -352,17 +359,28 @@ export async function PATCH(req: Request, ctx: Ctx) {
 
 export async function DELETE(_req: Request, ctx: Ctx) {
   try {
-    const session = await requireRole(["admin"]);
-    await connectDB();
     const { invoiceId } = await ctx.params;
     if (!mongoose.Types.ObjectId.isValid(invoiceId)) {
       return apiError("Invalid invoice id", 400);
     }
+    await connectDB();
 
     const inv = await InvoiceModel.findById(invoiceId);
     if (!inv) {
       return apiError("Invoice not found", 404);
     }
+
+    const auth = await authorizeResource({
+      permission: "invoices.delete",
+      projectId: String(inv.projectId),
+      companyId: (inv as any).companyId ? String((inv as any).companyId) : undefined,
+    });
+
+    if (!auth.authorized) {
+      return NextResponse.json({ message: auth.reason || "Unauthorized to delete invoice", code: auth.code }, { status: 403 });
+    }
+
+    const session = auth.session;
 
     // Check if period is locked
     const docDate = (inv.documentInfo as any)?.date || inv.dueDate;

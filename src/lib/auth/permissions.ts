@@ -7,22 +7,31 @@ export type ResourceAction =
   | "quotations.create"
   | "quotations.edit"
   | "quotations.delete"
-  | "quotations.approve"
   | "quotations.send"
+  | "quotations.approve"
+  | "quotations.reject"
+  | "quotations.convert"
   | "invoices.view"
   | "invoices.create"
   | "invoices.edit"
   | "invoices.delete"
-  | "invoices.approve"
+  | "invoices.issue"
+  | "invoices.send"
+  | "invoices.void"
+  | "invoices.markPaid"
   | "purchaseOrders.view"
   | "purchaseOrders.create"
   | "purchaseOrders.edit"
   | "purchaseOrders.delete"
+  | "purchaseOrders.send"
+  | "purchaseOrders.approve"
+  | "purchaseOrders.cancel"
   | "payments.view"
   | "payments.create"
   | "expenses.view"
   | "expenses.create"
   | "expenses.approve"
+  | "expenses.reject"
   | "company.view"
   | "company.edit"
   | "companyHierarchy.view"
@@ -34,11 +43,11 @@ export type ResourceAction =
 export const DEFAULT_ROLE_PERMISSIONS: Record<"admin" | "employee", ResourceAction[]> = {
   admin: [
     "projects.view", "projects.create", "projects.edit", "projects.delete",
-    "quotations.view", "quotations.create", "quotations.edit", "quotations.delete", "quotations.approve", "quotations.send",
-    "invoices.view", "invoices.create", "invoices.edit", "invoices.delete", "invoices.approve",
-    "purchaseOrders.view", "purchaseOrders.create", "purchaseOrders.edit", "purchaseOrders.delete",
+    "quotations.view", "quotations.create", "quotations.edit", "quotations.delete", "quotations.send", "quotations.approve", "quotations.reject", "quotations.convert",
+    "invoices.view", "invoices.create", "invoices.edit", "invoices.delete", "invoices.issue", "invoices.send", "invoices.void", "invoices.markPaid",
+    "purchaseOrders.view", "purchaseOrders.create", "purchaseOrders.edit", "purchaseOrders.delete", "purchaseOrders.send", "purchaseOrders.approve", "purchaseOrders.cancel",
     "payments.view", "payments.create",
-    "expenses.view", "expenses.create", "expenses.approve",
+    "expenses.view", "expenses.create", "expenses.approve", "expenses.reject",
     "company.view", "company.edit",
     "companyHierarchy.view", "companyHierarchy.manage",
     "groupView.access",

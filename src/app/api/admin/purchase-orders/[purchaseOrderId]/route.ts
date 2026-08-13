@@ -14,34 +14,32 @@ import {
 import { assertEmployeeCanAccessPurchaseOrder } from "@/lib/auth/employee-resource-access";
 import { convertToBase } from "@/lib/services/finance/exchange.engine";
 
+import { authorizeResource } from "@/lib/auth/authorization";
+
 type Ctx = { params: Promise<{ purchaseOrderId: string }> };
 
 export async function GET(_req: Request, ctx: Ctx) {
   try {
-    const session = await requireRole(["admin", "employee"]);
-    await connectDB();
     const { purchaseOrderId } = await ctx.params;
     if (!mongoose.Types.ObjectId.isValid(purchaseOrderId)) {
       return NextResponse.json({ message: "Invalid purchase order id" }, { status: 400 });
     }
-    if (session.user.role === "employee") {
-      try {
-        await assertEmployeeCanAccessPurchaseOrder(session.user.id, purchaseOrderId);
-      } catch (e) {
-        if (e instanceof Error && e.message === "FORBIDDEN") {
-          return NextResponse.json({ message: "Forbidden" }, { status: 403 });
-        }
-        if (e instanceof Error && e.message === "NOT_FOUND") {
-          return NextResponse.json({ message: "Purchase order not found" }, { status: 404 });
-        }
-        throw e;
-      }
-    }
+    await connectDB();
     const raw = await PurchaseOrderModel.findById(purchaseOrderId)
       .populate("quotationId", "quotationNumber")
       .lean();
     if (!raw) {
       return NextResponse.json({ message: "Purchase order not found" }, { status: 404 });
+    }
+
+    const auth = await authorizeResource({
+      permission: "purchaseOrders.view",
+      projectId: String(raw.projectId),
+      companyId: (raw as any).companyId ? String((raw as any).companyId) : undefined,
+    });
+
+    if (!auth.authorized) {
+      return NextResponse.json({ message: auth.reason || "Forbidden", code: auth.code }, { status: 403 });
     }
 
     const qi = raw.quotationId as unknown;
@@ -90,25 +88,15 @@ export async function GET(_req: Request, ctx: Ctx) {
 
 export async function PATCH(req: Request, ctx: Ctx) {
   try {
-    const session = await requireRole(["admin", "employee"]);
-    await connectDB();
     const { purchaseOrderId } = await ctx.params;
     if (!mongoose.Types.ObjectId.isValid(purchaseOrderId)) {
       return NextResponse.json({ message: "Invalid purchase order id" }, { status: 400 });
     }
+    await connectDB();
 
-    if (session.user.role === "employee") {
-      try {
-        await assertEmployeeCanAccessPurchaseOrder(session.user.id, purchaseOrderId);
-      } catch (e) {
-        if (e instanceof Error && e.message === "FORBIDDEN") {
-          return NextResponse.json({ message: "Forbidden" }, { status: 403 });
-        }
-        if (e instanceof Error && e.message === "NOT_FOUND") {
-          return NextResponse.json({ message: "Purchase order not found" }, { status: 404 });
-        }
-        throw e;
-      }
+    const po = await PurchaseOrderModel.findById(purchaseOrderId);
+    if (!po) {
+      return NextResponse.json({ message: "Purchase order not found" }, { status: 404 });
     }
 
     const ct = (req.headers.get("content-type") ?? "").toLowerCase();
@@ -169,10 +157,25 @@ export async function PATCH(req: Request, ctx: Ctx) {
       incomingUrl = String(body.fileUrl ?? "").trim();
     }
 
-    const po = await PurchaseOrderModel.findById(purchaseOrderId);
-    if (!po) {
-      return NextResponse.json({ message: "Purchase order not found" }, { status: 404 });
+    const targetStatus = status;
+    const requiredPermission = targetStatus === "active" ? "purchaseOrders.approve" : "purchaseOrders.edit";
+
+    const auth = await authorizeResource({
+      permission: requiredPermission,
+      projectId: String(po.projectId),
+      companyId: (po as any).companyId ? String((po as any).companyId) : undefined,
+      workflowTransition: targetStatus && targetStatus !== po.status ? {
+        resourceType: "purchaseOrder",
+        fromState: String(po.status),
+        toState: targetStatus,
+      } : undefined,
+    });
+
+    if (!auth.authorized) {
+      return NextResponse.json({ message: auth.reason || "Unauthorized to update purchase order", code: auth.code }, { status: 403 });
     }
+
+    const session = auth.session;
 
     if (externalPoNumber !== undefined) {
       po.externalPoNumber = externalPoNumber.trim();
@@ -267,12 +270,28 @@ export async function PATCH(req: Request, ctx: Ctx) {
 
 export async function DELETE(_req: Request, ctx: Ctx) {
   try {
-    const session = await requireRole(["admin"]);
-    await connectDB();
     const { purchaseOrderId } = await ctx.params;
     if (!mongoose.Types.ObjectId.isValid(purchaseOrderId)) {
       return NextResponse.json({ message: "Invalid purchase order id" }, { status: 400 });
     }
+    await connectDB();
+
+    const po = await PurchaseOrderModel.findById(purchaseOrderId).lean();
+    if (!po) {
+      return NextResponse.json({ message: "Purchase order not found" }, { status: 404 });
+    }
+
+    const auth = await authorizeResource({
+      permission: "purchaseOrders.delete",
+      projectId: String(po.projectId),
+      companyId: (po as any).companyId ? String((po as any).companyId) : undefined,
+    });
+
+    if (!auth.authorized) {
+      return NextResponse.json({ message: auth.reason || "Unauthorized to delete purchase order", code: auth.code }, { status: 403 });
+    }
+
+    const session = auth.session;
 
     const invoiceCount = await InvoiceModel.countDocuments({
       poId: new mongoose.Types.ObjectId(purchaseOrderId),

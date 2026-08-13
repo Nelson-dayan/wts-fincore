@@ -79,11 +79,12 @@ export async function buildQuotationSnapshots(projectId: string): Promise<{
   if (!client) {
     throw new Error("Client not found for project");
   }
-  const company = await CompanyModel.findOne({ isPrimary: true })
-    .sort({ updatedAt: -1 })
-    .lean();
+  const targetCompanyId = (project as any).companyId;
+  const company = targetCompanyId
+    ? await CompanyModel.findById(targetCompanyId).lean()
+    : await CompanyModel.findOne({ isPrimary: true }).sort({ updatedAt: -1 }).lean();
   if (!company) {
-    throw new Error("Primary company is not configured. Complete company settings first.");
+    throw new Error("Target company entity is not configured. Complete company settings first.");
   }
 
   const c = client as {
