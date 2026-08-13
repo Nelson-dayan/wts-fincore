@@ -35,6 +35,10 @@ import {
 } from "../src/lib/db/models";
 
 export async function seedPerformanceData(datasetSize: "small" | "medium" = "small") {
+  if (process.env.NODE_ENV === "production" && process.env.ALLOW_PROD_TEST !== "true") {
+    throw new Error("❌ CRITICAL SAFETY ABORT: Cannot run performance seed in PRODUCTION environment!");
+  }
+
   console.log(`🚀 Seeding Synthetic Performance Dataset (${datasetSize.toUpperCase()})...`);
   await connectDB();
 

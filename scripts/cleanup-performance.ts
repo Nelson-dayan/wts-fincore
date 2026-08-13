@@ -35,11 +35,22 @@ import {
 } from "../src/lib/db/models";
 
 export async function cleanupPerformanceData() {
+  if (process.env.NODE_ENV === "production" && process.env.ALLOW_PROD_TEST !== "true") {
+    throw new Error("❌ CRITICAL SAFETY ABORT: Cannot run performance cleanup in PRODUCTION environment!");
+  }
+
   console.log("🧹 Cleaning up Synthetic Performance Data ONLY (Safe & Isolated)...");
   await connectDB();
 
   // Find performance test companies
   const perfCompanies = await CompanyModel.find({ code: /^PERF-/ });
+  
+  // Hard Safety Guard: Verify EVERY matched company code starts with PERF-
+  const invalidTarget = perfCompanies.find(c => !c.code.startsWith("PERF-"));
+  if (invalidTarget) {
+    throw new Error(`CRITICAL SAFETY ABORT: Attempted to clean up non-PERF company: ${invalidTarget.code}`);
+  }
+
   const perfCompanyIds = perfCompanies.map((c) => c._id);
 
   if (perfCompanyIds.length === 0) {
@@ -47,7 +58,7 @@ export async function cleanupPerformanceData() {
     return;
   }
 
-  const result = await Promise.all([
+  await Promise.all([
     CompanyModel.deleteMany({ _id: { $in: perfCompanyIds } }),
     UserModel.deleteMany({ email: /^perf\./ }),
     ClientModel.deleteMany({ companyId: { $in: perfCompanyIds } }),

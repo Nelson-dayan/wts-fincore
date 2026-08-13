@@ -48,7 +48,7 @@ export function canTransitionWorkflowState(
 
   if (resourceType === "quotation") {
     // Quotation Lifecycle: DRAFT -> SENT -> APPROVED / DECLINED
-    if (from === "APPROVED" && to !== "APPROVED") {
+    if (from === "APPROVED") {
       return { allowed: false, reason: "Cannot edit or transition an already APPROVED quotation." };
     }
     if (to === "SENT") {

@@ -39,6 +39,10 @@ import {
 import bcrypt from "bcryptjs";
 
 export async function seedTestData() {
+  if (process.env.NODE_ENV === "production" && process.env.ALLOW_PROD_TEST !== "true") {
+    throw new Error("❌ CRITICAL SAFETY ABORT: Cannot run test seed script in PRODUCTION environment!");
+  }
+
   console.log("🧪 Seeding Dedicated QA Test Dataset (Isolated & Non-Destructive)...");
   await connectDB();
 
