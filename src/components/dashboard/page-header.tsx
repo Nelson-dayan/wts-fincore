@@ -26,7 +26,7 @@ export function DashboardPageHeader({
             {eyebrow}
           </p>
         ) : null}
-        <h1 className="text-2xl font-bold tracking-tight text-foreground md:text-3xl">
+        <h1 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-tight text-foreground break-words">
           {title}
         </h1>
         {description != null && description !== "" ? (

@@ -253,22 +253,22 @@ export function AdminCompanyClient() {
             <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-transparent to-transparent pointer-events-none" />
 
             <div className="relative flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-              <div className="flex items-center gap-5">
-                <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-2xl border border-border/60 bg-muted/30 shadow-inner overflow-hidden">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-5">
+                <div className="flex h-20 w-20 sm:h-24 sm:w-24 shrink-0 items-center justify-center rounded-2xl border border-border/60 bg-muted/30 shadow-inner overflow-hidden">
                   {isImageSrc(form.logoUrl) ? (
                     <img
                       src={form.logoUrl}
                       alt="Company Logo"
-                      className="h-16 w-16 object-contain"
+                      className="h-14 w-14 sm:h-16 sm:w-16 object-contain"
                     />
                   ) : (
-                    <Building2 className="h-10 w-10 text-primary" />
+                    <Building2 className="h-8 w-8 sm:h-10 sm:w-10 text-primary" />
                   )}
                 </div>
 
-                <div className="space-y-1.5">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs uppercase tracking-widest text-muted-foreground font-semibold">
+                <div className="space-y-1.5 min-w-0">
+                  <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+                    <span className="text-[11px] sm:text-xs uppercase tracking-widest text-muted-foreground font-semibold">
                       {form.code || "ENTITY"}
                     </span>
                     <span className="inline-flex items-center rounded-full border border-primary/20 bg-primary/10 px-2.5 py-0.5 text-[10px] font-semibold text-primary">
@@ -276,7 +276,7 @@ export function AdminCompanyClient() {
                     </span>
                     {scopeMode === "group" ? (
                       <span className="inline-flex items-center gap-1 rounded-full border border-amber-500/30 bg-amber-500/10 px-2.5 py-0.5 text-[10px] font-semibold text-amber-600 dark:text-amber-400">
-                        <Network className="h-3 w-3" /> Group View (Primary Corporate Settings)
+                        <Network className="h-3 w-3" /> Group View
                       </span>
                     ) : (
                       <span className="inline-flex items-center gap-1 rounded-full border border-blue-500/30 bg-blue-500/10 px-2.5 py-0.5 text-[10px] font-semibold text-blue-600 dark:text-blue-400">
@@ -285,7 +285,7 @@ export function AdminCompanyClient() {
                     )}
                   </div>
 
-                  <h1 className="text-2xl lg:text-3xl font-bold tracking-tight text-foreground">
+                  <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold tracking-tight text-foreground break-words">
                     {form.name || "Enterprise Headquarter"}
                   </h1>
 

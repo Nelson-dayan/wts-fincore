@@ -12,6 +12,7 @@ export const clientSchema = new Schema(
     taxId: { type: String, default: "", trim: true },
     currency: { type: String, enum: SUPPORTED_CURRENCY_VALUES, default: DEFAULT_CURRENCY, trim: true },
     paymentTerms: { type: String, default: "", trim: true },
+    status: { type: String, enum: ["ACTIVE", "INACTIVE"], default: "ACTIVE", index: true },
     notes: { type: String, default: "" },
 
     // Location Fields
