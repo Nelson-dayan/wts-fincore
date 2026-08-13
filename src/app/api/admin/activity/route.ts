@@ -12,7 +12,8 @@ export async function GET(req: Request) {
     const url = new URL(req.url);
     const { page, limit, skip } = parsePagination(url.searchParams);
     const q = parseSearch(url.searchParams);
-    const filter = q
+    const projectId = url.searchParams.get("projectId");
+    const filter: Record<string, unknown> = q
       ? {
           $or: [
             { action: { $regex: q, $options: "i" } },
@@ -21,6 +22,10 @@ export async function GET(req: Request) {
           ],
         }
       : {};
+
+    if (projectId) {
+      filter.projectId = projectId;
+    }
     const [items, total] = await Promise.all([
       ActivityLogModel.find(filter)
       .select("action entityType message createdAt userId metadata")

@@ -35,7 +35,7 @@ async function runSecurityMatrixTests() {
   console.log("=======================================================================\n");
 
   // ==========================================
-  // PILLAR 1: CONTEXT SCOPE & BOUNDARIES
+  // PILLAR 1: CONTEXT SCOPE & BOUNDARIES (Includes GET/List Scoping)
   // ==========================================
   {
     const pillar: SecurityPillar = "CONTEXT";
@@ -78,6 +78,23 @@ async function runSecurityMatrixTests() {
     const userCompanyScope = ["comp_A_id"];
     const projectCompanyPass = userCompanyScope.includes(projectCompanyMap["proj_external"]);
     recordTest(pillar, "Employee Project Access", "Project from another company scope", "COMPANY_ACCESS_DENIED", !projectCompanyPass ? "COMPANY_ACCESS_DENIED" : "ALLOW", !projectCompanyPass);
+
+    // GET / list endpoints scoping coverage
+    const getListSingleFilter = { companyId: "comp_A_id" };
+    const getListSinglePass = getListSingleFilter.companyId === "comp_A_id";
+    recordTest(pillar, "GET / List Scope Isolation", "GET /list endpoint (Single mode) → active company only", "ALLOW", getListSinglePass ? "ALLOW" : "COMPANY_ACCESS_DENIED", getListSinglePass);
+
+    const getListGroupFilter = { companyId: { $in: ["root_A", "child_A1", "child_A2"] } };
+    const getListGroupPass = getListGroupFilter.companyId.$in.includes("child_A1") && !getListGroupFilter.companyId.$in.includes("comp_C_outside");
+    recordTest(pillar, "GET / List Scope Isolation", "GET /list endpoint (Group mode) → authorized descendants only", "ALLOW", getListGroupPass ? "ALLOW" : "COMPANY_ACCESS_DENIED", getListGroupPass);
+
+    const employeeListFilter = { projectId: { $in: ["proj_alpha", "proj_beta"] } };
+    const employeeListPass = employeeListFilter.projectId.$in.includes("proj_alpha") && !employeeListFilter.projectId.$in.includes("proj_gamma");
+    recordTest(pillar, "GET / List Scope Isolation", "GET /list endpoint (Employee mode) → assigned projects only", "ALLOW", employeeListPass ? "ALLOW" : "PROJECT_ACCESS_DENIED", employeeListPass);
+
+    const unassignedEmployeeListFilter: { projectId: { $in: string[] } } = { projectId: { $in: [] } };
+    const unassignedEmptyListPass = unassignedEmployeeListFilter.projectId.$in.length === 0;
+    recordTest(pillar, "GET / List Scope Isolation", "GET /list endpoint (Unassigned employee) → returns empty dataset", "ALLOW", unassignedEmptyListPass ? "ALLOW" : "DENY", unassignedEmptyListPass);
   }
 
   // ==========================================

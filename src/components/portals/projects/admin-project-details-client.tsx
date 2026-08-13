@@ -19,6 +19,7 @@ import { useSaveFeedback } from "@/lib/hooks/use-save-feedback";
 import { formatCurrency } from "@/lib/utils/formatters";
 import { ProjectTeamPermissions } from "./project-team-permissions";
 import { ProjectContactsCard } from "./project-contacts-card";
+import { ProjectAuditHistoryCard } from "./project-audit-history-card";
 
 type ProjectDetailsPayload = {
   project?: {
@@ -843,6 +844,8 @@ export function AdminProjectDetailsClient({
           createdAt: new Date(String(ex.createdAt)).toLocaleString(),
         }))}
       />
+
+      <ProjectAuditHistoryCard projectId={projectId} />
 
       <RecordPaymentModal
         isOpen={paymentModalOpen}

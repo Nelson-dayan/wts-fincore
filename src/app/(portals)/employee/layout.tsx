@@ -61,6 +61,9 @@ export default async function EmployeePortalLayout({
             <PortalNavLink href="/employee/expenses" match="prefix" className="w-full justify-start">
               Expenses
             </PortalNavLink>
+            <PortalNavLink href="/employee/notifications" match="prefix" className="w-full justify-start">
+              Notifications
+            </PortalNavLink>
           </div>
         </nav>
 
@@ -100,6 +103,9 @@ export default async function EmployeePortalLayout({
               </PortalNavLink>
               <PortalNavLink href="/employee/expenses" match="prefix" className="w-full justify-start">
                 Expenses
+              </PortalNavLink>
+              <PortalNavLink href="/employee/notifications" match="prefix" className="w-full justify-start">
+                Notifications
               </PortalNavLink>
             </div>
           </nav>
