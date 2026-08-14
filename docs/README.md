@@ -9,14 +9,21 @@ Welcome to the **Sec-DocuTrade Platform**. This master onboarding guide provides
 ```text
 Sec-DocuTrade Documentation
 │
-├── Architecture & Invariants
-│   ├── Business Rules (10 Inviolable Contracts) ─── docs/architecture/business-rules.md
+├── Architecture & Security
+│   ├── Access Control Architecture ──────────────── docs/architecture/access-control.md
+│   ├── Company Membership Model ─────────────────── docs/architecture/company-membership-model.md
+│   ├── Group Access Model ───────────────────────── docs/architecture/group-access-model.md
+│   ├── Super Admin Model ───────── docs/architecture/super-admin-model.md
+│   ├── Context Security Architecture ────────────── docs/architecture/context-security.md
+│   ├── Company Data Isolation ───────────────────── docs/security/company-isolation.md
+│   ├── Business Rules (Inviolable Contracts) ───── docs/architecture/business-rules.md
 │   └── Data Ownership & Legal Hierarchy ─────────── docs/architecture/data-ownership.md
 │
 ├── Database & Schemas
 │   └── Schema Overview & Relationships ───────────── docs/database/schema-overview.md
 │
-├── Modules & Feature Completeness (25 Specs)
+├── Modules & Feature Completeness (26 Specs)
+│   ├── Multi-Company Access Control Feature ─────── docs/features/company-access-control.md
 │   ├── Feature Matrix Summary ────────────────────── docs/feature-completeness-matrix.md
 │   └── Individual Feature Specifications ────────── docs/features/*.md
 │

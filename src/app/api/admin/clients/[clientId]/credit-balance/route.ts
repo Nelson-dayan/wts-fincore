@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
-import { requireRole } from "@/lib/auth/require-role";
 import { connectDB } from "@/lib/db/connect";
-import { PaymentModel, PaymentAllocationModel } from "@/lib/db/models";
+import { ClientModel, PaymentModel, PaymentAllocationModel } from "@/lib/db/models";
+import { authorizeResource } from "@/lib/auth/authorization";
+import { authErrorResponse } from "@/lib/api/route-auth";
 import { decimalToNumber } from "@/lib/services/business/money";
 import { convertBaseToTreasury } from "@/lib/services/finance/forex.engine";
 
@@ -10,9 +11,22 @@ export async function GET(
   { params }: { params: Promise<{ clientId: string }> }
 ) {
   try {
-    await requireRole(["admin", "employee"]);
     await connectDB();
     const { clientId } = await params;
+
+    const existingClient = await ClientModel.findById(clientId).select("companyId").lean();
+    if (!existingClient) {
+      return NextResponse.json({ message: "Client not found" }, { status: 404 });
+    }
+
+    const auth = await authorizeResource({
+      permission: "clients.view",
+      companyId: existingClient.companyId ? String(existingClient.companyId) : undefined,
+      clientId,
+    });
+    if (!auth.authorized) {
+      return authErrorResponse({ message: auth.reason, code: auth.code }, "Access denied");
+    }
 
     // 1. Fetch confirmed incoming non-deleted payments for this client
     const payments = await PaymentModel.find({

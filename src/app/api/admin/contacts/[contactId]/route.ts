@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
-import { requireRole } from "@/lib/auth/require-role";
+import { connectDB } from "@/lib/db/connect";
+import { ContactModel } from "@/lib/db/models";
+import { authorizeResource } from "@/lib/auth/authorization";
 import { authErrorResponse } from "@/lib/api/route-auth";
 import { deleteContact, getContactById, updateContact } from "@/lib/services/business/contact.service";
 
@@ -8,8 +10,22 @@ export async function GET(
   { params }: { params: Promise<{ contactId: string }> }
 ) {
   try {
-    await requireRole(["admin", "employee"]);
+    await connectDB();
     const { contactId } = await params;
+
+    const contact = await ContactModel.findById(contactId).select("companyId").lean();
+    if (!contact) {
+      return NextResponse.json({ message: "Contact not found" }, { status: 404 });
+    }
+
+    const auth = await authorizeResource({
+      permission: "clients.view",
+      companyId: contact.companyId ? String(contact.companyId) : undefined,
+    });
+    if (!auth.authorized) {
+      return authErrorResponse({ message: auth.reason, code: auth.code }, "Access denied");
+    }
+
     const item = await getContactById(contactId);
     if (!item) {
       return NextResponse.json({ message: "Contact not found" }, { status: 404 });
@@ -25,8 +41,22 @@ export async function PUT(
   { params }: { params: Promise<{ contactId: string }> }
 ) {
   try {
-    await requireRole(["admin", "employee"]);
+    await connectDB();
     const { contactId } = await params;
+
+    const contact = await ContactModel.findById(contactId).select("companyId").lean();
+    if (!contact) {
+      return NextResponse.json({ message: "Contact not found" }, { status: 404 });
+    }
+
+    const auth = await authorizeResource({
+      permission: "clients.edit",
+      companyId: contact.companyId ? String(contact.companyId) : undefined,
+    });
+    if (!auth.authorized) {
+      return authErrorResponse({ message: auth.reason, code: auth.code }, "Access denied");
+    }
+
     const body = await req.json();
 
     const updated = await updateContact(contactId, {
@@ -57,8 +87,22 @@ export async function DELETE(
   { params }: { params: Promise<{ contactId: string }> }
 ) {
   try {
-    await requireRole(["admin", "employee"]);
+    await connectDB();
     const { contactId } = await params;
+
+    const contact = await ContactModel.findById(contactId).select("companyId").lean();
+    if (!contact) {
+      return NextResponse.json({ message: "Contact not found" }, { status: 404 });
+    }
+
+    const auth = await authorizeResource({
+      permission: "clients.edit",
+      companyId: contact.companyId ? String(contact.companyId) : undefined,
+    });
+    if (!auth.authorized) {
+      return authErrorResponse({ message: auth.reason, code: auth.code }, "Access denied");
+    }
+
     const success = await deleteContact(contactId);
     if (!success) {
       return NextResponse.json({ message: "Contact not found or already deleted" }, { status: 404 });

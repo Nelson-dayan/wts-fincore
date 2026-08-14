@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
-import { requireRole } from "@/lib/auth/require-role";
 import { authErrorResponse } from "@/lib/api/route-auth";
+import { connectDB } from "@/lib/db/connect";
+import { ProjectModel } from "@/lib/db/models";
+import { authorizeResource } from "@/lib/auth/authorization";
 import {
   getCandidateContactsForProject,
   getProjectContacts,
@@ -14,8 +16,22 @@ export async function GET(
   { params }: { params: Promise<{ projectId: string }> }
 ) {
   try {
-    await requireRole(["admin", "employee"]);
+    await connectDB();
     const { projectId } = await params;
+
+    const project = await ProjectModel.findById(projectId).select("companyId").lean();
+    if (!project) {
+      return NextResponse.json({ message: "Project not found" }, { status: 404 });
+    }
+
+    const auth = await authorizeResource({
+      permission: "projects.view",
+      companyId: project.companyId ? String(project.companyId) : undefined,
+      projectId,
+    });
+    if (!auth.authorized) {
+      return authErrorResponse({ message: auth.reason, code: auth.code }, "Access denied");
+    }
 
     const [assigned, candidates] = await Promise.all([
       getProjectContacts(projectId),
@@ -33,8 +49,24 @@ export async function POST(
   { params }: { params: Promise<{ projectId: string }> }
 ) {
   try {
-    const session = await requireRole(["admin", "employee"]);
+    await connectDB();
     const { projectId } = await params;
+
+    const project = await ProjectModel.findById(projectId).select("companyId").lean();
+    if (!project) {
+      return NextResponse.json({ message: "Project not found" }, { status: 404 });
+    }
+
+    const auth = await authorizeResource({
+      permission: "projects.edit",
+      companyId: project.companyId ? String(project.companyId) : undefined,
+      projectId,
+    });
+    if (!auth.authorized) {
+      return authErrorResponse({ message: auth.reason, code: auth.code }, "Access denied");
+    }
+    const session = auth.context;
+
     const body = await req.json();
 
     const contactId = String(body.contactId || "").trim();
@@ -48,7 +80,7 @@ export async function POST(
       projectId,
       contactId,
       roles,
-      createdBy: session.user.id,
+      createdBy: session.userId,
     });
 
     if (!updatedGroup) {
@@ -66,8 +98,23 @@ export async function DELETE(
   { params }: { params: Promise<{ projectId: string }> }
 ) {
   try {
-    await requireRole(["admin", "employee"]);
+    await connectDB();
     const { projectId } = await params;
+
+    const project = await ProjectModel.findById(projectId).select("companyId").lean();
+    if (!project) {
+      return NextResponse.json({ message: "Project not found" }, { status: 404 });
+    }
+
+    const auth = await authorizeResource({
+      permission: "projects.edit",
+      companyId: project.companyId ? String(project.companyId) : undefined,
+      projectId,
+    });
+    if (!auth.authorized) {
+      return authErrorResponse({ message: auth.reason, code: auth.code }, "Access denied");
+    }
+
     const url = new URL(req.url);
     const contactId = url.searchParams.get("contactId");
 

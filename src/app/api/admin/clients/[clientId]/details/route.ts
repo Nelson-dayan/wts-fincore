@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { requireRole } from "@/lib/auth/require-role";
 import { connectDB } from "@/lib/db/connect";
+import { authorizeResource } from "@/lib/auth/authorization";
 import {
   ClientModel,
   ExpenseModel,
@@ -18,9 +18,22 @@ interface RouteCtx {
 
 export async function GET(_req: Request, ctx: RouteCtx) {
   try {
-    await requireRole(["admin"]);
     await connectDB();
     const { clientId } = await ctx.params;
+
+    const existingClient = await ClientModel.findById(clientId).select("companyId").lean();
+    if (!existingClient) {
+      return NextResponse.json({ message: "Client not found" }, { status: 404 });
+    }
+
+    const auth = await authorizeResource({
+      permission: "clients.view",
+      companyId: existingClient.companyId ? String(existingClient.companyId) : undefined,
+      clientId,
+    });
+    if (!auth.authorized) {
+      return authErrorResponse({ message: auth.reason, code: auth.code }, "Access denied");
+    }
 
     const client = await ClientModel.findById(clientId)
       .select(
