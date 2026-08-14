@@ -45,11 +45,17 @@ export function computeQuotationTotals(
 }
 
 import { getNextFiscalSequence } from "@/lib/services/business/counter.service";
+import { generateStandardDocumentRef } from "@/lib/utils/document-reference";
 
-export async function generateQuotationNumber(userId: string): Promise<{ quotationNumber: string; seqValue: number; year: string }> {
+export async function generateQuotationNumber(
+  userId: string,
+  companyCode = "SDT",
+  companyId?: string
+): Promise<{ quotationNumber: string; seqValue: number; year: string }> {
   const currentYear = new Date().getFullYear().toString();
-  const seqValue = await getNextFiscalSequence("quotation_number", currentYear, "Quotation", userId);
-  const quotationNumber = `# SLMEC/QT/${currentYear}/${String(seqValue).padStart(5, "0")}`;
+  const scopeKey = companyId || companyCode;
+  const seqValue = await getNextFiscalSequence("quotation_number", currentYear, "Quotation", userId, undefined, scopeKey);
+  const quotationNumber = generateStandardDocumentRef({ docType: "QT", companyCode, sequence: seqValue });
   return { quotationNumber, seqValue, year: currentYear };
 }
 

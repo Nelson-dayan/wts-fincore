@@ -19,6 +19,10 @@ export type QuotationData = {
   date: string;
   companyName: string;
   companyAddress: string;
+  /** True if user unlocked and manually edited company details (disables automatic context sync). */
+  isCompanyDataEdited?: boolean;
+  /** True if user unlocked and manually edited the quotation number / reference number. */
+  isRefNoEdited?: boolean;
   /** Page 2 — heading under logo area. Empty = hidden. */
   page2Title: string;
   description: string;
@@ -62,6 +66,8 @@ export const defaultQuotationData = (): QuotationData => ({
   date: "",
   companyName: "",
   companyAddress: "",
+  isCompanyDataEdited: false,
+  isRefNoEdited: false,
   page2Title: "",
   description: "",
   tableHeaderDetail: "Details",
@@ -144,6 +150,8 @@ export function normalizeQuotationData(raw: unknown): QuotationData {
     date: String(o.date ?? base.date),
     companyName: String(o.companyName ?? base.companyName),
     companyAddress: String(o.companyAddress ?? base.companyAddress),
+    isCompanyDataEdited: typeof o.isCompanyDataEdited === "boolean" ? o.isCompanyDataEdited : false,
+    isRefNoEdited: typeof o.isRefNoEdited === "boolean" ? o.isRefNoEdited : false,
     page2Title: String(o.page2Title ?? base.page2Title),
     description: String(o.description ?? base.description),
     tableHeaderDetail: defaultIfBlank(o.tableHeaderDetail, base.tableHeaderDetail),

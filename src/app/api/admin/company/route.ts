@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireRole } from "@/lib/auth/require-role";
 import { connectDB } from "@/lib/db/connect";
-import { CompanyModel } from "@/lib/db/models";
+import { CompanyModel, QuotationModel } from "@/lib/db/models";
 import { authErrorResponse } from "@/lib/api/route-auth";
 import { logActivity } from "@/lib/services/activity/log-activity.service";
 import { isImageSrc } from "@/lib/utils/is-image-src";
@@ -27,8 +27,12 @@ export async function GET(req: Request) {
     }
 
     const item = await CompanyModel.findById(resolvedCompanyId).lean();
+    const quotationCount = resolvedCompanyId
+      ? await QuotationModel.countDocuments({ companyId: resolvedCompanyId, deletedAt: null })
+      : 0;
+    const nextQuotationSeq = quotationCount + 1;
 
-    return NextResponse.json({ item, context });
+    return NextResponse.json({ item, context, quotationCount, nextQuotationSeq });
   } catch (error) {
     return authErrorResponse(error, "Failed to load company settings");
   }

@@ -87,6 +87,8 @@ function mergeSnapshotsWithForm(
     ...built.companySnapshot,
     ...(data.companyName.trim() ? { name: data.companyName.trim() } : {}),
     ...(data.companyAddress.trim() ? { address: data.companyAddress.trim() } : {}),
+    isCompanyDataEdited: Boolean(data.isCompanyDataEdited),
+    isRefNoEdited: Boolean(data.isRefNoEdited),
   };
   return { clientSnapshot, companySnapshot };
 }

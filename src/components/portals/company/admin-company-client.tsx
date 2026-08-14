@@ -363,13 +363,14 @@ export function AdminCompanyClient() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <Label className="text-xs font-medium mb-1.5 block">
-                      Unique Code (3-8 Chars) <span className="text-destructive">*</span>
+                      Entity Code (3-5 Chars) <span className="text-destructive">*</span>
                     </Label>
                     <Input
                       className="h-10 rounded-xl bg-muted/20 text-sm uppercase"
                       value={form.code}
-                      onChange={(e) => setForm((prev) => ({ ...prev, code: e.target.value.toUpperCase() }))}
-                      placeholder="e.g. SDT-DXB"
+                      maxLength={5}
+                      onChange={(e) => setForm((prev) => ({ ...prev, code: e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 5) }))}
+                      placeholder="e.g. DXB, HOLD"
                       required
                     />
                   </div>
@@ -519,32 +520,35 @@ export function AdminCompanyClient() {
               <div className="space-y-4">
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div>
-                    <Label className="text-xs font-medium mb-1.5 block">Invoice Prefix</Label>
+                    <Label className="text-xs font-medium mb-1.5 block">Invoice Sub-Prefix (Max 5 Chars)</Label>
                     <Input
                       className="h-10 rounded-xl bg-muted/20 text-sm uppercase"
                       value={form.invoicePrefix}
-                      onChange={(e) => setForm((prev) => ({ ...prev, invoicePrefix: e.target.value.toUpperCase() }))}
-                      placeholder="INV-DXB"
+                      maxLength={5}
+                      onChange={(e) => setForm((prev) => ({ ...prev, invoicePrefix: e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 5) }))}
+                      placeholder="INV"
                     />
                   </div>
 
                   <div>
-                    <Label className="text-xs font-medium mb-1.5 block">Quotation Prefix</Label>
+                    <Label className="text-xs font-medium mb-1.5 block">Quotation Sub-Prefix (Max 5 Chars)</Label>
                     <Input
                       className="h-10 rounded-xl bg-muted/20 text-sm uppercase"
                       value={form.quotationPrefix}
-                      onChange={(e) => setForm((prev) => ({ ...prev, quotationPrefix: e.target.value.toUpperCase() }))}
-                      placeholder="QT-DXB"
+                      maxLength={5}
+                      onChange={(e) => setForm((prev) => ({ ...prev, quotationPrefix: e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 5) }))}
+                      placeholder="QT"
                     />
                   </div>
 
                   <div>
-                    <Label className="text-xs font-medium mb-1.5 block">PO Prefix</Label>
+                    <Label className="text-xs font-medium mb-1.5 block">PO Sub-Prefix (Max 5 Chars)</Label>
                     <Input
                       className="h-10 rounded-xl bg-muted/20 text-sm uppercase"
                       value={form.poPrefix}
-                      onChange={(e) => setForm((prev) => ({ ...prev, poPrefix: e.target.value.toUpperCase() }))}
-                      placeholder="PO-DXB"
+                      maxLength={5}
+                      onChange={(e) => setForm((prev) => ({ ...prev, poPrefix: e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 5) }))}
+                      placeholder="PO"
                     />
                   </div>
                 </div>

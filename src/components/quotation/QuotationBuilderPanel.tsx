@@ -45,6 +45,7 @@ function applyPrimaryCompanyDefaults(
   company: PrimaryCompanySettings | null
 ): QuotationData {
   if (!company) return current;
+  if (current.isCompanyDataEdited) return current;
   return {
     ...current,
     companyName: current.companyName.trim() ? current.companyName : String(company.name ?? ""),

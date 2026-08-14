@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { ImageUp, Plus, Save, Trash2, Sparkles, Building2, CheckCircle2, Lock } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { ImageUp, Plus, Save, Trash2, Sparkles, Building2, CheckCircle2, Lock, Unlock, RotateCcw, Edit2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -29,6 +29,12 @@ export type QuotationFormProps = {
 };
 
 
+import { generateStandardDocumentRef, resolveCompanyCode, generateRandomSuffix } from "@/lib/utils/document-reference";
+
+function resolveCompanyPrefix(comp: any, docType: string = "QT"): string {
+  return resolveCompanyCode(comp, docType);
+}
+
 export function QuotationForm({
   data,
   onChange,
@@ -43,56 +49,85 @@ export function QuotationForm({
   isCurrencyLocked = false,
 }: QuotationFormProps) {
   const [companies, setCompanies] = useState<any[]>([]);
+  const [activeCompany, setActiveCompany] = useState<any | null>(null);
   const [selectedCompanyId, setSelectedCompanyId] = useState<string>("");
   const [autoFillNotice, setAutoFillNotice] = useState<string | null>(null);
   const [scopeMode, setScopeMode] = useState<"single" | "group">("single");
 
-  useEffect(() => {
+  const dataRef = useRef(data);
+  dataRef.current = data;
+
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
+
+  const patch = useCallback((partial: Partial<QuotationData>) => {
+    onChangeRef.current({ ...dataRef.current, ...partial });
+  }, []);
+
+  const syncCompanyContext = useCallback(async () => {
     const scope = (localStorage.getItem("scopeMode") as "single" | "group") || "single";
+    const activeCompanyId = localStorage.getItem("activeCompanyId") || "";
     setScopeMode(scope);
 
-    if (scope === "single") {
-      // Single Co Mode: Automatically fetch and load the active single company context
-      async function loadActiveCompany() {
-        try {
-          const res = await fetch("/api/admin/company");
-          if (!res.ok) return;
-          const json = await res.json();
-          if (json.item) {
-            const comp = json.item;
-            if (!data.companyName) {
-              const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, "");
-              const randomSuffix = Math.random().toString(36).substring(2, 6).toUpperCase();
-              const prefix = comp.branding?.quotationPrefix || comp.quotationPrefix || "QT-";
-              const generatedRef = `${prefix}${dateStr}-${randomSuffix}`;
+    try {
+      const queryParams = new URLSearchParams();
+      if (activeCompanyId) queryParams.set("companyId", activeCompanyId);
+      queryParams.set("scopeMode", scope);
 
-              const addressParts = [
-                comp.name,
-                comp.address,
-                comp.email ? `Email: ${comp.email}` : null,
-                comp.phone ? `Tel: ${comp.phone}` : null,
-                comp.taxId ? `TRN/Tax ID: ${comp.taxId}` : null,
-              ].filter(Boolean);
+      const res = await fetch(`/api/admin/company?${queryParams.toString()}`);
+      if (!res.ok) return;
+      const json = await res.json();
+      if (json.item) {
+        const comp = json.item;
+        setActiveCompany(comp);
 
-              patch({
-                companyName: comp.name,
-                companyAddress: addressParts.join("\n"),
-                logo: comp.branding?.logoUrl || comp.logoUrl || data.logo,
-                currency: comp.baseCurrency || data.currency || "AED",
-                refNo: data.refNo || generatedRef,
-                contactEmail: comp.email || data.contactEmail,
-                contactPhone: comp.phone || data.contactPhone,
-                paymentMilestone: comp.branding?.invoiceFooter || comp.invoiceFooter || data.paymentMilestone,
-              });
-            }
-          }
-        } catch (err) {
-          console.error("Failed to auto-load active single company details:", err);
+        // If company data is NOT manually edited by user, auto-sync from active company context
+        if (!dataRef.current.isCompanyDataEdited) {
+          const compCode = resolveCompanyPrefix(comp);
+
+          const now = new Date();
+          const yy = now.getFullYear().toString().slice(-2);
+          const mm = String(now.getMonth() + 1).padStart(2, "0");
+          const dd = String(now.getDate()).padStart(2, "0");
+          const shortDate = `${yy}${mm}${dd}`;
+
+          const seqNum = json.nextQuotationSeq ? String(json.nextQuotationSeq).padStart(3, "0") : "001";
+          const randomSuffix = generateRandomSuffix(3);
+
+          const generatedRef = `QT-${compCode}-${shortDate}-${seqNum}-${randomSuffix}`;
+
+          const addressParts = [
+            comp.name,
+            comp.address,
+            comp.email ? `Email: ${comp.email}` : null,
+            comp.phone ? `Tel: ${comp.phone}` : null,
+            comp.taxId ? `TRN/Tax ID: ${comp.taxId}` : null,
+          ].filter(Boolean);
+
+          patch({
+            companyName: comp.name,
+            companyAddress: addressParts.join("\n"),
+            logo: comp.branding?.logoUrl || comp.logoUrl || dataRef.current.logo,
+            currency: comp.baseCurrency || dataRef.current.currency || "AED",
+            refNo: dataRef.current.isRefNoEdited && dataRef.current.refNo ? dataRef.current.refNo : generatedRef,
+            contactName: comp.contactName || dataRef.current.contactName,
+            contactEmail: comp.email || dataRef.current.contactEmail,
+            contactPhone: comp.phone || dataRef.current.contactPhone,
+            paymentMilestone: comp.branding?.invoiceFooter || comp.invoiceFooter || dataRef.current.paymentMilestone,
+            isCompanyDataEdited: false,
+          });
         }
       }
-      loadActiveCompany();
-    } else {
-      // Group View Mode: Fetch corporate tree so user can select issuing entity
+    } catch (err) {
+      console.error("Failed to auto-load active company details:", err);
+    }
+  }, [patch]);
+
+  useEffect(() => {
+    syncCompanyContext();
+
+    const scope = (localStorage.getItem("scopeMode") as "single" | "group") || "single";
+    if (scope === "group") {
       async function fetchCompanyHierarchy() {
         try {
           const res = await fetch("/api/admin/companies/tree");
@@ -107,7 +142,48 @@ export function QuotationForm({
       }
       fetchCompanyHierarchy();
     }
-  }, []);
+
+    const handleContextChange = () => {
+      syncCompanyContext();
+    };
+    window.addEventListener("companyContextChanged", handleContextChange);
+    return () => window.removeEventListener("companyContextChanged", handleContextChange);
+  }, [syncCompanyContext]);
+
+  const handleResetCompanyToContext = () => {
+    if (!activeCompany) return;
+    const comp = activeCompany;
+    const compCode = resolveCompanyPrefix(comp);
+    const now = new Date();
+    const yy = now.getFullYear().toString().slice(-2);
+    const mm = String(now.getMonth() + 1).padStart(2, "0");
+    const dd = String(now.getDate()).padStart(2, "0");
+    const shortDate = `${yy}${mm}${dd}`;
+    const randomSuffix = generateRandomSuffix(3);
+    const generatedRef = `QT-${compCode}-${shortDate}-001-${randomSuffix}`;
+
+    const addressParts = [
+      comp.name,
+      comp.address,
+      comp.email ? `Email: ${comp.email}` : null,
+      comp.phone ? `Tel: ${comp.phone}` : null,
+      comp.taxId ? `TRN/Tax ID: ${comp.taxId}` : null,
+    ].filter(Boolean);
+
+    patch({
+      companyName: comp.name,
+      companyAddress: addressParts.join("\n"),
+      logo: comp.branding?.logoUrl || comp.logoUrl || data.logo,
+      currency: comp.baseCurrency || data.currency || "AED",
+      refNo: generatedRef,
+      contactEmail: comp.email || data.contactEmail,
+      contactPhone: comp.phone || data.contactPhone,
+      paymentMilestone: comp.branding?.invoiceFooter || comp.invoiceFooter || data.paymentMilestone,
+      isCompanyDataEdited: false,
+    });
+    setAutoFillNotice(`Reset company details to active company "${comp.name}"`);
+    setTimeout(() => setAutoFillNotice(null), 3500);
+  };
 
   const handleAutoFillCompany = (companyId: string) => {
     setSelectedCompanyId(companyId);
@@ -116,10 +192,14 @@ export function QuotationForm({
     const comp = companies.find((c) => c._id === companyId);
     if (!comp) return;
 
-    const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, "");
-    const randomSuffix = Math.random().toString(36).substring(2, 6).toUpperCase();
-    const prefix = comp.branding?.quotationPrefix || "QT-";
-    const generatedRef = `${prefix}${dateStr}-${randomSuffix}`;
+    const compCode = resolveCompanyPrefix(comp);
+    const now = new Date();
+    const yy = now.getFullYear().toString().slice(-2);
+    const mm = String(now.getMonth() + 1).padStart(2, "0");
+    const dd = String(now.getDate()).padStart(2, "0");
+    const shortDate = `${yy}${mm}${dd}`;
+    const randomSuffix = generateRandomSuffix(3);
+    const generatedRef = `QT-${compCode}-${shortDate}-001-${randomSuffix}`;
 
     const addressParts = [
       comp.name,
@@ -138,14 +218,11 @@ export function QuotationForm({
       contactEmail: comp.email || data.contactEmail,
       contactPhone: comp.phone || data.contactPhone,
       paymentMilestone: comp.branding?.invoiceFooter || data.paymentMilestone,
+      isCompanyDataEdited: false,
     });
 
     setAutoFillNotice(`Auto-filled details & branding from "${comp.name}" (${comp.code})`);
     setTimeout(() => setAutoFillNotice(null), 4500);
-  };
-
-  const patch = (partial: Partial<QuotationData>) => {
-    onChange({ ...data, ...partial });
   };
 
   const setItem = (pageIndex: number, lineIndex: number, partial: Partial<QuotationItem>) => {
@@ -259,13 +336,108 @@ export function QuotationForm({
           </div>
           <div className="grid gap-2 sm:grid-cols-2 sm:gap-3">
             <div className="grid gap-2">
-              <Label htmlFor="qg-quotation-no">Quotation no</Label>
-            <Input
-              id="qg-quotation-no"
-              value={data.refNo}
-              onChange={(e) => patch({ refNo: e.target.value })}
-              placeholder="e.g. QT-20260402-A1B2C3D4 (auto-filled for new quotes)"
-            />
+              <div className="flex items-center justify-between">
+                <Label htmlFor="qg-quotation-no" className="flex items-center gap-1.5">
+                  Quotation no
+                  {!data.isRefNoEdited ? (
+                    <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                      <Lock className="h-3 w-3" /> (Auto-generated)
+                    </span>
+                  ) : (
+                    <span className="text-[10px] font-semibold text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                      <Edit2 className="h-3 w-3" /> (Custom)
+                    </span>
+                  )}
+                </Label>
+                {!data.isRefNoEdited ? (
+                  <button
+                    type="button"
+                    onClick={() => patch({ isRefNoEdited: true })}
+                    className="text-xs text-primary underline-offset-2 hover:underline flex items-center gap-1"
+                  >
+                    <Unlock className="h-3 w-3" /> Unlock to edit
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const compCode = resolveCompanyPrefix(activeCompany);
+                      const now = new Date();
+                      const yy = now.getFullYear().toString().slice(-2);
+                      const mm = String(now.getMonth() + 1).padStart(2, "0");
+                      const dd = String(now.getDate()).padStart(2, "0");
+                      const shortDate = `${yy}${mm}${dd}`;
+                      const randomSuffix = generateRandomSuffix(3);
+
+                      patch({ refNo: `QT-${compCode}-${shortDate}-001-${randomSuffix}`, isRefNoEdited: false });
+                    }}
+                    className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1"
+                  >
+                    <RotateCcw className="h-3 w-3" /> Reset / Lock
+                  </button>
+                )}
+              </div>
+              {(() => {
+                const activeCompCode = resolveCompanyPrefix(activeCompany);
+                const fixedPrefix = `QT-${activeCompCode}-`;
+
+                const currentRef = data.refNo || "";
+                let displaySuffix = currentRef;
+
+                if (currentRef.startsWith(fixedPrefix)) {
+                  displaySuffix = currentRef.slice(fixedPrefix.length);
+                } else if (currentRef.startsWith("QT-")) {
+                  const secondDash = currentRef.indexOf("-", 3);
+                  if (secondDash !== -1) {
+                    displaySuffix = currentRef.slice(secondDash + 1);
+                  }
+                }
+
+                const isValidFormat = /^QT-[A-Z0-9]{3,5}-[0-9]{6}-[0-9]{3,4}-[A-Z0-9]{3,4}$/i.test(currentRef);
+
+                return (
+                  <div className="space-y-1">
+                    <div className="flex items-center rounded-xl overflow-hidden border border-input focus-within:ring-2 focus-within:ring-ring transition-all">
+                      <div className="bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-r border-emerald-500/30 px-3 py-2 text-xs font-mono font-bold flex items-center gap-1 select-none shrink-0">
+                        <Lock className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
+                        <span>{fixedPrefix}</span>
+                      </div>
+
+                      <input
+                        id="qg-quotation-no"
+                        value={displaySuffix}
+                        readOnly={!data.isRefNoEdited}
+                        onChange={(e) => {
+                          const inputVal = e.target.value;
+                          patch({ refNo: `${fixedPrefix}${inputVal}`, isRefNoEdited: true });
+                        }}
+                        placeholder="260814-001-K9X"
+                        className={cn(
+                          "flex-1 bg-background px-3 py-2 text-sm font-mono focus:outline-none min-w-0",
+                          !data.isRefNoEdited && "bg-muted/30 text-muted-foreground cursor-not-allowed"
+                        )}
+                      />
+
+                      {!data.isRefNoEdited && (
+                        <div className="px-3 flex items-center bg-muted/30">
+                          <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">LOCKED</span>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex items-center justify-between px-1">
+                      <span className="text-[11px] text-muted-foreground font-mono">
+                        Full Ref: <strong className="text-foreground">{data.refNo}</strong>
+                      </span>
+                      {data.isRefNoEdited && (
+                        <span className={cn("text-[10px] font-semibold flex items-center gap-1", isValidFormat ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400")}>
+                          {isValidFormat ? "✓ Standard Format" : "⚠ Custom Suffix"}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
             <div className="grid gap-2">
               <Label htmlFor="qg-date">Date</Label>
@@ -277,81 +449,180 @@ export function QuotationForm({
               />
             </div>
           </div>
-          {/* Company Context Selector & Single Co. Lock */}
-          {scopeMode === "group" && companies.length > 0 ? (
-            <div className="rounded-xl border border-primary/25 bg-primary/5 p-3.5 grid gap-2 transition-all shadow-xs">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="company-autofill-select" className="text-xs font-semibold text-primary flex items-center gap-1.5">
-                  <Building2 className="h-3.5 w-3.5 text-primary" /> Group View: Select Issuing Entity for Quotation
-                </Label>
+
+          {/* Company Lock State & Context Banner */}
+          <div className={cn(
+            "rounded-xl border p-3.5 grid gap-2 transition-all shadow-xs",
+            data.isCompanyDataEdited
+              ? "border-amber-500/30 bg-amber-500/5 dark:bg-amber-500/10"
+              : "border-emerald-500/30 bg-emerald-500/5 dark:bg-emerald-500/10"
+          )}>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <Building2 className="h-4 w-4 text-primary" />
+                <span className="text-xs font-semibold text-foreground">Issuing Entity Context</span>
+                {data.isCompanyDataEdited ? (
+                  <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-700 dark:text-amber-400 bg-amber-500/15 border border-amber-500/30 px-2 py-0.5 rounded-full">
+                    <Unlock className="h-3 w-3 text-amber-600 dark:text-amber-400" />
+                    Customized / Edited Data
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-500/15 border border-emerald-500/30 px-2 py-0.5 rounded-full">
+                    <Lock className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
+                    Locked to Context ({activeCompany?.name || data.companyName || "Active Corporate Unit"})
+                  </span>
+                )}
+              </div>
+
+              <div className="flex items-center gap-2">
                 {autoFillNotice && (
                   <span className="text-[11px] font-medium text-emerald-600 dark:text-emerald-400 flex items-center gap-1 animate-in fade-in-50">
                     <CheckCircle2 className="h-3.5 w-3.5" /> {autoFillNotice}
                   </span>
                 )}
+                {data.isCompanyDataEdited ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleResetCompanyToContext}
+                    className="h-7 text-xs gap-1.5 border-border bg-background hover:bg-muted"
+                  >
+                    <RotateCcw className="h-3 w-3" />
+                    Reset to Company Context
+                  </Button>
+                ) : (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => patch({ isCompanyDataEdited: true })}
+                    className="h-7 text-xs gap-1.5 border-amber-500/40 text-amber-700 dark:text-amber-400 hover:bg-amber-500/10"
+                  >
+                    <Unlock className="h-3 w-3" />
+                    Unlock & Edit Company Data
+                  </Button>
+                )}
               </div>
-              <Dropdown
-                id="company-autofill-select"
-                value={selectedCompanyId}
-                onValueChange={(val) => handleAutoFillCompany(val)}
-                placeholder="-- Select Group Sub-Company / Branch --"
-                searchable={true}
-                options={[
-                  { value: "", label: "-- Select Group Sub-Company / Branch --" },
-                  ...companies.map((c) => ({
-                    value: c._id,
-                    label: `${c.name} [${c.code}]`,
-                    badge: c.kind,
-                    description: `Currency: ${c.baseCurrency} ${c.taxId ? `• Tax/TRN ID: ${c.taxId}` : ""}`,
-                  })),
-                ]}
-              />
             </div>
-          ) : (
-            <div className="rounded-xl border border-border/60 bg-muted/20 p-3.5 grid gap-1.5 transition-all">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
-                  <Building2 className="h-3.5 w-3.5 text-primary" /> Issuing Company Context
-                </span>
-                <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-muted-foreground bg-background border px-2 py-0.5 rounded-full shadow-2xs">
-                  <Lock className="h-3 w-3 text-muted-foreground" /> Single Entity Context Locked
-                </span>
+
+            <p className="text-[11px] text-muted-foreground leading-normal">
+              {data.isCompanyDataEdited
+                ? "This quotation uses custom/edited company details. Click 'Reset to Company Context' to re-lock and sync with active context."
+                : "Company details are locked to your active company context. Switch active company from navbar to issue for another company, or unlock to customize."}
+            </p>
+
+            {scopeMode === "group" && companies.length > 0 && (
+              <div className="mt-2 border-t border-border/40 pt-2 grid gap-1.5">
+                <Label htmlFor="company-autofill-select" className="text-xs font-semibold text-primary flex items-center gap-1.5">
+                  Group View: Switch Entity for this Quotation
+                </Label>
+                <Dropdown
+                  id="company-autofill-select"
+                  value={selectedCompanyId}
+                  onValueChange={(val) => handleAutoFillCompany(val)}
+                  placeholder="-- Select Group Sub-Company / Branch --"
+                  searchable={true}
+                  options={[
+                    { value: "", label: "-- Select Group Sub-Company / Branch --" },
+                    ...companies.map((c) => ({
+                      value: c._id,
+                      label: `${c.name} [${c.code}]`,
+                      badge: c.kind,
+                      description: `Currency: ${c.baseCurrency} ${c.taxId ? `• Tax/TRN ID: ${c.taxId}` : ""}`,
+                    })),
+                  ]}
+                />
               </div>
-              <div className="text-sm font-semibold text-foreground flex items-center gap-2">
-                {data.companyName || "Active Corporate Unit"}
-              </div>
-              <p className="text-[11px] text-muted-foreground">
-                Document ownership is tied to your active company context. Switch company from navbar to issue for a different entity.
-              </p>
-            </div>
-          )}
+            )}
+          </div>
 
           <div className="grid gap-2">
-            <Label htmlFor="qg-company">Company name</Label>
-            <Input
-              id="qg-company"
-              value={data.companyName}
-              onChange={(e) => patch({ companyName: e.target.value })}
-              placeholder="Your company"
-            />
-          </div>
-          <div className="grid gap-2">
-            <Label htmlFor="qg-address">Company address</Label>
-            <textarea
-              id="qg-address"
-              value={data.companyAddress}
-              onChange={(e) => patch({ companyAddress: e.target.value })}
-              placeholder="Full address"
-              rows={3}
-              className={cn(
-                "flex min-h-22 w-full rounded-lg border border-input/90 bg-background/80 px-3.5 py-2 text-base shadow-sm transition-[border-color,box-shadow,background-color] duration-200 md:text-[0.9375rem]",
-                "placeholder:text-muted-foreground/65",
-                "hover:border-muted-foreground/25 hover:bg-background",
-                "focus-visible:border-primary/35 focus-visible:bg-background",
-                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45 focus-visible:ring-offset-0",
-                "disabled:cursor-not-allowed disabled:opacity-50"
+            <div className="flex items-center justify-between">
+              <Label htmlFor="qg-company" className="flex items-center gap-1.5">
+                Company name
+                {!data.isCompanyDataEdited ? (
+                  <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                    <Lock className="h-3 w-3" /> (Locked)
+                  </span>
+                ) : (
+                  <span className="text-[10px] font-semibold text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                    <Edit2 className="h-3 w-3" /> (Custom)
+                  </span>
+                )}
+              </Label>
+              {!data.isCompanyDataEdited && (
+                <button
+                  type="button"
+                  onClick={() => patch({ isCompanyDataEdited: true })}
+                  className="text-xs text-primary underline-offset-2 hover:underline flex items-center gap-1"
+                >
+                  <Unlock className="h-3 w-3" /> Unlock to edit
+                </button>
               )}
-            />
+            </div>
+            <div className="relative">
+              <Input
+                id="qg-company"
+                value={data.companyName}
+                readOnly={!data.isCompanyDataEdited}
+                onChange={(e) => patch({ companyName: e.target.value, isCompanyDataEdited: true })}
+                placeholder="Your company"
+                className={cn(
+                  !data.isCompanyDataEdited && "bg-muted/50 font-medium text-foreground cursor-not-allowed border-emerald-500/30"
+                )}
+              />
+              {!data.isCompanyDataEdited && (
+                <Lock className="absolute right-3 top-2.5 h-4 w-4 text-muted-foreground/60" />
+              )}
+            </div>
+          </div>
+
+          <div className="grid gap-2">
+            <div className="flex items-center justify-between">
+              <Label htmlFor="qg-address" className="flex items-center gap-1.5">
+                Company address
+                {!data.isCompanyDataEdited ? (
+                  <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                    <Lock className="h-3 w-3" /> (Locked)
+                  </span>
+                ) : (
+                  <span className="text-[10px] font-semibold text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                    <Edit2 className="h-3 w-3" /> (Custom)
+                  </span>
+                )}
+              </Label>
+              {!data.isCompanyDataEdited && (
+                <button
+                  type="button"
+                  onClick={() => patch({ isCompanyDataEdited: true })}
+                  className="text-xs text-primary underline-offset-2 hover:underline flex items-center gap-1"
+                >
+                  <Unlock className="h-3 w-3" /> Unlock to edit
+                </button>
+              )}
+            </div>
+            <div className="relative">
+              <textarea
+                id="qg-address"
+                value={data.companyAddress}
+                readOnly={!data.isCompanyDataEdited}
+                onChange={(e) => patch({ companyAddress: e.target.value, isCompanyDataEdited: true })}
+                placeholder="Full address"
+                rows={3}
+                className={cn(
+                  "flex min-h-22 w-full rounded-lg border border-input/90 bg-background/80 px-3.5 py-2 text-base shadow-sm transition-[border-color,box-shadow,background-color] duration-200 md:text-[0.9375rem]",
+                  "placeholder:text-muted-foreground/65",
+                  "hover:border-muted-foreground/25 hover:bg-background",
+                  "focus-visible:border-primary/35 focus-visible:bg-background",
+                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45 focus-visible:ring-offset-0",
+                  !data.isCompanyDataEdited && "bg-muted/50 font-medium text-foreground cursor-not-allowed border-emerald-500/30"
+                )}
+              />
+              {!data.isCompanyDataEdited && (
+                <Lock className="absolute right-3 top-3 h-4 w-4 text-muted-foreground/60" />
+              )}
+            </div>
           </div>
         </fieldset>
 
@@ -553,19 +824,48 @@ export function QuotationForm({
           </div>
 
           <div className="grid gap-2">
-            <Label htmlFor="qg-milestone">Payment milestone</Label>
-            <textarea
-              id="qg-milestone"
-              value={data.paymentMilestone}
-              onChange={(e) => patch({ paymentMilestone: e.target.value })}
-              placeholder="Full payment after report submission."
-              rows={3}
-              className={cn(
-                "flex min-h-20 w-full rounded-lg border border-input/90 bg-background/90 px-3.5 py-2 text-base shadow-sm md:text-[0.9375rem]",
-                "placeholder:text-muted-foreground/65",
-                "focus-visible:border-primary/35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45"
+            <div className="flex items-center justify-between">
+              <Label htmlFor="qg-milestone" className="flex items-center gap-1.5">
+                Payment milestone
+                {!data.isCompanyDataEdited ? (
+                  <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                    <Lock className="h-3 w-3" /> (Locked)
+                  </span>
+                ) : (
+                  <span className="text-[10px] font-semibold text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                    <Edit2 className="h-3 w-3" /> (Custom)
+                  </span>
+                )}
+              </Label>
+              {!data.isCompanyDataEdited && (
+                <button
+                  type="button"
+                  onClick={() => patch({ isCompanyDataEdited: true })}
+                  className="text-xs text-primary underline-offset-2 hover:underline flex items-center gap-1"
+                >
+                  <Unlock className="h-3 w-3" /> Unlock to edit
+                </button>
               )}
-            />
+            </div>
+            <div className="relative">
+              <textarea
+                id="qg-milestone"
+                value={data.paymentMilestone}
+                readOnly={!data.isCompanyDataEdited}
+                onChange={(e) => patch({ paymentMilestone: e.target.value, isCompanyDataEdited: true })}
+                placeholder="Full payment after report submission."
+                rows={3}
+                className={cn(
+                  "flex min-h-20 w-full rounded-lg border border-input/90 bg-background/90 px-3.5 py-2 text-base shadow-sm md:text-[0.9375rem]",
+                  "placeholder:text-muted-foreground/65",
+                  "focus-visible:border-primary/35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45",
+                  !data.isCompanyDataEdited && "bg-muted/50 font-medium text-foreground cursor-not-allowed border-emerald-500/30"
+                )}
+              />
+              {!data.isCompanyDataEdited && (
+                <Lock className="absolute right-3 top-3 h-4 w-4 text-muted-foreground/60" />
+              )}
+            </div>
           </div>
         </fieldset>
 
@@ -580,30 +880,123 @@ export function QuotationForm({
             />
           </div>
           <div className="grid gap-2">
-            <Label htmlFor="qg-contact-name">Contact name</Label>
-            <Input
-              id="qg-contact-name"
-              value={data.contactName}
-              onChange={(e) => patch({ contactName: e.target.value })}
-            />
+            <div className="flex items-center justify-between">
+              <Label htmlFor="qg-contact-name" className="flex items-center gap-1.5">
+                Contact name
+                {!data.isCompanyDataEdited ? (
+                  <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                    <Lock className="h-3 w-3" /> (Locked)
+                  </span>
+                ) : (
+                  <span className="text-[10px] font-semibold text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                    <Edit2 className="h-3 w-3" /> (Custom)
+                  </span>
+                )}
+              </Label>
+              {!data.isCompanyDataEdited && (
+                <button
+                  type="button"
+                  onClick={() => patch({ isCompanyDataEdited: true })}
+                  className="text-xs text-primary underline-offset-2 hover:underline flex items-center gap-1"
+                >
+                  <Unlock className="h-3 w-3" /> Unlock to edit
+                </button>
+              )}
+            </div>
+            <div className="relative">
+              <Input
+                id="qg-contact-name"
+                value={data.contactName}
+                readOnly={!data.isCompanyDataEdited}
+                onChange={(e) => patch({ contactName: e.target.value, isCompanyDataEdited: true })}
+                className={cn(
+                  !data.isCompanyDataEdited && "bg-muted/50 font-medium text-foreground cursor-not-allowed border-emerald-500/30"
+                )}
+              />
+              {!data.isCompanyDataEdited && (
+                <Lock className="absolute right-3 top-2.5 h-4 w-4 text-muted-foreground/60" />
+              )}
+            </div>
           </div>
           <div className="grid gap-2">
-            <Label htmlFor="qg-phone">Phone</Label>
-            <Input
-              id="qg-phone"
-              value={data.contactPhone}
-              onChange={(e) => patch({ contactPhone: e.target.value })}
-              className="tabular-nums"
-            />
+            <div className="flex items-center justify-between">
+              <Label htmlFor="qg-phone" className="flex items-center gap-1.5">
+                Phone
+                {!data.isCompanyDataEdited ? (
+                  <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                    <Lock className="h-3 w-3" /> (Locked)
+                  </span>
+                ) : (
+                  <span className="text-[10px] font-semibold text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                    <Edit2 className="h-3 w-3" /> (Custom)
+                  </span>
+                )}
+              </Label>
+              {!data.isCompanyDataEdited && (
+                <button
+                  type="button"
+                  onClick={() => patch({ isCompanyDataEdited: true })}
+                  className="text-xs text-primary underline-offset-2 hover:underline flex items-center gap-1"
+                >
+                  <Unlock className="h-3 w-3" /> Unlock to edit
+                </button>
+              )}
+            </div>
+            <div className="relative">
+              <Input
+                id="qg-phone"
+                value={data.contactPhone}
+                readOnly={!data.isCompanyDataEdited}
+                onChange={(e) => patch({ contactPhone: e.target.value, isCompanyDataEdited: true })}
+                className={cn(
+                  "tabular-nums",
+                  !data.isCompanyDataEdited && "bg-muted/50 font-medium text-foreground cursor-not-allowed border-emerald-500/30"
+                )}
+              />
+              {!data.isCompanyDataEdited && (
+                <Lock className="absolute right-3 top-2.5 h-4 w-4 text-muted-foreground/60" />
+              )}
+            </div>
           </div>
           <div className="grid gap-2">
-            <Label htmlFor="qg-email">Email</Label>
-            <Input
-              id="qg-email"
-              type="email"
-              value={data.contactEmail}
-              onChange={(e) => patch({ contactEmail: e.target.value })}
-            />
+            <div className="flex items-center justify-between">
+              <Label htmlFor="qg-email" className="flex items-center gap-1.5">
+                Email
+                {!data.isCompanyDataEdited ? (
+                  <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                    <Lock className="h-3 w-3" /> (Locked)
+                  </span>
+                ) : (
+                  <span className="text-[10px] font-semibold text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                    <Edit2 className="h-3 w-3" /> (Custom)
+                  </span>
+                )}
+              </Label>
+              {!data.isCompanyDataEdited && (
+                <button
+                  type="button"
+                  onClick={() => patch({ isCompanyDataEdited: true })}
+                  className="text-xs text-primary underline-offset-2 hover:underline flex items-center gap-1"
+                >
+                  <Unlock className="h-3 w-3" /> Unlock to edit
+                </button>
+              )}
+            </div>
+            <div className="relative">
+              <Input
+                id="qg-email"
+                type="email"
+                value={data.contactEmail}
+                readOnly={!data.isCompanyDataEdited}
+                onChange={(e) => patch({ contactEmail: e.target.value, isCompanyDataEdited: true })}
+                className={cn(
+                  !data.isCompanyDataEdited && "bg-muted/50 font-medium text-foreground cursor-not-allowed border-emerald-500/30"
+                )}
+              />
+              {!data.isCompanyDataEdited && (
+                <Lock className="absolute right-3 top-2.5 h-4 w-4 text-muted-foreground/60" />
+              )}
+            </div>
           </div>
         </fieldset>
 

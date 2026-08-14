@@ -15,14 +15,19 @@ import { logActivity } from "@/lib/services/activity/log-activity.service";
 import { DEFAULT_CURRENCY } from "@/lib/constants/finance";
 import { getNextFiscalSequence, updateSequenceReservationEntity } from "@/lib/services/business/counter.service";
 import { assertPeriodNotLocked } from "@/lib/services/business/period-lock.service";
-
+import { generateStandardDocumentRef } from "@/lib/utils/document-reference";
 
 export { MAX_INVOICES_PER_PURCHASE_ORDER };
 
-export async function generateUniqueInvoiceNumber(userId: string): Promise<{ invoiceNumber: string; seqValue: number; year: string }> {
+export async function generateUniqueInvoiceNumber(
+  userId: string,
+  companyCode = "SDT",
+  companyId?: string
+): Promise<{ invoiceNumber: string; seqValue: number; year: string }> {
   const currentYear = new Date().getFullYear().toString();
-  const seqValue = await getNextFiscalSequence("invoice_number", currentYear, "Invoice", userId);
-  const invoiceNumber = `# SLMEC/INV/${currentYear}/${String(seqValue).padStart(5, "0")}`;
+  const scopeKey = companyId || companyCode;
+  const seqValue = await getNextFiscalSequence("invoice_number", currentYear, "Invoice", userId, undefined, scopeKey);
+  const invoiceNumber = generateStandardDocumentRef({ docType: "INV", companyCode, sequence: seqValue });
   return { invoiceNumber, seqValue, year: currentYear };
 }
 
@@ -154,7 +159,8 @@ export async function createInvoiceForPurchaseOrder(
     primaryCompany
   );
 
-  const { invoiceNumber, seqValue, year } = await generateUniqueInvoiceNumber(input.createdBy);
+  const companyCode = (primaryCompany as any)?.code || "SDT";
+  const { invoiceNumber, seqValue, year } = await generateUniqueInvoiceNumber(input.createdBy, companyCode);
   const invDate = new Date();
   await assertPeriodNotLocked(invDate);
   const due = new Date(invDate);

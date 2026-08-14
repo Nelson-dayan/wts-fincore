@@ -10,20 +10,25 @@ export async function getNextFiscalSequence(
   fiscalYear: string,
   entityType: "Invoice" | "Quotation" | "PurchaseOrder",
   userId: string,
-  entityId?: string
+  entityId?: string,
+  companyCode?: string
 ): Promise<number> {
+  const scopedKey = companyCode && companyCode.trim().length > 0
+    ? `${key}_${companyCode.toUpperCase().replace(/[^A-Z0-9]/g, "")}`
+    : key;
+
   // Perform thread-safe Mongoose atomic findOneAndUpdate with $inc
   const counter = await CounterModel.findOneAndUpdate(
-    { key, fiscalYear },
+    { key: scopedKey, fiscalYear },
     { $inc: { sequenceValue: 1 } },
-    { new: true, upsert: true, setDefaultsOnInsert: true }
+    { returnDocument: "after", upsert: true, setDefaultsOnInsert: true }
   ).lean();
 
   const reservedValue = counter.sequenceValue;
 
   // Persist sequence reservation log for operational tracking
   await SequenceReservationModel.create({
-    key,
+    key: scopedKey,
     fiscalYear,
     value: reservedValue,
     entityType,

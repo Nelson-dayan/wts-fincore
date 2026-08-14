@@ -3,13 +3,19 @@ import { connectDB } from "@/lib/db/connect";
 import { PurchaseOrderModel, QuotationModel } from "@/lib/db/models";
 import { applyExchangeRate } from "@/lib/finance/engine";
 import { getNextFiscalSequence } from "@/lib/services/business/counter.service";
+import { generateStandardDocumentRef } from "@/lib/utils/document-reference";
 
 type POType = "client" | "internal";
 
-export async function generatePONumber(userId: string): Promise<{ poNumber: string; seqValue: number; year: string }> {
+export async function generatePONumber(
+  userId: string,
+  companyCode = "SDT",
+  companyId?: string
+): Promise<{ poNumber: string; seqValue: number; year: string }> {
   const currentYear = new Date().getFullYear().toString();
-  const seqValue = await getNextFiscalSequence("purchase_order_number", currentYear, "PurchaseOrder", userId);
-  const poNumber = `# SLMEC/PO/${currentYear}/${String(seqValue).padStart(5, "0")}`;
+  const scopeKey = companyId || companyCode;
+  const seqValue = await getNextFiscalSequence("purchase_order_number", currentYear, "PurchaseOrder", userId, undefined, scopeKey);
+  const poNumber = generateStandardDocumentRef({ docType: "PO", companyCode, sequence: seqValue });
   return { poNumber, seqValue, year: currentYear };
 }
 

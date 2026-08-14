@@ -66,16 +66,16 @@ async function main() {
   console.log("🏢 Seeding Companies...");
   const holdingCompany = await CompanyModel.create({
     name: "FinCore Global Holdings",
-    code: "HOLDING",
+    code: "HOLD",
     kind: "holding",
     taxId: "TAX-99887766",
     baseCurrency: "USD",
     isActive: true,
     isPrimary: false,
     branding: {
-      invoicePrefix: "INV-HOLD",
-      quotationPrefix: "QT-HOLD",
-      poPrefix: "PO-HOLD",
+      invoicePrefix: "HOLD",
+      quotationPrefix: "HOLD",
+      poPrefix: "HOLD",
     },
   });
 
