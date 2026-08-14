@@ -2,6 +2,7 @@ import { requireSession } from "./require-role";
 import { hasPermissionForRole, type ResourceAction } from "./permissions";
 import { resolveAuthCompanyContext, type ResolvedAuthContext } from "./company-context";
 import { validateResourceHierarchyAlignment } from "./resource-access";
+import { assertEmployeeCanAccessProject } from "./employee-resource-access";
 
 export type AuthorizationFailureCode =
   | "NOT_AUTHENTICATED"
@@ -148,6 +149,16 @@ export async function authorizeResource(options: AuthorizeOptions): Promise<Auth
   }
 
   // Step 3: Company Ownership & Legal Scope Check
+  if (context.isRequestedCompanyUnauthorized && options.companyId && !context.userAssignedCompanyIds?.includes(options.companyId)) {
+    return {
+      authorized: false,
+      code: "COMPANY_ACCESS_DENIED",
+      reason: `Company '${options.companyId}' is outside your authorized company scope.`,
+      session,
+      context,
+    };
+  }
+
   if (options.companyId && !context.allowedCompanyIds.includes(options.companyId)) {
     const isMemberOfTargetCompany = context.userAssignedCompanyIds?.includes(options.companyId);
     if (isMemberOfTargetCompany) {
@@ -189,6 +200,21 @@ export async function authorizeResource(options: AuthorizeOptions): Promise<Auth
         authorized: false,
         code,
         reason: alignment.error,
+        session,
+        context,
+      };
+    }
+  }
+
+  // Step 4.5: Employee Project Scope Check
+  if (globalRole === "employee" && options.projectId) {
+    try {
+      await assertEmployeeCanAccessProject(session.user.id, options.projectId);
+    } catch {
+      return {
+        authorized: false,
+        code: "PROJECT_ACCESS_DENIED",
+        reason: `Employee does not have access to project '${options.projectId}'.`,
         session,
         context,
       };

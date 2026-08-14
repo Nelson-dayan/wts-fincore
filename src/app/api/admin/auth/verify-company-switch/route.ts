@@ -31,10 +31,10 @@ export async function POST(req: Request) {
     // Step 1: Verify Password
     const isPasswordValid = await verifyPassword(password, user.password);
     if (!isPasswordValid) {
-      return apiError("Invalid password. Re-authentication failed.", 401);
+      return apiError("Authentication failed. Invalid credentials or unauthorized context.", 401);
     }
 
-    // Step 2: Verify Company/Group Access
+    // Step 2: Verify Company/Group Access (Password verification NEVER grants unassigned access)
     const hasCompanyAccess = await canUserAccessCompany(
       session.user.id,
       targetCompanyId,
@@ -42,7 +42,7 @@ export async function POST(req: Request) {
     );
 
     if (!hasCompanyAccess) {
-      return apiError("You do not have authorization to access this company or group.", 403);
+      return apiError("Authentication failed. Invalid credentials or unauthorized context.", 403);
     }
 
     return apiSuccess({

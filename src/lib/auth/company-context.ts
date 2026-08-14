@@ -11,6 +11,7 @@ export interface ResolvedAuthContext {
   allowedCompanyIds: string[];
   activeCompanyId: string;
   userAssignedCompanyIds: string[];
+  isRequestedCompanyUnauthorized?: boolean;
 }
 
 export async function resolveAuthCompanyContext(
@@ -25,10 +26,11 @@ export async function resolveAuthCompanyContext(
 
   const userAccess = await getUserAccessInfo(sessionUser.id, globalRole);
 
+  let isRequestedCompanyUnauthorized = false;
   // Validate target company request against user's assigned companies
   let targetCompanyId = requestedCompanyId || userAccess.defaultCompanyId;
-  if (targetCompanyId && !userAccess.isSuperAdmin && !userAccess.assignedCompanyIds.includes(targetCompanyId)) {
-    // If requested company is outside user's assigned scope, fallback to user default assigned company
+  if (requestedCompanyId && !userAccess.isSuperAdmin && !userAccess.assignedCompanyIds.includes(requestedCompanyId)) {
+    isRequestedCompanyUnauthorized = true;
     targetCompanyId = userAccess.defaultCompanyId || userAccess.assignedCompanyIds[0] || null;
   }
 
@@ -59,6 +61,7 @@ export async function resolveAuthCompanyContext(
     allowedCompanyIds: finalAllowedIds,
     activeCompanyId: context.companyId.toString(),
     userAssignedCompanyIds: userAccess.assignedCompanyIds,
+    isRequestedCompanyUnauthorized,
   };
 }
 

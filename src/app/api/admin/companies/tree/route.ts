@@ -23,14 +23,21 @@ export async function GET(req: Request) {
       .sort({ name: 1 })
       .lean();
 
+    const isSuperAdmin = authContext.globalRole === "super_admin";
+    const allowedIds = authContext.userAssignedCompanyIds || [];
+    const userCompanies = isSuperAdmin
+      ? flatCompanies
+      : flatCompanies.filter((c) => allowedIds.includes(c._id.toString()));
+
     const context = await CompanyHierarchyService.resolveCompanyContext(activeId, authContext.scopeMode);
 
     return NextResponse.json({
       tree,
-      companies: flatCompanies,
+      companies: userCompanies,
       context,
       canAccessGroupView: authContext.canAccessGroupView,
       canManageGroup: authContext.canManageGroup,
+      isSuperAdmin,
     });
   } catch (error) {
     return authErrorResponse(error, "Failed to load company hierarchy");

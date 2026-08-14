@@ -12,6 +12,8 @@ import { authErrorResponse } from "@/lib/api/route-auth";
 import { authorizeResource } from "@/lib/auth/authorization";
 
 
+import { getEmployeeAssignedProjectIdStrings } from "@/lib/auth/employee-resource-access";
+
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
@@ -37,24 +39,31 @@ export async function GET(req: Request) {
     await connectDB();
     const companyContext = auth.context;
     const isSuperAdmin = companyContext.globalRole === "super_admin";
+    const isEmployee = companyContext.globalRole === "employee";
 
     const companyFilter = isSuperAdmin
       ? {}
-      : {
-          $or: [
-            { companyId: { $in: companyContext.allowedCompanyIds } },
-            { companyId: { $exists: false } },
-            { companyId: null },
-          ],
-        };
+      : { companyId: { $in: companyContext.allowedCompanyIds } };
+
+    let employeeProjectFilter = {};
+    let assignedProjectIds: string[] = [];
+    if (isEmployee) {
+      assignedProjectIds = await getEmployeeAssignedProjectIdStrings(auth.session.user.id);
+      employeeProjectFilter = { projectId: { $in: assignedProjectIds } };
+    }
 
     const regex = new RegExp(q, "i");
 
-    // Parallel search across all primary collections with company isolation filter
+    // Parallel search across all primary collections with strict company & employee isolation
     const [projects, invoices, clients, pos, quotes, expenses] = await Promise.all([
-      ProjectModel.find({ ...companyFilter, name: regex }).limit(5).lean(),
+      ProjectModel.find({
+        ...companyFilter,
+        ...(isEmployee ? { _id: { $in: assignedProjectIds } } : {}),
+        name: regex,
+      }).limit(5).lean(),
       InvoiceModel.find({ 
         ...companyFilter,
+        ...employeeProjectFilter,
         $or: [
           { invoiceNumber: regex },
           { status: regex }
@@ -70,14 +79,20 @@ export async function GET(req: Request) {
       }).limit(5).lean(),
       PurchaseOrderModel.find({ 
         ...companyFilter,
+        ...employeeProjectFilter,
         $or: [
           { poNumber: regex },
           { vendorName: regex }
         ] 
       }).limit(5).lean(),
-      QuotationModel.find({ ...companyFilter, quotationNumber: regex }).limit(5).lean(),
+      QuotationModel.find({
+        ...companyFilter,
+        ...employeeProjectFilter,
+        quotationNumber: regex
+      }).limit(5).lean(),
       ExpenseModel.find({
         ...companyFilter,
+        ...employeeProjectFilter,
         isDeleted: { $ne: true },
         $or: [
           { title: regex },

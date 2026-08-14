@@ -76,9 +76,13 @@ export async function getUserAccessInfo(
 
   let assignedCompanyIds = Array.from(assignedIdsSet);
 
-  // Fallback for legacy users where companyMemberships is not yet populated
+  // Fallback for legacy unassigned users: assign primary/first company only, never all active companies
   if (assignedCompanyIds.length === 0) {
-    assignedCompanyIds = allActiveCompanyIdsStr;
+    if (userDoc.defaultCompanyId) {
+      assignedCompanyIds = [userDoc.defaultCompanyId.toString()];
+    } else if (allActiveCompanyIdsStr.length > 0) {
+      assignedCompanyIds = [allActiveCompanyIdsStr[0]];
+    }
   }
 
   return {
