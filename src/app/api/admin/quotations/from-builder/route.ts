@@ -317,7 +317,10 @@ export async function POST(req: Request) {
       return apiSuccess(resData);
     }
 
-    const { quotationNumber, seqValue, year } = await generateQuotationNumber(session.user.id);
+    const projectDoc = await ProjectModel.findById(projectId).lean();
+    const companyIdStr = projectDoc?.companyId ? String(projectDoc.companyId) : undefined;
+    const companyCode = (companySnapshot as any)?.code || "SDT";
+    const { quotationNumber, seqValue, year } = await generateQuotationNumber(session.user.id, companyCode, companyIdStr);
     const created = await QuotationModel.create({
       quotationNumber,
       projectId: new mongoose.Types.ObjectId(projectId),
