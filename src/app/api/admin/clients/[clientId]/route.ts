@@ -5,15 +5,31 @@ import { ClientModel, ProjectModel } from "@/lib/db/models";
 import { authErrorResponse } from "@/lib/api/route-auth";
 import { logActivity } from "@/lib/services/activity/log-activity.service";
 
+import { authorizeResource } from "@/lib/auth/authorization";
+
 interface RouteCtx {
   params: Promise<{ clientId: string }>;
 }
 
 export async function PATCH(req: Request, ctx: RouteCtx) {
   try {
-    const session = await requireRole(["admin"]);
     await connectDB();
     const { clientId } = await ctx.params;
+
+    const existingClient = await ClientModel.findById(clientId).select("companyId").lean();
+    if (!existingClient) {
+      return NextResponse.json({ message: "Client not found" }, { status: 404 });
+    }
+
+    const auth = await authorizeResource({
+      permission: "clients.edit",
+      companyId: existingClient.companyId ? String(existingClient.companyId) : undefined,
+      clientId,
+    });
+    if (!auth.authorized) {
+      return authErrorResponse({ message: auth.reason, code: auth.code }, "Access denied");
+    }
+    const session = auth.context;
     const body = (await req.json()) as {
       name?: string;
       company?: string;
@@ -72,7 +88,7 @@ export async function PATCH(req: Request, ctx: RouteCtx) {
     }
 
     await logActivity({
-      userId: session.user.id,
+      userId: session.userId,
       action: "updated_client",
       entityType: "client",
       entityId: String(updated._id),
@@ -87,9 +103,24 @@ export async function PATCH(req: Request, ctx: RouteCtx) {
 
 export async function DELETE(_req: Request, ctx: RouteCtx) {
   try {
-    const session = await requireRole(["admin"]);
     await connectDB();
     const { clientId } = await ctx.params;
+
+    const existingClient = await ClientModel.findById(clientId).select("companyId").lean();
+    if (!existingClient) {
+      return NextResponse.json({ message: "Client not found" }, { status: 404 });
+    }
+
+    const auth = await authorizeResource({
+      permission: "clients.delete",
+      companyId: existingClient.companyId ? String(existingClient.companyId) : undefined,
+      clientId,
+    });
+    if (!auth.authorized) {
+      return authErrorResponse({ message: auth.reason, code: auth.code }, "Access denied");
+    }
+    const session = auth.context;
+
     const linkedProjectCount = await ProjectModel.countDocuments({ clientId });
     if (linkedProjectCount > 0) {
       return NextResponse.json(
@@ -106,7 +137,7 @@ export async function DELETE(_req: Request, ctx: RouteCtx) {
     }
 
     await logActivity({
-      userId: session.user.id,
+      userId: session.userId,
       action: "deleted_client",
       entityType: "client",
       entityId: String(deleted._id),

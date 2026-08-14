@@ -1,15 +1,14 @@
 import { NextResponse } from "next/server";
-import { requireRole } from "@/lib/auth/require-role";
 import { connectDB } from "@/lib/db/connect";
 import { ClientModel, InvoiceModel, PaymentModel, PaymentAllocationModel, ProjectModel } from "@/lib/db/models";
-import { decimalToNumber } from "@/lib/services/business/money";
+import { authorizeResource } from "@/lib/auth/authorization";
+import { authErrorResponse } from "@/lib/api/route-auth";
 
 export async function GET(
   req: Request,
   { params }: { params: Promise<{ clientId: string }> }
 ) {
   try {
-    await requireRole(["admin", "employee"]);
     await connectDB();
     const { clientId } = await params;
 
@@ -17,6 +16,15 @@ export async function GET(
     const client = await ClientModel.findById(clientId).lean();
     if (!client) {
       return NextResponse.json({ message: "Client not found" }, { status: 404 });
+    }
+
+    const auth = await authorizeResource({
+      permission: "clients.view",
+      companyId: client.companyId ? String(client.companyId) : undefined,
+      clientId,
+    });
+    if (!auth.authorized) {
+      return authErrorResponse({ message: auth.reason, code: auth.code }, "Access denied");
     }
 
     // 2. Fetch all Client projects

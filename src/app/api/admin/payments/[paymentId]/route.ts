@@ -5,22 +5,32 @@ import { PaymentModel, PaymentAllocationModel } from "@/lib/db/models";
 import { authErrorResponse } from "@/lib/api/route-auth";
 import { deletePayment } from "@/lib/services/business/payment.service";
 
+import { authorizeResource } from "@/lib/auth/authorization";
+
 export async function GET(
   req: Request,
   { params }: { params: Promise<{ paymentId: string }> }
 ) {
   try {
-    await requireRole(["admin", "employee"]);
     await connectDB();
     const { paymentId } = await params;
     
     const item = await PaymentModel.findById(paymentId)
-      .populate("invoiceId", "invoiceNumber status totalsCache")
+      .populate("invoiceId", "invoiceNumber status totalsCache companyId")
       .populate("createdBy", "name email")
       .lean();
       
     if (!item || item.isDeleted) {
       return NextResponse.json({ message: "Payment not found" }, { status: 404 });
+    }
+
+    const auth = await authorizeResource({
+      permission: "payments.view",
+      companyId: item.companyId ? String(item.companyId) : (item.invoiceId as any)?.companyId ? String((item.invoiceId as any).companyId) : undefined,
+      projectId: item.projectId ? String(item.projectId) : undefined,
+    });
+    if (!auth.authorized) {
+      return authErrorResponse({ message: auth.reason, code: auth.code }, "Access denied");
     }
 
     // Fetch associated allocations
@@ -60,14 +70,28 @@ export async function DELETE(
   { params }: { params: Promise<{ paymentId: string }> }
 ) {
   try {
-    const session = await requireRole(["admin"]);
+    await connectDB();
     const { paymentId } = await params;
     
     if (!paymentId) {
       return NextResponse.json({ message: "paymentId is required" }, { status: 400 });
     }
 
-    const result = await deletePayment(paymentId, session.user.id);
+    const item = await PaymentModel.findById(paymentId).select("companyId projectId").lean();
+    if (!item) {
+      return NextResponse.json({ message: "Payment not found" }, { status: 404 });
+    }
+
+    const auth = await authorizeResource({
+      permission: "payments.delete",
+      companyId: item.companyId ? String(item.companyId) : undefined,
+      projectId: item.projectId ? String(item.projectId) : undefined,
+    });
+    if (!auth.authorized) {
+      return authErrorResponse({ message: auth.reason, code: auth.code }, "Access denied");
+    }
+
+    const result = await deletePayment(paymentId, auth.context.userId);
     return NextResponse.json(result);
   } catch (error) {
     return authErrorResponse(error, "Failed to delete payment");

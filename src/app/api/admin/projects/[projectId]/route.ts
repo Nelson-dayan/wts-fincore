@@ -14,21 +14,29 @@ import { buildProjectDetailPayload } from "@/lib/services/business/project-detai
 import { authErrorResponse } from "@/lib/api/route-auth";
 import { logActivity } from "@/lib/services/activity/log-activity.service";
 
+import { authorizeResource } from "@/lib/auth/authorization";
+
 interface RouteCtx {
   params: Promise<{ projectId: string }>;
 }
 
 export async function GET(_req: Request, ctx: RouteCtx) {
   try {
-    const session = await requireRole(["admin", "employee"]);
     await connectDB();
     const { projectId } = await ctx.params;
 
-    if (session.user.role === "employee") {
-      const assigned = await ProjectModel.exists({ _id: projectId, assignedTo: session.user.id });
-      if (!assigned) {
-        return NextResponse.json({ message: "Project not found" }, { status: 404 });
-      }
+    const projectDoc = await ProjectModel.findById(projectId).select("companyId").lean();
+    if (!projectDoc) {
+      return NextResponse.json({ message: "Project not found" }, { status: 404 });
+    }
+
+    const auth = await authorizeResource({
+      permission: "projects.view",
+      companyId: projectDoc.companyId ? String(projectDoc.companyId) : undefined,
+      projectId,
+    });
+    if (!auth.authorized) {
+      return authErrorResponse({ message: auth.reason, code: auth.code }, "Access denied");
     }
 
     const payload = await buildProjectDetailPayload(projectId);
@@ -44,7 +52,6 @@ export async function GET(_req: Request, ctx: RouteCtx) {
 
 export async function PATCH(req: Request, ctx: RouteCtx) {
   try {
-    const session = await requireRole(["admin"]);
     await connectDB();
     const { projectId } = await ctx.params;
     const body = (await req.json()) as {
@@ -73,6 +80,17 @@ export async function PATCH(req: Request, ctx: RouteCtx) {
     if (!project) {
       return NextResponse.json({ message: "Project not found" }, { status: 404 });
     }
+
+    const auth = await authorizeResource({
+      permission: "projects.edit",
+      companyId: project.companyId ? String(project.companyId) : undefined,
+      projectId,
+    });
+    if (!auth.authorized) {
+      return authErrorResponse({ message: auth.reason, code: auth.code }, "Access denied");
+    }
+    const session = auth.context;
+
     const previousStatus = project.status;
 
     if (Array.isArray(body.assignedTo) && body.assignedTo.length > 0) {
@@ -141,7 +159,7 @@ export async function PATCH(req: Request, ctx: RouteCtx) {
         const result = await executeTransition({
           policyId,
           entityId: projectId,
-          approvedBy: session.user.id,
+          approvedBy: session.userId,
           triggerEvent,
           route: `/api/admin/projects/${projectId}`
         });
@@ -161,7 +179,7 @@ export async function PATCH(req: Request, ctx: RouteCtx) {
     }
 
     await logActivity({
-      userId: session.user.id,
+      userId: session.userId,
       action: "updated_project",
       entityType: "project",
       entityId: String(updated._id),
@@ -178,9 +196,23 @@ export async function PATCH(req: Request, ctx: RouteCtx) {
 
 export async function DELETE(_req: Request, ctx: RouteCtx) {
   try {
-    const session = await requireRole(["admin"]);
     await connectDB();
     const { projectId } = await ctx.params;
+
+    const project = await ProjectModel.findById(projectId).select("companyId name").lean();
+    if (!project) {
+      return NextResponse.json({ message: "Project not found" }, { status: 404 });
+    }
+
+    const auth = await authorizeResource({
+      permission: "projects.delete",
+      companyId: project.companyId ? String(project.companyId) : undefined,
+      projectId,
+    });
+    if (!auth.authorized) {
+      return authErrorResponse({ message: auth.reason, code: auth.code }, "Access denied");
+    }
+    const session = auth.context;
 
     const [quotationCount, poCount, invoiceCount, expenseCount] = await Promise.all([
       QuotationModel.countDocuments({ projectId }),
@@ -205,7 +237,7 @@ export async function DELETE(_req: Request, ctx: RouteCtx) {
     }
 
     await logActivity({
-      userId: session.user.id,
+      userId: session.userId,
       action: "deleted_project",
       entityType: "project",
       entityId: String(deleted._id),

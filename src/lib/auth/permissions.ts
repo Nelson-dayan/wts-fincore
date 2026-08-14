@@ -28,12 +28,20 @@ export type ResourceAction =
   | "purchaseOrders.cancel"
   | "payments.view"
   | "payments.create"
+  | "payments.delete"
   | "expenses.view"
   | "expenses.create"
   | "expenses.approve"
   | "expenses.reject"
+  | "expenses.edit"
+  | "expenses.delete"
+  | "clients.view"
+  | "clients.create"
+  | "clients.edit"
+  | "clients.delete"
   | "company.view"
   | "company.edit"
+  | "company.delete"
   | "companyHierarchy.view"
   | "companyHierarchy.manage"
   | "groupView.access"
@@ -46,9 +54,10 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<"super_admin" | "admin" | "employe
     "quotations.view", "quotations.create", "quotations.edit", "quotations.delete", "quotations.send", "quotations.approve", "quotations.reject", "quotations.convert",
     "invoices.view", "invoices.create", "invoices.edit", "invoices.delete", "invoices.issue", "invoices.send", "invoices.void", "invoices.markPaid",
     "purchaseOrders.view", "purchaseOrders.create", "purchaseOrders.edit", "purchaseOrders.delete", "purchaseOrders.send", "purchaseOrders.approve", "purchaseOrders.cancel",
-    "payments.view", "payments.create",
-    "expenses.view", "expenses.create", "expenses.approve", "expenses.reject",
-    "company.view", "company.edit",
+    "payments.view", "payments.create", "payments.delete",
+    "expenses.view", "expenses.create", "expenses.approve", "expenses.reject", "expenses.edit", "expenses.delete",
+    "clients.view", "clients.create", "clients.edit", "clients.delete",
+    "company.view", "company.edit", "company.delete",
     "companyHierarchy.view", "companyHierarchy.manage",
     "groupView.access",
     "users.view", "users.manage",
@@ -58,9 +67,10 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<"super_admin" | "admin" | "employe
     "quotations.view", "quotations.create", "quotations.edit", "quotations.delete", "quotations.send", "quotations.approve", "quotations.reject", "quotations.convert",
     "invoices.view", "invoices.create", "invoices.edit", "invoices.delete", "invoices.issue", "invoices.send", "invoices.void", "invoices.markPaid",
     "purchaseOrders.view", "purchaseOrders.create", "purchaseOrders.edit", "purchaseOrders.delete", "purchaseOrders.send", "purchaseOrders.approve", "purchaseOrders.cancel",
-    "payments.view", "payments.create",
-    "expenses.view", "expenses.create", "expenses.approve", "expenses.reject",
-    "company.view", "company.edit",
+    "payments.view", "payments.create", "payments.delete",
+    "expenses.view", "expenses.create", "expenses.approve", "expenses.reject", "expenses.edit", "expenses.delete",
+    "clients.view", "clients.create", "clients.edit", "clients.delete",
+    "company.view", "company.edit", "company.delete",
     "companyHierarchy.view", "companyHierarchy.manage",
     "groupView.access",
     "users.view", "users.manage",
@@ -71,6 +81,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<"super_admin" | "admin" | "employe
     "invoices.view",
     "purchaseOrders.view",
     "expenses.view", "expenses.create",
+    "clients.view",
     "company.view",
   ],
 };

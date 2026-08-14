@@ -15,6 +15,7 @@
     "test:api": "npx tsx scripts/api-health-suite.ts",
     "test:e2e": "npx tsx scripts/real-e2e-suite.ts",
     "test:numbering": "npx tsx scripts/document-numbering-test.ts",
+    "test:performance": "npx tsx scripts/run-performance-audit.ts",
     "verify": "npm run test:security && npm run test:access-control && npm run test:numbering && npx tsc --noEmit && npm run build",
     "verify:all": "npm run test:security && npm run test:access-control && npm run test:numbering && npm run test:integrity && npm run test:api && npm run test:e2e && npm run test:performance && npx tsc --noEmit && npm run build",
     "lint": "eslint"

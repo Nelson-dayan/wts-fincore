@@ -6,14 +6,23 @@ import { CompanyModel } from "@/lib/db/models";
 import { logActivity } from "@/lib/services/activity/log-activity.service";
 import { isImageSrc } from "@/lib/utils/is-image-src";
 
+import { authorizeResource } from "@/lib/auth/authorization";
+
 export async function GET(
   req: Request,
   { params }: { params: Promise<{ companyId: string }> }
 ) {
   try {
-    await requireRole(["admin", "employee"]);
     await connectDB();
     const { companyId } = await params;
+
+    const auth = await authorizeResource({
+      permission: "company.view",
+      companyId,
+    });
+    if (!auth.authorized) {
+      return authErrorResponse({ message: auth.reason, code: auth.code }, "Access denied");
+    }
 
     const company = await CompanyModel.findOne({ _id: companyId, deletedAt: null })
       .populate("parentCompanyId", "name code kind")
@@ -34,9 +43,17 @@ export async function PATCH(
   { params }: { params: Promise<{ companyId: string }> }
 ) {
   try {
-    const session = await requireRole(["admin"]);
     await connectDB();
     const { companyId } = await params;
+
+    const auth = await authorizeResource({
+      permission: "company.edit",
+      companyId,
+    });
+    if (!auth.authorized) {
+      return authErrorResponse({ message: auth.reason, code: auth.code }, "Access denied");
+    }
+    const session = auth.context;
     const body = await req.json();
 
     const current = await CompanyModel.findOne({ _id: companyId, deletedAt: null });
@@ -120,7 +137,7 @@ export async function PATCH(
     }
 
     await logActivity({
-      userId: session.user.id,
+      userId: session.userId,
       action: "updated_company",
       entityType: "company",
       entityId: companyId,
@@ -138,9 +155,17 @@ export async function DELETE(
   { params }: { params: Promise<{ companyId: string }> }
 ) {
   try {
-    const session = await requireRole(["admin"]);
     await connectDB();
     const { companyId } = await params;
+
+    const auth = await authorizeResource({
+      permission: "company.delete",
+      companyId,
+    });
+    if (!auth.authorized) {
+      return authErrorResponse({ message: auth.reason, code: auth.code }, "Access denied");
+    }
+    const session = auth.context;
 
     const company = await CompanyModel.findById(companyId);
     if (!company) {
@@ -150,11 +175,11 @@ export async function DELETE(
     // Perform soft delete
     company.isActive = false;
     company.deletedAt = new Date();
-    company.deletedBy = session.user.id as any;
+    company.deletedBy = session.userId as any;
     await company.save();
 
     await logActivity({
-      userId: session.user.id,
+      userId: session.userId,
       action: "deleted_company",
       entityType: "company",
       entityId: companyId,
