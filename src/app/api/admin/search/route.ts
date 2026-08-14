@@ -8,14 +8,12 @@ import {
   QuotationModel,
   ExpenseModel
 } from "@/lib/db/models";
-import { requireRole } from "@/lib/auth/require-role";
 import { authErrorResponse } from "@/lib/api/route-auth";
+import { authorizeResource } from "@/lib/auth/authorization";
+
 
 export async function GET(req: Request) {
   try {
-    await requireRole(["admin", "employee"]);
-    await connectDB();
-
     const { searchParams } = new URL(req.url);
     const q = searchParams.get("q")?.trim();
 
@@ -23,18 +21,47 @@ export async function GET(req: Request) {
       return NextResponse.json({ items: [] });
     }
 
+    const targetCompanyId = req.headers.get("x-company-id") || searchParams.get("companyId") || undefined;
+    const scopeMode = (req.headers.get("x-scope-mode") || searchParams.get("scopeMode")) as "single" | "group" || "single";
+
+    const auth = await authorizeResource({
+      permission: "projects.view",
+      companyId: targetCompanyId,
+      requestedScopeMode: scopeMode,
+    });
+
+    if (!auth.authorized) {
+      return NextResponse.json({ items: [] });
+    }
+
+    await connectDB();
+    const companyContext = auth.context;
+    const isSuperAdmin = companyContext.globalRole === "super_admin";
+
+    const companyFilter = isSuperAdmin
+      ? {}
+      : {
+          $or: [
+            { companyId: { $in: companyContext.allowedCompanyIds } },
+            { companyId: { $exists: false } },
+            { companyId: null },
+          ],
+        };
+
     const regex = new RegExp(q, "i");
 
-    // Parallel search across all primary collections
+    // Parallel search across all primary collections with company isolation filter
     const [projects, invoices, clients, pos, quotes, expenses] = await Promise.all([
-      ProjectModel.find({ name: regex }).limit(5).lean(),
+      ProjectModel.find({ ...companyFilter, name: regex }).limit(5).lean(),
       InvoiceModel.find({ 
+        ...companyFilter,
         $or: [
           { invoiceNumber: regex },
           { status: regex }
         ] 
       }).limit(5).lean(),
       ClientModel.find({ 
+        ...companyFilter,
         $or: [
           { name: regex },
           { company: regex },
@@ -42,13 +69,15 @@ export async function GET(req: Request) {
         ] 
       }).limit(5).lean(),
       PurchaseOrderModel.find({ 
+        ...companyFilter,
         $or: [
           { poNumber: regex },
           { vendorName: regex }
         ] 
       }).limit(5).lean(),
-      QuotationModel.find({ quotationNumber: regex }).limit(5).lean(),
+      QuotationModel.find({ ...companyFilter, quotationNumber: regex }).limit(5).lean(),
       ExpenseModel.find({
+        ...companyFilter,
         isDeleted: { $ne: true },
         $or: [
           { title: regex },
@@ -57,6 +86,7 @@ export async function GET(req: Request) {
         ]
       }).limit(5).lean()
     ]);
+
 
     const items: any[] = [];
 

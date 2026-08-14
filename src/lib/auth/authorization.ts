@@ -7,6 +7,7 @@ export type AuthorizationFailureCode =
   | "NOT_AUTHENTICATED"
   | "PERMISSION_DENIED"
   | "COMPANY_ACCESS_DENIED"
+  | "COMPANY_CONTEXT_SWITCH_REQUIRED"
   | "GROUP_SCOPE_DENIED"
   | "PROJECT_ACCESS_DENIED"
   | "RESOURCE_NOT_FOUND"
@@ -41,7 +42,7 @@ export function canTransitionWorkflowState(
   resourceType: "quotation" | "purchaseOrder" | "invoice" | "expense",
   fromState: string,
   toState: string,
-  userRole: "admin" | "employee"
+  userRole: "super_admin" | "admin" | "employee"
 ): { allowed: boolean; requiredPermission?: ResourceAction; reason?: string } {
   const from = fromState.toUpperCase();
   const to = toState.toUpperCase();
@@ -119,7 +120,7 @@ export async function authorizeResource(options: AuthorizeOptions): Promise<Auth
   }
 
   const user = session.user;
-  const globalRole = (user.role as "admin" | "employee") || "employee";
+  const globalRole = (user.role as "super_admin" | "admin" | "employee") || "employee";
 
   // Step 1: Capability Permission Check
   const hasPerm = hasPermissionForRole(globalRole, options.permission);
@@ -148,14 +149,26 @@ export async function authorizeResource(options: AuthorizeOptions): Promise<Auth
 
   // Step 3: Company Ownership & Legal Scope Check
   if (options.companyId && !context.allowedCompanyIds.includes(options.companyId)) {
+    const isMemberOfTargetCompany = context.userAssignedCompanyIds?.includes(options.companyId);
+    if (isMemberOfTargetCompany) {
+      return {
+        authorized: false,
+        code: "COMPANY_CONTEXT_SWITCH_REQUIRED",
+        reason: `Target document belongs to company '${options.companyId}'. Context switch with authentication required to access.`,
+        session,
+        context,
+      };
+    }
+
     return {
       authorized: false,
       code: "COMPANY_ACCESS_DENIED",
-      reason: `Company '${options.companyId}' is outside your active scope.`,
+      reason: `Company '${options.companyId}' is outside your authorized company scope.`,
       session,
       context,
     };
   }
+
 
   // Step 4: Validate Data Hierarchy Alignment (Company -> Client -> Project)
   if (options.companyId || options.clientId || options.projectId) {

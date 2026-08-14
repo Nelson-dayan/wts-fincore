@@ -40,7 +40,19 @@ export type ResourceAction =
   | "users.view"
   | "users.manage";
 
-export const DEFAULT_ROLE_PERMISSIONS: Record<"admin" | "employee", ResourceAction[]> = {
+export const DEFAULT_ROLE_PERMISSIONS: Record<"super_admin" | "admin" | "employee", ResourceAction[]> = {
+  super_admin: [
+    "projects.view", "projects.create", "projects.edit", "projects.delete",
+    "quotations.view", "quotations.create", "quotations.edit", "quotations.delete", "quotations.send", "quotations.approve", "quotations.reject", "quotations.convert",
+    "invoices.view", "invoices.create", "invoices.edit", "invoices.delete", "invoices.issue", "invoices.send", "invoices.void", "invoices.markPaid",
+    "purchaseOrders.view", "purchaseOrders.create", "purchaseOrders.edit", "purchaseOrders.delete", "purchaseOrders.send", "purchaseOrders.approve", "purchaseOrders.cancel",
+    "payments.view", "payments.create",
+    "expenses.view", "expenses.create", "expenses.approve", "expenses.reject",
+    "company.view", "company.edit",
+    "companyHierarchy.view", "companyHierarchy.manage",
+    "groupView.access",
+    "users.view", "users.manage",
+  ],
   admin: [
     "projects.view", "projects.create", "projects.edit", "projects.delete",
     "quotations.view", "quotations.create", "quotations.edit", "quotations.delete", "quotations.send", "quotations.approve", "quotations.reject", "quotations.convert",
@@ -68,9 +80,13 @@ export function hasPermissionForRole(
   permission: ResourceAction,
   customPermissions?: ResourceAction[]
 ): boolean {
+  if (role === "super_admin") {
+    return true;
+  }
   if (customPermissions && Array.isArray(customPermissions)) {
     return customPermissions.includes(permission);
   }
-  const defaultPerms = DEFAULT_ROLE_PERMISSIONS[role as "admin" | "employee"] || [];
+  const defaultPerms = DEFAULT_ROLE_PERMISSIONS[role as "super_admin" | "admin" | "employee"] || [];
   return defaultPerms.includes(permission);
 }
+
