@@ -6,12 +6,11 @@ import {
   ClientModel, 
   PurchaseOrderModel, 
   QuotationModel,
-  ExpenseModel
+  ExpenseModel,
+  CompanyModel
 } from "@/lib/db/models";
 import { authErrorResponse } from "@/lib/api/route-auth";
 import { authorizeResource } from "@/lib/auth/authorization";
-
-
 import { getEmployeeAssignedProjectIdStrings } from "@/lib/auth/employee-resource-access";
 
 export async function GET(req: Request) {
@@ -53,6 +52,10 @@ export async function GET(req: Request) {
     }
 
     const regex = new RegExp(q, "i");
+
+    // Fetch company code map for result labeling
+    const companyDocs = await CompanyModel.find({ deletedAt: null }).select("_id code name").lean();
+    const companyCodeMap = new Map(companyDocs.map((c: any) => [String(c._id), c.code]));
 
     // Parallel search across all primary collections with strict company & employee isolation
     const [projects, invoices, clients, pos, quotes, expenses] = await Promise.all([
@@ -102,7 +105,6 @@ export async function GET(req: Request) {
       }).limit(5).lean()
     ]);
 
-
     const items: any[] = [];
 
     projects.forEach((p: any) => {
@@ -111,6 +113,8 @@ export async function GET(req: Request) {
         type: "Project",
         title: p.name,
         subtitle: `Status: ${p.status || "Active"} · Budget: ₹${(p.budget || 0).toLocaleString()}`,
+        companyId: p.companyId ? String(p.companyId) : undefined,
+        companyCode: p.companyId ? companyCodeMap.get(String(p.companyId)) || undefined : undefined,
         url: `/admin/projects/${p._id}`
       });
     });
@@ -121,6 +125,8 @@ export async function GET(req: Request) {
         type: "Invoice",
         title: i.invoiceNumber,
         subtitle: `Status: ${i.status} · Total: ₹${(i.total || 0).toLocaleString()}`,
+        companyId: i.companyId ? String(i.companyId) : undefined,
+        companyCode: i.companyId ? companyCodeMap.get(String(i.companyId)) || undefined : undefined,
         url: `/admin/invoices/${i._id}`
       });
     });
@@ -131,6 +137,8 @@ export async function GET(req: Request) {
         type: "Client",
         title: c.name || c.company || "Unnamed Client",
         subtitle: `${c.company ? c.company + " · " : ""}${c.email || "No email"}`,
+        companyId: c.companyId ? String(c.companyId) : undefined,
+        companyCode: c.companyId ? companyCodeMap.get(String(c.companyId)) || undefined : undefined,
         url: `/admin/clients/${c._id}`
       });
     });
@@ -141,6 +149,8 @@ export async function GET(req: Request) {
         type: "Purchase Order",
         title: p.poNumber,
         subtitle: `Vendor: ${p.vendorName || "N/A"} · Quotation: ${p.quotationNumber || "N/A"}`,
+        companyId: p.companyId ? String(p.companyId) : undefined,
+        companyCode: p.companyId ? companyCodeMap.get(String(p.companyId)) || undefined : undefined,
         url: `/admin/purchase-orders`
       });
     });
@@ -151,6 +161,8 @@ export async function GET(req: Request) {
         type: "Quotation",
         title: q.quotationNumber,
         subtitle: `Client: ${q.clientSnapshot?.name || "N/A"}`,
+        companyId: q.companyId ? String(q.companyId) : undefined,
+        companyCode: q.companyId ? companyCodeMap.get(String(q.companyId)) || undefined : undefined,
         url: `/admin/quotations/${q._id}`
       });
     });
@@ -161,6 +173,8 @@ export async function GET(req: Request) {
         type: "Expense",
         title: e.title || e.category || "Expense",
         subtitle: `Category: ${e.category || "General"} · Amount: ₹${(e.amountBase || e.amount || 0).toLocaleString()}`,
+        companyId: e.companyId ? String(e.companyId) : undefined,
+        companyCode: e.companyId ? companyCodeMap.get(String(e.companyId)) || undefined : undefined,
         url: `/admin/expenses`
       });
     });

@@ -22,6 +22,8 @@ type SearchResult = {
   type: "Project" | "Invoice" | "Client" | "Purchase Order" | "Quotation" | "Expense";
   title: string;
   subtitle: string;
+  companyId?: string;
+  companyCode?: string;
   url: string;
 };
 
@@ -211,6 +213,16 @@ export function CommandPalette() {
                         )}>{item.subtitle}</p>
                       </div>
                       <div className="shrink-0 flex items-center gap-2">
+                        {item.companyCode && (
+                          <span className={cn(
+                            "text-[9px] font-mono font-bold uppercase px-1.5 py-0.5 rounded border",
+                            idx === selectedIndex 
+                              ? "border-white/30 bg-white/20 text-white" 
+                              : "border-border/60 bg-muted/80 text-foreground"
+                          )}>
+                            {item.companyCode}
+                          </span>
+                        )}
                         <span className={cn(
                           "text-[9px] font-bold uppercase px-1.5 py-0.5 rounded",
                           idx === selectedIndex ? "bg-white/20 text-white" : "bg-muted text-muted-foreground"

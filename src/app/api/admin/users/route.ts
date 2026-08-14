@@ -25,7 +25,7 @@ export async function GET(req: Request) {
       : {};
     const [usersRaw, total] = await Promise.all([
       UserModel.find(filter)
-      .select("name email role isActive phone phoneNumber signatureUrl createdAt updatedAt")
+      .select("name email role isActive phone phoneNumber companyIds groupIds groupViewAccess primaryCompanyId signatureUrl createdAt updatedAt")
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit)
@@ -34,6 +34,11 @@ export async function GET(req: Request) {
     ]);
     const users = usersRaw.map((user) => ({
       ...user,
+      role: user.role ?? "employee",
+      companyIds: (user.companyIds || []).map(String),
+      groupIds: (user.groupIds || []).map(String),
+      groupViewAccess: Boolean(user.groupViewAccess),
+      primaryCompanyId: user.primaryCompanyId ? String(user.primaryCompanyId) : "",
       phone:
         String(
           (user as { phone?: string }).phone ??
@@ -62,7 +67,11 @@ export async function POST(req: Request) {
       email?: string;
       password?: string;
       phoneNumber?: string;
-      role?: "admin" | "employee";
+      role?: "admin" | "employee" | "super_admin";
+      companyIds?: string[];
+      groupIds?: string[];
+      groupViewAccess?: boolean;
+      primaryCompanyId?: string;
     };
 
     // Reuse registration validator+service to keep one source of truth.
@@ -78,8 +87,30 @@ export async function POST(req: Request) {
     }
 
     await connectDB();
-    const created = await UserModel.findOne({ email: String(body.email ?? "").toLowerCase() })
-      .select("_id name email role isActive phone createdAt")
+
+    const updateFields: Record<string, unknown> = {};
+    if (body.role && ["admin", "employee", "super_admin"].includes(body.role)) {
+      updateFields.role = body.role;
+    }
+    if (Array.isArray(body.companyIds)) {
+      updateFields.companyIds = body.companyIds;
+    }
+    if (Array.isArray(body.groupIds)) {
+      updateFields.groupIds = body.groupIds;
+    }
+    if (typeof body.groupViewAccess === "boolean") {
+      updateFields.groupViewAccess = body.groupViewAccess;
+    }
+    if (body.primaryCompanyId) {
+      updateFields.primaryCompanyId = body.primaryCompanyId;
+    }
+
+    let created = await UserModel.findOneAndUpdate(
+      { email: String(body.email ?? "").toLowerCase() },
+      { $set: updateFields },
+      { new: true }
+    )
+      .select("_id name email role isActive phone companyIds groupIds groupViewAccess primaryCompanyId createdAt")
       .lean();
 
     if (created?._id) {
@@ -88,7 +119,7 @@ export async function POST(req: Request) {
         action: "created_user",
         entityType: "user",
         entityId: String(created._id),
-        message: `Created user ${created.email}`,
+        message: `Created user ${created.email} with role ${created.role}`,
       });
     }
 
