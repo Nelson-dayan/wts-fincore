@@ -18,7 +18,12 @@ import { redirect } from "next/navigation";
 
 
 export default async function Login() {
-  const session = await getServerSession(authOptions);
+  let session = null;
+  try {
+    session = await getServerSession(authOptions);
+  } catch (err) {
+    console.error("[Login Page] Failed to retrieve server session:", err);
+  }
 
   if (session) {
     const role = session.user?.role;
