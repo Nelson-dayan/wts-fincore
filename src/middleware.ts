@@ -21,6 +21,9 @@ export default withAuth(
         return true;
       },
     },
+    pages: {
+      signIn: "/login",
+    },
     secret: process.env.NEXTAUTH_SECRET,
   }
 );
