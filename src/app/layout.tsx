@@ -19,7 +19,6 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: { default: "WTS-FinCore", template: "%s · WTS-FinCore" },
   description: "WTS-FinCore - Financial Core & Trade Management System",
-  manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
@@ -71,6 +70,7 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <head>
+        <link rel="manifest" href="/manifest.webmanifest" crossOrigin="use-credentials" />
         <script
           suppressHydrationWarning
           dangerouslySetInnerHTML={{ __html: themeInitScript }}

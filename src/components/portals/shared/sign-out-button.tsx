@@ -15,7 +15,7 @@ export function SignOutButton({ className }: { className?: string }) {
         "h-9 gap-1.5 rounded-xl px-2.5 sm:px-3 text-xs sm:text-sm font-medium text-muted-foreground transition-[transform,background-color,color] duration-200 hover:-translate-y-px hover:bg-destructive/12 hover:text-destructive active:translate-y-0 motion-reduce:hover:translate-y-0",
         className
       )}
-      onClick={() => signOut({ callbackUrl: "/login" })}
+      onClick={() => signOut({ callbackUrl: window.location.origin + "/login" })}
       title="Sign out"
     >
       <LogOut className="size-4 shrink-0" aria-hidden />
