@@ -3,23 +3,23 @@ import { connectDB } from "@/lib/db/connect";
 import { UserModel } from "@/lib/db/models";
 import { requireRole } from "@/lib/auth/require-role";
 import { authErrorResponse } from "@/lib/api/route-auth";
-import { parsePagination, parseSearch } from "@/lib/api/pagination";
+import { parsePagination, parseSearch, escapeRegex } from "@/lib/api/pagination";
 import { registerUser } from "@/lib/register/service";
 import { publicRegisterMessage } from "@/lib/register/http-map";
 import { logActivity } from "@/lib/services/activity/log-activity.service";
 
 export async function GET(req: Request) {
   try {
-    await requireRole(["admin"]);
-    await connectDB();
     const url = new URL(req.url);
     const { page, limit, skip } = parsePagination(url.searchParams);
     const q = parseSearch(url.searchParams);
+    await requireRole(["admin"]);
+    await connectDB();
     const filter = q
       ? {
           $or: [
-            { name: { $regex: q, $options: "i" } },
-            { email: { $regex: q, $options: "i" } },
+            { name: { $regex: escapeRegex(q), $options: "i" } },
+            { email: { $regex: escapeRegex(q), $options: "i" } },
           ],
         }
       : {};

@@ -10,7 +10,7 @@ import {
   InvoiceModel 
 } from "@/lib/db/models";
 import { authErrorResponse } from "@/lib/api/route-auth";
-import { parsePagination, parseSearch } from "@/lib/api/pagination";
+import { parsePagination, parseSearch, escapeRegex } from "@/lib/api/pagination";
 import { logActivity } from "@/lib/services/activity/log-activity.service";
 import { decimalToNumber } from "@/lib/services/business/money";
 
@@ -40,7 +40,7 @@ export async function GET(req: Request) {
       filter.companyId = { $in: companyContext.allowedCompanyIds };
     }
 
-    if (q) filter.name = { $regex: q, $options: "i" };
+    if (q) filter.name = { $regex: escapeRegex(q), $options: "i" };
     if (clientId) filter.clientId = clientId;
     if (session.user.role === "employee") {
       filter.assignedTo = session.user.id;

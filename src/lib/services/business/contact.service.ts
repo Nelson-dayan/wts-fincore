@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 import { connectDB } from "@/lib/db/connect";
 import { ContactModel, ProjectContactAssignmentModel } from "@/lib/db/models";
+import { escapeRegex } from "@/lib/api/pagination";
 import type { ContactData } from "@/types/contact";
 
 export interface CreateContactInput {
@@ -138,7 +139,7 @@ export async function listContacts(filter: ListContactsFilter = {}): Promise<Con
   }
 
   if (filter.q) {
-    const regex = new RegExp(filter.q.trim(), "i");
+    const regex = new RegExp(escapeRegex(filter.q.trim()), "i");
     query.$or = [
       { firstName: regex },
       { lastName: regex },

@@ -10,21 +10,21 @@ import {
 } from "@/lib/db/models";
 import { authErrorResponse } from "@/lib/api/route-auth";
 import { authorizeResource } from "@/lib/auth/authorization";
-
+import { parseSearch, escapeRegex } from "@/lib/api/pagination";
 
 import { getEmployeeAssignedProjectIdStrings } from "@/lib/auth/employee-resource-access";
 
 export async function GET(req: Request) {
   try {
-    const { searchParams } = new URL(req.url);
-    const q = searchParams.get("q")?.trim();
+    const url = new URL(req.url);
+    const q = parseSearch(url.searchParams);
 
     if (!q || q.length < 2) {
       return NextResponse.json({ items: [] });
     }
 
-    const targetCompanyId = req.headers.get("x-company-id") || searchParams.get("companyId") || undefined;
-    const scopeMode = (req.headers.get("x-scope-mode") || searchParams.get("scopeMode")) as "single" | "group" || "single";
+    const targetCompanyId = req.headers.get("x-company-id") || url.searchParams.get("companyId") || undefined;
+    const scopeMode = (req.headers.get("x-scope-mode") || url.searchParams.get("scopeMode")) as "single" | "group" || "single";
 
     const auth = await authorizeResource({
       permission: "projects.view",
@@ -52,7 +52,7 @@ export async function GET(req: Request) {
       employeeProjectFilter = { projectId: { $in: assignedProjectIds } };
     }
 
-    const regex = new RegExp(q, "i");
+    const regex = new RegExp(escapeRegex(q), "i");
 
     // Parallel search across all primary collections with strict company & employee isolation
     const [projects, invoices, clients, pos, quotes, expenses] = await Promise.all([

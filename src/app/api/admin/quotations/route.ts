@@ -3,7 +3,7 @@ import { requireRole } from "@/lib/auth/require-role";
 import { connectDB } from "@/lib/db/connect";
 import { PurchaseOrderModel, QuotationModel } from "@/lib/db/models";
 import { apiSuccess, apiError } from "@/lib/api/response";
-import { parsePagination, parseSearch } from "@/lib/api/pagination";
+import { parsePagination, parseSearch, escapeRegex } from "@/lib/api/pagination";
 import { logActivity } from "@/lib/services/activity/log-activity.service";
 import {
   buildQuotationSnapshots,
@@ -24,6 +24,9 @@ import { CompanyHierarchyService } from "@/lib/services/business/company-hierarc
 export async function GET(req: Request) {
   try {
     const url = new URL(req.url);
+    const { page, limit, skip } = parsePagination(url.searchParams);
+    const q = parseSearch(url.searchParams);
+
     const targetCompanyId = req.headers.get("x-company-id") || url.searchParams.get("companyId") || undefined;
     const scopeMode = (req.headers.get("x-scope-mode") || url.searchParams.get("scopeMode")) as "single" | "group" || "single";
     const projectId = String(url.searchParams.get("projectId") ?? "").trim() || undefined;
@@ -42,8 +45,6 @@ export async function GET(req: Request) {
     const session = auth.session;
     const companyContext = auth.context;
     await connectDB();
-    const { page, limit, skip } = parsePagination(url.searchParams);
-    const q = parseSearch(url.searchParams);
 
     const filter: Record<string, unknown> = {
       $or: [
@@ -53,7 +54,7 @@ export async function GET(req: Request) {
       ],
     };
 
-    if (q) filter.quotationNumber = { $regex: q, $options: "i" };
+    if (q) filter.quotationNumber = { $regex: escapeRegex(q), $options: "i" };
 
     if (session.user.role === "employee") {
       const employeeProjectIds = await getEmployeeAssignedProjectIdStrings(session.user.id);
@@ -129,7 +130,10 @@ export async function GET(req: Request) {
       }
     });
     return apiSuccess({ items, page, limit, total, hasMore: skip + items.length < total });
-  } catch (error) {
+  } catch (error: any) {
+    if (error?.statusCode === 400 || error?.name === "InvalidQueryParamError") {
+      return apiError(error.message, 400);
+    }
     console.error("GET Quotations Error:", error);
     return apiError("Failed to load quotations", 500);
   }

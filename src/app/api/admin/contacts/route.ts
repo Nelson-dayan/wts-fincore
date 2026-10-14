@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireRole } from "@/lib/auth/require-role";
 import { authErrorResponse } from "@/lib/api/route-auth";
+import { parseSearch, escapeRegex } from "@/lib/api/pagination";
 import { createContact, listContacts } from "@/lib/services/business/contact.service";
 
 export async function GET(req: Request) {
@@ -9,7 +10,7 @@ export async function GET(req: Request) {
     const url = new URL(req.url);
     const companyId = url.searchParams.get("companyId") || undefined;
     const clientId = url.searchParams.get("clientId") || undefined;
-    const q = url.searchParams.get("q") || undefined;
+    const q = parseSearch(url.searchParams) || undefined;
     const status = (url.searchParams.get("status") as "ACTIVE" | "INACTIVE") || undefined;
 
     const items = await listContacts({ companyId, clientId, q, status });

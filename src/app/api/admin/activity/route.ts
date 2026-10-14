@@ -2,7 +2,7 @@ import { requireRole } from "@/lib/auth/require-role";
 import { connectDB } from "@/lib/db/connect";
 import { ActivityLogModel } from "@/lib/db/models";
 import { apiSuccess, apiError } from "@/lib/api/response";
-import { parsePagination, parseSearch } from "@/lib/api/pagination";
+import { parsePagination, parseSearch, escapeRegex } from "@/lib/api/pagination";
 import { isNextInternalError } from "@/lib/api/standard-response";
 
 export async function GET(req: Request) {
@@ -16,9 +16,9 @@ export async function GET(req: Request) {
     const filter: Record<string, unknown> = q
       ? {
           $or: [
-            { action: { $regex: q, $options: "i" } },
-            { entityType: { $regex: q, $options: "i" } },
-            { message: { $regex: q, $options: "i" } },
+            { action: { $regex: escapeRegex(q), $options: "i" } },
+            { entityType: { $regex: escapeRegex(q), $options: "i" } },
+            { message: { $regex: escapeRegex(q), $options: "i" } },
           ],
         }
       : {};
@@ -36,8 +36,11 @@ export async function GET(req: Request) {
       ActivityLogModel.countDocuments(filter),
     ]);
     return apiSuccess({ items, page, limit, total, hasMore: skip + items.length < total });
-  } catch (error) {
+  } catch (error: any) {
     if (isNextInternalError(error)) throw error;
+    if (error?.statusCode === 400 || error?.name === "InvalidQueryParamError") {
+      return apiError(error.message, 400);
+    }
     console.error("Activity API Error:", error);
     return apiError("Failed to load activity logs", 500);
   }

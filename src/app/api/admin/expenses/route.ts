@@ -3,7 +3,7 @@ import { requireRole } from "@/lib/auth/require-role";
 import { connectDB } from "@/lib/db/connect";
 import { ExpenseModel, ProjectModel, ClientModel, CompanyModel } from "@/lib/db/models";
 import { authErrorResponse } from "@/lib/api/route-auth";
-import { parsePagination, parseSearch } from "@/lib/api/pagination";
+import { parsePagination, parseSearch, escapeRegex } from "@/lib/api/pagination";
 import { logActivity } from "@/lib/services/activity/log-activity.service";
 import { decimalToNumber } from "@/lib/services/business/money";
 import { normalizeToBase } from "@/lib/services/finance/forex.engine";
@@ -40,6 +40,9 @@ function formatExpenseRow(row: Record<string, unknown>) {
 export async function GET(req: Request) {
   try {
     const url = new URL(req.url);
+    const { page, limit, skip } = parsePagination(url.searchParams);
+    const q = parseSearch(url.searchParams);
+
     const targetCompanyId = req.headers.get("x-company-id") || url.searchParams.get("companyId") || undefined;
     const projectId = url.searchParams.get("projectId") || undefined;
 
@@ -56,8 +59,6 @@ export async function GET(req: Request) {
     const session = auth.session;
     const companyContext = auth.context;
     await connectDB();
-    const { page, limit, skip } = parsePagination(url.searchParams);
-    const q = parseSearch(url.searchParams);
 
     const parts: Record<string, unknown>[] = [];
     parts.push({ isDeleted: { $ne: true } });
@@ -87,10 +88,11 @@ export async function GET(req: Request) {
     }
 
     if (q) {
+      const safeQ = escapeRegex(q);
       parts.push({
         $or: [
-          { title: { $regex: q, $options: "i" } },
-          { category: { $regex: q, $options: "i" } },
+          { title: { $regex: safeQ, $options: "i" } },
+          { category: { $regex: safeQ, $options: "i" } },
         ],
       });
     }

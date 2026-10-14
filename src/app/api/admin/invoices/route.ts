@@ -4,7 +4,7 @@ import { requireRole } from "@/lib/auth/require-role";
 import { connectDB } from "@/lib/db/connect";
 import { InvoiceModel, PurchaseOrderModel } from "@/lib/db/models";
 import { authErrorResponse } from "@/lib/api/route-auth";
-import { parsePagination, parseSearch } from "@/lib/api/pagination";
+import { parsePagination, parseSearch, escapeRegex } from "@/lib/api/pagination";
 import { logActivity } from "@/lib/services/activity/log-activity.service";
 import { createInvoiceForPurchaseOrder } from "@/lib/services/business/invoice.service";
 import { decimalToNumber } from "@/lib/services/business/money";
@@ -20,6 +20,10 @@ import { CompanyHierarchyService } from "@/lib/services/business/company-hierarc
 export async function GET(req: Request) {
   try {
     const url = new URL(req.url);
+    const { page, limit, skip } = parsePagination(url.searchParams);
+    const q = parseSearch(url.searchParams);
+    const poId = String(url.searchParams.get("poId") ?? "").trim();
+
     const targetCompanyId = req.headers.get("x-company-id") || url.searchParams.get("companyId") || undefined;
     const scopeMode = (req.headers.get("x-scope-mode") || url.searchParams.get("scopeMode")) as "single" | "group" || "single";
     const projectId = String(url.searchParams.get("projectId") ?? "").trim() || undefined;
@@ -38,16 +42,13 @@ export async function GET(req: Request) {
     const session = auth.session;
     const companyContext = auth.context;
     await connectDB();
-    const { page, limit, skip } = parsePagination(url.searchParams);
-    const q = parseSearch(url.searchParams);
-    const poId = String(url.searchParams.get("poId") ?? "").trim();
 
     const filter: Record<string, unknown> = {
       lifecycleStatus: { $ne: "DRAFT_HIDDEN" },
       isDeleted: { $ne: true },
       companyId: { $in: companyContext.allowedCompanyIds },
     };
-    if (q) filter.invoiceNumber = { $regex: q, $options: "i" };
+    if (q) filter.invoiceNumber = { $regex: escapeRegex(q), $options: "i" };
 
     if (session.user.role === "employee") {
       const employeeProjectIds = await getEmployeeAssignedProjectIdStrings(session.user.id);

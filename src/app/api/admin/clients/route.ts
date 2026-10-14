@@ -3,18 +3,18 @@ import { requireRole } from "@/lib/auth/require-role";
 import { connectDB } from "@/lib/db/connect";
 import { ClientModel, ProjectModel } from "@/lib/db/models";
 import { authErrorResponse } from "@/lib/api/route-auth";
-import { parsePagination, parseSearch } from "@/lib/api/pagination";
+import { parsePagination, parseSearch, escapeRegex } from "@/lib/api/pagination";
 import { logActivity } from "@/lib/services/activity/log-activity.service";
 
 import { CompanyHierarchyService } from "@/lib/services/business/company-hierarchy.service";
 
 export async function GET(req: Request) {
   try {
-    await requireRole(["admin"]);
-    await connectDB();
     const url = new URL(req.url);
     const { page, limit, skip } = parsePagination(url.searchParams);
     const q = parseSearch(url.searchParams);
+    await requireRole(["admin"]);
+    await connectDB();
     const targetCompanyId = req.headers.get("x-company-id") || url.searchParams.get("companyId");
     const scopeMode = (req.headers.get("x-scope-mode") || url.searchParams.get("scopeMode")) as "single" | "group" || "single";
 
@@ -32,11 +32,12 @@ export async function GET(req: Request) {
     }
 
     if (q) {
+      const safeQ = escapeRegex(q);
       const qCond = {
         $or: [
-          { name: { $regex: q, $options: "i" } },
-          { company: { $regex: q, $options: "i" } },
-          { email: { $regex: q, $options: "i" } },
+          { name: { $regex: safeQ, $options: "i" } },
+          { company: { $regex: safeQ, $options: "i" } },
+          { email: { $regex: safeQ, $options: "i" } },
         ],
       };
       if (filter.$or) {

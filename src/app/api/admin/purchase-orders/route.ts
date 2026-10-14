@@ -3,7 +3,7 @@ import { requireRole } from "@/lib/auth/require-role";
 import { connectDB } from "@/lib/db/connect";
 import { InvoiceModel, PurchaseOrderModel, QuotationModel } from "@/lib/db/models";
 import { authErrorResponse } from "@/lib/api/route-auth";
-import { parsePagination, parseSearch } from "@/lib/api/pagination";
+import { parsePagination, parseSearch, escapeRegex } from "@/lib/api/pagination";
 import { logActivity } from "@/lib/services/activity/log-activity.service";
 import {
   createPurchaseOrder,
@@ -37,6 +37,9 @@ import { CompanyHierarchyService } from "@/lib/services/business/company-hierarc
 export async function GET(req: Request) {
   try {
     const url = new URL(req.url);
+    const { page, limit, skip } = parsePagination(url.searchParams);
+    const q = parseSearch(url.searchParams);
+
     const targetCompanyId = req.headers.get("x-company-id") || url.searchParams.get("companyId") || undefined;
     const scopeMode = (req.headers.get("x-scope-mode") || url.searchParams.get("scopeMode")) as "single" | "group" || "single";
     const projectId = String(url.searchParams.get("projectId") ?? "").trim() || undefined;
@@ -55,8 +58,6 @@ export async function GET(req: Request) {
     const session = auth.session;
     const companyContext = auth.context;
     await connectDB();
-    const { page, limit, skip } = parsePagination(url.searchParams);
-    const q = parseSearch(url.searchParams);
     const quotationId = String(url.searchParams.get("quotationId") ?? "").trim();
 
     const filter: Record<string, unknown> = {
@@ -67,7 +68,7 @@ export async function GET(req: Request) {
       ],
     };
 
-    if (q) filter.poNumber = { $regex: q, $options: "i" };
+    if (q) filter.poNumber = { $regex: escapeRegex(q), $options: "i" };
 
     if (session.user.role === "employee") {
       const employeeProjectIds = await getEmployeeAssignedProjectIdStrings(session.user.id);
