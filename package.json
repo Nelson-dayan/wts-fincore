@@ -10,6 +10,7 @@
     "seed": "npx tsx scripts/seed.ts",
     "seed:test": "npx tsx scripts/seed-test.ts",
     "test:security": "npx tsx scripts/security-authorization-matrix-test.ts",
+    "test:transfer-security": "npx tsx scripts/test-transfer-security.ts",
     "test:access-control": "npx tsx scripts/company-access-control-test.ts",
     "test:integrity": "npx tsx scripts/db-integrity-test.ts",
     "test:api": "npx tsx scripts/api-health-suite.ts",
