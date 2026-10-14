@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { X, Loader2, RefreshCw } from "lucide-react";
+import { X, Loader2, RefreshCw, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -21,6 +21,7 @@ interface TransferFundsModalProps {
   onSuccess: () => void;
   apiPrefix: string;
 }
+import { getBenchmarkRate, getCurrencyDecimals } from "@/lib/constants/finance";
 
 export function TransferFundsModal({ isOpen, onClose, onSuccess, apiPrefix }: TransferFundsModalProps) {
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -72,14 +73,32 @@ export function TransferFundsModal({ isOpen, onClose, onSuccess, apiPrefix }: Tr
   const toAccount = accounts.find((a) => a._id === toAccountId);
   const isSameCurrency = Boolean(fromAccount && toAccount && fromAccount.currency === toAccount.currency);
 
+  const recalculateToAmount = (fromVal: string, feesVal: string, rateVal: string) => {
+    const from = parseFloat(fromVal);
+    const fee = parseFloat(feesVal) || 0;
+    const rate = parseFloat(rateVal);
+    if (!isNaN(from) && from > 0 && !isNaN(rate) && rate > 0 && fee >= 0 && fee < from) {
+      const destDecimals = toAccount ? getCurrencyDecimals(toAccount.currency) : 2;
+      const net = from - fee;
+      const factor = Math.pow(10, destDecimals);
+      const calculated = (Math.round((net * rate + Number.EPSILON) * factor) / factor).toFixed(destDecimals);
+      setToAmount(calculated);
+    } else {
+      setToAmount("");
+    }
+  };
+
   // Sync exchange rate when accounts change
   useEffect(() => {
+    let newRate = "1";
     if (isSameCurrency) {
-      setExchangeRate("1");
-      if (fromAmount) {
-        setToAmount(fromAmount);
-      }
+      newRate = "1";
+    } else if (fromAccount && toAccount) {
+      const benchmark = getBenchmarkRate(fromAccount.currency, toAccount.currency);
+      newRate = benchmark.toFixed(4);
     }
+    setExchangeRate(newRate);
+    recalculateToAmount(fromAmount, fees, newRate);
   }, [fromAccountId, toAccountId, isSameCurrency]);
 
   // Real-time parsed numbers
@@ -88,49 +107,40 @@ export function TransferFundsModal({ isOpen, onClose, onSuccess, apiPrefix }: Tr
   const rateNum = parseFloat(exchangeRate);
   const feesNum = parseFloat(fees);
 
-  // Auto-calculation logic with strict non-negative clamping
   const handleFromAmountChange = (val: string) => {
     setFromAmount(val);
-    const amount = parseFloat(val);
-    const rate = parseFloat(exchangeRate);
-    if (!isNaN(amount) && amount > 0 && !isNaN(rate) && rate > 0) {
-      setToAmount((amount * rate).toFixed(2));
-    } else if (isNaN(amount) || amount <= 0) {
-      setToAmount("");
-    }
+    recalculateToAmount(val, fees, exchangeRate);
+  };
+
+  const handleFeesChange = (val: string) => {
+    setFees(val);
+    recalculateToAmount(fromAmount, val, exchangeRate);
   };
 
   const handleExchangeRateChange = (val: string) => {
     if (isSameCurrency) return; // Locked to 1 for same-currency
     setExchangeRate(val);
-    const amount = parseFloat(fromAmount);
-    const rate = parseFloat(val);
-    if (!isNaN(amount) && amount > 0 && !isNaN(rate) && rate > 0) {
-      setToAmount((amount * rate).toFixed(2));
-    } else {
-      setToAmount("");
-    }
+    recalculateToAmount(fromAmount, fees, val);
   };
 
-  const handleToAmountChange = (val: string) => {
-    setToAmount(val);
-    const origin = parseFloat(fromAmount);
-    const target = parseFloat(val);
-    // Never derive a negative or zero exchange rate from target
-    if (!isSameCurrency && !isNaN(origin) && origin > 0 && !isNaN(target) && target > 0) {
-      setExchangeRate((target / origin).toFixed(4));
+  const handleResetExchangeRate = () => {
+    let newRate = "1";
+    if (isSameCurrency) {
+      newRate = "1";
+    } else if (fromAccount && toAccount) {
+      const benchmark = getBenchmarkRate(fromAccount.currency, toAccount.currency);
+      newRate = benchmark.toFixed(4);
     }
+    setExchangeRate(newRate);
+    recalculateToAmount(fromAmount, fees, newRate);
   };
 
   // Real-time field errors
   let fromAmountError = "";
   if (fromAmount !== "" && (isNaN(fromAmountNum) || fromAmountNum <= 0)) {
     fromAmountError = "Transfer amount must be greater than 0.";
-  }
-
-  let toAmountError = "";
-  if (toAmount !== "" && (isNaN(toAmountNum) || toAmountNum <= 0)) {
-    toAmountError = "Received amount must be greater than 0.";
+  } else if (fromAccount && !isNaN(fromAmountNum) && fromAmountNum > fromAccount.currentBalance) {
+    fromAmountError = `Amount exceeds available balance (${fromAccount.currentBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })} ${fromAccount.currency}).`;
   }
 
   let rateError = "";
@@ -143,6 +153,8 @@ export function TransferFundsModal({ isOpen, onClose, onSuccess, apiPrefix }: Tr
   let feesError = "";
   if (fees !== "" && (isNaN(feesNum) || feesNum < 0)) {
     feesError = "Fees cannot be negative.";
+  } else if (!isNaN(feesNum) && !isNaN(fromAmountNum) && fromAmountNum > 0 && feesNum >= fromAmountNum) {
+    feesError = "Fees cannot be greater than or equal to transfer amount.";
   }
 
   let accountsError = "";
@@ -158,8 +170,8 @@ export function TransferFundsModal({ isOpen, onClose, onSuccess, apiPrefix }: Tr
     toAmountNum > 0 &&
     rateNum > 0 &&
     feesNum >= 0 &&
+    feesNum < fromAmountNum &&
     !fromAmountError &&
-    !toAmountError &&
     !rateError &&
     !feesError &&
     !accountsError
@@ -171,8 +183,17 @@ export function TransferFundsModal({ isOpen, onClose, onSuccess, apiPrefix }: Tr
     if (fromAccountId === toAccountId) return setError("Source and destination accounts must be different.");
     
     if (isNaN(fromAmountNum) || fromAmountNum <= 0) return setError("Please enter a valid transfer amount greater than 0.");
-    if (isNaN(toAmountNum) || toAmountNum <= 0) return setError("Please enter a valid destination amount greater than 0.");
+    if (fromAccount && fromAmountNum > fromAccount.currentBalance) {
+      return setError(`Insufficient funds. Available balance in "${fromAccount.name}" is ${fromAccount.currentBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })} ${fromAccount.currency}.`);
+    }
+    if (isNaN(feesNum) || feesNum < 0) return setError("Transfer fees cannot be negative.");
+    if (feesNum >= fromAmountNum) return setError("Fees cannot be greater than or equal to transfer amount.");
+    if (isNaN(toAmountNum) || toAmountNum <= 0) return setError("Calculated destination amount must be greater than 0.");
     if (isNaN(rateNum) || rateNum <= 0) return setError("Please enter a valid exchange rate greater than 0.");
+
+    if (isSameCurrency && Math.abs(rateNum - 1.0) > 0.0001) {
+      return setError("Same-currency transfers must have an exchange rate of 1.0.");
+    }
     if (isNaN(feesNum) || feesNum < 0) return setError("Transfer fees cannot be negative.");
 
     if (isSameCurrency && Math.abs(rateNum - 1.0) > 0.0001) {
@@ -301,21 +322,19 @@ export function TransferFundsModal({ isOpen, onClose, onSuccess, apiPrefix }: Tr
               </div>
 
               <div className="space-y-1.5">
-                <Label className="text-xs">Received Amount {toAccount ? `(${toAccount.currency})` : ""}</Label>
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs">Received Amount {toAccount ? `(${toAccount.currency})` : ""}</Label>
+                  <span className="text-[10px] text-muted-foreground font-medium flex items-center gap-1">
+                    <Lock className="w-2.5 h-2.5" /> Auto-calculated
+                  </span>
+                </div>
                 <Input
-                  type="number"
-                  step="0.01"
-                  min="0.01"
-                  required
+                  type="text"
+                  readOnly
                   placeholder="0.00"
-                  value={toAmount}
-                  onChange={(e) => handleToAmountChange(e.target.value)}
-                  disabled={isSameCurrency}
-                  className={toAmountError ? "border-destructive focus-visible:ring-destructive" : ""}
+                  value={toAmount ? `${toAmount} ${toAccount?.currency || ""}` : ""}
+                  className="bg-muted/40 cursor-default font-medium text-foreground select-none"
                 />
-                {toAmountError && (
-                  <p className="text-[11px] text-destructive font-medium">{toAmountError}</p>
-                )}
               </div>
             </div>
 
@@ -337,11 +356,19 @@ export function TransferFundsModal({ isOpen, onClose, onSuccess, apiPrefix }: Tr
                     value={exchangeRate}
                     onChange={(e) => handleExchangeRateChange(e.target.value)}
                     disabled={isSameCurrency}
-                    className={rateError ? "border-destructive focus-visible:ring-destructive pr-8" : "pr-8"}
+                    className={`pr-9 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${
+                      rateError ? "border-destructive focus-visible:ring-destructive" : ""
+                    }`}
                   />
-                  <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-                    <RefreshCw className="w-3.5 h-3.5 text-muted-foreground/50" />
-                  </div>
+                  <button
+                    type="button"
+                    onClick={handleResetExchangeRate}
+                    disabled={isSameCurrency}
+                    title="Reset to benchmark exchange rate"
+                    className="absolute inset-y-0 right-0 pr-2.5 flex items-center text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:pointer-events-none transition-colors group cursor-pointer"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5 transition-transform duration-300 group-hover:rotate-180 group-active:scale-90" />
+                  </button>
                 </div>
                 {rateError && (
                   <p className="text-[11px] text-destructive font-medium">{rateError}</p>
@@ -355,7 +382,7 @@ export function TransferFundsModal({ isOpen, onClose, onSuccess, apiPrefix }: Tr
                   step="0.01"
                   min="0"
                   value={fees}
-                  onChange={(e) => setFees(e.target.value)}
+                  onChange={(e) => handleFeesChange(e.target.value)}
                   className={feesError ? "border-destructive focus-visible:ring-destructive" : ""}
                 />
                 {feesError && (
@@ -363,6 +390,44 @@ export function TransferFundsModal({ isOpen, onClose, onSuccess, apiPrefix }: Tr
                 )}
               </div>
             </div>
+
+            {/* Calculation Breakdown Card */}
+            {fromAmountNum > 0 && rateNum > 0 && feesNum >= 0 && feesNum < fromAmountNum && (
+              <div className="p-3.5 rounded-xl bg-muted/30 border border-border/70 text-xs space-y-1.5">
+                <div className="flex justify-between text-muted-foreground">
+                  <span>Transfer Amount:</span>
+                  <span className="font-mono text-foreground font-medium">
+                    {fromAmountNum.toLocaleString(undefined, { minimumFractionDigits: 2 })} {fromAccount?.currency}
+                  </span>
+                </div>
+                {feesNum > 0 && (
+                  <div className="flex justify-between text-muted-foreground">
+                    <span>Less Transfer / Wire Fees:</span>
+                    <span className="font-mono text-destructive font-medium">
+                      - {feesNum.toLocaleString(undefined, { minimumFractionDigits: 2 })} {fromAccount?.currency}
+                    </span>
+                  </div>
+                )}
+                <div className="flex justify-between text-muted-foreground">
+                  <span>Net Converted:</span>
+                  <span className="font-mono text-foreground font-medium">
+                    {(fromAmountNum - feesNum).toLocaleString(undefined, { minimumFractionDigits: 2 })} {fromAccount?.currency}
+                  </span>
+                </div>
+                <div className="flex justify-between text-muted-foreground">
+                  <span>Exchange Rate:</span>
+                  <span className="font-mono text-foreground font-medium">
+                    × {rateNum.toFixed(4)}
+                  </span>
+                </div>
+                <div className="pt-1.5 border-t border-border/60 flex justify-between font-semibold">
+                  <span className="text-foreground">Total Received:</span>
+                  <span className="font-mono text-primary text-sm font-bold">
+                    {toAmount} {toAccount?.currency}
+                  </span>
+                </div>
+              </div>
+            )}
 
             {/* Override Reason (Cross-Currency) */}
             {!isSameCurrency && (

@@ -81,6 +81,11 @@ export async function withdraw(
   if (!account) throw new Error("Account not found");
 
   const balanceBefore = decimalToNumber(account.currentBalance);
+  if (balanceBefore < numAmount) {
+    throw new Error(
+      `Insufficient funds: Account "${account.name}" has balance ${balanceBefore} ${account.currency}, cannot withdraw ${numAmount} ${account.currency}`
+    );
+  }
   
   // Update Account Balance (Negative increment for withdrawal)
   await AccountModel.updateOne(
@@ -97,6 +102,9 @@ export async function withdraw(
   // Finding #01 Mitigation: Ledger sanity check (DEBIT must decrease balance)
   if (balanceAfter >= balanceBefore) {
     throw new Error("Ledger sanity check failed: DEBIT transaction must decrease account balance");
+  }
+  if (balanceAfter < 0) {
+    throw new Error("Ledger sanity check failed: Withdrawal would result in a negative account balance");
   }
 
   // Record Transaction

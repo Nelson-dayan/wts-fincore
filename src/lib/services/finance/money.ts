@@ -51,13 +51,4 @@ export function safeSubtract(a: number, b: number): number {
   return roundMoney(a - b, 4);
 }
 
-/**
- * Return default decimals based on currency type.
- */
-export function getCurrencyDecimals(currency: string): number {
-  const upper = currency.toUpperCase();
-  if (["BHD", "KWD", "OMR"].includes(upper)) {
-    return 3;
-  }
-  return 2;
-}
+export { getCurrencyDecimals } from "@/lib/constants/finance";

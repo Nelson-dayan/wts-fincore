@@ -57,6 +57,13 @@ export async function POST(req: Request) {
       );
     }
 
+    if (fees >= fromAmount) {
+      return NextResponse.json(
+        { message: `Transfer fees (${fees}) cannot be greater than or equal to source transfer amount (${fromAmount})` },
+        { status: 400 }
+      );
+    }
+
     const payload = {
       fromAccountId: body.fromAccountId,
       toAccountId: body.toAccountId,
@@ -97,7 +104,8 @@ export async function POST(req: Request) {
       error.message.includes("Ledger sanity check failed") ||
       error.message.includes("Transfer amounts exceed") ||
       error.message.includes("override reason") ||
-      error.message.includes("A documented override reason")
+      error.message.includes("A documented override reason") ||
+      error.message.includes("Insufficient funds")
     )) {
       return NextResponse.json({ message: error.message }, { status: 400 });
     }
@@ -138,7 +146,8 @@ export async function PATCH(req: Request) {
       error.message.includes("Maker-checker violation") ||
       error.message.includes("only PENDING_APPROVAL") ||
       error.message.includes("inactive") ||
-      error.message.includes("Ledger sanity check")
+      error.message.includes("Ledger sanity check") ||
+      error.message.includes("Insufficient funds")
     )) {
       return NextResponse.json({ message: error.message }, { status: 400 });
     }

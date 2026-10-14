@@ -2,9 +2,11 @@ import type { ClientSession, Types } from "mongoose";
 import { connectDB } from "@/lib/db/connect";
 import { TransferModel, AccountModel } from "@/lib/db/models";
 import { logActivity } from "@/lib/services/activity/log-activity.service";
-import { STATIC_FX_RATES } from "@/lib/services/finance/forex.engine";
+import { STATIC_FX_RATES, getCurrencyDecimals, getBenchmarkRate } from "@/lib/constants/finance";
 import { decimalToNumber } from "@/lib/services/business/money";
 import * as accountEngine from "./account.engine";
+
+export { getCurrencyDecimals };
 
 export interface CreateTransferInput {
   fromAccountId: string | Types.ObjectId;
@@ -18,18 +20,6 @@ export interface CreateTransferInput {
   rateSource?: "LIVE_API" | "FALLBACK_STATIC" | "MANUAL_OVERRIDE";
   overrideReason?: string;
   createdBy: string | Types.ObjectId;
-}
-
-/**
- * Returns currency minor units / decimals.
- * Standard currencies (USD, AED, INR, AUD, SGD, RM) use 2.
- * High-precision currencies (BHD, KWD, OMR) use 3. Zero-decimal (JPY) use 0.
- */
-export function getCurrencyDecimals(currency: string): number {
-  const upper = String(currency || "").toUpperCase();
-  if (["JPY", "KRW", "VND", "CLP"].includes(upper)) return 0;
-  if (["BHD", "KWD", "OMR", "JOD"].includes(upper)) return 3;
-  return 2;
 }
 
 /**
@@ -59,6 +49,12 @@ export async function recordTransfer(input: CreateTransferInput) {
   if (!Number.isFinite(fees) || fees < 0) {
     throw new Error("Transfer fees cannot be negative");
   }
+  if (fees >= fromAmount) {
+    throw new Error(`Transfer fees (${fees}) cannot be greater than or equal to source transfer amount (${fromAmount})`);
+  }
+
+  // Net amount converted after fee deduction
+  const netAmount = fromAmount - fees;
 
   // Sanity upper-bound guard
   if (fromAmount > 1e12 || toAmount > 1e12 || fees > 1e12) {
@@ -83,6 +79,14 @@ export async function recordTransfer(input: CreateTransferInput) {
         throw new Error("Source and destination accounts must be different");
       }
 
+      // Check available balance in source account
+      const availableBalance = decimalToNumber(fromAccount.currentBalance);
+      if (fromAmount > availableBalance) {
+        throw new Error(
+          `Insufficient funds in source account "${fromAccount.name}". Available balance: ${availableBalance.toFixed(2)} ${fromAccount.currency}, requested transfer amount: ${fromAmount.toFixed(2)} ${fromAccount.currency}`
+        );
+      }
+
       const fromCurrency = String(fromAccount.currency || "").toUpperCase();
       const toCurrency = String(toAccount.currency || "").toUpperCase();
 
@@ -91,7 +95,7 @@ export async function recordTransfer(input: CreateTransferInput) {
       let rateSource = input.rateSource || "MANUAL_OVERRIDE";
 
       // Finding #02: Currency Direction & Same-Currency Rule
-      // If accounts are in the same currency, rate MUST be 1.0 and amounts MUST be identical
+      // If accounts are in the same currency, rate MUST be 1.0 and destination amount MUST equal net transferred amount
       if (fromCurrency === toCurrency) {
         benchmarkRate = 1.0;
         rateDeviationPercent = 0;
@@ -100,8 +104,10 @@ export async function recordTransfer(input: CreateTransferInput) {
         if (Math.abs(exchangeRate - 1.0) > 0.0001) {
           throw new Error(`Same-currency transfers (${fromCurrency} -> ${toCurrency}) must have an exchange rate of 1.0`);
         }
-        if (Math.abs(toAmount - fromAmount) > 0.01) {
-          throw new Error(`Same-currency transfers (${fromCurrency} -> ${toCurrency}) must have identical source and destination amounts`);
+        if (Math.abs(toAmount - netAmount) > 0.01) {
+          throw new Error(
+            `Same-currency transfers (${fromCurrency} -> ${toCurrency}) must have destination amount equal to transfer amount minus fees (${fromAmount} - ${fees} = ${netAmount.toFixed(2)} ${toCurrency})`
+          );
         }
       } else {
         // Cross-currency transfer: check absolute exchange rate sanity thresholds
@@ -146,15 +152,15 @@ export async function recordTransfer(input: CreateTransferInput) {
         }
       }
 
-      // Currency-specific destination precision check
+      // Currency-specific destination precision check: toAmount = (fromAmount - fees) * exchangeRate
       const destDecimals = getCurrencyDecimals(toCurrency);
       const factor = Math.pow(10, destDecimals);
-      const expectedToAmount = Math.round((fromAmount * exchangeRate + Number.EPSILON) * factor) / factor;
+      const expectedToAmount = Math.round((netAmount * exchangeRate + Number.EPSILON) * factor) / factor;
       const tolerance = 1 / factor; // e.g. 0.01 for 2-decimal currencies
 
       if (Math.abs(toAmount - expectedToAmount) > tolerance) {
         throw new Error(
-          `Destination amount (${toAmount} ${toCurrency}) does not match exchange rate calculation (expected ${expectedToAmount.toFixed(destDecimals)} ${toCurrency})`
+          `Destination amount (${toAmount} ${toCurrency}) does not match net calculation: (${fromAmount} sent - ${fees} fees) * ${exchangeRate} (expected ${expectedToAmount.toFixed(destDecimals)} ${toCurrency})`
         );
       }
 
@@ -314,6 +320,13 @@ export async function approveTransfer({
 
       const fromAmount = decimalToNumber(transfer.fromAmount);
       const toAmount = decimalToNumber(transfer.toAmount);
+
+      const availableBalance = decimalToNumber(fromAccount.currentBalance);
+      if (fromAmount > availableBalance) {
+        throw new Error(
+          `Insufficient funds in source account "${fromAccount.name}". Available balance: ${availableBalance.toFixed(2)} ${fromAccount.currency}, requested transfer amount: ${fromAmount.toFixed(2)} ${fromAccount.currency}`
+        );
+      }
 
       // Execute atomic debit and credit
       await accountEngine.withdraw(

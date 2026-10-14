@@ -218,6 +218,34 @@ async function runComprehensiveTransferSecurityTests() {
     "cannot be negative"
   );
 
+  await assertThrows(
+    "Reject fees equal to fromAmount (100 fees on 100 transfer)",
+    () => recordTransfer({
+      fromAccountId: "6a7af096bfb7b01601206f86",
+      toAccountId: "6ac3d5858dda19c58990d3ac",
+      fromAmount: 100,
+      toAmount: 100,
+      exchangeRate: 1,
+      fees: 100,
+      createdBy: "user1"
+    }),
+    "cannot be greater than or equal to"
+  );
+
+  await assertThrows(
+    "Reject fees exceeding fromAmount (150 fees on 100 transfer)",
+    () => recordTransfer({
+      fromAccountId: "6a7af096bfb7b01601206f86",
+      toAccountId: "6ac3d5858dda19c58990d3ac",
+      fromAmount: 100,
+      toAmount: 100,
+      exchangeRate: 1,
+      fees: 150,
+      createdBy: "user1"
+    }),
+    "cannot be greater than or equal to"
+  );
+
   // -------------------------------------------------------------
   // SECTION 3: CURRENCY PRECISION & ROUNDING HELPERS
   // -------------------------------------------------------------
@@ -355,6 +383,21 @@ async function runComprehensiveTransferSecurityTests() {
       "is inactive"
     );
 
+    // Test 5.2b: Insufficient funds & Negative Balance Prevention
+    // Account has balance 10,000, attempts to transfer 100,000
+    await assertThrows(
+      "Reject transfer exceeding source account balance (insufficient funds / negative balance prevention)",
+      () => recordTransfer({
+        fromAccountId: accAed1._id,
+        toAccountId: accAed2._id,
+        fromAmount: 100000,
+        toAmount: 100000,
+        exchangeRate: 1.0,
+        createdBy: testUserId,
+      }),
+      "Insufficient funds in source account"
+    );
+
     // Test 5.3: Finding #02: Same-currency transfer rate manipulation bypass attempt
     // Attacker sets exchangeRate: 5 to create 400 AED out of 100 AED
     await assertThrows(
@@ -381,7 +424,7 @@ async function runComprehensiveTransferSecurityTests() {
         exchangeRate: 1,
         createdBy: testUserId,
       }),
-      "must have identical source and destination amounts"
+      "must have destination amount equal to transfer amount minus fees"
     );
 
     // Test 5.5: Cross-currency astronomical rate manipulation bypass attempt
@@ -424,7 +467,7 @@ async function runComprehensiveTransferSecurityTests() {
         exchangeRate: 2.41,
         createdBy: testUserId,
       }),
-      "does not match exchange rate calculation"
+      "does not match net calculation"
     );
 
     // Test 5.8: Valid Same-Currency Transfer (Atomic Ledger Execution)
@@ -478,7 +521,7 @@ async function runComprehensiveTransferSecurityTests() {
       fromAmount: 100,
       toAmount: 245.00,
       exchangeRate: 2.45,
-      fees: 15.00, // $15 wire fee recorded
+      fees: 0,
       reference: "AUD_AED_FX_01",
       createdBy: testUserId,
     });
@@ -494,6 +537,37 @@ async function runComprehensiveTransferSecurityTests() {
     assertTrue(
       "AED destination credited by 245 AED",
       Math.abs((aedBefore as number) + 245 - (aedAfter as number)) < 0.001
+    );
+
+    // Test 5.9b: Transfer with fees deducted from sent amount before conversion
+    // e.g. 100 AUD sent, 2 AUD fee, rate 2.45 -> (100 - 2) * 2.45 = 240.10 AED
+    const feeTransferResult = await recordTransfer({
+      fromAccountId: accAud._id,
+      toAccountId: accAed1._id,
+      fromAmount: 100,
+      toAmount: 240.10,
+      exchangeRate: 2.45,
+      fees: 2.00,
+      reference: "AUD_AED_FEE_NET",
+      createdBy: testUserId,
+    });
+    assertTrue("Net calculation with fee deduction succeeded ((100 - 2) * 2.45 = 240.10)", feeTransferResult.success === true);
+
+    // Test 5.9c: Reject attempt to bypass fee deduction on destination amount
+    // Attacker specifies 2 AUD fee, but sets destination to 245 AED (ignoring fee)
+    await assertThrows(
+      "Reject destination amount ignoring fee deduction",
+      () => recordTransfer({
+        fromAccountId: accAud._id,
+        toAccountId: accAed1._id,
+        fromAmount: 100,
+        toAmount: 245.00,
+        exchangeRate: 2.45,
+        fees: 2.00,
+        reference: "FEE_BYPASS_ATTEMPT",
+        createdBy: testUserId,
+      }),
+      "does not match net calculation"
     );
 
     // Test 5.10: Atomic Rollback on Failure Verification
