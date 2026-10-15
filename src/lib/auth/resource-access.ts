@@ -2,9 +2,10 @@ import { ProjectModel, ClientModel } from "@/lib/db/models";
 import mongoose from "mongoose";
 
 export interface ResourceAlignmentCheck {
-  companyId: string;
+  companyId?: string;
   clientId?: string;
   projectId?: string;
+  explicitCompanyId?: string | null;
 }
 
 export async function validateResourceHierarchyAlignment(check: ResourceAlignmentCheck): Promise<{
@@ -13,6 +14,11 @@ export async function validateResourceHierarchyAlignment(check: ResourceAlignmen
   project?: any;
   client?: any;
 }> {
+  const targetCompanyId =
+    check.explicitCompanyId !== undefined
+      ? check.explicitCompanyId
+      : check.companyId;
+
   if (check.projectId) {
     if (!mongoose.Types.ObjectId.isValid(check.projectId)) {
       return { valid: false, error: "INVALID_PROJECT_ID" };
@@ -23,7 +29,7 @@ export async function validateResourceHierarchyAlignment(check: ResourceAlignmen
     }
 
     // Rule: Server-validated alignment between Project and Document
-    if (String(project.companyId) !== String(check.companyId)) {
+    if (targetCompanyId && String(project.companyId) !== String(targetCompanyId)) {
       return { valid: false, error: "PROJECT_COMPANY_MISMATCH: Project companyId does not match document companyId" };
     }
 
@@ -43,7 +49,7 @@ export async function validateResourceHierarchyAlignment(check: ResourceAlignmen
       return { valid: false, error: "CLIENT_NOT_FOUND" };
     }
 
-    if (String(client.companyId) !== String(check.companyId)) {
+    if (targetCompanyId && String(client.companyId) !== String(targetCompanyId)) {
       return { valid: false, error: "CLIENT_COMPANY_MISMATCH: Client companyId does not match document companyId" };
     }
 
@@ -52,3 +58,4 @@ export async function validateResourceHierarchyAlignment(check: ResourceAlignmen
 
   return { valid: true };
 }
+

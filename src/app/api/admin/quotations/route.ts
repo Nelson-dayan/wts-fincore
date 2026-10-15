@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireRole } from "@/lib/auth/require-role";
 import { connectDB } from "@/lib/db/connect";
-import { CompanyModel, PurchaseOrderModel, QuotationModel } from "@/lib/db/models";
+import { CompanyModel, PurchaseOrderModel, QuotationModel, ProjectModel } from "@/lib/db/models";
 import { apiSuccess, apiError } from "@/lib/api/response";
 import { parsePagination, parseSearch, escapeRegex } from "@/lib/api/pagination";
 import { logActivity } from "@/lib/services/activity/log-activity.service";
@@ -200,9 +200,16 @@ export async function POST(req: Request) {
     if (!projectId) {
       return apiError("projectId is required", 400);
     }
+    if (!mongoose.Types.ObjectId.isValid(projectId)) {
+      return apiError("Invalid project id", 400);
+    }
 
-    const url = new URL(req.url);
-    const targetCompanyId = req.headers.get("x-company-id") || url.searchParams.get("companyId") || undefined;
+    const projectDoc = await ProjectModel.findById(projectId).select("companyId clientId").lean();
+    if (!projectDoc) {
+      return apiError("Project not found", 404);
+    }
+
+    const targetCompanyId = projectDoc.companyId ? String(projectDoc.companyId) : undefined;
 
     const auth = await authorizeResource({
       permission: "quotations.create",
@@ -276,7 +283,7 @@ export async function POST(req: Request) {
     const branding = body.branding ?? {};
     const created = await QuotationModel.create({
       quotationNumber,
-      companyId: companyContext.activeCompanyId,
+      companyId: projectDoc.companyId || companyContext.activeCompanyId,
       projectId: new mongoose.Types.ObjectId(projectId),
       createdBy: new mongoose.Types.ObjectId(session.user.id),
       documentInfo: {

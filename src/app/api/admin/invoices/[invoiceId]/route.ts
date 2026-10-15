@@ -28,15 +28,27 @@ export async function GET(_req: Request, ctx: Ctx) {
       return apiError("Invalid invoice id", 400);
     }
     await connectDB();
-    const raw = await InvoiceModel.findById(invoiceId).populate("projectId", "fixCurrency").lean();
+    const raw = await InvoiceModel.findById(invoiceId).populate("projectId", "fixCurrency companyId").lean();
     if (!raw) {
       return apiError("Invoice not found", 404);
     }
 
+    const projectIdStr = (raw as any)?.projectId?._id
+      ? String((raw as any).projectId._id)
+      : (raw as any)?.projectId
+      ? String((raw as any).projectId)
+      : undefined;
+
+    const companyIdStr = (raw as any).companyId
+      ? String((raw as any).companyId)
+      : (raw as any).projectId?.companyId
+      ? String((raw as any).projectId.companyId)
+      : undefined;
+
     const auth = await authorizeResource({
       permission: "invoices.view",
-      projectId: String(raw.projectId),
-      companyId: (raw as any).companyId ? String((raw as any).companyId) : undefined,
+      projectId: projectIdStr,
+      companyId: companyIdStr,
     });
 
     if (!auth.authorized) {
@@ -94,10 +106,18 @@ export async function PATCH(req: Request, ctx: Ctx) {
     else if (nextStatusRaw === "PAID") requiredPermission = "invoices.markPaid";
     else if (nextStatusRaw === "CANCELLED" || nextStatusRaw === "VOID") requiredPermission = "invoices.void";
 
+    const projectIdStr = (inv as any)?.projectId?._id
+      ? String((inv as any).projectId._id)
+      : (inv as any)?.projectId
+      ? String((inv as any).projectId)
+      : undefined;
+
+    const companyIdStr = (inv as any).companyId ? String((inv as any).companyId) : undefined;
+
     const auth = await authorizeResource({
       permission: requiredPermission,
-      projectId: String(inv.projectId),
-      companyId: (inv as any).companyId ? String((inv as any).companyId) : undefined,
+      projectId: projectIdStr,
+      companyId: companyIdStr,
       workflowTransition: nextStatusRaw && nextStatusRaw !== inv.status ? {
         resourceType: "invoice",
         fromState: String(inv.status),
@@ -370,10 +390,18 @@ export async function DELETE(_req: Request, ctx: Ctx) {
       return apiError("Invoice not found", 404);
     }
 
+    const projectIdStr = (inv as any)?.projectId?._id
+      ? String((inv as any).projectId._id)
+      : (inv as any)?.projectId
+      ? String((inv as any).projectId)
+      : undefined;
+
+    const companyIdStr = (inv as any).companyId ? String((inv as any).companyId) : undefined;
+
     const auth = await authorizeResource({
       permission: "invoices.delete",
-      projectId: String(inv.projectId),
-      companyId: (inv as any).companyId ? String((inv as any).companyId) : undefined,
+      projectId: projectIdStr,
+      companyId: companyIdStr,
     });
 
     if (!auth.authorized) {

@@ -32,10 +32,18 @@ export async function GET(_req: Request, ctx: Ctx) {
       return NextResponse.json({ message: "Purchase order not found" }, { status: 404 });
     }
 
+    const projectIdStr = (raw as any)?.projectId?._id
+      ? String((raw as any).projectId._id)
+      : (raw as any)?.projectId
+      ? String((raw as any).projectId)
+      : undefined;
+
+    const companyIdStr = (raw as any).companyId ? String((raw as any).companyId) : undefined;
+
     const auth = await authorizeResource({
       permission: "purchaseOrders.view",
-      projectId: String(raw.projectId),
-      companyId: (raw as any).companyId ? String((raw as any).companyId) : undefined,
+      projectId: projectIdStr,
+      companyId: companyIdStr,
     });
 
     if (!auth.authorized) {
@@ -160,10 +168,18 @@ export async function PATCH(req: Request, ctx: Ctx) {
     const targetStatus = status;
     const requiredPermission = targetStatus === "active" ? "purchaseOrders.approve" : "purchaseOrders.edit";
 
+    const projectIdStr = (po as any)?.projectId?._id
+      ? String((po as any).projectId._id)
+      : (po as any)?.projectId
+      ? String((po as any).projectId)
+      : undefined;
+
+    const companyIdStr = (po as any).companyId ? String((po as any).companyId) : undefined;
+
     const auth = await authorizeResource({
       permission: requiredPermission,
-      projectId: String(po.projectId),
-      companyId: (po as any).companyId ? String((po as any).companyId) : undefined,
+      projectId: projectIdStr,
+      companyId: companyIdStr,
       workflowTransition: targetStatus && targetStatus !== po.status ? {
         resourceType: "purchaseOrder",
         fromState: String(po.status),
@@ -281,10 +297,18 @@ export async function DELETE(_req: Request, ctx: Ctx) {
       return NextResponse.json({ message: "Purchase order not found" }, { status: 404 });
     }
 
+    const projectIdStr = (po as any)?.projectId?._id
+      ? String((po as any).projectId._id)
+      : (po as any)?.projectId
+      ? String((po as any).projectId)
+      : undefined;
+
+    const companyIdStr = (po as any).companyId ? String((po as any).companyId) : undefined;
+
     const auth = await authorizeResource({
       permission: "purchaseOrders.delete",
-      projectId: String(po.projectId),
-      companyId: (po as any).companyId ? String((po as any).companyId) : undefined,
+      projectId: projectIdStr,
+      companyId: companyIdStr,
     });
 
     if (!auth.authorized) {

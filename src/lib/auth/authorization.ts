@@ -1,3 +1,5 @@
+import mongoose from "mongoose";
+import { ProjectModel, ClientModel } from "@/lib/db/models";
 import { requireSession } from "./require-role";
 import { hasPermissionForRole, type ResourceAction } from "./permissions";
 import { resolveAuthCompanyContext, type ResolvedAuthContext } from "./company-context";
@@ -20,9 +22,9 @@ export type AuthorizationFailureCode =
 
 export interface AuthorizeOptions {
   permission: ResourceAction;
-  companyId?: string;
-  clientId?: string;
-  projectId?: string;
+  companyId?: string | null;
+  clientId?: string | null;
+  projectId?: string | Record<string, unknown> | null;
   requestedScopeMode?: "single" | "group";
   workflowTransition?: {
     resourceType: "quotation" | "purchaseOrder" | "invoice" | "expense";
@@ -30,6 +32,7 @@ export interface AuthorizeOptions {
     toState: string;
   };
 }
+
 
 export interface AuthorizeResult {
   authorized: boolean;
@@ -135,8 +138,51 @@ export async function authorizeResource(options: AuthorizeOptions): Promise<Auth
     };
   }
 
+  // Sanitize projectId & clientId
+  let cleanProjectId: string | undefined = undefined;
+  if (options.projectId) {
+    if (typeof options.projectId === "object" && options.projectId !== null && "_id" in (options.projectId as any)) {
+      cleanProjectId = String((options.projectId as any)._id);
+    } else {
+      cleanProjectId = String(options.projectId).trim();
+    }
+    if (!cleanProjectId || cleanProjectId === "[object Object]" || cleanProjectId === "undefined" || cleanProjectId === "null") {
+      cleanProjectId = undefined;
+    }
+  }
+
+  let cleanClientId: string | undefined = undefined;
+  if (options.clientId) {
+    if (typeof options.clientId === "object" && options.clientId !== null && "_id" in (options.clientId as any)) {
+      cleanClientId = String((options.clientId as any)._id);
+    } else {
+      cleanClientId = String(options.clientId).trim();
+    }
+    if (!cleanClientId || cleanClientId === "[object Object]" || cleanClientId === "undefined" || cleanClientId === "null") {
+      cleanClientId = undefined;
+    }
+  }
+
+  // Resolve effective resource companyId if omitted
+  let resolvedCompanyId = options.companyId ? String(options.companyId).trim() : undefined;
+  if (resolvedCompanyId === "[object Object]" || resolvedCompanyId === "undefined" || resolvedCompanyId === "null") {
+    resolvedCompanyId = undefined;
+  }
+
+  if (!resolvedCompanyId && cleanProjectId && mongoose.Types.ObjectId.isValid(cleanProjectId)) {
+    const proj = await ProjectModel.findById(cleanProjectId).select("companyId clientId").lean();
+    if (proj && proj.companyId) {
+      resolvedCompanyId = String(proj.companyId);
+    }
+  } else if (!resolvedCompanyId && cleanClientId && mongoose.Types.ObjectId.isValid(cleanClientId)) {
+    const cli = await ClientModel.findById(cleanClientId).select("companyId").lean();
+    if (cli && cli.companyId) {
+      resolvedCompanyId = String(cli.companyId);
+    }
+  }
+
   // Step 2: Active Context & Scope Resolution
-  const context = await resolveAuthCompanyContext(user, options.companyId, options.requestedScopeMode);
+  const context = await resolveAuthCompanyContext(user, resolvedCompanyId, options.requestedScopeMode);
 
   if (options.requestedScopeMode === "group" && !context.canAccessGroupView) {
     return {
@@ -149,23 +195,23 @@ export async function authorizeResource(options: AuthorizeOptions): Promise<Auth
   }
 
   // Step 3: Company Ownership & Legal Scope Check
-  if (context.isRequestedCompanyUnauthorized && options.companyId && !context.userAssignedCompanyIds?.includes(options.companyId)) {
+  if (context.isRequestedCompanyUnauthorized && resolvedCompanyId && !context.userAssignedCompanyIds?.includes(resolvedCompanyId)) {
     return {
       authorized: false,
       code: "COMPANY_ACCESS_DENIED",
-      reason: `Company '${options.companyId}' is outside your authorized company scope.`,
+      reason: `Company '${resolvedCompanyId}' is outside your authorized company scope.`,
       session,
       context,
     };
   }
 
-  if (options.companyId && !context.allowedCompanyIds.includes(options.companyId)) {
-    const isMemberOfTargetCompany = context.userAssignedCompanyIds?.includes(options.companyId);
+  if (resolvedCompanyId && !context.allowedCompanyIds.includes(resolvedCompanyId)) {
+    const isMemberOfTargetCompany = context.userAssignedCompanyIds?.includes(resolvedCompanyId);
     if (isMemberOfTargetCompany) {
       return {
         authorized: false,
         code: "COMPANY_CONTEXT_SWITCH_REQUIRED",
-        reason: `Target document belongs to company '${options.companyId}'. Context switch with authentication required to access.`,
+        reason: `Target document belongs to company '${resolvedCompanyId}'. Context switch with authentication required to access.`,
         session,
         context,
       };
@@ -174,7 +220,7 @@ export async function authorizeResource(options: AuthorizeOptions): Promise<Auth
     return {
       authorized: false,
       code: "COMPANY_ACCESS_DENIED",
-      reason: `Company '${options.companyId}' is outside your authorized company scope.`,
+      reason: `Company '${resolvedCompanyId}' is outside your authorized company scope.`,
       session,
       context,
     };
@@ -182,11 +228,12 @@ export async function authorizeResource(options: AuthorizeOptions): Promise<Auth
 
 
   // Step 4: Validate Data Hierarchy Alignment (Company -> Client -> Project)
-  if (options.companyId || options.clientId || options.projectId) {
+  if (resolvedCompanyId || cleanClientId || cleanProjectId) {
     const alignment = await validateResourceHierarchyAlignment({
-      companyId: options.companyId || context.activeCompanyId,
-      clientId: options.clientId,
-      projectId: options.projectId,
+      companyId: resolvedCompanyId || context.activeCompanyId,
+      clientId: cleanClientId,
+      projectId: cleanProjectId,
+      explicitCompanyId: options.companyId ? String(options.companyId).trim() : null,
     });
 
     if (!alignment.valid) {
@@ -207,14 +254,14 @@ export async function authorizeResource(options: AuthorizeOptions): Promise<Auth
   }
 
   // Step 4.5: Employee Project Scope Check
-  if (globalRole === "employee" && options.projectId) {
+  if (globalRole === "employee" && cleanProjectId) {
     try {
-      await assertEmployeeCanAccessProject(session.user.id, options.projectId);
+      await assertEmployeeCanAccessProject(session.user.id, cleanProjectId);
     } catch {
       return {
         authorized: false,
         code: "PROJECT_ACCESS_DENIED",
-        reason: `Employee does not have access to project '${options.projectId}'.`,
+        reason: `Employee does not have access to project '${cleanProjectId}'.`,
         session,
         context,
       };
