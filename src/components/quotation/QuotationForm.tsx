@@ -280,26 +280,26 @@ export function QuotationForm({
 
   return (
     <Card className="mx-auto w-full border-border/80 shadow-md">
-      <CardHeader className="sticky top-10 z-50 flex flex-row items-center justify-between border-b border-border/80 bg-card/95 py-4 shadow-sm backdrop-blur supports-backdrop-filter:bg-card/80">
-        <CardTitle>{formTitle}</CardTitle>
-        <div className="flex items-center gap-2">
+      <CardHeader className="sticky top-10 z-50 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-border/80 bg-card/95 py-3 sm:py-4 px-4 sm:px-6 shadow-sm backdrop-blur supports-backdrop-filter:bg-card/80">
+        <CardTitle className="text-base sm:text-lg">{formTitle}</CardTitle>
+        <div className="flex flex-wrap items-center gap-2">
           {onCancelEdit ? (
-            <Button size="sm" type="button" variant="ghost" onClick={onCancelEdit}>
+            <Button size="sm" type="button" variant="ghost" onClick={onCancelEdit} className="text-xs">
               Cancel
             </Button>
           ) : null}
-          <Button size="sm" type="button" variant="outline" onClick={onReset}>
+          <Button size="sm" type="button" variant="outline" onClick={onReset} className="text-xs">
             Reset
           </Button>
-          <Button size="sm" type="button" variant="secondary" onClick={onSaveQuotation}>
-            <Save className="mr-2 size-4" aria-hidden />
+          <Button size="sm" type="button" variant="secondary" onClick={onSaveQuotation} className="text-xs">
+            <Save className="mr-1.5 size-3.5" aria-hidden />
             Save quotation
           </Button>
-          <Button size="sm" type="button" onClick={onDownloadPdf} disabled={exporting}>
+          <Button size="sm" type="button" onClick={onDownloadPdf} disabled={exporting} className="text-xs">
             {exporting ? "Building PDF…" : "Download PDF"}
           </Button>
           {saveNotice ? (
-            <span className="text-muted-foreground text-sm ml-2" role="status">
+            <span className="text-muted-foreground text-xs ml-1" role="status">
               {saveNotice}
             </span>
           ) : null}
@@ -419,7 +419,7 @@ export function QuotationForm({
                       />
 
                       {!data.isRefNoEdited && (
-                        <div className="px-3 flex items-center bg-muted/30">
+                        <div className="hidden sm:flex px-3 items-center bg-muted/30">
                           <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">LOCKED</span>
                         </div>
                       )}
@@ -802,7 +802,7 @@ export function QuotationForm({
                               className="px-2 text-right tabular-nums"
                             />
                           </div>
-                          <div className="mt-[22px] flex justify-center">
+                          <div className="mt-0 sm:mt-[22px] flex justify-end sm:justify-center">
                             <Button
                               type="button"
                               variant="ghost"

@@ -367,8 +367,8 @@ export function ProjectTeamPermissions({
 
       {/* Permission Modal / Drawer */}
       {editingMember && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs">
-          <div className="w-full max-w-xl rounded-2xl border border-border bg-card p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-2 sm:p-4 backdrop-blur-xs">
+          <div className="w-full max-w-[96vw] sm:max-w-xl max-h-[92vh] overflow-y-auto rounded-2xl border border-border bg-card p-4 sm:p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-200">
             <div className="flex items-center justify-between border-b border-border/60 pb-4">
               <div>
                 <h4 className="text-lg font-bold text-foreground">
@@ -414,7 +414,7 @@ export function ProjectTeamPermissions({
             {/* Matrix Table */}
             <div className="mt-6 space-y-3">
               <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Granular Module Permissions</label>
-              <div className="overflow-hidden rounded-xl border border-border/70">
+              <div className="overflow-x-auto rounded-xl border border-border/70">
                 <table className="w-full text-left text-xs">
                   <thead className="bg-muted/60 text-muted-foreground border-b border-border/70">
                     <tr>

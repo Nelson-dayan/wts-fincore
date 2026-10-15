@@ -233,17 +233,17 @@ export function TransferFundsModal({ isOpen, onClose, onSuccess, apiPrefix }: Tr
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4">
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full max-w-[480px] bg-card rounded-2xl shadow-2xl border border-border overflow-hidden animate-in fade-in duration-200">
+      <div className="relative w-full max-w-[96vw] sm:max-w-[480px] bg-card rounded-2xl shadow-2xl border border-border overflow-hidden animate-in fade-in duration-200">
         
         {/* Header */}
-        <div className="px-6 py-5 border-b bg-muted/10 flex items-center justify-between">
+        <div className="px-4 py-3.5 sm:px-6 sm:py-5 border-b bg-muted/10 flex items-center justify-between">
           <div>
-            <h2 className="text-lg font-semibold tracking-tight">Transfer Funds</h2>
+            <h2 className="text-base sm:text-lg font-semibold tracking-tight">Transfer Funds</h2>
             <p className="text-xs text-muted-foreground mt-0.5">Move money between internal accounts</p>
           </div>
-          <button onClick={onClose} className="p-2 rounded-full hover:bg-muted text-muted-foreground transition-colors">
+          <button onClick={onClose} className="p-1.5 sm:p-2 rounded-full hover:bg-muted text-muted-foreground transition-colors" aria-label="Close modal">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -253,7 +253,7 @@ export function TransferFundsModal({ isOpen, onClose, onSuccess, apiPrefix }: Tr
             <Loader2 className="w-8 h-8 animate-spin text-primary/40" />
           </div>
         ) : (
-          <form onSubmit={handleSubmit} className="p-6 space-y-5">
+          <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4 sm:space-y-5">
             {error && (
               <div className="p-3 rounded-lg bg-destructive/10 text-destructive text-xs font-medium">
                 {error}
@@ -262,7 +262,7 @@ export function TransferFundsModal({ isOpen, onClose, onSuccess, apiPrefix }: Tr
 
             {/* From & To Dropdowns */}
             <div className="space-y-1.5">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                 <div className="space-y-1.5">
                   <Label className="text-xs">From Account</Label>
                   <Select
@@ -303,7 +303,7 @@ export function TransferFundsModal({ isOpen, onClose, onSuccess, apiPrefix }: Tr
             </div>
 
             {/* Sent & Received Amounts */}
-            <div className="grid grid-cols-2 gap-4 pt-1">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 pt-1">
               <div className="space-y-1.5">
                 <Label className="text-xs">Sent Amount {fromAccount ? `(${fromAccount.currency})` : ""}</Label>
                 <Input
@@ -339,7 +339,7 @@ export function TransferFundsModal({ isOpen, onClose, onSuccess, apiPrefix }: Tr
             </div>
 
             {/* Exchange Rate & Fees */}
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
                   <Label className="text-xs">Exchange Rate</Label>
@@ -466,11 +466,11 @@ export function TransferFundsModal({ isOpen, onClose, onSuccess, apiPrefix }: Tr
             </div>
 
             {/* Footer Buttons */}
-            <div className="pt-4 flex gap-3">
-              <Button type="button" variant="outline" className="flex-1" onClick={onClose} disabled={submitting}>
+            <div className="pt-4 flex flex-col-reverse sm:flex-row gap-2 sm:gap-3">
+              <Button type="button" variant="outline" className="w-full sm:flex-1" onClick={onClose} disabled={submitting}>
                 Cancel
               </Button>
-              <Button type="submit" className="flex-1 gap-2" disabled={!isFormValid || submitting}>
+              <Button type="submit" className="w-full sm:flex-1 gap-2" disabled={!isFormValid || submitting}>
                 {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
                 Execute Transfer
               </Button>

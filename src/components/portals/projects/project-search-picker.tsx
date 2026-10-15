@@ -118,7 +118,7 @@ export function ProjectSearchPicker({
         </div>
       ) : (
         <>
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-stretch">
+          <div className="flex items-stretch gap-2">
             <div className="relative min-w-0 flex-1">
               <Search
                 className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
@@ -129,16 +129,16 @@ export function ProjectSearchPicker({
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), void search())}
-                placeholder="Type project name, then Search…"
+                placeholder="Search project..."
                 disabled={disabled}
-                className="h-10 border-border/80 bg-background/80 pl-9 pr-3"
+                className="h-10 border-border/80 bg-background/80 pl-9 pr-3 text-xs sm:text-sm"
                 autoComplete="off"
               />
             </div>
             <Button
               type="button"
               variant="secondary"
-              className="h-10 shrink-0 sm:w-auto"
+              className="h-10 shrink-0 px-3 sm:px-4 text-xs sm:text-sm font-medium"
               disabled={disabled || !query.trim() || loading}
               onClick={() => void search()}
             >

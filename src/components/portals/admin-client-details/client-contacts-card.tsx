@@ -262,8 +262,8 @@ export function ClientContactsCard({ clientId, clientName }: ClientContactsCardP
 
         {/* Modal Form */}
         {isModalOpen ? (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4">
-            <div className="w-full max-w-lg rounded-xl border border-border bg-card p-6 shadow-xl space-y-4">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-2 sm:p-4">
+            <div className="w-full max-w-[96vw] sm:max-w-lg rounded-xl border border-border bg-card p-4 sm:p-6 shadow-xl space-y-4 max-h-[92vh] overflow-y-auto">
               <div className="flex items-center justify-between border-b pb-3">
                 <h3 className="font-semibold text-lg text-foreground">
                   {editingContact ? "Edit Contact" : "Add New Contact"}
@@ -274,7 +274,7 @@ export function ClientContactsCard({ clientId, clientName }: ClientContactsCardP
               </div>
 
               <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="space-y-1.5">
                     <Label htmlFor="c-fn">First Name *</Label>
                     <Input id="c-fn" value={firstName} onChange={(e) => setFirstName(e.target.value)} required />
@@ -285,7 +285,7 @@ export function ClientContactsCard({ clientId, clientName }: ClientContactsCardP
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="space-y-1.5">
                     <Label htmlFor="c-email">Email</Label>
                     <Input id="c-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
@@ -296,7 +296,7 @@ export function ClientContactsCard({ clientId, clientName }: ClientContactsCardP
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="space-y-1.5">
                     <Label htmlFor="c-job">Job Title</Label>
                     <Input id="c-job" value={jobTitle} onChange={(e) => setJobTitle(e.target.value)} placeholder="e.g. Lead Engineer" />
@@ -307,7 +307,7 @@ export function ClientContactsCard({ clientId, clientName }: ClientContactsCardP
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="space-y-1.5">
                     <Label htmlFor="c-altphone">Alternate Phone</Label>
                     <Input id="c-altphone" value={alternatePhone} onChange={(e) => setAlternatePhone(e.target.value)} />

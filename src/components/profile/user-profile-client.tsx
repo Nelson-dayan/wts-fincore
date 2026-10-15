@@ -260,17 +260,23 @@ export function UserProfileClient({ portal }: { portal: "admin" | "employee" }) 
     setTimeout(() => setCopiedEmail(false), 2000);
   }
 
-  // Generate initials from name or email
+  // Generate clean initials from name or email (strips annotations like (Admin))
   const initials = (() => {
     if (data?.user.name) {
-      const parts = data.user.name.trim().split(/\s+/);
+      const cleanName = data.user.name.replace(/\([^)]*\)/g, "").replace(/[^a-zA-Z0-9\s]/g, "").trim();
+      const parts = cleanName.split(/\s+/).filter(Boolean);
       if (parts.length >= 2) {
         return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
       }
-      return parts[0].slice(0, 2).toUpperCase();
+      if (parts.length === 1 && parts[0].length >= 2) {
+        return parts[0].slice(0, 2).toUpperCase();
+      }
+      if (parts.length === 1 && parts[0].length === 1) {
+        return parts[0].toUpperCase();
+      }
     }
     if (data?.user.email) {
-      return data.user.email.slice(0, 2).toUpperCase();
+      return data.user.email.replace(/[^a-zA-Z0-9]/g, "").slice(0, 2).toUpperCase();
     }
     return "ME";
   })();
@@ -364,11 +370,11 @@ export function UserProfileClient({ portal }: { portal: "admin" | "employee" }) 
           <div className="absolute inset-0 bg-[radial-gradient(#3b82f6_1px,transparent_1px)] [background-size:16px_16px] opacity-15" />
         </div>
 
-        <div className="px-6 pb-6 pt-0 relative">
-          <div className="flex flex-col sm:flex-row items-start sm:items-end justify-between gap-4 -mt-12 sm:-mt-16 mb-4">
-            <div className="flex items-end gap-4">
-              <div className="relative group">
-                <div className="size-24 sm:size-28 rounded-2xl bg-gradient-to-tr from-primary via-primary/90 to-primary/70 text-primary-foreground font-bold text-3xl sm:text-4xl flex items-center justify-center shadow-xl ring-4 ring-background border border-primary/20 transition-transform group-hover:scale-105">
+        <div className="px-4 sm:px-6 pb-6 pt-0 relative">
+          <div className="flex flex-col sm:flex-row items-start sm:items-end justify-between gap-4 -mt-10 sm:-mt-16 mb-4">
+            <div className="flex flex-col sm:flex-row items-start sm:items-end gap-3 sm:gap-4 w-full sm:w-auto">
+              <div className="relative group shrink-0">
+                <div className="size-20 sm:size-28 rounded-2xl bg-gradient-to-tr from-primary via-primary/90 to-primary/70 text-primary-foreground font-bold text-2xl sm:text-4xl flex items-center justify-center shadow-xl ring-4 ring-background border border-primary/20 transition-transform group-hover:scale-105">
                   {initials}
                 </div>
                 <div 
@@ -379,21 +385,21 @@ export function UserProfileClient({ portal }: { portal: "admin" | "employee" }) 
                 </div>
               </div>
 
-              <div className="space-y-1 mb-1">
-                <div className="flex flex-wrap items-center gap-2.5">
-                  <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
+              <div className="space-y-1 mb-1 min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h1 className="text-xl sm:text-3xl font-bold tracking-tight text-foreground break-normal">
                     {user.name || "User Account"}
                   </h1>
-                  <Badge variant="outline" className={cn("px-2.5 py-0.5 font-medium text-xs", roleBadgeClass)}>
+                  <Badge variant="outline" className={cn("px-2.5 py-0.5 font-medium text-xs shrink-0", roleBadgeClass)}>
                     {roleLabel}
                   </Badge>
                 </div>
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <span>{user.email}</span>
+                <div className="flex items-center gap-2 text-xs sm:text-sm text-muted-foreground truncate">
+                  <span className="truncate">{user.email}</span>
                   <button
                     type="button"
                     onClick={copyEmailToClipboard}
-                    className="p-1 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                    className="p-1 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors shrink-0"
                     title="Copy email to clipboard"
                     aria-label="Copy email address"
                   >
@@ -421,7 +427,7 @@ export function UserProfileClient({ portal }: { portal: "admin" | "employee" }) 
           </div>
 
           {/* Quick Metrics Bar */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-4 border-t border-border/60">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-4 border-t border-border/60">
             <div className="rounded-xl bg-muted/40 p-3 border border-border/40">
               <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground block">
                 Primary Workspace

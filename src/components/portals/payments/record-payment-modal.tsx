@@ -578,29 +578,29 @@ export function RecordPaymentModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4">
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full max-w-[600px] bg-card rounded-2xl shadow-2xl border border-border overflow-hidden flex flex-col max-h-[92vh] animate-in fade-in duration-200">
+      <div className="relative w-full max-w-[96vw] sm:max-w-[600px] bg-card rounded-2xl shadow-2xl border border-border overflow-hidden flex flex-col max-h-[94vh] animate-in fade-in duration-200">
         
         {/* Header */}
-        <div className="px-6 py-5 border-b bg-muted/10 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary ring-1 ring-primary/20">
-              <CreditCard className="w-5 h-5" />
+        <div className="px-4 py-3 sm:px-6 sm:py-5 border-b bg-muted/10 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary ring-1 ring-primary/20 shrink-0">
+              <CreditCard className="w-4 h-4 sm:w-5 sm:h-5" />
             </div>
-            <div>
-              <h2 className="text-lg font-bold tracking-tight">Record Payment</h2>
-              <p className="text-xs text-muted-foreground">Manage project revenues, forex, fees and allocations</p>
+            <div className="min-w-0">
+              <h2 className="text-base sm:text-lg font-bold tracking-tight truncate">Record Payment</h2>
+              <p className="text-[11px] sm:text-xs text-muted-foreground truncate">Manage project revenues, forex, fees and allocations</p>
             </div>
           </div>
-          <button onClick={onClose} className="p-2 rounded-full hover:bg-muted text-muted-foreground transition-colors">
-            <X className="w-5 h-5" />
+          <button onClick={onClose} className="p-1.5 sm:p-2 rounded-full hover:bg-muted text-muted-foreground transition-colors shrink-0" aria-label="Close modal">
+            <X className="w-4 h-4 sm:w-5 sm:h-5" />
           </button>
         </div>
 
         {/* Scrollable Form Body */}
-        <div className="p-6 overflow-y-auto flex-1 custom-scrollbar space-y-6">
-          <form id="record-payment-form" onSubmit={handleSubmit} className="space-y-6">
+        <div className="p-3.5 sm:p-6 overflow-y-auto flex-1 custom-scrollbar space-y-4 sm:space-y-6">
+          <form id="record-payment-form" onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
             
             {error && (
               <div className="p-3.5 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive text-sm font-semibold flex items-center gap-2 animate-shake">
@@ -616,7 +616,7 @@ export function RecordPaymentModal({
             </div>
 
             {/* 2. Receiving Account */}
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
               <div className="space-y-2">
                 <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">2. Receiving Account</Label>
                 {loadingAccounts ? (
@@ -668,7 +668,7 @@ export function RecordPaymentModal({
 
               {isDifferentCurrency ? (
                 <div className="p-4 bg-muted/10 rounded-xl border border-border/80 space-y-4 animate-in slide-in-from-top-2 duration-200">
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                     <div className="space-y-2">
                       <Label className="text-xs">From Currency</Label>
                       <Select 
@@ -689,7 +689,7 @@ export function RecordPaymentModal({
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                     <div className="space-y-2">
                       <Label className="text-xs">Gross Amount Received ({paymentCurrency})</Label>
                       <Input 
@@ -766,7 +766,7 @@ export function RecordPaymentModal({
                     <Calculator className="w-4 h-4 text-amber-600" />
                     Aggregated Base Treasury Settings
                   </div>
-                  <div className="grid grid-cols-2 gap-3 items-center">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-center">
                     <div className="space-y-1">
                       <Label className="text-xs text-amber-600/80">Exchange Rate ({accountCurrency} &rarr; INR)</Label>
                       {isManualBaseRate ? (
@@ -847,8 +847,8 @@ export function RecordPaymentModal({
                   ) : (
                     <div className="space-y-2">
                       {fees.map((fee, idx) => (
-                        <div key={idx} className="grid grid-cols-12 gap-2 bg-background/50 p-2 rounded-lg border border-border/40 items-center relative animate-in fade-in duration-100">
-                          <div className="col-span-4">
+                        <div key={idx} className="flex flex-col sm:grid sm:grid-cols-12 gap-2 bg-background/50 p-2.5 sm:p-2 rounded-lg border border-border/40 items-stretch sm:items-center relative animate-in fade-in duration-100">
+                          <div className="sm:col-span-4">
                             <Input 
                               required
                               placeholder="Title (e.g. Stripe Fee)" 
@@ -857,48 +857,52 @@ export function RecordPaymentModal({
                               onChange={e => updateFeeRow(idx, { title: e.target.value })}
                             />
                           </div>
-                          <div className="col-span-3">
-                            <Input 
-                              required
-                              type="number" 
-                              step="0.01" 
-                              placeholder="Amount" 
-                              className="h-8 text-xs"
-                              value={fee.amount || ""}
-                              onChange={e => updateFeeRow(idx, { amount: Number(e.target.value) })}
-                            />
+                          <div className="grid grid-cols-3 sm:contents gap-2">
+                            <div className="col-span-1 sm:col-span-3">
+                              <Input 
+                                required
+                                type="number" 
+                                step="0.01" 
+                                placeholder="Amount" 
+                                className="h-8 text-xs"
+                                value={fee.amount || ""}
+                                onChange={e => updateFeeRow(idx, { amount: Number(e.target.value) })}
+                              />
+                            </div>
+                            <div className="col-span-1 sm:col-span-2">
+                              <Select 
+                                value={fee.currency}
+                                onValueChange={val => updateFeeRow(idx, { currency: val })}
+                                options={(isDifferentCurrency 
+                                  ? Array.from(new Set([paymentCurrency, accountCurrency]))
+                                  : [accountCurrency]
+                                ).map(cur => ({ value: cur, label: cur }))}
+                              />
+                            </div>
+                            <div className="col-span-1 sm:col-span-2">
+                              <Select 
+                                value={fee.category}
+                                onValueChange={val => updateFeeRow(idx, { category: val as any })}
+                                options={[
+                                  { value: "GATEWAY_FEE", label: "Gateway" },
+                                  { value: "TDS", label: "TDS" },
+                                  { value: "BANK_CHARGE", label: "Bank" },
+                                  { value: "FOREX", label: "Forex" },
+                                  { value: "GST_ON_FEE", label: "GST" },
+                                  { value: "OTHER", label: "Other" },
+                                ]}
+                              />
+                            </div>
                           </div>
-                          <div className="col-span-2">
-                            <Select 
-                              value={fee.currency}
-                              onValueChange={val => updateFeeRow(idx, { currency: val })}
-                              options={(isDifferentCurrency 
-                                ? Array.from(new Set([paymentCurrency, accountCurrency]))
-                                : [accountCurrency]
-                              ).map(cur => ({ value: cur, label: cur }))}
-                            />
-                          </div>
-                          <div className="col-span-2">
-                            <Select 
-                              value={fee.category}
-                              onValueChange={val => updateFeeRow(idx, { category: val as any })}
-                              options={[
-                                { value: "GATEWAY_FEE", label: "Gateway" },
-                                { value: "TDS", label: "TDS" },
-                                { value: "BANK_CHARGE", label: "Bank" },
-                                { value: "FOREX", label: "Forex" },
-                                { value: "GST_ON_FEE", label: "GST" },
-                                { value: "OTHER", label: "Other" },
-                              ]}
-                            />
-                          </div>
-                          <div className="col-span-1 text-center">
+                          <div className="sm:col-span-1 flex justify-end sm:justify-center">
                             <button 
                               type="button" 
                               onClick={() => removeFeeRow(idx)}
-                              className="p-1 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                              className="p-1 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors flex items-center gap-1 text-xs"
+                              aria-label="Remove fee item"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
+                              <span className="sm:hidden text-xs">Remove</span>
                             </button>
                           </div>
                         </div>
@@ -1002,7 +1006,7 @@ export function RecordPaymentModal({
                               />
                             </div>
                             
-                            <div className="grid grid-cols-2 gap-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                               <div className="space-y-2">
                                 <Label className="text-xs">Amount to Allocate ({invoiceCurrency})</Label>
                                 <Input 
@@ -1056,7 +1060,7 @@ export function RecordPaymentModal({
             {/* 6. Notes & Reference */}
             <div className="space-y-4 pt-4 border-t border-dashed border-border/80">
               <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">6. Transaction References</Label>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                 <div className="space-y-2">
                   <Label className="text-xs">Reference Number / Transaction ID</Label>
                   <Input 
@@ -1078,7 +1082,7 @@ export function RecordPaymentModal({
 
             {/* Zoho/QuickBooks Premium Live Summary Card */}
             {grossAmount > 0 && (
-              <div className="p-6 rounded-2xl bg-gradient-to-br from-zinc-900/50 to-zinc-950/50 backdrop-blur-md border border-border/80 shadow-2xl space-y-5 animate-in fade-in duration-300">
+              <div className="p-3.5 sm:p-6 rounded-2xl bg-gradient-to-br from-zinc-900/50 to-zinc-950/50 backdrop-blur-md border border-border/80 shadow-2xl space-y-4 sm:space-y-5 animate-in fade-in duration-300">
                 <div className="flex items-center justify-between border-b border-border/40 pb-2">
                   <h3 className="text-xs font-extrabold uppercase tracking-wider text-primary flex items-center gap-1.5">
                     <Calculator className="w-4 h-4 text-primary animate-pulse" />
@@ -1089,7 +1093,7 @@ export function RecordPaymentModal({
                   </span>
                 </div>
                 
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-4 items-center">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4 items-start sm:items-center">
                   <div className="space-y-1">
                     <div className="flex items-center gap-1 text-[10px] text-muted-foreground font-semibold uppercase tracking-wider">
                       Gross Received
@@ -1097,7 +1101,7 @@ export function RecordPaymentModal({
                         <Info className="w-3 h-3" />
                       </span>
                     </div>
-                    <p className="text-lg font-extrabold text-foreground tabular-nums">
+                    <p className="text-base sm:text-lg font-extrabold text-foreground tabular-nums">
                       {grossAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })} <span className="text-xs text-muted-foreground font-medium">{paymentCurrency}</span>
                     </p>
                   </div>
@@ -1110,7 +1114,7 @@ export function RecordPaymentModal({
                           <Info className="w-3 h-3" />
                         </span>
                       </div>
-                      <p className="text-lg font-extrabold text-red-500/90 tabular-nums">
+                      <p className="text-base sm:text-lg font-extrabold text-red-500/90 tabular-nums">
                         -{totalFeesInPaymentCurrency.toLocaleString(undefined, { minimumFractionDigits: 2 })} <span className="text-xs text-muted-foreground font-medium">{paymentCurrency}</span>
                       </p>
                     </div>
@@ -1123,14 +1127,14 @@ export function RecordPaymentModal({
                         <Info className="w-3 h-3" />
                       </span>
                     </div>
-                    <p className="text-lg font-extrabold text-green-500 tabular-nums">
+                    <p className="text-base sm:text-lg font-extrabold text-green-500 tabular-nums">
                       {netAmountInAccountCurrency.toLocaleString(undefined, { minimumFractionDigits: 2 })} <span className="text-xs text-muted-foreground font-medium">{accountCurrency}</span>
                     </p>
                   </div>
                 </div>
 
                 {allocateToInvoice && (
-                  <div className="pt-4 border-t border-border/40 grid grid-cols-2 md:grid-cols-3 gap-4">
+                  <div className="pt-3 sm:pt-4 border-t border-border/40 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
                     <div className="space-y-1">
                       <div className="flex items-center gap-1 text-[10px] text-muted-foreground font-semibold uppercase tracking-wider">
                         Allocated
@@ -1138,7 +1142,7 @@ export function RecordPaymentModal({
                           <Info className="w-3 h-3" />
                         </span>
                       </div>
-                      <p className="text-base font-bold text-foreground tabular-nums">
+                      <p className="text-sm sm:text-base font-bold text-foreground tabular-nums">
                         {totalAllocatedInAccountCurrency.toLocaleString(undefined, { minimumFractionDigits: 2 })} <span className="text-xs text-muted-foreground font-medium">{accountCurrency}</span>
                       </p>
                     </div>
@@ -1150,7 +1154,7 @@ export function RecordPaymentModal({
                           <Info className="w-3 h-3" />
                         </span>
                       </div>
-                      <p className={`text-base font-bold tabular-nums ${
+                      <p className={`text-sm sm:text-base font-bold tabular-nums ${
                         remainingInAccountCurrency < -0.01 
                           ? "text-destructive" 
                           : remainingInAccountCurrency > 0.01 
@@ -1164,7 +1168,7 @@ export function RecordPaymentModal({
                 )}
 
                 {/* VISUAL MONEY FLOW JOURNEY - EXTREMELY HIGH PREMIUM FINTECH UX */}
-                <div className="mt-2 p-3.5 bg-zinc-950/40 rounded-xl border border-border/40 space-y-2.5">
+                <div className="mt-2 p-3 sm:p-3.5 bg-zinc-950/40 rounded-xl border border-border/40 space-y-2">
                   <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1">
                     <TrendingUp className="w-3.5 h-3.5 text-primary" />
                     Interactive Ledger Flow Map
@@ -1244,9 +1248,9 @@ export function RecordPaymentModal({
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 border-t bg-muted/10 flex items-center justify-end gap-3 shrink-0">
-          <Button variant="outline" onClick={onClose} disabled={submitting}>Cancel</Button>
-          <Button form="record-payment-form" type="submit" disabled={submitting} className="min-w-[150px]">
+        <div className="px-4 py-3 sm:px-6 sm:py-4 border-t bg-muted/10 flex flex-col-reverse sm:flex-row sm:items-center sm:justify-end gap-2 sm:gap-3 shrink-0">
+          <Button variant="outline" onClick={onClose} disabled={submitting} className="w-full sm:w-auto">Cancel</Button>
+          <Button form="record-payment-form" type="submit" disabled={submitting} className="w-full sm:w-auto sm:min-w-[150px]">
             {submitting ? (
               <span className="flex items-center gap-1.5 justify-center">
                 <Loader2 className="w-3.5 h-3.5 animate-spin" />

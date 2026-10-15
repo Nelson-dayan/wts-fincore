@@ -1142,10 +1142,10 @@ export default function CompaniesManagementPage() {
 
       {/* 16. Modal for Creating / Editing Companies & Branding */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-xs p-3 sm:p-5 overflow-hidden">
-          <div className="w-full max-w-3xl max-h-[92vh] flex flex-col rounded-2xl border border-border bg-card shadow-2xl animate-in fade-in-50 zoom-in-95 my-auto overflow-hidden">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-xs p-2 sm:p-5 overflow-hidden">
+          <div className="w-full max-w-3xl max-h-[94vh] flex flex-col rounded-2xl border border-border bg-card shadow-2xl animate-in fade-in-50 zoom-in-95 my-auto overflow-hidden">
             {/* Modal Header */}
-            <div className="flex items-center justify-between border-b border-border/60 px-6 py-4 shrink-0 bg-card">
+            <div className="flex items-center justify-between border-b border-border/60 px-4 py-3 sm:px-6 sm:py-4 shrink-0 bg-card">
               <div>
                 <h2 className="text-lg font-bold text-foreground">
                   {editingCompany ? `Edit Entity: ${editingCompany.name}` : "Create Corporate Entity"}
@@ -1164,7 +1164,7 @@ export default function CompaniesManagementPage() {
             </div>
 
             {/* Modal Navigation Tabs */}
-            <div className="flex items-center gap-2 border-b border-border/40 px-6 py-2.5 shrink-0 bg-muted/20">
+            <div className="flex items-center gap-2 border-b border-border/40 px-4 py-2 sm:px-6 sm:py-2.5 shrink-0 bg-muted/20 overflow-x-auto">
               <button
                 type="button"
                 onClick={() => setModalTab("general")}
@@ -1195,7 +1195,7 @@ export default function CompaniesManagementPage() {
 
             {/* Form Content */}
             <form onSubmit={handleSaveCompany} className="flex flex-col flex-1 overflow-hidden">
-              <div className="flex-1 overflow-y-auto p-6 space-y-4 text-xs">
+              <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 text-xs">
                 {modalTab === "general" ? (
                   <div className="space-y-4">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -1494,18 +1494,18 @@ export default function CompaniesManagementPage() {
               </div>
 
               {/* Modal Footer Buttons */}
-              <div className="flex items-center justify-end gap-2 border-t border-border/60 px-6 py-3.5 shrink-0 bg-muted/30">
+              <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-2 border-t border-border/60 px-4 py-3 sm:px-6 sm:py-3.5 shrink-0 bg-muted/30">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="rounded-xl border border-border/60 px-4 py-2 text-xs font-semibold text-muted-foreground hover:bg-muted transition-colors"
+                  className="rounded-xl border border-border/60 px-4 py-2 text-xs font-semibold text-muted-foreground hover:bg-muted transition-colors w-full sm:w-auto"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={saving}
-                  className="rounded-xl bg-primary px-5 py-2 text-xs font-semibold text-primary-foreground shadow-md hover:bg-primary/90 transition-all disabled:opacity-50"
+                  className="rounded-xl bg-primary px-5 py-2 text-xs font-semibold text-primary-foreground shadow-md hover:bg-primary/90 transition-all disabled:opacity-50 w-full sm:w-auto"
                 >
                   {saving ? "Saving..." : "Save Company"}
                 </button>

@@ -91,7 +91,7 @@ export function AddUserForm({
   return (
     <Card className="glass-card overflow-hidden border border-border/70 shadow-lg transition-all duration-300 hover:shadow-xl">
       <div className="h-1 bg-linear-to-r from-primary via-indigo-500 to-sky-400" />
-      <CardHeader className="pb-3 pt-6 px-6">
+      <CardHeader className="pb-3 pt-6 px-4 sm:px-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3.5">
             <div className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary ring-1 ring-primary/20 shadow-xs">
@@ -109,7 +109,7 @@ export function AddUserForm({
         </div>
       </CardHeader>
 
-      <CardContent className="p-6 pt-2">
+      <CardContent className="p-4 sm:p-6 pt-2">
         <form onSubmit={onSubmit} className="grid gap-5 sm:grid-cols-2">
           {/* Full Name */}
           <div className="space-y-2">
@@ -326,7 +326,7 @@ export function AddUserForm({
                 <Select
                   id="primary-company"
                   value={form.primaryCompanyId}
-                  className="h-8 max-w-60 text-xs font-medium border-border/70"
+                  className="h-8 w-full sm:max-w-60 text-xs font-medium border-border/70"
                   onChange={(e) => onFormChange({ ...form, primaryCompanyId: e.target.value })}
                   options={companies
                     .filter((c) => (form.companyIds || []).includes(c._id))
@@ -370,7 +370,7 @@ export function AddUserForm({
             <Button
               type="submit"
               disabled={saving}
-              className="h-10 px-6 rounded-xl font-bold text-xs shadow-md shadow-primary/20 transition-all hover:scale-[1.01]"
+              className="h-10 px-6 rounded-xl font-bold text-xs shadow-md shadow-primary/20 transition-all hover:scale-[1.01] w-full sm:w-auto"
             >
               {saving ? (
                 <>
