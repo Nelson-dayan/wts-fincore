@@ -80,7 +80,7 @@ export async function PATCH(req: Request, ctx: RouteCtx) {
     const updated = await ClientModel.findByIdAndUpdate(
       clientId,
       { $set },
-      { new: true }
+      { returnDocument: "after" }
     ).lean();
 
     if (!updated) {

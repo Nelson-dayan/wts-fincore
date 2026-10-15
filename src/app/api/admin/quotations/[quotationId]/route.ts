@@ -364,7 +364,7 @@ export async function PATCH(req: Request, ctx: RouteCtx) {
           internalNotes: nextInternalNotes,
         },
       },
-      { new: true }
+      { returnDocument: "after" }
     ).lean();
 
     if (!updated) {

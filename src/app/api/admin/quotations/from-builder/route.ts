@@ -285,7 +285,7 @@ export async function POST(req: Request) {
             projectId: existingProjectId,
           },
         },
-        { new: true }
+        { returnDocument: "after" }
       ).lean();
 
       if (!updated) {

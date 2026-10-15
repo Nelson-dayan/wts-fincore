@@ -108,7 +108,7 @@ export async function POST(req: Request) {
     let created = await UserModel.findOneAndUpdate(
       { email: String(body.email ?? "").toLowerCase() },
       { $set: updateFields },
-      { new: true }
+      { returnDocument: "after" }
     )
       .select("_id name email role isActive phone companyIds groupIds groupViewAccess primaryCompanyId createdAt")
       .lean();

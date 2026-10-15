@@ -115,7 +115,7 @@ export async function PATCH(req: Request) {
     const updated = await CompanyModel.findByIdAndUpdate(
       companyId,
       { $set: updates },
-      { new: true, runValidators: true }
+      { returnDocument: "after", runValidators: true }
     ).lean();
 
     await logActivity({

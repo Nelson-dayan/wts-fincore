@@ -133,7 +133,7 @@ export async function PATCH(req: Request, ctx: RouteCtx) {
     const updated = await ProjectModel.findByIdAndUpdate(
       projectId,
       { $set },
-      { new: true }
+      { returnDocument: "after" }
     ).lean();
 
     if (!updated) {

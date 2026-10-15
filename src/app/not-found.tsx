@@ -61,12 +61,6 @@ export default function NotFound() {
               <span>Admin Dashboard</span>
             </Button>
           </Link>
-          <Link href="/admin/accounts" id="not-found-accounts-btn" className="w-full sm:w-auto">
-            <Button variant="outline" className="w-full gap-2 font-medium" size="lg">
-              <Wallet className="h-4 w-4" />
-              <span>Treasury Accounts</span>
-            </Button>
-          </Link>
         </div>
 
         {/* System Health / Footer Note */}

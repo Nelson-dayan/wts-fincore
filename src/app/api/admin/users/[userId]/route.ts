@@ -65,7 +65,7 @@ export async function PATCH(req: Request, ctx: RouteCtx) {
       passwordReset = true;
     }
 
-    const updated = await UserModel.findByIdAndUpdate(userId, { $set: updates }, { new: true })
+    const updated = await UserModel.findByIdAndUpdate(userId, { $set: updates }, { returnDocument: "after" })
       .select("_id name email role isActive phone companyIds groupIds groupViewAccess primaryCompanyId signatureUrl updatedAt")
       .lean();
     if (!updated) {

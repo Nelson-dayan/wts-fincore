@@ -76,7 +76,7 @@ export async function updateContact(
   const updated = await ContactModel.findOneAndUpdate(
     { _id: contactId, isDeleted: { $ne: true } },
     { $set: updateData },
-    { new: true }
+    { returnDocument: "after" }
   ).lean();
 
   if (!updated) return null;
