@@ -10,10 +10,13 @@ import { NotificationBell } from "@/components/portals/notification-bell";
 import { CommandPalette } from "@/components/portals/command-palette";
 import { CommandPaletteTrigger } from "@/components/portals/command-palette-trigger";
 import { CompanySwitcher } from "@/components/companies/company-switcher";
+import { PortalUserMenu } from "@/components/layout/portal-user-menu";
+import { PortalUserBadge } from "@/components/layout/portal-user-badge";
 import { 
   LayoutDashboard, 
   Users, 
   UserCheck, 
+  UserCircle,
   FolderKanban, 
   Building2, 
   Network,
@@ -57,7 +60,7 @@ export default async function AdminPortalLayout({
           <>
             <NotificationBell />
             <ThemeToggle />
-            <SignOutButton className="border-0 bg-transparent hover:bg-destructive/12" />
+            <PortalUserMenu portal="admin" />
           </>
         }
       >
@@ -93,6 +96,10 @@ export default async function AdminPortalLayout({
               <PortalNavLink href="/admin/settings/company" match="exact" className="w-full justify-start gap-2.5">
                 <Building2 className="size-4 shrink-0" />
                 <span>Company Profile</span>
+              </PortalNavLink>
+              <PortalNavLink href="/admin/profile" match="prefix" className="w-full justify-start gap-2.5">
+                <UserCircle className="size-4 shrink-0 text-primary" />
+                <span>My Profile</span>
               </PortalNavLink>
             </div>
           </div>
@@ -147,6 +154,9 @@ export default async function AdminPortalLayout({
             </div>
           )}
         </nav>
+        <div className="pt-4">
+          <PortalUserBadge portal="admin" />
+        </div>
       </PortalMobileDrawer>
 
       {/* Desktop Sidebar Navigation */}
@@ -188,6 +198,10 @@ export default async function AdminPortalLayout({
                   <PortalNavLink href="/admin/settings/company" match="exact" className="w-full justify-start gap-2.5">
                     <Building2 className="size-4 shrink-0" />
                     <span>Company Profile</span>
+                  </PortalNavLink>
+                  <PortalNavLink href="/admin/profile" match="prefix" className="w-full justify-start gap-2.5">
+                    <UserCircle className="size-4 shrink-0 text-primary" />
+                    <span>My Profile</span>
                   </PortalNavLink>
                 </div>
               </div>
@@ -244,7 +258,8 @@ export default async function AdminPortalLayout({
             </nav>
           </div>
 
-          <div className="border-t border-border/80 pt-3">
+          <div className="border-t border-border/80 pt-3 space-y-2">
+            <PortalUserBadge portal="admin" />
             <div className="px-2 py-1 flex items-center justify-between text-[11px] text-muted-foreground font-mono">
               <span>Sec-DocuTrade v2.5</span>
               <span className="text-emerald-500 font-semibold">• Live</span>
@@ -260,11 +275,11 @@ export default async function AdminPortalLayout({
             <div className="flex-1 max-w-md">
               <CommandPaletteTrigger />
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2.5">
               <CompanySwitcher />
               <NotificationBell />
               <ThemeToggle />
-              <SignOutButton className="border-0 bg-transparent hover:bg-destructive/12" />
+              <PortalUserMenu portal="admin" />
             </div>
           </div>
         </header>

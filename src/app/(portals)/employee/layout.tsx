@@ -8,6 +8,7 @@ import { SignOutButton } from "@/components/portals/sign-out-button";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { EmployeePortalProviders } from "@/components/portals/employee-portal-providers";
 import { PortalUserBadge } from "@/components/layout/portal-user-badge";
+import { PortalUserMenu } from "@/components/layout/portal-user-menu";
 
 import { connection } from "next/server";
 
@@ -33,7 +34,7 @@ export default async function EmployeePortalLayout({
         actions={
           <>
             <ThemeToggle />
-            <SignOutButton className="border-0 bg-transparent hover:bg-destructive/12" />
+            <PortalUserMenu portal="employee" />
           </>
         }
       >
@@ -63,6 +64,9 @@ export default async function EmployeePortalLayout({
             </PortalNavLink>
             <PortalNavLink href="/employee/notifications" match="prefix" className="w-full justify-start">
               Notifications
+            </PortalNavLink>
+            <PortalNavLink href="/employee/profile" match="prefix" className="w-full justify-start text-primary font-medium">
+              My Profile
             </PortalNavLink>
           </div>
         </nav>
@@ -107,6 +111,9 @@ export default async function EmployeePortalLayout({
               <PortalNavLink href="/employee/notifications" match="prefix" className="w-full justify-start">
                 Notifications
               </PortalNavLink>
+              <PortalNavLink href="/employee/profile" match="prefix" className="w-full justify-start text-primary font-medium">
+                My Profile
+              </PortalNavLink>
             </div>
           </nav>
 
@@ -116,9 +123,9 @@ export default async function EmployeePortalLayout({
 
       <PortalShell>
         <header className="sticky top-0 z-30 hidden border-b border-border/60 bg-card/70 backdrop-blur md:block">
-          <div className="mx-auto flex w-full max-w-6xl items-center justify-end gap-2 px-4 py-3 sm:px-6">
+          <div className="mx-auto flex w-full max-w-6xl items-center justify-end gap-2.5 px-4 py-3 sm:px-6">
             <ThemeToggle />
-            <SignOutButton className="border-0 bg-transparent hover:bg-destructive/12" />
+            <PortalUserMenu portal="employee" />
           </div>
         </header>
         <div className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 sm:py-10">

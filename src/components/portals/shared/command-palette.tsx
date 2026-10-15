@@ -12,7 +12,8 @@ import {
   ShoppingCart, 
   Loader2,
   ChevronRight,
-  Wallet
+  Wallet,
+  UserCircle
 } from "lucide-react";
 import { usePortalConfig } from "@/components/portals/portal-config-context";
 import { cn } from "@/lib/utils/cn";
@@ -153,10 +154,11 @@ export function CommandPalette() {
               <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-3 px-2">Quick Navigation</p>
               <div className="grid grid-cols-2 gap-2">
                 {[
-                  { label: "Projects", url: "/admin/projects", icon: Briefcase },
-                  { label: "Invoices", url: "/admin/invoices", icon: FileText },
-                  { label: "Payments", url: "/admin/payments", icon: ShoppingCart },
-                  { label: "Clients", url: "/admin/clients", icon: Users },
+                  { label: "My Profile", url: `${pathPrefix}/profile`, icon: UserCircle },
+                  { label: "Projects", url: `${pathPrefix}/projects`, icon: Briefcase },
+                  { label: "Invoices", url: `${pathPrefix}/invoices`, icon: FileText },
+                  { label: "Clients", url: `${pathPrefix}/clients`, icon: Users },
+                  { label: "Payments", url: `${pathPrefix}/payments`, icon: ShoppingCart },
                 ].map((link) => (
                   <button
                     key={link.label}
