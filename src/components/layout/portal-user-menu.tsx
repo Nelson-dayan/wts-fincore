@@ -100,7 +100,7 @@ export function PortalUserMenu({ portal }: { portal: "admin" | "employee" }) {
         type="button"
         onClick={() => setOpen(!open)}
         className={cn(
-          "flex items-center gap-2.5 rounded-full border border-border/80 bg-background/80 py-1 pl-1 pr-3 text-sm font-medium transition-all duration-200",
+          "flex items-center gap-1.5 sm:gap-2.5 rounded-full border border-border/80 bg-background/80 py-1 pl-1 pr-1 sm:pr-3 text-sm font-medium transition-all duration-200",
           "hover:border-primary/40 hover:bg-accent/60 hover:shadow-sm focus:outline-none focus:ring-2 focus:ring-ring/30",
           open && "border-primary/50 bg-accent ring-2 ring-ring/20"
         )}
@@ -124,7 +124,7 @@ export function PortalUserMenu({ portal }: { portal: "admin" | "employee" }) {
           </span>
         </div>
 
-        <ChevronDown className={cn("size-3.5 text-muted-foreground transition-transform duration-200", open && "rotate-180")} />
+        <ChevronDown className={cn("hidden sm:block size-3.5 text-muted-foreground transition-transform duration-200", open && "rotate-180")} />
       </button>
 
       {/* Dropdown Menu */}

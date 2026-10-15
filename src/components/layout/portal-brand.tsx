@@ -38,10 +38,10 @@ export function PortalBrand({
         )}
       </span>
       <span className="min-w-0 text-left leading-tight">
-        <span className="font-brand block truncate text-[15px] font-semibold tracking-tight sm:text-base">
+        <span className="font-brand block truncate text-sm font-semibold tracking-tight sm:text-base">
           {title}
         </span>
-        <span className="mt-0.5 block text-[11px] font-medium tracking-wide text-muted-foreground/90">
+        <span className="mt-0.5 hidden sm:block text-[11px] font-medium tracking-wide text-muted-foreground/90">
           {subtitle}
         </span>
       </span>

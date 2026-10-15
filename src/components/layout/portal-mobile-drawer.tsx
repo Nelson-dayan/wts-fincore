@@ -49,7 +49,7 @@ export function PortalMobileDrawer({
             >
               <Menu className="size-4.5" aria-hidden />
             </Button>
-            <div className="min-w-0 flex-1 truncate">{brand}</div>
+            <div className="min-w-0 flex-1">{brand}</div>
           </div>
 
           <div className="flex items-center gap-1 shrink-0">{actions}</div>
