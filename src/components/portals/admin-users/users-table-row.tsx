@@ -1,6 +1,6 @@
 "use client";
 
-import { Building2, Crown, KeyRound, Layers, Loader2, Pencil, Shield, ShieldCheck, Trash2, UserCheck, X } from "lucide-react";
+import { Building2, Crown, KeyRound, Layers, Loader2, Pencil, Shield, ShieldAlert, ShieldCheck, Trash2, UserCheck, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
@@ -61,6 +61,7 @@ function StatusBadge({ active }: { active: boolean }) {
 type UsersTableRowProps = {
   user: AdminUser;
   companies?: CompanyOption[];
+  isCallerSuperAdmin?: boolean;
   editingId: string | null;
   savingId: string;
   draft?: Partial<AdminUser>;
@@ -76,6 +77,7 @@ type UsersTableRowProps = {
 export function UsersTableRow({
   user,
   companies = [],
+  isCallerSuperAdmin = false,
   editingId,
   savingId,
   draft,
@@ -87,7 +89,8 @@ export function UsersTableRow({
   onDelete,
   onResetPassword,
 }: UsersTableRowProps) {
-  const isEditing = editingId === user._id;
+  const isProtectedSuperAdmin = user.role === "super_admin" && !isCallerSuperAdmin;
+  const isEditing = !isProtectedSuperAdmin && editingId === user._id;
 
   // Resolve assigned company badges
   const assignedCompanies = companies.filter((c) => (user.companyIds || []).includes(c._id));
@@ -189,7 +192,15 @@ export function UsersTableRow({
       {/* Actions */}
       <td className="px-0 py-3.5 pr-5 text-right">
         <div className="flex justify-end gap-1.5">
-          {isEditing ? (
+          {isProtectedSuperAdmin ? (
+            <span
+              className="inline-flex items-center gap-1.5 rounded-lg border border-amber-500/35 bg-amber-500/10 px-2.5 py-1 text-xs font-semibold text-amber-600 dark:text-amber-400 select-none shadow-2xs"
+              title="Protected Account: Super Admin accounts can only be managed by another Super Admin."
+            >
+              <ShieldAlert className="size-3.5 text-amber-500" />
+              Protected
+            </span>
+          ) : isEditing ? (
             <>
               <Button size="sm" className="rounded-lg px-3" onClick={() => onSave(user._id)} disabled={savingId === user._id}>
                 {savingId === user._id ? (

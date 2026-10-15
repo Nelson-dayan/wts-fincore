@@ -74,6 +74,13 @@ export async function POST(req: Request) {
       primaryCompanyId?: string;
     };
 
+    if (body.role === "super_admin" && session.user.role !== "super_admin") {
+      return NextResponse.json(
+        { message: "Only a Super Admin can create another Super Admin." },
+        { status: 403 }
+      );
+    }
+
     // Reuse registration validator+service to keep one source of truth.
     const result = await registerUser(body, {
       headerRegisterSecret: process.env.REGISTER_SECRET ?? null,

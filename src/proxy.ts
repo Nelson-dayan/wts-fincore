@@ -6,7 +6,7 @@ export const proxy = withAuth(
     const path = req.nextUrl.pathname;
     const role = req.nextauth.token?.role as string | undefined;
 
-    if (path.startsWith("/admin") && role !== "admin") {
+    if (path.startsWith("/admin") && role !== "admin" && role !== "super_admin") {
       return NextResponse.redirect(new URL("/employee", req.url));
     }
     return NextResponse.next();

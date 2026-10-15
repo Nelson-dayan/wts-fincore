@@ -17,6 +17,7 @@ import type { CompanyOption } from "@/components/companies/company-switcher";
 export function UsersTable({
   users,
   companies = [],
+  isCallerSuperAdmin = false,
   total,
   page,
   limit,
@@ -40,6 +41,7 @@ export function UsersTable({
 }: {
   users: AdminUser[];
   companies?: CompanyOption[];
+  isCallerSuperAdmin?: boolean;
   total: number;
   page: number;
   limit: number;
@@ -204,6 +206,7 @@ export function UsersTable({
                     key={user._id}
                     user={user}
                     companies={companies}
+                    isCallerSuperAdmin={isCallerSuperAdmin}
                     editingId={editingId}
                     savingId={savingId}
                     draft={drafts[user._id]}

@@ -28,6 +28,46 @@ export async function PATCH(req: Request, ctx: RouteCtx) {
       primaryCompanyId?: string;
     };
 
+    const targetUser = await UserModel.findById(userId).select("_id role email isActive").lean();
+    if (!targetUser) {
+      return NextResponse.json({ message: "User not found" }, { status: 404 });
+    }
+
+    // Role Escalation & Hierarchy Guards:
+    // 1. Only a super_admin can modify a super_admin account.
+    if (targetUser.role === "super_admin" && session.user.role !== "super_admin") {
+      return NextResponse.json(
+        { message: "Only a Super Admin can modify a Super Admin account." },
+        { status: 403 }
+      );
+    }
+
+    // 2. Only a super_admin can grant the super_admin role.
+    if (body.role === "super_admin" && session.user.role !== "super_admin") {
+      return NextResponse.json(
+        { message: "Only a Super Admin can grant Super Admin privileges." },
+        { status: 403 }
+      );
+    }
+
+    // 3. Ensure at least one active super_admin remains if demoting or deactivating
+    if (
+      targetUser.role === "super_admin" &&
+      ((body.role && body.role !== "super_admin") || body.isActive === false)
+    ) {
+      const otherActiveSuperAdmins = await UserModel.countDocuments({
+        _id: { $ne: targetUser._id },
+        role: "super_admin",
+        isActive: { $ne: false },
+      });
+      if (otherActiveSuperAdmins === 0) {
+        return NextResponse.json(
+          { message: "Cannot demote or deactivate the only active Super Admin." },
+          { status: 400 }
+        );
+      }
+    }
+
     const updates: Record<string, unknown> = {};
     if (body.name !== undefined) updates.name = String(body.name).trim();
     if (body.role !== undefined && ["admin", "employee", "super_admin"].includes(body.role)) {
@@ -99,17 +139,40 @@ export async function DELETE(_req: Request, ctx: RouteCtx) {
       );
     }
 
-    const user = await UserModel.findByIdAndDelete(userId).select("_id email").lean();
-    if (!user) {
+    const targetUser = await UserModel.findById(userId).select("_id role email").lean();
+    if (!targetUser) {
       return NextResponse.json({ message: "User not found" }, { status: 404 });
     }
+
+    // Role Hierarchy Guards for Account Deletion:
+    if (targetUser.role === "super_admin") {
+      if (session.user.role !== "super_admin") {
+        return NextResponse.json(
+          { message: "Only a Super Admin can delete a Super Admin account." },
+          { status: 403 }
+        );
+      }
+
+      const otherSuperAdmins = await UserModel.countDocuments({
+        _id: { $ne: targetUser._id },
+        role: "super_admin",
+      });
+      if (otherSuperAdmins === 0) {
+        return NextResponse.json(
+          { message: "Cannot delete the only Super Admin account." },
+          { status: 400 }
+        );
+      }
+    }
+
+    await UserModel.findByIdAndDelete(userId);
 
     await logActivity({
       userId: session.user.id,
       action: "deleted_user",
       entityType: "user",
-      entityId: String(user._id),
-      message: `Deleted user ${user.email}`,
+      entityId: String(targetUser._id),
+      message: `Deleted user ${targetUser.email}`,
     });
 
     return NextResponse.json({ ok: true });

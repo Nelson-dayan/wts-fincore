@@ -11,10 +11,18 @@ export async function requireSession() {
   return session;
 }
 
-export async function requireRole(roles: Array<"admin" | "employee">) {
+export async function requireRole(roles: Array<"admin" | "employee" | "super_admin">) {
   const session = await requireSession();
-  const role = session.user.role as "admin" | "employee";
-  if (!roles.includes(role)) {
+  const role = session.user.role as "admin" | "employee" | "super_admin";
+  if (role === "super_admin" || roles.includes(role)) {
+    return session;
+  }
+  throw new Error("FORBIDDEN");
+}
+
+export async function requireSuperAdmin() {
+  const session = await requireSession();
+  if (session.user.role !== "super_admin") {
     throw new Error("FORBIDDEN");
   }
   return session;

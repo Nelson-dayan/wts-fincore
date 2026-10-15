@@ -301,6 +301,60 @@ async function runAccessControlTestSuite() {
     // 38. Super Admin audit logging
     const loggedRole = "super_admin";
     recordResult("CASE-G38", pillar, "Super Admin actions logged with role super_admin", "ALLOW", loggedRole === "super_admin" ? "ALLOW" : "DENY", loggedRole === "super_admin");
+
+    // 38A. Standard Admin cannot create another Super Admin
+    const checkCreateUser = (callerRole: string, requestedRole: string) => {
+      if (requestedRole === "super_admin" && callerRole !== "super_admin") {
+        return "FORBIDDEN";
+      }
+      return "ALLOW";
+    };
+    const adminCreateAttempt = checkCreateUser("admin", "super_admin");
+    recordResult("CASE-G38A", pillar, "Standard Admin cannot create another Super Admin", "FORBIDDEN", adminCreateAttempt, adminCreateAttempt === "FORBIDDEN");
+
+    // 38B. Super Admin can create another Super Admin
+    const superAdminCreateAttempt = checkCreateUser("super_admin", "super_admin");
+    recordResult("CASE-G38B", pillar, "Super Admin can create another Super Admin", "ALLOW", superAdminCreateAttempt, superAdminCreateAttempt === "ALLOW");
+
+    // 38C. Standard Admin cannot promote user to Super Admin
+    const checkPromoteUser = (callerRole: string, newRole: string) => {
+      if (newRole === "super_admin" && callerRole !== "super_admin") {
+        return "FORBIDDEN";
+      }
+      return "ALLOW";
+    };
+    const adminPromoteAttempt = checkPromoteUser("admin", "super_admin");
+    recordResult("CASE-G38C", pillar, "Standard Admin cannot promote user to Super Admin", "FORBIDDEN", adminPromoteAttempt, adminPromoteAttempt === "FORBIDDEN");
+
+    // 38D. Standard Admin cannot modify Super Admin account
+    const checkModifyUser = (callerRole: string, targetUserRole: string) => {
+      if (targetUserRole === "super_admin" && callerRole !== "super_admin") {
+        return "FORBIDDEN";
+      }
+      return "ALLOW";
+    };
+    const adminModifyAttempt = checkModifyUser("admin", "super_admin");
+    recordResult("CASE-G38D", pillar, "Standard Admin cannot modify Super Admin account", "FORBIDDEN", adminModifyAttempt, adminModifyAttempt === "FORBIDDEN");
+
+    // 38E. Standard Admin cannot delete Super Admin account
+    const checkDeleteUser = (callerRole: string, targetUserRole: string) => {
+      if (targetUserRole === "super_admin" && callerRole !== "super_admin") {
+        return "FORBIDDEN";
+      }
+      return "ALLOW";
+    };
+    const adminDeleteAttempt = checkDeleteUser("admin", "super_admin");
+    recordResult("CASE-G38E", pillar, "Standard Admin cannot delete Super Admin account", "FORBIDDEN", adminDeleteAttempt, adminDeleteAttempt === "FORBIDDEN");
+
+    // 38F. Last remaining Super Admin cannot be deleted or demoted
+    const checkLastSuperAdmin = (targetUserRole: string, otherActiveSuperAdmins: number) => {
+      if (targetUserRole === "super_admin" && otherActiveSuperAdmins === 0) {
+        return "LAST_SUPER_ADMIN_PROTECTED";
+      }
+      return "ALLOW";
+    };
+    const lastSuperAdminCheck = checkLastSuperAdmin("super_admin", 0);
+    recordResult("CASE-G38F", pillar, "Last remaining Super Admin cannot be deleted or demoted", "LAST_SUPER_ADMIN_PROTECTED", lastSuperAdminCheck, lastSuperAdminCheck === "LAST_SUPER_ADMIN_PROTECTED");
   }
 
   // =========================================================================

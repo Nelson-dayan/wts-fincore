@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useSession } from "next-auth/react";
 import { DashboardPageHeader } from "@/components/dashboard/page-header";
 import { AddUserForm } from "@/components/portals/admin-users/add-user-form";
 import { UsersTable } from "@/components/portals/admin-users/users-table";
@@ -13,6 +14,9 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { normalizePhoneInput, parseRegisterPayload } from "@/lib/register/validate";
 
 export function AdminUsersClient() {
+  const { data: session } = useSession();
+  const isCallerSuperAdmin = session?.user?.role === "super_admin";
+
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [companies, setCompanies] = useState<CompanyOption[]>([]);
   const [error, setError] = useState<string>("");
@@ -223,12 +227,14 @@ export function AdminUsersClient() {
           form={form}
           saving={savingId === "create"}
           companies={companies}
+          isCallerSuperAdmin={isCallerSuperAdmin}
           onFormChange={setForm}
           onSubmit={createUser}
         />
         <UsersTable
           users={users}
           companies={companies}
+          isCallerSuperAdmin={isCallerSuperAdmin}
           total={total}
           page={page}
           limit={limit}
@@ -274,6 +280,7 @@ export function AdminUsersClient() {
 
       <AdminResetPasswordModal
         user={resetTargetUser}
+        isCallerSuperAdmin={isCallerSuperAdmin}
         onClose={() => setResetTargetUser(null)}
         onResetComplete={() => {
           setResetTargetUser(null);
@@ -284,6 +291,7 @@ export function AdminUsersClient() {
       <EditUserAccessModal
         user={accessTargetUser}
         companies={companies}
+        isCallerSuperAdmin={isCallerSuperAdmin}
         onClose={() => setAccessTargetUser(null)}
         onSaveComplete={() => {
           setAccessTargetUser(null);

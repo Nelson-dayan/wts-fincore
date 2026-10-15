@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { Check, Copy, KeyRound, Loader2, RefreshCw, X } from "lucide-react";
+import { Check, Copy, KeyRound, Loader2, RefreshCw, ShieldAlert, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -19,10 +19,12 @@ function generateSecurePassword() {
 
 export function AdminResetPasswordModal({
   user,
+  isCallerSuperAdmin = false,
   onClose,
   onResetComplete,
 }: {
   user: AdminUser | null;
+  isCallerSuperAdmin?: boolean;
   onClose: () => void;
   onResetComplete: () => void;
 }) {
@@ -130,7 +132,21 @@ export function AdminResetPasswordModal({
           </button>
         </div>
 
-        {success ? (
+        {user.role === "super_admin" && !isCallerSuperAdmin ? (
+          <div className="my-6 space-y-4">
+            <div className="flex items-center gap-2.5 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3.5 text-xs text-amber-700 dark:text-amber-300">
+              <ShieldAlert className="size-5 shrink-0 text-amber-500" />
+              <span>
+                <strong>Protected Account:</strong> This user holds the Super Administrator role. Passwords for Super Administrator accounts can only be reset by another Super Administrator.
+              </span>
+            </div>
+            <div className="flex justify-end pt-2">
+              <Button type="button" variant="outline" size="sm" onClick={onClose}>
+                Close
+              </Button>
+            </div>
+          </div>
+        ) : success ? (
           <div className="my-6 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4 text-center">
             <Check className="mx-auto size-8 text-emerald-500" />
             <p className="mt-2 text-sm font-bold text-emerald-700 dark:text-emerald-300">

@@ -40,12 +40,14 @@ export function AddUserForm({
   form,
   saving,
   companies = [],
+  isCallerSuperAdmin = false,
   onFormChange,
   onSubmit,
 }: {
   form: NewUserForm;
   saving: boolean;
   companies?: CompanyOption[];
+  isCallerSuperAdmin?: boolean;
   onFormChange: (next: NewUserForm) => void;
   onSubmit: (e: React.FormEvent<HTMLFormElement>) => void;
 }) {
@@ -219,9 +221,17 @@ export function AddUserForm({
               options={[
                 { value: "employee", label: "Employee — Access to assigned projects & Quotations" },
                 { value: "admin", label: "Admin — Full Management within assigned companies" },
-                { value: "super_admin", label: "Super Admin — Global System Access across ALL Companies & Groups" },
+                ...(isCallerSuperAdmin
+                  ? [{ value: "super_admin", label: "Super Admin — Global System Access across ALL Companies & Groups" }]
+                  : []),
               ]}
             />
+            {!isCallerSuperAdmin && (
+              <p className="text-[11px] text-muted-foreground flex items-center gap-1.5 mt-1.5">
+                <ShieldAlert className="size-3.5 text-amber-500 shrink-0" />
+                <span>Super Administrator role assignment is restricted to existing Super Administrators.</span>
+              </p>
+            )}
             {form.role === "super_admin" && (
               <div className="flex items-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 p-2.5 text-xs text-amber-600 dark:text-amber-400 mt-2">
                 <Crown className="size-4 shrink-0 text-amber-500" />

@@ -10,6 +10,7 @@ import {
   Loader2,
   Network,
   Shield,
+  ShieldAlert,
   UserCheck,
   X,
 } from "lucide-react";
@@ -22,11 +23,13 @@ import type { CompanyOption } from "@/components/companies/company-switcher";
 export function EditUserAccessModal({
   user,
   companies = [],
+  isCallerSuperAdmin = false,
   onClose,
   onSaveComplete,
 }: {
   user: AdminUser | null;
   companies: CompanyOption[];
+  isCallerSuperAdmin?: boolean;
   onClose: () => void;
   onSaveComplete: () => void;
 }) {
@@ -127,6 +130,15 @@ export function EditUserAccessModal({
           </button>
         </div>
 
+        {user.role === "super_admin" && !isCallerSuperAdmin && (
+          <div className="mt-4 flex items-center gap-2.5 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-700 dark:text-amber-300">
+            <ShieldAlert className="size-4 shrink-0 text-amber-500" />
+            <span>
+              <strong>Protected Account:</strong> This user holds the Super Administrator role. Only another Super Administrator can modify this account&apos;s permissions, operating scope, or status.
+            </span>
+          </div>
+        )}
+
         <form onSubmit={handleSave} className="mt-4 space-y-5">
           {/* System Role */}
           <div className="space-y-2">
@@ -135,14 +147,23 @@ export function EditUserAccessModal({
             </Label>
             <Select
               value={role}
+              disabled={user.role === "super_admin" && !isCallerSuperAdmin}
               className="h-10 text-xs font-medium"
               onChange={(e) => setRole(e.target.value as "admin" | "employee" | "super_admin")}
               options={[
                 { value: "employee", label: "Employee — Access to assigned projects & Quotations" },
                 { value: "admin", label: "Admin — Full Management within assigned companies" },
-                { value: "super_admin", label: "Super Admin — Global System Access across ALL Companies & Groups" },
+                ...(isCallerSuperAdmin || user.role === "super_admin"
+                  ? [{ value: "super_admin", label: "Super Admin — Global System Access across ALL Companies & Groups" }]
+                  : []),
               ]}
             />
+            {!isCallerSuperAdmin && user.role !== "super_admin" && (
+              <p className="text-[11px] text-muted-foreground flex items-center gap-1 mt-1">
+                <ShieldAlert className="size-3 text-amber-500" />
+                Only Super Admins can promote users to Super Admin.
+              </p>
+            )}
             {role === "super_admin" && (
               <div className="flex items-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 p-2.5 text-xs text-amber-600 dark:text-amber-400">
                 <Crown className="size-4 shrink-0 text-amber-500" />
@@ -162,10 +183,13 @@ export function EditUserAccessModal({
             <div className="grid gap-2 sm:grid-cols-2">
               {companies.map((comp) => {
                 const isChecked = companyIds.includes(comp._id);
+                const isLocked = user.role === "super_admin" && !isCallerSuperAdmin;
                 return (
                   <label
                     key={comp._id}
-                    className={`flex items-center justify-between rounded-xl border p-2.5 cursor-pointer text-xs transition-all ${
+                    className={`flex items-center justify-between rounded-xl border p-2.5 text-xs transition-all ${
+                      isLocked ? "cursor-not-allowed opacity-60" : "cursor-pointer"
+                    } ${
                       isChecked
                         ? "border-primary/50 bg-primary/10 text-primary font-semibold"
                         : "border-border/60 bg-background/50 text-foreground"
@@ -186,6 +210,7 @@ export function EditUserAccessModal({
                     </div>
                     <input
                       type="checkbox"
+                      disabled={isLocked}
                       className="sr-only"
                       checked={isChecked}
                       onChange={() => toggleCompanyId(comp._id)}
@@ -202,9 +227,12 @@ export function EditUserAccessModal({
               <Network className="size-4 text-indigo-500" />
               Group View Permissions
             </Label>
-            <label className="flex items-start gap-3 rounded-xl border border-border/60 bg-background/50 p-3 cursor-pointer">
+            <label className={`flex items-start gap-3 rounded-xl border border-border/60 bg-background/50 p-3 ${
+              user.role === "super_admin" && !isCallerSuperAdmin ? "cursor-not-allowed opacity-60" : "cursor-pointer"
+            }`}>
               <input
                 type="checkbox"
+                disabled={user.role === "super_admin" && !isCallerSuperAdmin}
                 className="mt-0.5 size-4 rounded border-border text-primary focus:ring-primary"
                 checked={groupViewAccess}
                 onChange={(e) => setGroupViewAccess(e.target.checked)}
@@ -226,6 +254,7 @@ export function EditUserAccessModal({
             <Label className="text-xs font-semibold text-foreground">Account Status</Label>
             <Select
               value={String(isActive)}
+              disabled={user.role === "super_admin" && !isCallerSuperAdmin}
               className="h-9 text-xs font-medium"
               onChange={(e) => setIsActive(e.target.value === "true")}
               options={[
@@ -245,7 +274,11 @@ export function EditUserAccessModal({
             <Button type="button" variant="outline" size="sm" onClick={onClose} disabled={loading}>
               Cancel
             </Button>
-            <Button type="submit" size="sm" disabled={loading}>
+            <Button
+              type="submit"
+              size="sm"
+              disabled={loading || (user.role === "super_admin" && !isCallerSuperAdmin)}
+            >
               {loading ? (
                 <>
                   <Loader2 className="mr-1.5 size-3.5 animate-spin" /> Saving…
