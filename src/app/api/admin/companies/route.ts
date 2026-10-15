@@ -2,15 +2,23 @@ import { NextResponse } from "next/server";
 import { requireRole } from "@/lib/auth/require-role";
 import { authErrorResponse } from "@/lib/api/route-auth";
 import { connectDB } from "@/lib/db/connect";
-import { CompanyModel } from "@/lib/db/models";
+import { CompanyModel, UserModel } from "@/lib/db/models";
 import { logActivity } from "@/lib/services/activity/log-activity.service";
+import { getUserAccessInfo } from "@/lib/auth/user-company-access";
 
 export async function GET() {
   try {
-    await requireRole(["admin", "employee"]);
+    const session = await requireRole(["admin", "employee"]);
     await connectDB();
 
-    const companies = await CompanyModel.find({ deletedAt: null })
+    const userAccess = await getUserAccessInfo(session.user.id, session.user.role);
+
+    const query: Record<string, any> = { deletedAt: null };
+    if (!userAccess.isSuperAdmin) {
+      query._id = { $in: userAccess.assignedCompanyIds };
+    }
+
+    const companies = await CompanyModel.find(query)
       .populate("parentCompanyId", "name code kind")
       .sort({ updatedAt: -1 })
       .lean();
@@ -26,6 +34,7 @@ export async function POST(req: Request) {
     const session = await requireRole(["admin"]);
     await connectDB();
 
+    const userAccess = await getUserAccessInfo(session.user.id, session.user.role);
     const body = await req.json();
 
     const name = String(body.name || "").trim();
@@ -35,6 +44,21 @@ export async function POST(req: Request) {
 
     if (!name) {
       return NextResponse.json({ error: "Company name is required" }, { status: 400 });
+    }
+
+    if (!userAccess.isSuperAdmin) {
+      if (body.isPrimary === true) {
+        return NextResponse.json({ error: "Only Super Admin can designate a primary company." }, { status: 403 });
+      }
+      if (!parentCompanyId || !userAccess.assignedCompanyIds.includes(parentCompanyId)) {
+        return NextResponse.json(
+          { error: "Standard Admins can only create branch or division entities under their assigned parent company." },
+          { status: 403 }
+        );
+      }
+      if (kind === "holding") {
+        return NextResponse.json({ error: "Only Super Admin can create holding company entities." }, { status: 403 });
+      }
     }
 
     // Auto-generate code if missing
@@ -88,6 +112,12 @@ export async function POST(req: Request) {
     // If marked primary, unset other primary flags
     if (body.isPrimary === true) {
       await CompanyModel.updateMany({ _id: { $ne: company._id } }, { $set: { isPrimary: false } });
+    }
+
+    if (!userAccess.isSuperAdmin) {
+      await UserModel.findByIdAndUpdate(session.user.id, {
+        $addToSet: { companyIds: company._id },
+      });
     }
 
     await logActivity({

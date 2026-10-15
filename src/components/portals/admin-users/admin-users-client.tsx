@@ -235,6 +235,7 @@ export function AdminUsersClient() {
           users={users}
           companies={companies}
           isCallerSuperAdmin={isCallerSuperAdmin}
+          currentUserId={session?.user?.id}
           total={total}
           page={page}
           limit={limit}

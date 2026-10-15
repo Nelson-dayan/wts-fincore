@@ -62,6 +62,7 @@ type UsersTableRowProps = {
   user: AdminUser;
   companies?: CompanyOption[];
   isCallerSuperAdmin?: boolean;
+  currentUserId?: string;
   editingId: string | null;
   savingId: string;
   draft?: Partial<AdminUser>;
@@ -78,6 +79,7 @@ export function UsersTableRow({
   user,
   companies = [],
   isCallerSuperAdmin = false,
+  currentUserId,
   editingId,
   savingId,
   draft,
@@ -89,8 +91,10 @@ export function UsersTableRow({
   onDelete,
   onResetPassword,
 }: UsersTableRowProps) {
-  const isProtectedSuperAdmin = user.role === "super_admin" && !isCallerSuperAdmin;
-  const isEditing = !isProtectedSuperAdmin && editingId === user._id;
+  const isProtectedAccount =
+    (user.role === "super_admin" || (user.role === "admin" && user._id !== currentUserId)) &&
+    !isCallerSuperAdmin;
+  const isEditing = !isProtectedAccount && editingId === user._id;
 
   // Resolve assigned company badges
   const assignedCompanies = companies.filter((c) => (user.companyIds || []).includes(c._id));
@@ -192,10 +196,10 @@ export function UsersTableRow({
       {/* Actions */}
       <td className="px-0 py-3.5 pr-5 text-right">
         <div className="flex justify-end gap-1.5">
-          {isProtectedSuperAdmin ? (
+          {isProtectedAccount ? (
             <span
               className="inline-flex items-center gap-1.5 rounded-lg border border-amber-500/35 bg-amber-500/10 px-2.5 py-1 text-xs font-semibold text-amber-600 dark:text-amber-400 select-none shadow-2xs"
-              title="Protected Account: Super Admin accounts can only be managed by another Super Admin."
+              title={`Protected Account: ${user.role === "super_admin" ? "Super Admin" : "Admin"} accounts can only be managed by a Super Admin.`}
             >
               <ShieldAlert className="size-3.5 text-amber-500" />
               Protected

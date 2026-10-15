@@ -62,13 +62,21 @@ export async function GET(req: Request) {
 
     const parts: Record<string, unknown>[] = [];
     parts.push({ isDeleted: { $ne: true } });
-    parts.push({
-      $or: [
-        { companyId: { $in: companyContext.allowedCompanyIds } },
-        { companyId: { $exists: false } },
-        { companyId: null },
-      ],
-    });
+
+    const primaryCompany = await CompanyModel.findOne({ isPrimary: true, isActive: true, deletedAt: null }).select("_id").lean();
+    const isPrimaryActive = primaryCompany && companyContext.allowedCompanyIds.includes(String(primaryCompany._id));
+
+    parts.push(
+      isPrimaryActive
+        ? {
+            $or: [
+              { companyId: { $in: companyContext.allowedCompanyIds } },
+              { companyId: { $exists: false } },
+              { companyId: null },
+            ],
+          }
+        : { companyId: { $in: companyContext.allowedCompanyIds } }
+    );
 
     if (session.user.role === "employee") {
       const employeeProjectIds = await getEmployeeAssignedProjectIdStrings(session.user.id);

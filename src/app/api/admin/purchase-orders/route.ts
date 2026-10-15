@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireRole } from "@/lib/auth/require-role";
 import { connectDB } from "@/lib/db/connect";
-import { InvoiceModel, PurchaseOrderModel, QuotationModel } from "@/lib/db/models";
+import { CompanyModel, InvoiceModel, PurchaseOrderModel, QuotationModel } from "@/lib/db/models";
 import { authErrorResponse } from "@/lib/api/route-auth";
 import { parsePagination, parseSearch, escapeRegex } from "@/lib/api/pagination";
 import { logActivity } from "@/lib/services/activity/log-activity.service";
@@ -60,13 +60,18 @@ export async function GET(req: Request) {
     await connectDB();
     const quotationId = String(url.searchParams.get("quotationId") ?? "").trim();
 
-    const filter: Record<string, unknown> = {
-      $or: [
-        { companyId: { $in: companyContext.allowedCompanyIds } },
-        { companyId: { $exists: false } },
-        { companyId: null },
-      ],
-    };
+    const primaryCompany = await CompanyModel.findOne({ isPrimary: true, isActive: true, deletedAt: null }).select("_id").lean();
+    const isPrimaryActive = primaryCompany && companyContext.allowedCompanyIds.includes(String(primaryCompany._id));
+
+    const filter: Record<string, unknown> = isPrimaryActive
+      ? {
+          $or: [
+            { companyId: { $in: companyContext.allowedCompanyIds } },
+            { companyId: { $exists: false } },
+            { companyId: null },
+          ],
+        }
+      : { companyId: { $in: companyContext.allowedCompanyIds } };
 
     if (q) filter.poNumber = { $regex: escapeRegex(q), $options: "i" };
 

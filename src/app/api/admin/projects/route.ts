@@ -7,14 +7,14 @@ import {
   UserModel, 
   PaymentModel, 
   ExpenseModel, 
-  InvoiceModel 
+  InvoiceModel,
+  CompanyModel
 } from "@/lib/db/models";
 import { authErrorResponse } from "@/lib/api/route-auth";
 import { parsePagination, parseSearch, escapeRegex } from "@/lib/api/pagination";
 import { logActivity } from "@/lib/services/activity/log-activity.service";
 import { decimalToNumber } from "@/lib/services/business/money";
-
-import { CompanyHierarchyService } from "@/lib/services/business/company-hierarchy.service";
+import { resolveAuthCompanyContext } from "@/lib/auth/company-context";
 
 export async function GET(req: Request) {
   try {
@@ -27,17 +27,21 @@ export async function GET(req: Request) {
     const targetCompanyId = req.headers.get("x-company-id") || url.searchParams.get("companyId");
     const scopeMode = (req.headers.get("x-scope-mode") || url.searchParams.get("scopeMode")) as "single" | "group" || "single";
 
-    const companyContext = await CompanyHierarchyService.resolveCompanyContext(targetCompanyId, scopeMode);
+    const companyContext = await resolveAuthCompanyContext(session.user, targetCompanyId, scopeMode);
+    const allowedCompanyIds = companyContext.allowedCompanyIds;
+
+    const primaryCompany = await CompanyModel.findOne({ isPrimary: true, isActive: true, deletedAt: null }).select("_id").lean();
+    const isPrimaryActive = primaryCompany && allowedCompanyIds.includes(String(primaryCompany._id));
 
     const filter: Record<string, unknown> = {};
-    if (companyContext.activeCompany?.isPrimary) {
+    if (isPrimaryActive) {
       filter.$or = [
-        { companyId: { $in: companyContext.allowedCompanyIds } },
+        { companyId: { $in: allowedCompanyIds } },
         { companyId: { $exists: false } },
         { companyId: null },
       ];
     } else {
-      filter.companyId = { $in: companyContext.allowedCompanyIds };
+      filter.companyId = { $in: allowedCompanyIds };
     }
 
     if (q) filter.name = { $regex: escapeRegex(q), $options: "i" };
@@ -151,12 +155,20 @@ export async function POST(req: Request) {
         }));
 
     const url = new URL(req.url);
-    const targetCompanyId = req.headers.get("x-company-id") || url.searchParams.get("companyId");
-    const companyContext = await CompanyHierarchyService.resolveCompanyContext(targetCompanyId, "single");
+    const targetCompanyId = body.companyId || req.headers.get("x-company-id") || url.searchParams.get("companyId");
+    const companyContext = await resolveAuthCompanyContext(session.user, targetCompanyId, "single");
+
+    const effectiveCompanyId = body.companyId || companyContext.activeCompanyId;
+    if (!companyContext.allowedCompanyIds.includes(String(effectiveCompanyId))) {
+      return NextResponse.json(
+        { message: "Target company is outside your authorized operating scope." },
+        { status: 403 }
+      );
+    }
 
     const created = await ProjectModel.create({
       name,
-      companyId: companyContext.companyId,
+      companyId: effectiveCompanyId,
       description: String(body.description ?? ""),
       clientId,
       assignedTo: assignedUserIds,

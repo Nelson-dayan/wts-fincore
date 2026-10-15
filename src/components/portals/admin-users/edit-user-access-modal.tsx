@@ -57,7 +57,10 @@ export function EditUserAccessModal({
 
   if (!user || !mounted) return null;
 
+  const isTargetProtected = (user.role === "super_admin" || user.role === "admin") && !isCallerSuperAdmin;
+
   const toggleCompanyId = (id: string) => {
+    if (isTargetProtected) return;
     setCompanyIds((prev) =>
       prev.includes(id) ? prev.filter((c) => c !== id) : [...prev, id]
     );
@@ -65,6 +68,7 @@ export function EditUserAccessModal({
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isTargetProtected) return;
     setLoading(true);
     setError(null);
 
@@ -130,11 +134,11 @@ export function EditUserAccessModal({
           </button>
         </div>
 
-        {user.role === "super_admin" && !isCallerSuperAdmin && (
+        {(user.role === "super_admin" || user.role === "admin") && !isCallerSuperAdmin && (
           <div className="mt-4 flex items-center gap-2.5 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-700 dark:text-amber-300">
             <ShieldAlert className="size-4 shrink-0 text-amber-500" />
             <span>
-              <strong>Protected Account:</strong> This user holds the Super Administrator role. Only another Super Administrator can modify this account&apos;s permissions, operating scope, or status.
+              <strong>Protected Account:</strong> This user holds {user.role === "super_admin" ? "Super Administrator" : "Administrator"} privileges. Only a Super Administrator can modify this account&apos;s permissions, operating scope, or status.
             </span>
           </div>
         )}
@@ -147,21 +151,27 @@ export function EditUserAccessModal({
             </Label>
             <Select
               value={role}
-              disabled={user.role === "super_admin" && !isCallerSuperAdmin}
-              className="h-10 text-xs font-medium"
+              disabled={!isCallerSuperAdmin}
+              className="h-10 text-xs font-medium disabled:opacity-80"
               onChange={(e) => setRole(e.target.value as "admin" | "employee" | "super_admin")}
-              options={[
-                { value: "employee", label: "Employee — Access to assigned projects & Quotations" },
-                { value: "admin", label: "Admin — Full Management within assigned companies" },
-                ...(isCallerSuperAdmin || user.role === "super_admin"
-                  ? [{ value: "super_admin", label: "Super Admin — Global System Access across ALL Companies & Groups" }]
-                  : []),
-              ]}
+              options={
+                isCallerSuperAdmin
+                  ? [
+                      { value: "employee", label: "Employee — Access to assigned projects & Quotations" },
+                      { value: "admin", label: "Admin — Full Management within assigned companies" },
+                      { value: "super_admin", label: "Super Admin — Global System Access across ALL Companies & Groups" },
+                    ]
+                  : [
+                      { value: "employee", label: "Employee — Access to assigned projects & Quotations" },
+                      ...(user.role === "admin" ? [{ value: "admin", label: "Admin (Protected — Super Admin Managed)" }] : []),
+                      ...(user.role === "super_admin" ? [{ value: "super_admin", label: "Super Admin (Protected)" }] : []),
+                    ]
+              }
             />
-            {!isCallerSuperAdmin && user.role !== "super_admin" && (
+            {!isCallerSuperAdmin && (
               <p className="text-[11px] text-muted-foreground flex items-center gap-1 mt-1">
                 <ShieldAlert className="size-3 text-amber-500" />
-                Only Super Admins can promote users to Super Admin.
+                Only Super Admins can promote users or assign administrative roles.
               </p>
             )}
             {role === "super_admin" && (
@@ -183,7 +193,7 @@ export function EditUserAccessModal({
             <div className="grid gap-2 sm:grid-cols-2">
               {companies.map((comp) => {
                 const isChecked = companyIds.includes(comp._id);
-                const isLocked = user.role === "super_admin" && !isCallerSuperAdmin;
+                const isLocked = isTargetProtected;
                 return (
                   <label
                     key={comp._id}
@@ -228,11 +238,11 @@ export function EditUserAccessModal({
               Group View Permissions
             </Label>
             <label className={`flex items-start gap-3 rounded-xl border border-border/60 bg-background/50 p-3 ${
-              user.role === "super_admin" && !isCallerSuperAdmin ? "cursor-not-allowed opacity-60" : "cursor-pointer"
+              isTargetProtected ? "cursor-not-allowed opacity-60" : "cursor-pointer"
             }`}>
               <input
                 type="checkbox"
-                disabled={user.role === "super_admin" && !isCallerSuperAdmin}
+                disabled={isTargetProtected}
                 className="mt-0.5 size-4 rounded border-border text-primary focus:ring-primary"
                 checked={groupViewAccess}
                 onChange={(e) => setGroupViewAccess(e.target.checked)}
@@ -254,7 +264,7 @@ export function EditUserAccessModal({
             <Label className="text-xs font-semibold text-foreground">Account Status</Label>
             <Select
               value={String(isActive)}
-              disabled={user.role === "super_admin" && !isCallerSuperAdmin}
+              disabled={isTargetProtected}
               className="h-9 text-xs font-medium"
               onChange={(e) => setIsActive(e.target.value === "true")}
               options={[
@@ -277,7 +287,7 @@ export function EditUserAccessModal({
             <Button
               type="submit"
               size="sm"
-              disabled={loading || (user.role === "super_admin" && !isCallerSuperAdmin)}
+              disabled={loading || isTargetProtected}
             >
               {loading ? (
                 <>

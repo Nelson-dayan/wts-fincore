@@ -132,12 +132,12 @@ export function AdminResetPasswordModal({
           </button>
         </div>
 
-        {user.role === "super_admin" && !isCallerSuperAdmin ? (
+        {(user.role === "super_admin" || user.role === "admin") && !isCallerSuperAdmin ? (
           <div className="my-6 space-y-4">
             <div className="flex items-center gap-2.5 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3.5 text-xs text-amber-700 dark:text-amber-300">
               <ShieldAlert className="size-5 shrink-0 text-amber-500" />
               <span>
-                <strong>Protected Account:</strong> This user holds the Super Administrator role. Passwords for Super Administrator accounts can only be reset by another Super Administrator.
+                <strong>Protected Account:</strong> This user holds {user.role === "super_admin" ? "Super Administrator" : "Administrator"} privileges. Passwords for administrative accounts can only be reset by a Super Administrator.
               </span>
             </div>
             <div className="flex justify-end pt-2">

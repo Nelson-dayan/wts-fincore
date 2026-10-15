@@ -18,6 +18,7 @@ export function UsersTable({
   users,
   companies = [],
   isCallerSuperAdmin = false,
+  currentUserId,
   total,
   page,
   limit,
@@ -42,6 +43,7 @@ export function UsersTable({
   users: AdminUser[];
   companies?: CompanyOption[];
   isCallerSuperAdmin?: boolean;
+  currentUserId?: string;
   total: number;
   page: number;
   limit: number;
@@ -207,6 +209,7 @@ export function UsersTable({
                     user={user}
                     companies={companies}
                     isCallerSuperAdmin={isCallerSuperAdmin}
+                    currentUserId={currentUserId}
                     editingId={editingId}
                     savingId={savingId}
                     draft={drafts[user._id]}

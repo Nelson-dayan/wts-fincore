@@ -5,6 +5,7 @@ import { requireRole } from "@/lib/auth/require-role";
 import { authErrorResponse } from "@/lib/api/route-auth";
 import { logActivity } from "@/lib/services/activity/log-activity.service";
 import { hashPassword } from "@/lib/auth/password";
+import { getUserAccessInfo } from "@/lib/auth/user-company-access";
 
 interface RouteCtx {
   params: Promise<{ userId: string }>;
@@ -13,8 +14,11 @@ interface RouteCtx {
 export async function PATCH(req: Request, ctx: RouteCtx) {
   try {
     const session = await requireRole(["admin"]);
+    const isSuperAdmin = session.user.role === "super_admin";
     await connectDB();
     const { userId } = await ctx.params;
+    const callerAccess = await getUserAccessInfo(session.user.id, session.user.role);
+
     const body = (await req.json()) as {
       name?: string;
       role?: "admin" | "employee" | "super_admin";
@@ -28,29 +32,86 @@ export async function PATCH(req: Request, ctx: RouteCtx) {
       primaryCompanyId?: string;
     };
 
-    const targetUser = await UserModel.findById(userId).select("_id role email isActive").lean();
+    const targetUser = await UserModel.findById(userId).select("_id role email isActive companyIds primaryCompanyId").lean();
     if (!targetUser) {
       return NextResponse.json({ message: "User not found" }, { status: 404 });
     }
 
     // Role Escalation & Hierarchy Guards:
     // 1. Only a super_admin can modify a super_admin account.
-    if (targetUser.role === "super_admin" && session.user.role !== "super_admin") {
+    if (targetUser.role === "super_admin" && !isSuperAdmin) {
       return NextResponse.json(
         { message: "Only a Super Admin can modify a Super Admin account." },
         { status: 403 }
       );
     }
 
-    // 2. Only a super_admin can grant the super_admin role.
-    if (body.role === "super_admin" && session.user.role !== "super_admin") {
+    // 2. Only a super_admin can modify other admin accounts.
+    if (targetUser.role === "admin" && !isSuperAdmin && session.user.id !== userId) {
+      return NextResponse.json(
+        { message: "Only a Super Admin can modify other Admin accounts." },
+        { status: 403 }
+      );
+    }
+
+    // 3. Only a super_admin can grant the super_admin role.
+    if (body.role === "super_admin" && !isSuperAdmin) {
       return NextResponse.json(
         { message: "Only a Super Admin can grant Super Admin privileges." },
         { status: 403 }
       );
     }
 
-    // 3. Ensure at least one active super_admin remains if demoting or deactivating
+    // 4. Only a super_admin can grant the admin role.
+    if (body.role === "admin" && !isSuperAdmin) {
+      return NextResponse.json(
+        { message: "Only a Super Admin can grant Admin privileges." },
+        { status: 403 }
+      );
+    }
+
+    // 5. Standard admin scope verification
+    if (!isSuperAdmin && session.user.id !== userId) {
+      const targetCompanies = [
+        ...(targetUser.companyIds || []).map(String),
+        ...(targetUser.primaryCompanyId ? [String(targetUser.primaryCompanyId)] : []),
+      ];
+      const hasSharedCompany = targetCompanies.some((cId) => callerAccess.assignedCompanyIds.includes(cId));
+      if (targetCompanies.length > 0 && !hasSharedCompany) {
+        return NextResponse.json(
+          { message: "You can only manage users within your authorized company scope." },
+          { status: 403 }
+        );
+      }
+
+      if (Array.isArray(body.companyIds)) {
+        const unauthorizedCompany = body.companyIds.find(
+          (cId) => !callerAccess.assignedCompanyIds.includes(cId)
+        );
+        if (unauthorizedCompany) {
+          return NextResponse.json(
+            { message: "You cannot assign companies outside your authorized scope." },
+            { status: 403 }
+          );
+        }
+      }
+
+      if (body.primaryCompanyId && !callerAccess.assignedCompanyIds.includes(body.primaryCompanyId)) {
+        return NextResponse.json(
+          { message: "Primary company must be one of your authorized companies." },
+          { status: 403 }
+        );
+      }
+
+      if (body.groupViewAccess) {
+        return NextResponse.json(
+          { message: "Only a Super Admin can grant group view access." },
+          { status: 403 }
+        );
+      }
+    }
+
+    // 6. Ensure at least one active super_admin remains if demoting or deactivating
     if (
       targetUser.role === "super_admin" &&
       ((body.role && body.role !== "super_admin") || body.isActive === false)
@@ -129,8 +190,10 @@ export async function PATCH(req: Request, ctx: RouteCtx) {
 export async function DELETE(_req: Request, ctx: RouteCtx) {
   try {
     const session = await requireRole(["admin"]);
+    const isSuperAdmin = session.user.role === "super_admin";
     await connectDB();
     const { userId } = await ctx.params;
+    const callerAccess = await getUserAccessInfo(session.user.id, session.user.role);
 
     if (session.user.id === userId) {
       return NextResponse.json(
@@ -139,14 +202,14 @@ export async function DELETE(_req: Request, ctx: RouteCtx) {
       );
     }
 
-    const targetUser = await UserModel.findById(userId).select("_id role email").lean();
+    const targetUser = await UserModel.findById(userId).select("_id role email companyIds primaryCompanyId").lean();
     if (!targetUser) {
       return NextResponse.json({ message: "User not found" }, { status: 404 });
     }
 
     // Role Hierarchy Guards for Account Deletion:
     if (targetUser.role === "super_admin") {
-      if (session.user.role !== "super_admin") {
+      if (!isSuperAdmin) {
         return NextResponse.json(
           { message: "Only a Super Admin can delete a Super Admin account." },
           { status: 403 }
@@ -161,6 +224,28 @@ export async function DELETE(_req: Request, ctx: RouteCtx) {
         return NextResponse.json(
           { message: "Cannot delete the only Super Admin account." },
           { status: 400 }
+        );
+      }
+    }
+
+    if (targetUser.role === "admin" && !isSuperAdmin) {
+      return NextResponse.json(
+        { message: "Only a Super Admin can delete Admin accounts." },
+        { status: 403 }
+      );
+    }
+
+    // Standard Admin can only delete users within their assigned companies
+    if (!isSuperAdmin) {
+      const targetCompanies = [
+        ...(targetUser.companyIds || []).map(String),
+        ...(targetUser.primaryCompanyId ? [String(targetUser.primaryCompanyId)] : []),
+      ];
+      const hasSharedCompany = targetCompanies.some((cId) => callerAccess.assignedCompanyIds.includes(cId));
+      if (targetCompanies.length > 0 && !hasSharedCompany) {
+        return NextResponse.json(
+          { message: "You can only delete users within your authorized company scope." },
+          { status: 403 }
         );
       }
     }

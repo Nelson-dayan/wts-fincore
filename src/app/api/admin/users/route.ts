@@ -7,22 +7,44 @@ import { parsePagination, parseSearch, escapeRegex } from "@/lib/api/pagination"
 import { registerUser } from "@/lib/register/service";
 import { publicRegisterMessage } from "@/lib/register/http-map";
 import { logActivity } from "@/lib/services/activity/log-activity.service";
+import { getUserAccessInfo } from "@/lib/auth/user-company-access";
 
 export async function GET(req: Request) {
   try {
     const url = new URL(req.url);
     const { page, limit, skip } = parsePagination(url.searchParams);
     const q = parseSearch(url.searchParams);
-    await requireRole(["admin"]);
+    const session = await requireRole(["admin"]);
     await connectDB();
-    const filter = q
-      ? {
-          $or: [
-            { name: { $regex: escapeRegex(q), $options: "i" } },
-            { email: { $regex: escapeRegex(q), $options: "i" } },
-          ],
-        }
-      : {};
+
+    const callerAccess = await getUserAccessInfo(session.user.id, session.user.role);
+
+    const filter: Record<string, any> = {};
+
+    // Standard admins can only see users belonging to their assigned companies (or themselves)
+    if (!callerAccess.isSuperAdmin) {
+      filter.$or = [
+        { companyIds: { $in: callerAccess.assignedCompanyIds } },
+        { primaryCompanyId: { $in: callerAccess.assignedCompanyIds } },
+        { _id: session.user.id },
+      ];
+    }
+
+    if (q) {
+      const searchCond = {
+        $or: [
+          { name: { $regex: escapeRegex(q), $options: "i" } },
+          { email: { $regex: escapeRegex(q), $options: "i" } },
+        ],
+      };
+      if (filter.$or) {
+        filter.$and = [{ $or: filter.$or }, searchCond];
+        delete filter.$or;
+      } else {
+        filter.$or = searchCond.$or;
+      }
+    }
+
     const [usersRaw, total] = await Promise.all([
       UserModel.find(filter)
       .select("name email role isActive phone phoneNumber companyIds groupIds groupViewAccess primaryCompanyId signatureUrl createdAt updatedAt")
@@ -62,6 +84,9 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   try {
     const session = await requireRole(["admin"]);
+    const isSuperAdmin = session.user.role === "super_admin";
+    const callerAccess = await getUserAccessInfo(session.user.id, session.user.role);
+
     const body = (await req.json()) as {
       name?: string;
       email?: string;
@@ -74,11 +99,59 @@ export async function POST(req: Request) {
       primaryCompanyId?: string;
     };
 
-    if (body.role === "super_admin" && session.user.role !== "super_admin") {
+    // Role Escalation & Hierarchy Guards:
+    // 1. Only Super Admin can create another Super Admin
+    if (body.role === "super_admin" && !isSuperAdmin) {
       return NextResponse.json(
         { message: "Only a Super Admin can create another Super Admin." },
         { status: 403 }
       );
+    }
+
+    // 2. Only Super Admin can create an Admin. Standard Admins can only create Employees.
+    if (body.role === "admin" && !isSuperAdmin) {
+      return NextResponse.json(
+        { message: "Only a Super Admin can create Admin accounts. Standard Admins can only onboard Employees within assigned companies." },
+        { status: 403 }
+      );
+    }
+
+    // 3. Company assignment bounds for standard Admins
+    if (!isSuperAdmin) {
+      body.role = "employee";
+
+      if (body.groupViewAccess) {
+        return NextResponse.json(
+          { message: "Only a Super Admin can grant group view access." },
+          { status: 403 }
+        );
+      }
+
+      if (Array.isArray(body.companyIds) && body.companyIds.length > 0) {
+        const unauthorizedCompany = body.companyIds.find(
+          (cId) => !callerAccess.assignedCompanyIds.includes(cId)
+        );
+        if (unauthorizedCompany) {
+          return NextResponse.json(
+            { message: "You can only assign users to companies within your authorized company scope." },
+            { status: 403 }
+          );
+        }
+      } else {
+        body.companyIds = callerAccess.defaultCompanyId
+          ? [callerAccess.defaultCompanyId]
+          : [...callerAccess.assignedCompanyIds];
+      }
+
+      if (body.primaryCompanyId && !callerAccess.assignedCompanyIds.includes(body.primaryCompanyId)) {
+        return NextResponse.json(
+          { message: "Primary company must be one of your authorized companies." },
+          { status: 403 }
+        );
+      }
+      if (!body.primaryCompanyId && body.companyIds.length > 0) {
+        body.primaryCompanyId = body.companyIds[0];
+      }
     }
 
     // Reuse registration validator+service to keep one source of truth.

@@ -213,33 +213,37 @@ export function AddUserForm({
             </Label>
             <Select
               id="new-role"
-              value={form.role}
-              className="h-10 text-xs font-medium border-border/70 bg-background/50"
+              value={isCallerSuperAdmin ? form.role : "employee"}
+              disabled={!isCallerSuperAdmin}
+              className="h-10 text-xs font-medium border-border/70 bg-background/50 disabled:opacity-80"
               onChange={(e) =>
                 onFormChange({ ...form, role: e.target.value as "admin" | "employee" | "super_admin" })
               }
-              options={[
-                { value: "employee", label: "Employee — Access to assigned projects & Quotations" },
-                { value: "admin", label: "Admin — Full Management within assigned companies" },
-                ...(isCallerSuperAdmin
-                  ? [{ value: "super_admin", label: "Super Admin — Global System Access across ALL Companies & Groups" }]
-                  : []),
-              ]}
+              options={
+                isCallerSuperAdmin
+                  ? [
+                      { value: "employee", label: "Employee — Access to assigned projects & Quotations" },
+                      { value: "admin", label: "Admin — Full Management within assigned companies" },
+                      { value: "super_admin", label: "Super Admin — Global System Access across ALL Companies & Groups" },
+                    ]
+                  : [
+                      { value: "employee", label: "Employee — Standard team member in assigned company" },
+                    ]
+              }
             />
-            {!isCallerSuperAdmin && (
+            {!isCallerSuperAdmin ? (
               <p className="text-[11px] text-muted-foreground flex items-center gap-1.5 mt-1.5">
                 <ShieldAlert className="size-3.5 text-amber-500 shrink-0" />
-                <span>Super Administrator role assignment is restricted to existing Super Administrators.</span>
+                <span>Standard Administrators can onboard Employees for their assigned companies. Super Administrator privileges are required to create Admin accounts.</span>
               </p>
-            )}
-            {form.role === "super_admin" && (
+            ) : form.role === "super_admin" ? (
               <div className="flex items-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 p-2.5 text-xs text-amber-600 dark:text-amber-400 mt-2">
                 <Crown className="size-4 shrink-0 text-amber-500" />
                 <span>
                   <strong>Super Admin Privilege Active:</strong> User bypasses tenant boundaries and has global administrative access across all operating entities.
                 </span>
               </div>
-            )}
+            ) : null}
           </div>
 
           {/* Multi-Company Operating Assignments */}

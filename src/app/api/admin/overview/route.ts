@@ -13,10 +13,11 @@ import {
   UserModel,
 } from "@/lib/db/models";
 import { requireRole } from "@/lib/auth/require-role";
+import { CompanyModel } from "@/lib/db/models/company.model";
+import { resolveAuthCompanyContext } from "@/lib/auth/company-context";
 import { decimalToNumber } from "@/lib/services/business/money";
 import { apiSuccess, apiError } from "@/lib/api/response";
 import { isNextInternalError } from "@/lib/api/standard-response";
-
 
 function monthKey(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
@@ -24,11 +25,22 @@ function monthKey(d: Date) {
 
 export async function GET(req: Request) {
   try {
-    await requireRole(["admin"]);
+    const session = await requireRole(["admin"]);
     await connectDB();
 
     const { searchParams } = new URL(req.url);
     const range = searchParams.get("range") || "last_6_months";
+    const targetCompanyId = req.headers.get("x-company-id") || searchParams.get("companyId") || undefined;
+    const requestedScopeMode = (req.headers.get("x-scope-mode") || searchParams.get("scopeMode")) as "single" | "group" || "single";
+
+    const companyContext = await resolveAuthCompanyContext(session.user, targetCompanyId, requestedScopeMode);
+    const allowedCompanyIds = companyContext.allowedCompanyIds.map((id) =>
+      typeof id === "string" ? new Types.ObjectId(id) : id
+    );
+    const allowedCompanyIdStrings = companyContext.allowedCompanyIds.map(String);
+
+    const primaryCompany = await CompanyModel.findOne({ isPrimary: true, isActive: true, deletedAt: null }).select("_id").lean();
+    const isPrimaryActive = primaryCompany && allowedCompanyIdStrings.includes(String(primaryCompany._id));
 
     const today = new Date();
     let startDate: Date | null = null;
@@ -43,8 +55,25 @@ export async function GET(req: Request) {
       startDate = new Date(today.getFullYear(), today.getMonth() - 5, 1);
     }
 
-    const expenseMatch: any = { isDeleted: { $ne: true } };
-    const paymentMatch: any = { status: "COMPLETED" };
+    const companyResourceFilter = isPrimaryActive
+      ? {
+          $or: [
+            { companyId: { $in: allowedCompanyIds } },
+            { companyId: null },
+            { companyId: { $exists: false } },
+          ],
+        }
+      : { companyId: { $in: allowedCompanyIds } };
+
+    const expenseMatch: any = {
+      isDeleted: { $ne: true },
+      companyId: { $in: allowedCompanyIds },
+    };
+    const paymentMatch: any = {
+      status: "COMPLETED",
+      isDeleted: { $ne: true },
+      companyId: { $in: allowedCompanyIds },
+    };
 
     if (startDate) {
       expenseMatch.createdAt = { $gte: startDate };
@@ -64,6 +93,9 @@ export async function GET(req: Request) {
           month: { $month: "$createdAt" },
         };
 
+    // Pre-resolve allowed project IDs for activity logs
+    const allowedProjectIds = await ProjectModel.find(companyResourceFilter).distinct("_id");
+
     const [
       users,
       clients,
@@ -82,15 +114,34 @@ export async function GET(req: Request) {
       expenseByCategoryData,
       topProjectsData,
     ] = await Promise.all([
-      UserModel.countDocuments(),
-      ClientModel.countDocuments(),
-      ProjectModel.countDocuments(),
-      QuotationModel.countDocuments(),
-      PurchaseOrderModel.countDocuments(),
-      InvoiceModel.countDocuments(),
-      PaymentModel.countDocuments(),
-      ExpenseModel.countDocuments({ isDeleted: { $ne: true } }),
-      ActivityLogModel.countDocuments(),
+      UserModel.countDocuments({
+        $or: [
+          { companyIds: { $in: allowedCompanyIdStrings } },
+          { primaryCompanyId: { $in: allowedCompanyIdStrings } },
+        ],
+      }),
+      ClientModel.countDocuments(companyResourceFilter),
+      ProjectModel.countDocuments(companyResourceFilter),
+      QuotationModel.countDocuments(companyResourceFilter),
+      PurchaseOrderModel.countDocuments(companyResourceFilter),
+      InvoiceModel.countDocuments({
+        ...companyResourceFilter,
+        isDeleted: { $ne: true },
+      }),
+      PaymentModel.countDocuments({
+        companyId: { $in: allowedCompanyIds },
+        isDeleted: { $ne: true },
+      }),
+      ExpenseModel.countDocuments({
+        companyId: { $in: allowedCompanyIds },
+        isDeleted: { $ne: true },
+      }),
+      ActivityLogModel.countDocuments({
+        $or: [
+          { projectId: { $in: allowedProjectIds } },
+          { entityType: "company", entityId: { $in: allowedCompanyIds } },
+        ],
+      }),
       ExpenseModel.aggregate([
         { $match: expenseMatch },
         { $group: { _id: null, total: { $sum: { $ifNull: ["$amountBase", { $ifNull: ["$baseAmount", "$amount"] }] } } } }
@@ -124,6 +175,7 @@ export async function GET(req: Request) {
         }
       ]),
       InvoiceModel.find({
+        ...companyResourceFilter,
         status: { $in: ["SENT", "PARTIAL", "OVERDUE"] },
         dueDate: { $lt: today },
         isDeleted: false
@@ -251,7 +303,7 @@ export async function GET(req: Request) {
 
     let allProjectsList: any[] = matchedProjects;
     if (matchedProjects.length < rawProjectIds.length) {
-      const additional = await ProjectModel.find({}).select("name title code").limit(10).lean();
+      const additional = await ProjectModel.find(companyResourceFilter).select("name title code").limit(10).lean();
       allProjectsList = [...matchedProjects, ...additional];
     }
 
