@@ -5,7 +5,7 @@ import { UserModel, CompanyModel } from "@/lib/db/models";
 import { requireSession } from "@/lib/auth/require-role";
 import { apiSuccess, apiError, standardAuthError } from "@/lib/api/standard-response";
 import { logActivity } from "@/lib/services/activity/log-activity.service";
-import { hashPassword, verifyPassword } from "@/lib/auth/password";
+import { hashPassword, verifyPassword, validatePasswordComplexity } from "@/lib/auth/password";
 import { normalizePhoneInput } from "@/lib/register/validate";
 import { getUserAccessInfo } from "@/lib/auth/user-company-access";
 
@@ -147,8 +147,9 @@ export async function PATCH(req: Request) {
       if (!valid) {
         return apiError("Current password is incorrect", 400);
       }
-      if (newPass.length < 6) {
-        return apiError("New password must be at least 6 characters long", 400);
+      const passCheck = validatePasswordComplexity(newPass, user.email);
+      if (!passCheck.valid) {
+        return apiError(passCheck.error || "New password does not meet complexity requirements", 400);
       }
       user.password = await hashPassword(newPass);
       user.resetPasswordToken = null;

@@ -6,6 +6,7 @@ import { authErrorResponse } from "@/lib/api/route-auth";
 import { logActivity } from "@/lib/services/activity/log-activity.service";
 
 import { authorizeResource } from "@/lib/auth/authorization";
+import { sanitizeText } from "@/lib/utils/sanitize-input";
 
 interface RouteCtx {
   params: Promise<{ clientId: string }>;
@@ -52,30 +53,30 @@ export async function PATCH(req: Request, ctx: RouteCtx) {
     };
 
     const $set: Record<string, unknown> = {};
-    if (body.name !== undefined) $set.name = String(body.name).trim();
-    if (body.company !== undefined) $set.company = String(body.company).trim();
-    if (body.website !== undefined) $set.website = String(body.website).trim();
-    if (body.address !== undefined) $set.address = String(body.address);
+    if (body.name !== undefined) $set.name = sanitizeText(body.name).trim();
+    if (body.company !== undefined) $set.company = sanitizeText(body.company).trim();
+    if (body.website !== undefined) $set.website = sanitizeText(body.website).trim();
+    if (body.address !== undefined) $set.address = sanitizeText(body.address).trim();
     if (body.email !== undefined) $set.email = String(body.email).trim().toLowerCase();
-    if (body.phone !== undefined) $set.phone = String(body.phone);
+    if (body.phone !== undefined) $set.phone = sanitizeText(body.phone).trim();
     if (body.clientLogoText !== undefined) {
-      const t = String(body.clientLogoText);
+      const t = sanitizeText(body.clientLogoText).trim();
       $set.clientLogoText = t;
       $set.clientLogoUrl = t;
     }
     if (body.clientSignatureText !== undefined) {
-      $set.clientSignatureText = String(body.clientSignatureText);
+      $set.clientSignatureText = sanitizeText(body.clientSignatureText).trim();
     }
-    if (body.taxId !== undefined) $set.taxId = String(body.taxId).trim();
-    if (body.currency !== undefined) $set.currency = String(body.currency).trim().toUpperCase();
-    if (body.paymentTerms !== undefined) $set.paymentTerms = String(body.paymentTerms).trim();
-    if (body.notes !== undefined) $set.notes = String(body.notes).trim();
-    if (body.billingAddress !== undefined) $set.billingAddress = String(body.billingAddress).trim();
-    if (body.shippingAddress !== undefined) $set.shippingAddress = String(body.shippingAddress).trim();
-    if (body.country !== undefined) $set.country = String(body.country).trim();
-    if (body.state !== undefined) $set.state = String(body.state).trim();
-    if (body.city !== undefined) $set.city = String(body.city).trim();
-    if (body.zipCode !== undefined) $set.zipCode = String(body.zipCode).trim();
+    if (body.taxId !== undefined) $set.taxId = sanitizeText(body.taxId).trim();
+    if (body.currency !== undefined) $set.currency = sanitizeText(body.currency).trim().toUpperCase();
+    if (body.paymentTerms !== undefined) $set.paymentTerms = sanitizeText(body.paymentTerms).trim();
+    if (body.notes !== undefined) $set.notes = sanitizeText(body.notes).trim();
+    if (body.billingAddress !== undefined) $set.billingAddress = sanitizeText(body.billingAddress).trim();
+    if (body.shippingAddress !== undefined) $set.shippingAddress = sanitizeText(body.shippingAddress).trim();
+    if (body.country !== undefined) $set.country = sanitizeText(body.country).trim();
+    if (body.state !== undefined) $set.state = sanitizeText(body.state).trim();
+    if (body.city !== undefined) $set.city = sanitizeText(body.city).trim();
+    if (body.zipCode !== undefined) $set.zipCode = sanitizeText(body.zipCode).trim();
 
     const updated = await ClientModel.findByIdAndUpdate(
       clientId,

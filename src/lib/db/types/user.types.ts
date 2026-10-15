@@ -24,6 +24,8 @@ export interface IUser {
   defaultCompanyId?: Types.ObjectId | null;
   resetPasswordToken?: string | null;
   resetPasswordExpires?: Date | null;
+  failedLoginAttempts?: number;
+  lockoutUntil?: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }

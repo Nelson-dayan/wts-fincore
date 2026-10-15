@@ -38,6 +38,8 @@ export const userSchema = new Schema<IUser>(
     defaultCompanyId: { type: Schema.Types.ObjectId, ref: "Company", default: null },
     resetPasswordToken: { type: String, default: null, select: false },
     resetPasswordExpires: { type: Date, default: null, select: false },
+    failedLoginAttempts: { type: Number, default: 0 },
+    lockoutUntil: { type: Date, default: null },
   },
   { _id: true, versionKey: false, timestamps: true }
 );

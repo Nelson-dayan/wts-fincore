@@ -13,6 +13,7 @@ import { assertEmployeeCanAccessInvoice } from "@/lib/auth/employee-resource-acc
 import { assertPeriodNotLocked } from "@/lib/services/business/period-lock.service";
 
 import { authorizeResource } from "@/lib/auth/authorization";
+import { sanitizeText, sanitizeObjectDeep } from "@/lib/utils/sanitize-input";
 
 type Ctx = { params: Promise<{ invoiceId: string }> };
 
@@ -188,26 +189,29 @@ export async function PATCH(req: Request, ctx: Ctx) {
           di.date = dt;
         }
       }
-      if (b.subject !== undefined) di.subject = String(b.subject ?? "");
-      if (b.title !== undefined) di.title = String(b.title ?? "");
-      if (b.description !== undefined) di.description = String(b.description ?? "");
+      if (b.subject !== undefined) di.subject = sanitizeText(b.subject).trim();
+      if (b.title !== undefined) di.title = sanitizeText(b.title).trim();
+      if (b.description !== undefined) di.description = sanitizeText(b.description).trim();
       if (typeof b.taxRate === "number") di.taxRate = b.taxRate;
       if (typeof b.taxEnabled === "boolean") di.taxEnabled = b.taxEnabled;
       inv.markModified("documentInfo");
     }
 
     if (body.clientSnapshot && typeof body.clientSnapshot === "object") {
-      Object.assign(inv.clientSnapshot as object, body.clientSnapshot);
+      const sanitizedCs = sanitizeObjectDeep(body.clientSnapshot);
+      Object.assign(inv.clientSnapshot as object, sanitizedCs);
       inv.markModified("clientSnapshot");
     }
 
     if (body.companySnapshot && typeof body.companySnapshot === "object") {
-      Object.assign(inv.companySnapshot as object, body.companySnapshot);
+      const sanitizedCo = sanitizeObjectDeep(body.companySnapshot);
+      Object.assign(inv.companySnapshot as object, sanitizedCo);
       inv.markModified("companySnapshot");
     }
 
     if (body.branding && typeof body.branding === "object") {
-      Object.assign(inv.branding as object, body.branding);
+      const sanitizedBranding = sanitizeObjectDeep(body.branding);
+      Object.assign(inv.branding as object, sanitizedBranding);
       inv.markModified("branding");
     }
 
@@ -221,16 +225,16 @@ export async function PATCH(req: Request, ctx: Ctx) {
           if (v && typeof v === "object") {
             const rawBank = ex[k] && typeof ex[k] === "object" ? JSON.parse(JSON.stringify(ex[k])) : {};
             const merged = {
-              accountName: String((v as any).accountName ?? rawBank.accountName ?? ""),
-              accountNo: String((v as any).accountNo ?? rawBank.accountNo ?? ""),
-              iban: String((v as any).iban ?? rawBank.iban ?? ""),
-              bankName: String((v as any).bankName ?? rawBank.bankName ?? ""),
-              swift: String((v as any).swift ?? rawBank.swift ?? ""),
+              accountName: sanitizeText((v as any).accountName ?? rawBank.accountName ?? "").trim(),
+              accountNo: sanitizeText((v as any).accountNo ?? rawBank.accountNo ?? "").trim(),
+              iban: sanitizeText((v as any).iban ?? rawBank.iban ?? "").trim(),
+              bankName: sanitizeText((v as any).bankName ?? rawBank.bankName ?? "").trim(),
+              swift: sanitizeText((v as any).swift ?? rawBank.swift ?? "").trim(),
             };
             ex.set(k, merged);
           }
         } else if (v !== undefined) {
-          ex.set(k, v);
+          ex.set(k, sanitizeObjectDeep(v));
         }
       }
       inv.markModified("extras");
@@ -248,8 +252,8 @@ export async function PATCH(req: Request, ctx: Ctx) {
         pageNumber: p.pageNumber,
         items: p.items.map((row) => ({
           number: row.number,
-          name: String(row.name ?? "").trim() || "—",
-          description: String(row.description ?? ""),
+          name: sanitizeText(row.name).trim() || "—",
+          description: sanitizeText(row.description).trim(),
           quantity: Math.max(0, Number(row.quantity) || 0),
           price: Number(row.price) || 0,
         })),

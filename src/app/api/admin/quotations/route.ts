@@ -20,6 +20,7 @@ import { updateSequenceReservationEntity } from "@/lib/services/business/counter
 
 import { authorizeResource } from "@/lib/auth/authorization";
 import { CompanyHierarchyService } from "@/lib/services/business/company-hierarchy.service";
+import { sanitizeText } from "@/lib/utils/sanitize-input";
 
 export async function GET(req: Request) {
   try {
@@ -242,21 +243,21 @@ export async function POST(req: Request) {
     const co = body.companySnapshot ?? {};
     const clientSnapshot = {
       ...built.clientSnapshot,
-      ...(cs.name !== undefined ? { name: String(cs.name) } : {}),
-      ...(cs.company !== undefined ? { company: String(cs.company) } : {}),
-      ...(cs.address !== undefined ? { address: String(cs.address) } : {}),
-      ...(cs.logoText !== undefined ? { logoText: String(cs.logoText) } : {}),
-      ...(cs.signatureText !== undefined ? { signatureText: String(cs.signatureText) } : {}),
+      ...(cs.name !== undefined ? { name: sanitizeText(cs.name).trim() } : {}),
+      ...(cs.company !== undefined ? { company: sanitizeText(cs.company).trim() } : {}),
+      ...(cs.address !== undefined ? { address: sanitizeText(cs.address).trim() } : {}),
+      ...(cs.logoText !== undefined ? { logoText: sanitizeText(cs.logoText).trim() } : {}),
+      ...(cs.signatureText !== undefined ? { signatureText: sanitizeText(cs.signatureText).trim() } : {}),
     };
     const companySnapshot = {
       ...built.companySnapshot,
-      ...(co.name !== undefined ? { name: String(co.name) } : {}),
-      ...(co.address !== undefined ? { address: String(co.address) } : {}),
-      ...(co.email !== undefined ? { email: String(co.email) } : {}),
-      ...(co.website !== undefined ? { website: String(co.website) } : {}),
-      ...(co.logoUrl !== undefined ? { logoUrl: String(co.logoUrl) } : {}),
-      ...(co.logoText !== undefined ? { logoText: String(co.logoText) } : {}),
-      ...(co.signatureText !== undefined ? { signatureText: String(co.signatureText) } : {}),
+      ...(co.name !== undefined ? { name: sanitizeText(co.name).trim() } : {}),
+      ...(co.address !== undefined ? { address: sanitizeText(co.address).trim() } : {}),
+      ...(co.email !== undefined ? { email: String(co.email).trim() } : {}),
+      ...(co.website !== undefined ? { website: sanitizeText(co.website).trim() } : {}),
+      ...(co.logoUrl !== undefined ? { logoUrl: sanitizeText(co.logoUrl).trim() } : {}),
+      ...(co.logoText !== undefined ? { logoText: sanitizeText(co.logoText).trim() } : {}),
+      ...(co.signatureText !== undefined ? { signatureText: sanitizeText(co.signatureText).trim() } : {}),
     };
     const { quotationNumber, seqValue, year } = await generateQuotationNumber(session.user.id);
 
@@ -264,9 +265,9 @@ export async function POST(req: Request) {
       pageNumber: p.pageNumber,
       items: p.items.map((item) => ({
         number: item.number,
-        name: item.name,
-        displayName: item.displayName ?? "",
-        description: item.description ?? "",
+        name: sanitizeText(item.name).trim(),
+        displayName: sanitizeText(item.displayName ?? "").trim(),
+        description: sanitizeText(item.description ?? "").trim(),
         length: item.length,
         width: item.width,
         quantity: item.quantity,
@@ -287,14 +288,14 @@ export async function POST(req: Request) {
       projectId: new mongoose.Types.ObjectId(projectId),
       createdBy: new mongoose.Types.ObjectId(session.user.id),
       documentInfo: {
-        quotationCode: String(
+        quotationCode: sanitizeText(
           body.documentInfo?.quotationCode ?? body.documentInfo?.geCode ?? ""
-        ),
+        ).trim(),
         geCode: "",
         date: docDate,
-        subject: String(body.documentInfo?.subject ?? ""),
-        title: String(body.documentInfo?.title ?? ""),
-        description: String(body.documentInfo?.description ?? ""),
+        subject: sanitizeText(body.documentInfo?.subject ?? "").trim(),
+        title: sanitizeText(body.documentInfo?.title ?? "").trim(),
+        description: sanitizeText(body.documentInfo?.description ?? "").trim(),
         taxRate,
         taxEnabled,
       },
@@ -307,24 +308,24 @@ export async function POST(req: Request) {
         total: toDecimal128(total),
       },
       quotationInfo: {
-        leadTime: String(quotationInfo.leadTime ?? ""),
+        leadTime: sanitizeText(quotationInfo.leadTime ?? "").trim(),
         confirmDate: confirmDate && !Number.isNaN(confirmDate.getTime()) ? confirmDate : undefined,
-        terms: String(quotationInfo.terms ?? ""),
-        validity: String(quotationInfo.validity ?? ""),
+        terms: sanitizeText(quotationInfo.terms ?? "").trim(),
+        validity: sanitizeText(quotationInfo.validity ?? "").trim(),
         remainingAmount:
           quotationInfo.remainingAmount !== undefined
             ? toDecimal128(Number(quotationInfo.remainingAmount))
             : undefined,
-        remainingText: String(quotationInfo.remainingText ?? ""),
+        remainingText: sanitizeText(quotationInfo.remainingText ?? "").trim(),
       },
       branding: {
         useCompanyLogo: branding.useCompanyLogo !== false,
         useCompanySignature: branding.useCompanySignature !== false,
         showClientSignature: branding.showClientSignature !== false,
-        customLogoText: String(branding.customLogoText ?? ""),
-        customSignatureText: String(branding.customSignatureText ?? ""),
+        customLogoText: sanitizeText(branding.customLogoText ?? "").trim(),
+        customSignatureText: sanitizeText(branding.customSignatureText ?? "").trim(),
       },
-      internalNotes: String(body.internalNotes ?? ""),
+      internalNotes: sanitizeText(body.internalNotes ?? "").trim(),
       currency: String(body.currency || "").trim() || undefined,
       status: body.status ?? "draft",
     });

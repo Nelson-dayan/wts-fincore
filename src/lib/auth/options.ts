@@ -32,10 +32,54 @@ export const authOptions: NextAuthOptions = {
 
         await connectDB();
         const user = await UserModel.findOne({ email }).select("+password");
-        if (!user?.isActive) return null;
+        if (!user || !user.isActive) return null;
+
+        // Check account lockout status (5 consecutive failed attempts = 15 minute lock)
+        if (user.lockoutUntil && new Date(user.lockoutUntil) > new Date()) {
+          const remainingMinutes = Math.max(
+            1,
+            Math.ceil(
+              (new Date(user.lockoutUntil).getTime() - Date.now()) / (60 * 1000)
+            )
+          );
+          throw new Error(
+            `AccountLocked: Account is temporarily locked due to multiple failed login attempts. Please try again in ${remainingMinutes} minute${
+              remainingMinutes > 1 ? "s" : ""
+            }.`
+          );
+        }
 
         const valid = await verifyPassword(password, user.password);
-        if (!valid) return null;
+        if (!valid) {
+          const attempts = (user.failedLoginAttempts || 0) + 1;
+          const MAX_FAILED_ATTEMPTS = 5;
+          const LOCKOUT_DURATION_MS = 15 * 60 * 1000; // 15 minutes
+
+          if (attempts >= MAX_FAILED_ATTEMPTS) {
+            const lockoutUntil = new Date(Date.now() + LOCKOUT_DURATION_MS);
+            await UserModel.updateOne(
+              { _id: user._id },
+              { $set: { failedLoginAttempts: attempts, lockoutUntil } }
+            );
+            throw new Error(
+              "AccountLocked: Account is temporarily locked due to multiple failed login attempts. Please try again in 15 minutes."
+            );
+          } else {
+            await UserModel.updateOne(
+              { _id: user._id },
+              { $set: { failedLoginAttempts: attempts } }
+            );
+            return null;
+          }
+        }
+
+        // Reset failed login tracking on successful authentication
+        if ((user.failedLoginAttempts ?? 0) > 0 || user.lockoutUntil) {
+          await UserModel.updateOne(
+            { _id: user._id },
+            { $set: { failedLoginAttempts: 0, lockoutUntil: null } }
+          );
+        }
 
         return {
           id: user._id.toString(),
