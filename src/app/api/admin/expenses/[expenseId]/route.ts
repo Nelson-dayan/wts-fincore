@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
-import { requireRole } from "@/lib/auth/require-role";
 import { connectDB } from "@/lib/db/connect";
 import { ExpenseModel } from "@/lib/db/models";
 import { authErrorResponse } from "@/lib/api/route-auth";
 import { logActivity } from "@/lib/services/activity/log-activity.service";
+import { authorizeResource } from "@/lib/auth/authorization";
 
 interface RouteCtx {
   params: Promise<{ expenseId: string }>;
@@ -14,7 +14,6 @@ export async function DELETE(
   ctx: RouteCtx
 ) {
   try {
-    const session = await requireRole(["admin"]);
     await connectDB();
     const { expenseId } = await ctx.params;
 
@@ -26,6 +25,18 @@ export async function DELETE(
     if (!existing || existing.isDeleted) {
       return NextResponse.json({ message: "Expense not found" }, { status: 404 });
     }
+
+    const auth = await authorizeResource({
+      permission: "expenses.delete",
+      companyId: existing.companyId ? String(existing.companyId) : undefined,
+      projectId: existing.projectId ? String(existing.projectId) : undefined,
+    });
+
+    if (!auth.authorized) {
+      return NextResponse.json({ message: auth.reason || "Forbidden", code: auth.code }, { status: 403 });
+    }
+
+    const session = auth.session;
 
     // Soft delete
     await ExpenseModel.findByIdAndUpdate(expenseId, {

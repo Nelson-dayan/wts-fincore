@@ -16,10 +16,7 @@ import { updateSequenceReservationEntity } from "@/lib/services/business/counter
 import { pagesFromGeneratorData } from "@/lib/quotation/map-builder-to-quotation";
 import { checkOrCreateIdempotency, saveIdempotencySuccess, saveIdempotencyFailed } from "@/lib/services/business/idempotency.service";
 import { normalizeQuotationData, type QuotationData } from "@/types/quotation-generator";
-import {
-  assertEmployeeCanAccessProject,
-  assertEmployeeCanAccessQuotation,
-} from "@/lib/auth/employee-resource-access";
+import { authorizeResource } from "@/lib/auth/authorization";
 
 function pdfBuilderPayload(data: QuotationData) {
   return JSON.parse(JSON.stringify(normalizeQuotationData(data))) as Record<string, unknown>;
@@ -197,20 +194,27 @@ export async function POST(req: Request) {
       snapshotBase = await buildQuotationSnapshots(projectId);
     }
 
-    if (session.user.role === "employee") {
-      try {
-        if (quotationOid) {
-          await assertEmployeeCanAccessQuotation(session.user.id, quotationOid);
-        } else {
-          await assertEmployeeCanAccessProject(session.user.id, projectId);
-        }
-      } catch (e) {
-        if (isIdempotencyEnabled) await saveIdempotencyFailed(idempotencyKey!, userId);
-        if (e instanceof Error && e.message === "FORBIDDEN") {
-          return apiError("Forbidden", 403);
-        }
-        throw e;
-      }
+    const projectDoc = await ProjectModel.findById(projectId).select("_id companyId").lean();
+    if (!projectDoc) {
+      if (isIdempotencyEnabled) await saveIdempotencyFailed(idempotencyKey!, userId);
+      return apiError("Project not found", 404);
+    }
+
+    const targetCompanyId = existingForUpdate?.companyId
+      ? String(existingForUpdate.companyId)
+      : projectDoc.companyId
+      ? String(projectDoc.companyId)
+      : undefined;
+
+    const auth = await authorizeResource({
+      permission: quotationOid ? "quotations.edit" : "quotations.create",
+      companyId: targetCompanyId,
+      projectId,
+    });
+
+    if (!auth.authorized) {
+      if (isIdempotencyEnabled) await saveIdempotencyFailed(idempotencyKey!, userId);
+      return apiError(auth.reason || "Forbidden", 403, auth.code);
     }
 
     const { clientSnapshot, companySnapshot } = mergeSnapshotsWithForm(snapshotBase, data);
@@ -317,13 +321,13 @@ export async function POST(req: Request) {
       return apiSuccess(resData);
     }
 
-    const projectDoc = await ProjectModel.findById(projectId).lean();
     const companyIdStr = projectDoc?.companyId ? String(projectDoc.companyId) : undefined;
     const companyCode = (companySnapshot as any)?.code || "SDT";
     const { quotationNumber, seqValue, year } = await generateQuotationNumber(session.user.id, companyCode, companyIdStr);
     const created = await QuotationModel.create({
       quotationNumber,
       projectId: new mongoose.Types.ObjectId(projectId),
+      companyId: projectDoc?.companyId ? new mongoose.Types.ObjectId(String(projectDoc.companyId)) : undefined,
       createdBy: new mongoose.Types.ObjectId(session.user.id),
       ...commonSet,
       internalNotes: "",

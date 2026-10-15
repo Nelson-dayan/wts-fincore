@@ -6,10 +6,10 @@ import { PaymentModel, PaymentAllocationModel, InvoiceModel } from "@/lib/db/mod
 import { allocate } from "@/lib/services/finance/allocation.engine";
 import { decimalToNumber } from "@/lib/services/business/money";
 import { convertToBase } from "@/lib/services/finance/exchange.engine";
+import { authorizeResource } from "@/lib/auth/authorization";
 
 export async function POST(req: Request) {
   try {
-    const session = await requireRole(["admin", "employee"]);
     await connectDB();
 
     const { paymentId, invoiceId, amount } = (await req.json()) as {
@@ -32,6 +32,24 @@ export async function POST(req: Request) {
     if (!invoice) {
       return NextResponse.json({ message: "Invoice not found" }, { status: 404 });
     }
+
+    const paymentCompanyId = payment.companyId ? String(payment.companyId) : undefined;
+    const invoiceCompanyId = (invoice as any).companyId ? String((invoice as any).companyId) : undefined;
+    if (paymentCompanyId && invoiceCompanyId && paymentCompanyId !== invoiceCompanyId) {
+      return NextResponse.json({ message: "Cannot allocate payment across different companies" }, { status: 400 });
+    }
+
+    const auth = await authorizeResource({
+      permission: "payments.create",
+      companyId: invoiceCompanyId || paymentCompanyId,
+      projectId: invoice.projectId ? String(invoice.projectId) : undefined,
+    });
+
+    if (!auth.authorized) {
+      return NextResponse.json({ message: auth.reason || "Forbidden", code: auth.code }, { status: 403 });
+    }
+
+    const session = auth.session;
 
     // 2. Verify that this client matches
     if (String(payment.clientId) !== String(invoice.clientSnapshot?.id || (invoice as any).clientId)) {

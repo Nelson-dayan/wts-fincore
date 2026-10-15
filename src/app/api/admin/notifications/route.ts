@@ -12,6 +12,8 @@ import {
 } from "@/lib/db/models";
 import { requireRole } from "@/lib/auth/require-role";
 import { decimalToNumber } from "@/lib/services/business/money";
+import { getUserAccessInfo } from "@/lib/auth/user-company-access";
+import { getEmployeeAssignedProjectIdStrings } from "@/lib/auth/employee-resource-access";
 
 export interface NotificationItem {
   id: string;
@@ -31,8 +33,23 @@ export async function GET() {
     await connectDB();
 
     const userId = session.user.id;
-    const userRole = session.user.role;
+    const userRole = (session.user.role as "super_admin" | "admin" | "employee") || "employee";
     const now = new Date();
+
+    const accessInfo = await getUserAccessInfo(userId, userRole);
+    const isSuperAdmin = accessInfo.isSuperAdmin;
+    const allowedCompanyIds = accessInfo.allowedCompanyIds;
+
+    const companyFilter = isSuperAdmin
+      ? {}
+      : { companyId: { $in: allowedCompanyIds } };
+
+    let employeeProjectFilter: Record<string, unknown> = {};
+    let employeeProjectIds: string[] = [];
+    if (userRole === "employee") {
+      employeeProjectIds = await getEmployeeAssignedProjectIdStrings(userId);
+      employeeProjectFilter = { projectId: { $in: employeeProjectIds } };
+    }
 
     // Fetch user-specific read & dismissed records
     const userStateRecords = await UserNotificationReadModel.find({ userId }).lean();
@@ -49,6 +66,7 @@ export async function GET() {
     // 1. Custom Broadcast / Announcement Notifications
     const customAnnouncements = await CustomNotificationModel.find({
       target: { $in: ["all", userRole] },
+      ...(isSuperAdmin ? {} : { $or: [{ companyId: { $in: allowedCompanyIds } }, { companyId: null }, { companyId: { $exists: false } }] }),
     })
       .sort({ createdAt: -1 })
       .limit(10)
@@ -71,6 +89,8 @@ export async function GET() {
 
     // 2. Overdue Invoices (High Priority - Need Attention)
     const overdueInvoices = await InvoiceModel.find({
+      ...companyFilter,
+      ...employeeProjectFilter,
       status: { $in: ["SENT", "PARTIAL", "OVERDUE"] },
       dueDate: { $lt: now },
       isDeleted: false,
@@ -97,6 +117,8 @@ export async function GET() {
 
     // 3. Pending Quotations needing client follow-up
     const pendingQuotations = await QuotationModel.find({
+      ...companyFilter,
+      ...employeeProjectFilter,
       status: { $in: ["SENT", "DRAFT"] },
       isDeleted: false,
     })
@@ -121,6 +143,8 @@ export async function GET() {
 
     // 4. Open POs awaiting fulfillment
     const openPOs = await PurchaseOrderModel.find({
+      ...companyFilter,
+      ...employeeProjectFilter,
       status: { $in: ["SENT", "ISSUED"] },
       isDeleted: false,
     })
@@ -144,7 +168,11 @@ export async function GET() {
     });
 
     // 5. Active Projects Monitoring
-    const activeProjects = await ProjectModel.find({ status: "active" })
+    const activeProjects = await ProjectModel.find({
+      ...companyFilter,
+      ...(userRole === "employee" ? { _id: { $in: employeeProjectIds } } : {}),
+      status: "active",
+    })
       .select("name budget createdAt")
       .sort({ createdAt: -1 })
       .limit(3)
@@ -168,6 +196,8 @@ export async function GET() {
     // 6. High Value Expenses logged in last 7 days
     const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
     const highExpenses = await ExpenseModel.find({
+      ...companyFilter,
+      ...employeeProjectFilter,
       createdAt: { $gte: weekAgo },
       isDeleted: false,
     })
@@ -195,6 +225,7 @@ export async function GET() {
 
     // 7. Recent Clients Onboarded
     const recentClients = await ClientModel.find({
+      ...companyFilter,
       createdAt: { $gte: weekAgo },
     })
       .select("name companyName createdAt")

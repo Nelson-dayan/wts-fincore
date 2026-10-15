@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 import { requireRole } from "@/lib/auth/require-role";
 import { connectDB } from "@/lib/db/connect";
-import { AccountTransactionModel } from "@/lib/db/models";
+import { AccountModel, AccountTransactionModel } from "@/lib/db/models";
 import { authErrorResponse } from "@/lib/api/route-auth";
 import { parsePagination } from "@/lib/api/pagination";
+import { authorizeResource } from "@/lib/auth/authorization";
 
 interface RouteCtx {
   params: Promise<{ accountId: string }>;
@@ -11,9 +12,23 @@ interface RouteCtx {
 
 export async function GET(req: Request, ctx: RouteCtx) {
   try {
-    await requireRole(["admin"]);
     await connectDB();
     const { accountId } = await ctx.params;
+
+    const account = await AccountModel.findById(accountId).select("_id companyId").lean();
+    if (!account) {
+      return NextResponse.json({ message: "Account not found" }, { status: 404 });
+    }
+
+    const auth = await authorizeResource({
+      permission: "accounts.view",
+      companyId: account.companyId ? String(account.companyId) : undefined,
+    });
+
+    if (!auth.authorized) {
+      return NextResponse.json({ message: auth.reason || "Forbidden", code: auth.code }, { status: 403 });
+    }
+
     const url = new URL(req.url);
     const { page, limit, skip } = parsePagination(url.searchParams);
 

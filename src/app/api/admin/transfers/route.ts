@@ -1,13 +1,12 @@
 import { NextResponse } from "next/server";
-import { requireRole } from "@/lib/auth/require-role";
 import { connectDB } from "@/lib/db/connect";
 import { recordTransfer, approveTransfer, rejectTransfer } from "@/lib/services/finance/transfer.service";
 import { authErrorResponse } from "@/lib/api/route-auth";
+import { AccountModel, TransferModel } from "@/lib/db/models";
+import { authorizeResource } from "@/lib/auth/authorization";
 
 export async function POST(req: Request) {
   try {
-    // Only Admin can perform bank transfers
-    const session = await requireRole(["admin"]);
     await connectDB();
     const body = await req.json();
 
@@ -22,6 +21,33 @@ export async function POST(req: Request) {
     if (String(body.fromAccountId) === String(body.toAccountId)) {
       return NextResponse.json({ message: "Source and destination accounts must be different" }, { status: 400 });
     }
+
+    const fromAccount = await AccountModel.findById(body.fromAccountId).select("_id companyId name isActive").lean();
+    if (!fromAccount) {
+      return NextResponse.json({ message: "Source account not found" }, { status: 404 });
+    }
+    const toAccount = await AccountModel.findById(body.toAccountId).select("_id companyId name isActive").lean();
+    if (!toAccount) {
+      return NextResponse.json({ message: "Destination account not found" }, { status: 404 });
+    }
+
+    const authFrom = await authorizeResource({
+      permission: "accounts.edit",
+      companyId: fromAccount.companyId ? String(fromAccount.companyId) : undefined,
+    });
+    if (!authFrom.authorized) {
+      return NextResponse.json({ message: authFrom.reason || "Forbidden for source account", code: authFrom.code }, { status: 403 });
+    }
+
+    const authTo = await authorizeResource({
+      permission: "accounts.edit",
+      companyId: toAccount.companyId ? String(toAccount.companyId) : undefined,
+    });
+    if (!authTo.authorized) {
+      return NextResponse.json({ message: authTo.reason || "Forbidden for destination account", code: authTo.code }, { status: 403 });
+    }
+
+    const session = authFrom.session;
 
     const fromAmount = Number(body.fromAmount);
     const toAmount = Number(body.toAmount);
@@ -115,7 +141,6 @@ export async function POST(req: Request) {
 
 export async function PATCH(req: Request) {
   try {
-    const session = await requireRole(["admin"]);
     await connectDB();
     const body = await req.json();
 
@@ -123,6 +148,22 @@ export async function PATCH(req: Request) {
     if (!transferId || !action) {
       return NextResponse.json({ message: "transferId and action are required" }, { status: 400 });
     }
+
+    const transfer = await TransferModel.findById(transferId).select("fromAccountId toAccountId").lean();
+    if (!transfer) {
+      return NextResponse.json({ message: "Transfer not found" }, { status: 404 });
+    }
+
+    const fromAccount = await AccountModel.findById(transfer.fromAccountId).select("_id companyId").lean();
+    const auth = await authorizeResource({
+      permission: "accounts.edit",
+      companyId: fromAccount?.companyId ? String(fromAccount.companyId) : undefined,
+    });
+    if (!auth.authorized) {
+      return NextResponse.json({ message: auth.reason || "Forbidden", code: auth.code }, { status: 403 });
+    }
+
+    const session = auth.session;
 
     if (action === "approve") {
       const result = await approveTransfer({

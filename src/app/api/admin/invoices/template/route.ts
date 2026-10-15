@@ -7,11 +7,10 @@ import { authErrorResponse } from "@/lib/api/route-auth";
 import { aedAmountInWords } from "@/lib/invoice/aed-amount-words";
 import { computeInvoiceTotals } from "@/lib/invoice/invoice-totals";
 import { generateUniqueInvoiceNumber } from "@/lib/services/business/invoice.service";
-import { assertEmployeeCanAccessPurchaseOrder } from "@/lib/auth/employee-resource-access";
+import { authorizeResource } from "@/lib/auth/authorization";
 
 export async function GET(req: Request) {
   try {
-    const session = await requireRole(["admin", "employee"]);
     await connectDB();
     const url = new URL(req.url);
     const poId = String(url.searchParams.get("poId") ?? "").trim();
@@ -21,6 +20,18 @@ export async function GET(req: Request) {
 
     const po = await PurchaseOrderModel.findById(poId).lean();
     if (!po) return NextResponse.json({ message: "Purchase order not found" }, { status: 404 });
+
+    const auth = await authorizeResource({
+      permission: "invoices.view",
+      companyId: (po as any).companyId ? String((po as any).companyId) : undefined,
+      projectId: po.projectId ? String(po.projectId) : undefined,
+    });
+
+    if (!auth.authorized) {
+      return NextResponse.json({ message: auth.reason || "Forbidden", code: auth.code }, { status: 403 });
+    }
+
+    const session = auth.session;
 
     const quotation = await QuotationModel.findById(po.quotationId).lean();
     if (!quotation) {
@@ -34,33 +45,25 @@ export async function GET(req: Request) {
     const urlType = url.searchParams.get("invoiceType");
     const invoiceType = urlType === "usd" ? "usd" : (urlType === "aed" ? "aed" : (qCurrency === "USD" ? "usd" : "aed"));
 
-    if (session.user.role === "employee") {
-      try {
-        await assertEmployeeCanAccessPurchaseOrder(session.user.id, poId);
-      } catch (e) {
-        if (e instanceof Error && e.message === "FORBIDDEN") {
-          return NextResponse.json({ message: "Forbidden" }, { status: 403 });
-        }
-        throw e;
-      }
-    }
+    const targetCompany = (po as any).companyId
+      ? await CompanyModel.findById((po as any).companyId).lean()
+      : await CompanyModel.findOne({ isPrimary: true }).sort({ updatedAt: -1 }).lean();
 
-    const primary = await CompanyModel.findOne({ isPrimary: true }).sort({ updatedAt: -1 }).lean();
     const qCompany =
       quotation.companySnapshot && typeof quotation.companySnapshot === "object"
         ? (quotation.companySnapshot as Record<string, unknown>)
         : {};
     const s = (v: unknown) => String(v ?? "").trim();
-    const logoFromCompany = s(primary?.logoText);
+    const logoFromCompany = s(targetCompany?.branding?.logoText || targetCompany?.name);
     const logoFromQuote = s(qCompany.logoUrl);
     const companySnapshot = {
-      name: s(primary?.name) || s(qCompany.name) || "Company",
-      address: s(primary?.address) || s(qCompany.address),
-      email: s(primary?.email) || s(qCompany.email),
-      website: s(primary?.website) || s(qCompany.website),
+      name: s(targetCompany?.name) || s(qCompany.name) || "Company",
+      address: s(targetCompany?.address) || s(qCompany.address),
+      email: s(targetCompany?.email) || s(qCompany.email),
+      website: s(targetCompany?.website) || s(qCompany.website),
       logoUrl: logoFromCompany || logoFromQuote,
-      logoText: s(qCompany.logoText),
-      signatureText: s(primary?.signatureText) || s(qCompany.signatureText),
+      logoText: s(qCompany.logoText || targetCompany?.branding?.logoText),
+      signatureText: s(targetCompany?.branding?.signatureUrl) || s(qCompany.signatureText),
     };
 
     const { invoiceNumber } = await generateUniqueInvoiceNumber(session.user.id);

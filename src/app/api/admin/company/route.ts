@@ -7,24 +7,19 @@ import { logActivity } from "@/lib/services/activity/log-activity.service";
 import { isImageSrc } from "@/lib/utils/is-image-src";
 import { CompanyHierarchyService } from "@/lib/services/business/company-hierarchy.service";
 
+import { resolveAuthCompanyContext } from "@/lib/auth/company-context";
+
 export async function GET(req: Request) {
   try {
-    await requireRole(["admin", "employee"]);
+    const session = await requireRole(["admin", "employee"]);
     await connectDB();
 
     const url = new URL(req.url);
     const targetCompanyId = req.headers.get("x-company-id") || url.searchParams.get("companyId");
     const scopeMode = (req.headers.get("x-scope-mode") || url.searchParams.get("scopeMode")) as "single" | "group" || "single";
 
-    const context = await CompanyHierarchyService.resolveCompanyContext(targetCompanyId, scopeMode);
-    
-    let resolvedCompanyId = context.companyId;
-    if (scopeMode === "group") {
-      const primaryCompany = await CompanyModel.findOne({ isPrimary: true, deletedAt: null }).lean();
-      if (primaryCompany) {
-        resolvedCompanyId = primaryCompany._id.toString();
-      }
-    }
+    const companyContext = await resolveAuthCompanyContext(session.user, targetCompanyId, scopeMode);
+    const resolvedCompanyId = companyContext.activeCompanyId;
 
     const item = await CompanyModel.findById(resolvedCompanyId).lean();
     const quotationCount = resolvedCompanyId
@@ -32,7 +27,7 @@ export async function GET(req: Request) {
       : 0;
     const nextQuotationSeq = quotationCount + 1;
 
-    return NextResponse.json({ item, context, quotationCount, nextQuotationSeq });
+    return NextResponse.json({ item, context: companyContext, quotationCount, nextQuotationSeq });
   } catch (error) {
     return authErrorResponse(error, "Failed to load company settings");
   }
@@ -46,8 +41,12 @@ export async function PATCH(req: Request) {
     const url = new URL(req.url);
 
     const targetCompanyId = body._id || body.companyId || req.headers.get("x-company-id") || url.searchParams.get("companyId");
-    const context = await CompanyHierarchyService.resolveCompanyContext(targetCompanyId, "single");
-    const companyId = context.companyId;
+    const companyContext = await resolveAuthCompanyContext(session.user, targetCompanyId, "single");
+    const companyId = companyContext.activeCompanyId;
+
+    if (!companyContext.allowedCompanyIds.includes(companyId)) {
+      return NextResponse.json({ message: "Unauthorized company selection" }, { status: 403 });
+    }
 
     const current = await CompanyModel.findById(companyId).lean();
 

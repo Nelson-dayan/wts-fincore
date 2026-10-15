@@ -4,20 +4,26 @@ import { CompanyModel } from "@/lib/db/models";
 import { getTreasuryDashboardProjection } from "@/lib/services/projections";
 import { apiSuccess, apiError } from "@/lib/api/response";
 import { isNextInternalError } from "@/lib/api/standard-response";
+import { resolveAuthCompanyContext } from "@/lib/auth/company-context";
 
 export async function GET(req: Request) {
   try {
-    await requireRole(["admin", "employee"]);
+    const session = await requireRole(["admin", "employee"]);
     await connectDB();
 
-    // Resolve companyId from primary company context
-    const primaryCompany = await CompanyModel.findOne({ isPrimary: true }).select("_id").lean();
-    if (!primaryCompany) {
-      return apiError("Primary company profile not found in system.", 404);
+    const url = new URL(req.url);
+    const targetCompanyId = req.headers.get("x-company-id") || url.searchParams.get("companyId");
+    const scopeMode = (req.headers.get("x-scope-mode") || url.searchParams.get("scopeMode")) as "single" | "group" || "single";
+
+    const companyContext = await resolveAuthCompanyContext(session.user, targetCompanyId, scopeMode);
+    const effectiveCompanyId = companyContext.activeCompanyId;
+
+    if (!effectiveCompanyId) {
+      return apiError("Company context not found.", 404);
     }
 
-    // Fetch the treasury read-model projection
-    const projection = await getTreasuryDashboardProjection(String(primaryCompany._id));
+    // Fetch the treasury read-model projection for authorized active company
+    const projection = await getTreasuryDashboardProjection(effectiveCompanyId);
 
     return apiSuccess({
       projection

@@ -29,12 +29,35 @@ export async function GET(req: Request) {
       ? flatCompanies
       : flatCompanies.filter((c) => allowedIds.includes(c._id.toString()));
 
+    function filterTree(nodes: any[], allowedSet: Set<string>): any[] {
+      const result: any[] = [];
+      for (const node of nodes) {
+        const filteredChildren = filterTree(node.children || [], allowedSet);
+        if (allowedSet.has(node._id.toString()) || filteredChildren.length > 0) {
+          result.push({
+            ...node,
+            children: filteredChildren,
+          });
+        }
+      }
+      return result;
+    }
+
+    const filteredTree = isSuperAdmin ? tree : filterTree(tree, new Set(allowedIds));
     const context = await CompanyHierarchyService.resolveCompanyContext(activeId, authContext.scopeMode);
 
+    const sanitizedContext = {
+      ...context,
+      allowedCompanyIds: authContext.allowedCompanyIds,
+      availableIssuingCompanies: isSuperAdmin
+        ? context.availableIssuingCompanies
+        : context.availableIssuingCompanies.filter((c) => allowedIds.includes(c._id.toString())),
+    };
+
     return NextResponse.json({
-      tree,
+      tree: filteredTree,
       companies: userCompanies,
-      context,
+      context: sanitizedContext,
       canAccessGroupView: authContext.canAccessGroupView,
       canManageGroup: authContext.canManageGroup,
       isSuperAdmin,

@@ -53,16 +53,7 @@ export async function POST(req: Request) {
   );
 }
 
-/** List users — admin only */
+/** List users — deprecated legacy endpoint disabled for tenant privacy */
 export async function GET() {
-  const session = await getServerSession(authOptions);
-  if (!session?.user || session.user.role !== "admin") {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-  await connectDB();
-  const users = await UserModel.find()
-    .select("-password")
-    .sort({ createdAt: -1 })
-    .lean();
-  return NextResponse.json(users);
+  return NextResponse.json({ error: "Method not allowed. Use /api/admin/users." }, { status: 405 });
 }

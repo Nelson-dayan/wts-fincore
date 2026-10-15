@@ -76,8 +76,8 @@ export async function PATCH(req: Request, ctx: RouteCtx) {
         ...(targetUser.companyIds || []).map(String),
         ...(targetUser.primaryCompanyId ? [String(targetUser.primaryCompanyId)] : []),
       ];
-      const hasSharedCompany = targetCompanies.some((cId) => callerAccess.assignedCompanyIds.includes(cId));
-      if (targetCompanies.length > 0 && !hasSharedCompany) {
+      const hasSharedCompany = targetCompanies.length > 0 && targetCompanies.some((cId) => callerAccess.assignedCompanyIds.includes(cId));
+      if (!hasSharedCompany) {
         return NextResponse.json(
           { message: "You can only manage users within your authorized company scope." },
           { status: 403 }
@@ -241,8 +241,8 @@ export async function DELETE(_req: Request, ctx: RouteCtx) {
         ...(targetUser.companyIds || []).map(String),
         ...(targetUser.primaryCompanyId ? [String(targetUser.primaryCompanyId)] : []),
       ];
-      const hasSharedCompany = targetCompanies.some((cId) => callerAccess.assignedCompanyIds.includes(cId));
-      if (targetCompanies.length > 0 && !hasSharedCompany) {
+      const hasSharedCompany = targetCompanies.length > 0 && targetCompanies.some((cId) => callerAccess.assignedCompanyIds.includes(cId));
+      if (!hasSharedCompany) {
         return NextResponse.json(
           { message: "You can only delete users within your authorized company scope." },
           { status: 403 }

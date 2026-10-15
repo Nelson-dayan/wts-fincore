@@ -39,6 +39,10 @@ export type ResourceAction =
   | "clients.create"
   | "clients.edit"
   | "clients.delete"
+  | "accounts.view"
+  | "accounts.create"
+  | "accounts.edit"
+  | "accounts.delete"
   | "company.view"
   | "company.edit"
   | "company.delete"
@@ -57,6 +61,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<"super_admin" | "admin" | "employe
     "payments.view", "payments.create", "payments.delete",
     "expenses.view", "expenses.create", "expenses.approve", "expenses.reject", "expenses.edit", "expenses.delete",
     "clients.view", "clients.create", "clients.edit", "clients.delete",
+    "accounts.view", "accounts.create", "accounts.edit", "accounts.delete",
     "company.view", "company.edit", "company.delete",
     "companyHierarchy.view", "companyHierarchy.manage",
     "groupView.access",
@@ -70,6 +75,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<"super_admin" | "admin" | "employe
     "payments.view", "payments.create", "payments.delete",
     "expenses.view", "expenses.create", "expenses.approve", "expenses.reject", "expenses.edit", "expenses.delete",
     "clients.view", "clients.create", "clients.edit", "clients.delete",
+    "accounts.view", "accounts.create", "accounts.edit", "accounts.delete",
     "company.view", "company.edit", "company.delete",
     "companyHierarchy.view", "companyHierarchy.manage",
     "groupView.access",
