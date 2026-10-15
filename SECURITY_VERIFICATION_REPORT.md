@@ -186,6 +186,14 @@ All test commands were executed directly in the project environment:
 - None of these lint warnings were introduced by our multi-company security changes.
 - The project's official verification script (`npm run verify` in `package.json`) intentionally relies on `npx tsc --noEmit` and `npm run build`, both of which pass with 100% clean compilation.
 
+### Runtime Defect Fixes Verified on Real MongoDB Records
+1. **`INVALID_PROJECT_ID` Resolution**:
+   - **Root Cause**: In `src/app/api/admin/invoices/[invoiceId]/route.ts`, `InvoiceModel.findById` was `.populate("projectId", "fixCurrency")`, causing `raw.projectId` to be a populated object `{ _id, fixCurrency }`. Passing `String(raw.projectId)` yielded `"[object Object]"`, failing `ObjectId.isValid` in hierarchy validation.
+   - **Fix**: Extracted `(raw as any)?.projectId?._id ? String((raw as any).projectId._id) : ...` across GET, PATCH, and DELETE in `invoices` and `purchase-orders`. In addition, `authorizeResource` now defensively sanitizes and unboxes any populated object passed into `options.projectId` and `options.clientId`.
+2. **`PROJECT_COMPANY_MISMATCH` False-Positive Resolution**:
+   - **Root Cause**: For legacy documents (e.g. Quotation `6ac52a5ea511f0ee509d9450`) where `companyId` was not stored on the record, or during new quotation creation where the user's active browser header was `HOLD` while the project was under `SDT-DXB`, `options.companyId` defaulted to `context.activeCompanyId`. Hierarchy validation then compared `project.companyId` (`SDT-DXB`) against `check.companyId` (`HOLD`) and raised `PROJECT_COMPANY_MISMATCH`.
+   - **Fix**: In `authorizeResource`, if `options.companyId` is not provided, the effective company is automatically inherited from `project.companyId` (or `client.companyId`), resolving context against that company. In `validateResourceHierarchyAlignment`, `explicitCompanyId` is used to enforce mismatch checks only when an explicit company was stamped on the document/payload, preventing false mismatches while strictly rejecting forged cross-tenant payloads.
+
 ---
 
 ## 6. Legacy-Data Migration Findings and Safe Procedure
