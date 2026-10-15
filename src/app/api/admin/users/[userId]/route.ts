@@ -17,16 +17,34 @@ export async function PATCH(req: Request, ctx: RouteCtx) {
     const { userId } = await ctx.params;
     const body = (await req.json()) as {
       name?: string;
-      role?: "admin" | "employee";
+      role?: "admin" | "employee" | "super_admin";
       phone?: string;
       isActive?: boolean;
       signatureUrl?: string;
       password?: string;
+      companyIds?: string[];
+      groupIds?: string[];
+      groupViewAccess?: boolean;
+      primaryCompanyId?: string;
     };
 
     const updates: Record<string, unknown> = {};
     if (body.name !== undefined) updates.name = String(body.name).trim();
-    if (body.role !== undefined) updates.role = body.role;
+    if (body.role !== undefined && ["admin", "employee", "super_admin"].includes(body.role)) {
+      updates.role = body.role;
+    }
+    if (Array.isArray(body.companyIds)) {
+      updates.companyIds = body.companyIds;
+    }
+    if (Array.isArray(body.groupIds)) {
+      updates.groupIds = body.groupIds;
+    }
+    if (typeof body.groupViewAccess === "boolean") {
+      updates.groupViewAccess = body.groupViewAccess;
+    }
+    if (body.primaryCompanyId !== undefined) {
+      updates.primaryCompanyId = body.primaryCompanyId || null;
+    }
     if (body.phone !== undefined) {
       updates.phone = String(body.phone);
       updates.phoneNumber = String(body.phone);
@@ -48,7 +66,7 @@ export async function PATCH(req: Request, ctx: RouteCtx) {
     }
 
     const updated = await UserModel.findByIdAndUpdate(userId, { $set: updates }, { new: true })
-      .select("_id name email role isActive phone signatureUrl updatedAt")
+      .select("_id name email role isActive phone companyIds groupIds groupViewAccess primaryCompanyId signatureUrl updatedAt")
       .lean();
     if (!updated) {
       return NextResponse.json({ message: "User not found" }, { status: 404 });

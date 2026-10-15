@@ -12,9 +12,11 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { UsersTableRow } from "@/components/portals/admin-users/users-table-row";
 import type { AdminUser } from "./types";
+import type { CompanyOption } from "@/components/companies/company-switcher";
 
 export function UsersTable({
   users,
+  companies = [],
   total,
   page,
   limit,
@@ -32,10 +34,12 @@ export function UsersTable({
   onCancelEdit,
   onDraftChange,
   onSave,
+  onOpenAccessModal,
   onDelete,
   onResetPassword,
 }: {
   users: AdminUser[];
+  companies?: CompanyOption[];
   total: number;
   page: number;
   limit: number;
@@ -53,6 +57,7 @@ export function UsersTable({
   onCancelEdit: () => void;
   onDraftChange: (userId: string, patch: Partial<AdminUser>) => void;
   onSave: (userId: string) => void;
+  onOpenAccessModal?: (user: AdminUser) => void;
   onDelete: (userId: string) => void;
   onResetPassword?: (user: AdminUser) => void;
 }) {
@@ -61,17 +66,17 @@ export function UsersTable({
   const start = total === 0 ? 0 : (page - 1) * limit + 1;
 
   return (
-    <Card className="overflow-hidden border-border/80">
+    <Card className="overflow-hidden border-border/80 shadow-md">
       <CardHeader className="border-b border-border/60 bg-muted/20 pb-5 dark:bg-muted/10">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <CardTitle className="text-[1.15rem] sm:text-xl">Team directory</CardTitle>
+            <CardTitle className="text-[1.15rem] sm:text-xl font-bold">Team Directory & Access Matrix</CardTitle>
             <CardDescription className="mt-1.5 max-w-lg">
-              Search by name or email. Inline edits for role, status, and phone—save when you&apos;re done.
+              Manage team members, assigned company operating scopes, system roles, and account statuses.
             </CardDescription>
           </div>
-          <div className="flex items-center gap-2 rounded-full border border-border/80 bg-background/80 px-3 py-1 text-xs font-medium text-muted-foreground shadow-sm">
-            <span className="tabular-nums text-foreground">{total}</span>
+          <div className="flex items-center gap-2 rounded-full border border-border/80 bg-background/80 px-3 py-1 text-xs font-medium text-muted-foreground shadow-xs">
+            <span className="tabular-nums font-bold text-foreground">{total}</span>
             <span>members</span>
           </div>
         </div>
@@ -87,14 +92,14 @@ export function UsersTable({
               onChange={(e) => onQueryChange(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && onSearch(undefined)}
               placeholder="Search by name or email…"
-              className="h-11 border-border/80 bg-background/80 pl-10 pr-4"
+              className="h-11 border-border/80 bg-background/80 pl-10 pr-4 text-xs font-medium"
             />
           </div>
           <div className="flex gap-2">
             <Button
               type="button"
               variant="default"
-              className="h-11 shrink-0 rounded-xl px-5"
+              className="h-11 shrink-0 rounded-xl px-5 font-semibold text-xs"
               onClick={() => onSearch(undefined)}
             >
               Search
@@ -102,7 +107,7 @@ export function UsersTable({
             <Button
               type="button"
               variant="outline"
-              className="h-11 shrink-0 rounded-xl"
+              className="h-11 shrink-0 rounded-xl font-medium text-xs"
               onClick={() => {
                 onQueryChange("");
                 onSearch("");
@@ -122,24 +127,24 @@ export function UsersTable({
           </div>
         ) : loading && users.length === 0 ? (
           <div className="overflow-x-auto" aria-busy="true">
-            <table className="w-full min-w-[760px] text-left text-sm">
+            <table className="w-full min-w-[840px] text-left text-sm">
               <thead>
                 <tr className="border-b border-border/80 bg-muted/30 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground dark:bg-muted/15">
                   <th className="px-5 py-3.5 pr-3">Member</th>
                   <th className="px-0 py-3.5 pr-3">Email</th>
                   <th className="px-0 py-3.5 pr-3">Role</th>
+                  <th className="px-0 py-3.5 pr-3">Operating Scopes</th>
                   <th className="px-0 py-3.5 pr-3">Status</th>
                   <th className="px-0 py-3.5 pr-3">Phone</th>
-                  <th className="px-0 py-3.5 pr-3">Joined</th>
                   <th className="px-0 py-3.5 pr-4 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/60">
-                {Array.from({ length: 8 }).map((_, ri) => (
+                {Array.from({ length: 6 }).map((_, ri) => (
                   <tr key={ri} className="bg-card">
                     <td className="px-5 py-3.5 pr-3">
                       <div className="flex items-center gap-3">
-                        <Skeleton className="size-10 shrink-0 rounded-full" />
+                        <Skeleton className="size-10 shrink-0 rounded-xl" />
                         <Skeleton className="h-4 w-36 max-w-full" />
                       </div>
                     </td>
@@ -147,13 +152,13 @@ export function UsersTable({
                       <Skeleton className="h-4 w-44 max-w-full" />
                     </td>
                     <td className="px-0 py-3.5 pr-3">
-                      <Skeleton className="h-4 w-20" />
+                      <Skeleton className="h-5 w-20 rounded-full" />
                     </td>
                     <td className="px-0 py-3.5 pr-3">
-                      <Skeleton className="h-7 w-20 rounded-full" />
+                      <Skeleton className="h-5 w-28 rounded-md" />
                     </td>
                     <td className="px-0 py-3.5 pr-3">
-                      <Skeleton className="h-4 w-28" />
+                      <Skeleton className="h-5 w-16 rounded-full" />
                     </td>
                     <td className="px-0 py-3.5 pr-3">
                       <Skeleton className="h-4 w-24" />
@@ -174,22 +179,22 @@ export function UsersTable({
             <span className="flex size-14 items-center justify-center rounded-2xl bg-muted/70 text-muted-foreground">
               <UserRound className="size-7" aria-hidden />
             </span>
-            <p className="text-base font-semibold text-foreground">No users match</p>
+            <p className="text-base font-semibold text-foreground">No users match query</p>
             <p className="max-w-sm text-sm text-muted-foreground">
-              Try another search, or invite someone new with the form above.
+              Try another search term or create a user with the form above.
             </p>
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[760px] text-left text-sm">
+            <table className="w-full min-w-[840px] text-left text-sm">
               <thead>
                 <tr className="border-b border-border/80 bg-muted/30 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground dark:bg-muted/15">
                   <th className="px-5 py-3.5 pr-3">Member</th>
                   <th className="px-0 py-3.5 pr-3">Email</th>
                   <th className="px-0 py-3.5 pr-3">Role</th>
+                  <th className="px-0 py-3.5 pr-3">Operating Scopes</th>
                   <th className="px-0 py-3.5 pr-3">Status</th>
                   <th className="px-0 py-3.5 pr-3">Phone</th>
-                  <th className="px-0 py-3.5 pr-3">Joined</th>
                   <th className="px-0 py-3.5 pr-4 text-right">Actions</th>
                 </tr>
               </thead>
@@ -198,6 +203,7 @@ export function UsersTable({
                   <UsersTableRow
                     key={user._id}
                     user={user}
+                    companies={companies}
                     editingId={editingId}
                     savingId={savingId}
                     draft={drafts[user._id]}
@@ -205,6 +211,7 @@ export function UsersTable({
                     onSave={onSave}
                     onCancelEdit={onCancelEdit}
                     onStartEdit={onStartEdit}
+                    onOpenAccessModal={onOpenAccessModal}
                     onDelete={onDelete}
                     onResetPassword={onResetPassword}
                   />

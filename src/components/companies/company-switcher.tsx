@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { Building2, ChevronDown, Check, Layers, Network, ShieldCheck, Lock, AlertCircle, Loader2, X } from "lucide-react";
+import { Building2, ChevronDown, Check, Layers, Network, ShieldCheck, Lock, AlertCircle, Loader2, X, ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 
 export interface CompanyOption {
@@ -314,76 +314,90 @@ export function CompanySwitcher() {
 
       {/* Password Authorization Verification Modal */}
       {pendingCompany && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in-50">
-          <div className="relative w-full max-w-md rounded-2xl border border-border bg-card p-6 shadow-2xl animate-in zoom-in-95">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md p-4 animate-in fade-in-50">
+          <div className="relative w-full max-w-md rounded-2xl border border-border/80 bg-card p-6 shadow-2xl animate-in zoom-in-95">
             <button
               type="button"
               onClick={() => setPendingCompany(null)}
-              className="absolute right-4 top-4 rounded-full p-1 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+              className="absolute right-4 top-4 rounded-full p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
             >
-              <X className="h-5 w-5" />
+              <X className="h-4 w-4" />
             </button>
 
-            <div className="flex items-center gap-3 border-b border-border pb-4 mb-4">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+            <div className="flex items-center gap-3 border-b border-border/60 pb-4 mb-4">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary ring-1 ring-primary/20 shadow-xs">
                 <Lock className="h-5 w-5" />
               </div>
               <div>
-                <h3 className="font-semibold text-base text-foreground">Confirm Context Switch</h3>
-                <p className="text-xs text-muted-foreground">Security authentication required</p>
+                <h3 className="font-bold text-base text-foreground">Re-Authenticate Context Switch</h3>
+                <p className="text-xs text-muted-foreground">Multi-Tenant Security Enforcement</p>
               </div>
             </div>
 
             <form onSubmit={handleConfirmPasswordSwitch} className="space-y-4">
-              <div className="rounded-xl border border-border/60 bg-muted/40 p-3 text-xs space-y-1">
-                <div className="text-muted-foreground font-medium">Target Company:</div>
-                <div className="font-semibold text-foreground text-sm">{pendingCompany.name}</div>
-                <div className="text-[11px] text-muted-foreground font-mono">
-                  Code: {pendingCompany.code} | Type: {pendingCompany.kind.toUpperCase()}
+              {/* Context Transition Badge */}
+              <div className="rounded-xl border border-border/70 bg-muted/30 p-3.5 space-y-2">
+                <div className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
+                  Environment Context Switch
+                </div>
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex flex-col min-w-0">
+                    <span className="text-[10px] text-muted-foreground font-medium">Current Context</span>
+                    <span className="font-semibold text-xs text-foreground truncate">{activeCompany?.name || "Active Workspace"}</span>
+                    <span className="text-[10px] font-mono text-muted-foreground">[{activeCompany?.code || "CURR"}]</span>
+                  </div>
+                  <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+                    <ArrowRight className="h-3.5 w-3.5" />
+                  </div>
+                  <div className="flex flex-col min-w-0 text-right">
+                    <span className="text-[10px] text-primary font-bold">Target Context</span>
+                    <span className="font-bold text-xs text-primary truncate">{pendingCompany.name}</span>
+                    <span className="text-[10px] font-mono text-primary/80">[{pendingCompany.code}]</span>
+                  </div>
                 </div>
               </div>
 
               {verifyError && (
-                <div className="flex items-center gap-2 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive">
+                <div className="flex items-center gap-2 rounded-xl border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive">
                   <AlertCircle className="h-4 w-4 shrink-0" />
                   <span>{verifyError}</span>
                 </div>
               )}
 
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-foreground">Account Password</label>
+                <label className="text-xs font-semibold text-foreground">Confirm Account Password</label>
                 <input
                   type="password"
                   required
                   autoFocus
-                  placeholder="Enter your login password"
+                  placeholder="Enter your account password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="w-full rounded-xl border border-input bg-background/60 px-3.5 py-2.5 text-xs font-mono placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:bg-background transition-all"
                 />
                 <p className="text-[11px] text-muted-foreground">
-                  Confirm your password to switch your active company environment safely.
+                  Password re-verification is required to switch operating scope and prevent accidental cross-company data access.
                 </p>
               </div>
 
-              <div className="flex items-center justify-end gap-2 pt-2">
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-border/50">
                 <button
                   type="button"
                   onClick={() => setPendingCompany(null)}
                   disabled={verifying}
-                  className="rounded-lg border border-border px-4 py-2 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                  className="rounded-xl border border-border px-4 py-2 text-xs font-semibold text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={verifying || !password.trim()}
-                  className="flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors"
+                  className="flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-xs font-bold text-primary-foreground shadow-md shadow-primary/20 hover:bg-primary/90 disabled:opacity-50 transition-colors"
                 >
                   {verifying ? (
                     <>
                       <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      Verifying...
+                      Verifying Access...
                     </>
                   ) : (
                     <>
