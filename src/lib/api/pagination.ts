@@ -165,8 +165,8 @@ export function getValidatedSearch(
   try {
     const q = parseSearch(searchParams, options);
     return { q, errorResponse: null };
-  } catch (err: any) {
-    const message = err?.message || "Invalid search parameter";
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Invalid search parameter";
     const res = new Response(
       JSON.stringify({
         success: false,

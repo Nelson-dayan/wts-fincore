@@ -115,25 +115,26 @@ export async function POST(req: Request) {
         _id: result.transferId
       }
     }, { status: statusCode });
-  } catch (error: any) {
-    if (error?.message && (
-      error.message.includes("must be greater than zero") ||
-      error.message.includes("cannot be negative") ||
-      error.message.includes("does not match exchange rate") ||
-      error.message.includes("Same-currency transfers") ||
-      error.message.includes("deviates excessively") ||
-      error.message.includes("outside allowable system thresholds") ||
-      error.message.includes("Source and destination accounts must be different") ||
-      error.message.includes("Source account not found") ||
-      error.message.includes("Destination account not found") ||
-      error.message.includes("is inactive") ||
-      error.message.includes("Ledger sanity check failed") ||
-      error.message.includes("Transfer amounts exceed") ||
-      error.message.includes("override reason") ||
-      error.message.includes("A documented override reason") ||
-      error.message.includes("Insufficient funds")
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "";
+    if (message && (
+      message.includes("must be greater than zero") ||
+      message.includes("cannot be negative") ||
+      message.includes("does not match exchange rate") ||
+      message.includes("Same-currency transfers") ||
+      message.includes("deviates excessively") ||
+      message.includes("outside allowable system thresholds") ||
+      message.includes("Source and destination accounts must be different") ||
+      message.includes("Source account not found") ||
+      message.includes("Destination account not found") ||
+      message.includes("is inactive") ||
+      message.includes("Ledger sanity check failed") ||
+      message.includes("Transfer amounts exceed") ||
+      message.includes("override reason") ||
+      message.includes("A documented override reason") ||
+      message.includes("Insufficient funds")
     )) {
-      return NextResponse.json({ message: error.message }, { status: 400 });
+      return NextResponse.json({ message }, { status: 400 });
     }
     return authErrorResponse(error, "Failed to record bank transfer");
   }
@@ -181,16 +182,17 @@ export async function PATCH(req: Request) {
     } else {
       return NextResponse.json({ message: `Invalid action "${action}". Must be "approve" or "reject".` }, { status: 400 });
     }
-  } catch (error: any) {
-    if (error?.message && (
-      error.message.includes("not found") ||
-      error.message.includes("Maker-checker violation") ||
-      error.message.includes("only PENDING_APPROVAL") ||
-      error.message.includes("inactive") ||
-      error.message.includes("Ledger sanity check") ||
-      error.message.includes("Insufficient funds")
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "";
+    if (message && (
+      message.includes("not found") ||
+      message.includes("Maker-checker violation") ||
+      message.includes("only PENDING_APPROVAL") ||
+      message.includes("inactive") ||
+      message.includes("Ledger sanity check") ||
+      message.includes("Insufficient funds")
     )) {
-      return NextResponse.json({ message: error.message }, { status: 400 });
+      return NextResponse.json({ message }, { status: 400 });
     }
     return authErrorResponse(error, "Failed to update transfer status");
   }

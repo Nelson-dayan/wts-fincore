@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { requireRole } from "@/lib/auth/require-role";
 import { connectDB } from "@/lib/db/connect";
 import { CompanyModel, InvoiceModel, PurchaseOrderModel, QuotationModel } from "@/lib/db/models";
 import { authErrorResponse } from "@/lib/api/route-auth";
@@ -17,7 +16,6 @@ import {
   validatePoDataUrlString,
 } from "@/lib/api/po-upload";
 import {
-  assertEmployeeCanAccessProject,
   getEmployeeAssignedProjectIdStrings,
 } from "@/lib/auth/employee-resource-access";
 
@@ -32,7 +30,6 @@ function jsonBodyError() {
 }
 
 import { authorizeResource } from "@/lib/auth/authorization";
-import { CompanyHierarchyService } from "@/lib/services/business/company-hierarchy.service";
 
 export async function GET(req: Request) {
   try {
@@ -247,7 +244,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ message: "Quotation not found" }, { status: 404 });
     }
     const projectId = String(quotation.projectId);
-    const targetCompanyId = (quotation as any).companyId ? String((quotation as any).companyId) : undefined;
+    const targetCompanyId = (quotation as Record<string, unknown>).companyId ? String((quotation as Record<string, unknown>).companyId) : undefined;
 
     const auth = await authorizeResource({
       permission: "purchaseOrders.create",

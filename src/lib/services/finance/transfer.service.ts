@@ -1,4 +1,4 @@
-import type { ClientSession, Types } from "mongoose";
+import { Types } from "mongoose";
 import { connectDB } from "@/lib/db/connect";
 import { TransferModel, AccountModel } from "@/lib/db/models";
 import { logActivity } from "@/lib/services/activity/log-activity.service";
@@ -22,6 +22,15 @@ export interface CreateTransferInput {
   createdBy: string | Types.ObjectId;
 }
 
+export interface TransferExecutionResult {
+  transferId: string;
+  status: "COMPLETED" | "PENDING_APPROVAL" | "REJECTED";
+  success?: boolean;
+  requiresApproval?: boolean;
+  rateDeviationPercent?: number;
+  message?: string;
+}
+
 /**
  * Records a new bank-to-bank transfer atomically.
  * Enforces exchange-rate deviation tiers:
@@ -30,7 +39,7 @@ export interface CreateTransferInput {
  * - Tier 3 (> 25% deviation): Queued as PENDING_APPROVAL. Server-side zero balance mutation invariant.
  * - Tier 4 (< 20% or > 500% of benchmark): Hard rejection.
  */
-export async function recordTransfer(input: CreateTransferInput) {
+export async function recordTransfer(input: CreateTransferInput): Promise<TransferExecutionResult> {
   const fromAmount = Number(input.fromAmount);
   const toAmount = Number(input.toAmount);
   const exchangeRate = Number(input.exchangeRate);
@@ -64,7 +73,10 @@ export async function recordTransfer(input: CreateTransferInput) {
   const db = await connectDB();
   const session = await db.startSession();
   try {
-    let result: any = {};
+    let result: TransferExecutionResult = {
+      transferId: "",
+      status: "COMPLETED",
+    };
     await session.withTransaction(async () => {
       // 1. Fetch Accounts
       const fromAccount = await AccountModel.findById(input.fromAccountId).session(session);
@@ -294,7 +306,10 @@ export async function approveTransfer({
   const db = await connectDB();
   const session = await db.startSession();
   try {
-    let result: any = {};
+    let result: TransferExecutionResult = {
+      transferId: String(transferId),
+      status: "COMPLETED",
+    };
     await session.withTransaction(async () => {
       const transfer = await TransferModel.findById(transferId).session(session);
       if (!transfer) {
@@ -350,7 +365,7 @@ export async function approveTransfer({
       );
 
       transfer.status = "COMPLETED";
-      transfer.approvedBy = approverId as any;
+      transfer.approvedBy = new Types.ObjectId(String(approverId));
       transfer.approvedAt = new Date();
       await transfer.save({ session });
 
@@ -398,7 +413,10 @@ export async function rejectTransfer({
   const db = await connectDB();
   const session = await db.startSession();
   try {
-    let result: any = {};
+    let result: TransferExecutionResult = {
+      transferId: String(transferId),
+      status: "REJECTED",
+    };
     await session.withTransaction(async () => {
       const transfer = await TransferModel.findById(transferId).session(session);
       if (!transfer) {

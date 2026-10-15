@@ -11,8 +11,8 @@ export interface ResourceAlignmentCheck {
 export async function validateResourceHierarchyAlignment(check: ResourceAlignmentCheck): Promise<{
   valid: boolean;
   error?: string;
-  project?: any;
-  client?: any;
+  project?: Record<string, unknown> | null;
+  client?: Record<string, unknown> | null;
 }> {
   const targetCompanyId =
     check.explicitCompanyId !== undefined

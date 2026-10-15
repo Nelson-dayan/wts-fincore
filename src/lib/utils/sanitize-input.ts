@@ -72,7 +72,7 @@ export function sanitizeObjectDeep<T>(value: T): T {
 
   if (typeof value === "object") {
     // Keep special instances intact
-    if (value instanceof Date || (value as any)?._bsontype) {
+    if (value instanceof Date || Boolean(value && typeof value === "object" && "_bsontype" in (value as Record<string, unknown>))) {
       return value;
     }
 

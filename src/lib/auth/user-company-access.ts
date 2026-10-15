@@ -1,7 +1,6 @@
 import { Types } from "mongoose";
 import { connectDB } from "@/lib/db/connect";
 import { UserModel, CompanyModel } from "@/lib/db/models";
-import { CompanyHierarchyService } from "@/lib/services/business/company-hierarchy.service";
 
 export interface UserAccessInfo {
   isSuperAdmin: boolean;

@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { requireRole } from "@/lib/auth/require-role";
 import { connectDB } from "@/lib/db/connect";
 import { CompanyModel, PurchaseOrderModel, QuotationModel, ProjectModel } from "@/lib/db/models";
 import { apiSuccess, apiError } from "@/lib/api/response";
@@ -17,9 +16,7 @@ import { decimalToNumber } from "@/lib/services/business/money";
 import { getEmployeeAssignedProjectIdStrings } from "@/lib/auth/employee-resource-access";
 import { updateSequenceReservationEntity } from "@/lib/services/business/counter.service";
 
-
 import { authorizeResource } from "@/lib/auth/authorization";
-import { CompanyHierarchyService } from "@/lib/services/business/company-hierarchy.service";
 import { sanitizeText } from "@/lib/utils/sanitize-input";
 
 export async function GET(req: Request) {
@@ -136,8 +133,8 @@ export async function GET(req: Request) {
       }
     });
     return apiSuccess({ items, page, limit, total, hasMore: skip + items.length < total });
-  } catch (error: any) {
-    if (error?.statusCode === 400 || error?.name === "InvalidQueryParamError") {
+  } catch (error: unknown) {
+    if (error instanceof Error && ((error as { statusCode?: number }).statusCode === 400 || error.name === "InvalidQueryParamError")) {
       return apiError(error.message, 400);
     }
     console.error("GET Quotations Error:", error);

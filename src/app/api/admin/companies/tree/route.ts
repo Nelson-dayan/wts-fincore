@@ -29,8 +29,11 @@ export async function GET(req: Request) {
       ? flatCompanies
       : flatCompanies.filter((c) => allowedIds.includes(c._id.toString()));
 
-    function filterTree(nodes: any[], allowedSet: Set<string>): any[] {
-      const result: any[] = [];
+    function filterTree<T extends { _id: { toString(): string }; children?: T[] }>(
+      nodes: T[],
+      allowedSet: Set<string>
+    ): T[] {
+      const result: T[] = [];
       for (const node of nodes) {
         const filteredChildren = filterTree(node.children || [], allowedSet);
         if (allowedSet.has(node._id.toString()) || filteredChildren.length > 0) {

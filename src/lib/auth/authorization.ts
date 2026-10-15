@@ -34,19 +34,29 @@ export interface AuthorizeOptions {
 }
 
 
-export interface AuthorizeResult {
-  authorized: boolean;
-  code?: AuthorizationFailureCode;
-  reason?: string;
-  session: any;
-  context: ResolvedAuthContext;
-}
+import type { Session } from "next-auth";
+
+export type AuthorizeResult =
+  | {
+      authorized: true;
+      code?: undefined;
+      reason?: undefined;
+      session: Session;
+      context: ResolvedAuthContext;
+    }
+  | {
+      authorized: false;
+      code: AuthorizationFailureCode;
+      reason?: string;
+      session: Session | null;
+      context: ResolvedAuthContext | null;
+    };
 
 export function canTransitionWorkflowState(
   resourceType: "quotation" | "purchaseOrder" | "invoice" | "expense",
   fromState: string,
   toState: string,
-  userRole: "super_admin" | "admin" | "employee"
+  _userRole?: "super_admin" | "admin" | "employee"
 ): { allowed: boolean; requiredPermission?: ResourceAction; reason?: string } {
   const from = fromState.toUpperCase();
   const to = toState.toUpperCase();
@@ -110,16 +120,16 @@ export function canTransitionWorkflowState(
 }
 
 export async function authorizeResource(options: AuthorizeOptions): Promise<AuthorizeResult> {
-  let session: any;
+  let session: Session;
   try {
     session = await requireSession();
-  } catch (err) {
+  } catch {
     return {
       authorized: false,
       code: "NOT_AUTHENTICATED",
       reason: "User session is invalid or missing.",
       session: null,
-      context: null as any,
+      context: null,
     };
   }
 
@@ -134,15 +144,15 @@ export async function authorizeResource(options: AuthorizeOptions): Promise<Auth
       code: "PERMISSION_DENIED",
       reason: `Action permission '${options.permission}' denied for role '${globalRole}'.`,
       session,
-      context: null as any,
+      context: null,
     };
   }
 
   // Sanitize projectId & clientId
   let cleanProjectId: string | undefined = undefined;
   if (options.projectId) {
-    if (typeof options.projectId === "object" && options.projectId !== null && "_id" in (options.projectId as any)) {
-      cleanProjectId = String((options.projectId as any)._id);
+    if (typeof options.projectId === "object" && options.projectId !== null && "_id" in options.projectId) {
+      cleanProjectId = String((options.projectId as { _id: unknown })._id);
     } else {
       cleanProjectId = String(options.projectId).trim();
     }
@@ -153,8 +163,8 @@ export async function authorizeResource(options: AuthorizeOptions): Promise<Auth
 
   let cleanClientId: string | undefined = undefined;
   if (options.clientId) {
-    if (typeof options.clientId === "object" && options.clientId !== null && "_id" in (options.clientId as any)) {
-      cleanClientId = String((options.clientId as any)._id);
+    if (typeof options.clientId === "object" && options.clientId !== null && "_id" in options.clientId) {
+      cleanClientId = String((options.clientId as { _id: unknown })._id);
     } else {
       cleanClientId = String(options.clientId).trim();
     }
