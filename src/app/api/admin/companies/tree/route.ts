@@ -17,14 +17,16 @@ export async function GET(req: Request) {
 
     const authContext = await resolveAuthCompanyContext(session.user, activeId, scopeMode);
 
-    const tree = await CompanyHierarchyService.getCompanyTree();
+    const isSuperAdmin = authContext.globalRole === "super_admin";
+    const allowedIds = (authContext.userAssignedCompanyIds || []).map((id) => id.toString());
+    const scopedTreeIds = isSuperAdmin ? undefined : (allowedIds.length > 0 ? allowedIds : authContext.allowedCompanyIds);
+
+    const tree = await CompanyHierarchyService.getCompanyTree(scopedTreeIds);
     const flatCompanies = await CompanyModel.find({ isActive: true, deletedAt: null })
       .select("name code kind parentCompanyId taxId baseCurrency branding isActive isPrimary")
       .sort({ name: 1 })
       .lean();
 
-    const isSuperAdmin = authContext.globalRole === "super_admin";
-    const allowedIds = authContext.userAssignedCompanyIds || [];
     const userCompanies = isSuperAdmin
       ? flatCompanies
       : flatCompanies.filter((c) => allowedIds.includes(c._id.toString()));

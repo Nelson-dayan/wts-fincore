@@ -20,6 +20,20 @@ export interface CreateTransferInput {
  * Records a new bank-to-bank transfer atomically.
  */
 export async function recordTransfer(input: CreateTransferInput) {
+  if (!Number.isFinite(input.fromAmount) || input.fromAmount <= 0) {
+    throw new Error("fromAmount must be greater than zero");
+  }
+  if (!Number.isFinite(input.toAmount) || input.toAmount <= 0) {
+    throw new Error("toAmount must be greater than zero");
+  }
+  if (!Number.isFinite(input.exchangeRate) || input.exchangeRate <= 0) {
+    throw new Error("exchangeRate must be greater than zero");
+  }
+  const expectedTo = Math.round(input.fromAmount * input.exchangeRate * 100) / 100;
+  if (Math.abs(input.toAmount - expectedTo) > 0.01) {
+    throw new Error("Exchange rate mismatch: toAmount must equal fromAmount * exchangeRate");
+  }
+
   const db = await connectDB();
   const session = await db.startSession();
   try {

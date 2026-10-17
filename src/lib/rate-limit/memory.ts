@@ -38,3 +38,43 @@ export function rateLimit(
 /** Registration: 10 attempts / hour / IP */
 export const REGISTER_LIMIT = 10;
 export const REGISTER_WINDOW_MS = 60 * 60 * 1000;
+
+/** Login Lockout: 5 failed attempts per 15 minutes per account */
+export const LOGIN_MAX_FAILED_ATTEMPTS = 5;
+export const LOGIN_LOCKOUT_WINDOW_MS = 15 * 60 * 1000;
+
+export function recordFailedLogin(
+  key: string,
+  limit = LOGIN_MAX_FAILED_ATTEMPTS,
+  windowMs = LOGIN_LOCKOUT_WINDOW_MS
+): { ok: boolean; remaining: number; retryAfterMs: number } {
+  const now = Date.now();
+  prune(now);
+  const cur = buckets.get(key);
+  if (!cur || now > cur.resetAt) {
+    buckets.set(key, { count: 1, resetAt: now + windowMs });
+    return { ok: true, remaining: limit - 1, retryAfterMs: 0 };
+  }
+  cur.count += 1;
+  if (cur.count >= limit) {
+    return { ok: false, remaining: 0, retryAfterMs: Math.max(0, cur.resetAt - now) };
+  }
+  return { ok: true, remaining: limit - cur.count, retryAfterMs: 0 };
+}
+
+export function isLoginLocked(
+  key: string,
+  limit = LOGIN_MAX_FAILED_ATTEMPTS
+): { locked: boolean; retryAfterMs: number } {
+  const now = Date.now();
+  const cur = buckets.get(key);
+  if (cur && now <= cur.resetAt && cur.count >= limit) {
+    return { locked: true, retryAfterMs: Math.max(0, cur.resetAt - now) };
+  }
+  return { locked: false, retryAfterMs: 0 };
+}
+
+export function clearFailedLogin(key: string): void {
+  buckets.delete(key);
+}
+

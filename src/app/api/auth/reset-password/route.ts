@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { connectDB } from "@/lib/db/connect";
 import { UserModel } from "@/lib/db/models";
-import { hashPassword } from "@/lib/auth/password";
+import { hashPassword, validatePasswordComplexity } from "@/lib/auth/password";
 
 export async function POST(req: Request) {
   try {
@@ -17,9 +17,10 @@ export async function POST(req: Request) {
       );
     }
 
-    if (password.length < 6) {
+    const complexity = validatePasswordComplexity(password, email);
+    if (!complexity.ok) {
       return NextResponse.json(
-        { message: "Password must be at least 6 characters long." },
+        { message: complexity.message || "Password does not meet complexity requirements." },
         { status: 400 }
       );
     }

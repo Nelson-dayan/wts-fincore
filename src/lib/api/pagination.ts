@@ -15,6 +15,45 @@ export function parsePagination(searchParams: URLSearchParams): PaginationParams
   return { page, limit, skip: (page - 1) * limit };
 }
 
-export function parseSearch(searchParams: URLSearchParams) {
-  return String(searchParams.get("q") ?? "").trim();
+export class InvalidSearchParameterError extends Error {
+  constructor(message = "Invalid search parameter") {
+    super(message);
+    this.name = "InvalidSearchParameterError";
+  }
+}
+
+export function parseSearch(searchParams: URLSearchParams): string {
+  // Reject parameter type confusion / bracket notation (e.g. q[$ne]=, q[0]=)
+  for (const key of searchParams.keys()) {
+    if (
+      key.startsWith("q[") ||
+      key.startsWith("q.") ||
+      key.startsWith("q$") ||
+      (key.startsWith("q") && (key.includes("[") || key.includes("$") || key.includes(".")))
+    ) {
+      throw new InvalidSearchParameterError("Invalid search parameter");
+    }
+  }
+
+  // Reject multiple q parameters
+  const allQ = searchParams.getAll("q");
+  if (allQ.length > 1) {
+    throw new InvalidSearchParameterError("Invalid search parameter");
+  }
+
+  const rawQ = searchParams.get("q");
+  if (rawQ === null || rawQ === undefined) {
+    return "";
+  }
+
+  if (typeof rawQ !== "string") {
+    throw new InvalidSearchParameterError("Invalid search parameter");
+  }
+
+  // Reject raw Mongo operators within the search string
+  if (/\$(?:ne|eq|gt|gte|lt|lte|in|nin|regex|where|exists|expr|jsonSchema|mod|all|size|type)\b/i.test(rawQ)) {
+    throw new InvalidSearchParameterError("Invalid search parameter");
+  }
+
+  return rawQ.trim();
 }

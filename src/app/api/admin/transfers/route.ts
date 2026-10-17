@@ -23,13 +23,41 @@ export async function POST(req: Request) {
       return NextResponse.json({ message: "Source and destination accounts must be different" }, { status: 400 });
     }
 
+    const fromAmount = Number(body.fromAmount);
+    const toAmount = Number(body.toAmount);
+    const exchangeRate = Number(body.exchangeRate);
+    const fees = body.fees ? Number(body.fees) : 0;
+
+    // Validate strictly positive amounts (Finding #01)
+    if (!Number.isFinite(fromAmount) || fromAmount <= 0) {
+      return NextResponse.json({ message: "fromAmount must be greater than zero" }, { status: 400 });
+    }
+    if (!Number.isFinite(toAmount) || toAmount <= 0) {
+      return NextResponse.json({ message: "toAmount must be greater than zero" }, { status: 400 });
+    }
+    if (!Number.isFinite(exchangeRate) || exchangeRate <= 0) {
+      return NextResponse.json({ message: "exchangeRate must be greater than zero" }, { status: 400 });
+    }
+    if (!Number.isFinite(fees) || fees < 0) {
+      return NextResponse.json({ message: "fees cannot be negative" }, { status: 400 });
+    }
+
+    // Validate exchange rate consistency (Finding #02)
+    const expectedToAmount = Math.round(fromAmount * exchangeRate * 100) / 100;
+    if (Math.abs(toAmount - expectedToAmount) > 0.01) {
+      return NextResponse.json(
+        { message: "Exchange rate mismatch: toAmount must equal fromAmount * exchangeRate" },
+        { status: 400 }
+      );
+    }
+
     const payload = {
       fromAccountId: body.fromAccountId,
       toAccountId: body.toAccountId,
-      fromAmount: Number(body.fromAmount),
-      toAmount: Number(body.toAmount),
-      exchangeRate: Number(body.exchangeRate),
-      fees: body.fees ? Number(body.fees) : 0,
+      fromAmount,
+      toAmount,
+      exchangeRate,
+      fees,
       reference: body.reference || "",
       note: body.note || "",
       createdBy: session.user.id,

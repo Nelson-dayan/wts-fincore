@@ -3,6 +3,7 @@ import CredentialsProvider from "next-auth/providers/credentials";
 import { connectDB } from "@/lib/db/connect";
 import { UserModel } from "@/lib/db/models";
 import { verifyPassword } from "@/lib/auth/password";
+import { isLoginLocked, recordFailedLogin, clearFailedLogin } from "@/lib/rate-limit/memory";
 import GoogleProvider from "next-auth/providers/google";
 
 const googleClientId = process.env.GOOGLE_CLIENT_ID?.trim();
@@ -30,12 +31,33 @@ export const authOptions: NextAuthOptions = {
         const password = credentials?.password;
         if (!email || !password) return null;
 
+        // Disallow identical email as password (Finding #06)
+        if (password.trim().toLowerCase() === email) {
+          throw new Error("Default weak credentials disallowed. Please reset your password.");
+        }
+
+        const lockKey = `login:${email}`;
+        const lockStatus = isLoginLocked(lockKey);
+        if (lockStatus.locked) {
+          const minutesLeft = Math.ceil(lockStatus.retryAfterMs / 60000);
+          throw new Error(`Account temporarily locked due to multiple failed login attempts. Try again in ${minutesLeft} minute(s).`);
+        }
+
         await connectDB();
         const user = await UserModel.findOne({ email }).select("+password");
-        if (!user?.isActive) return null;
+        if (!user?.isActive) {
+          recordFailedLogin(lockKey);
+          return null;
+        }
 
         const valid = await verifyPassword(password, user.password);
-        if (!valid) return null;
+        if (!valid) {
+          recordFailedLogin(lockKey);
+          return null;
+        }
+
+        // Reset failed login attempts upon successful authentication
+        clearFailedLogin(lockKey);
 
         return {
           id: user._id.toString(),

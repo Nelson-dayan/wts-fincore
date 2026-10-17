@@ -13,6 +13,7 @@ import { assertEmployeeCanAccessInvoice } from "@/lib/auth/employee-resource-acc
 import { assertPeriodNotLocked } from "@/lib/services/business/period-lock.service";
 
 import { authorizeResource } from "@/lib/auth/authorization";
+import { sanitizeObject } from "@/lib/security/sanitize";
 
 type Ctx = { params: Promise<{ invoiceId: string }> };
 
@@ -64,7 +65,7 @@ export async function PATCH(req: Request, ctx: Ctx) {
       return apiError("Invoice not found", 404);
     }
 
-    const body = (await req.json()) as {
+    const body = sanitizeObject((await req.json())) as {
       invoiceNumber?: string;
       invoiceType?: string;
       currency?: string;

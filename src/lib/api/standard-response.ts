@@ -63,6 +63,16 @@ export function standardAuthError(error: unknown, fallbackMessage = "Unauthorize
     if (error.message === "UNAUTHORIZED") {
       return apiError("Unauthorized", 401);
     }
+    if (
+      error.message === "Invalid search parameter" ||
+      error.name === "InvalidSearchParameterError" ||
+      error.message.includes("Invalid search parameter")
+    ) {
+      return NextResponse.json(
+        { error: "Invalid search parameter", message: "Invalid search parameter" },
+        { status: 400 }
+      );
+    }
     if (error.message.includes("is required")) {
       return apiError(error.message, 400);
     }

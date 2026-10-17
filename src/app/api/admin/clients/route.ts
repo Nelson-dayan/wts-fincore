@@ -5,6 +5,7 @@ import { ClientModel, ProjectModel } from "@/lib/db/models";
 import { authErrorResponse } from "@/lib/api/route-auth";
 import { parsePagination, parseSearch } from "@/lib/api/pagination";
 import { logActivity } from "@/lib/services/activity/log-activity.service";
+import { sanitizeText } from "@/lib/security/sanitize";
 
 import { CompanyHierarchyService } from "@/lib/services/business/company-hierarchy.service";
 
@@ -104,11 +105,11 @@ export async function POST(req: Request) {
       companyId?: string;
       parentCompanyId?: string;
     };
-    const name = String(body.name ?? "").trim();
-    const company = String(body.company ?? "").trim();
-    const email = String(body.email ?? "").trim().toLowerCase();
-    const phone = String(body.phone ?? "").trim();
-    const address = String(body.address ?? "").trim();
+    const name = sanitizeText(body.name);
+    const company = sanitizeText(body.company);
+    const email = sanitizeText(body.email).toLowerCase();
+    const phone = sanitizeText(body.phone);
+    const address = sanitizeText(body.address);
     if (!name || !company || !email || !phone || !address) {
       return NextResponse.json(
         {
@@ -122,23 +123,23 @@ export async function POST(req: Request) {
     const created = await ClientModel.create({
       name,
       company,
-      website: String(body.website ?? ""),
+      website: sanitizeText(body.website),
       address,
       email,
       phone,
-      clientLogoUrl: String(body.clientLogoText ?? ""),
-      clientLogoText: String(body.clientLogoText ?? ""),
-      clientSignatureText: String(body.clientSignatureText ?? ""),
-      taxId: String(body.taxId ?? "").trim(),
-      currency: String(body.currency ?? "AED").trim().toUpperCase(),
-      paymentTerms: String(body.paymentTerms ?? "").trim(),
-      notes: String(body.notes ?? "").trim(),
-      billingAddress: String(body.billingAddress ?? "").trim(),
-      shippingAddress: String(body.shippingAddress ?? "").trim(),
-      country: String(body.country ?? "").trim(),
-      state: String(body.state ?? "").trim(),
-      city: String(body.city ?? "").trim(),
-      zipCode: String(body.zipCode ?? "").trim(),
+      clientLogoUrl: sanitizeText(body.clientLogoText),
+      clientLogoText: sanitizeText(body.clientLogoText),
+      clientSignatureText: sanitizeText(body.clientSignatureText),
+      taxId: sanitizeText(body.taxId),
+      currency: sanitizeText(body.currency || "AED").toUpperCase(),
+      paymentTerms: sanitizeText(body.paymentTerms),
+      notes: sanitizeText(body.notes),
+      billingAddress: sanitizeText(body.billingAddress),
+      shippingAddress: sanitizeText(body.shippingAddress),
+      country: sanitizeText(body.country),
+      state: sanitizeText(body.state),
+      city: sanitizeText(body.city),
+      zipCode: sanitizeText(body.zipCode),
       companyId: body.companyId ? body.companyId : companyContext.companyId,
       parentCompanyId: body.parentCompanyId ? body.parentCompanyId : undefined,
       createdBy: session.user.id,

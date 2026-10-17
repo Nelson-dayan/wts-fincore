@@ -4,7 +4,7 @@ import { UserModel } from "@/lib/db/models";
 import { requireRole } from "@/lib/auth/require-role";
 import { authErrorResponse } from "@/lib/api/route-auth";
 import { logActivity } from "@/lib/services/activity/log-activity.service";
-import { hashPassword } from "@/lib/auth/password";
+import { hashPassword, validatePasswordComplexity } from "@/lib/auth/password";
 
 interface RouteCtx {
   params: Promise<{ userId: string }>;
@@ -37,9 +37,14 @@ export async function PATCH(req: Request, ctx: RouteCtx) {
     }
     let passwordReset = false;
     if (body.password !== undefined && String(body.password).trim() !== "") {
+      const existingUser = await UserModel.findById(userId).select("email").lean();
+      if (!existingUser) {
+        return NextResponse.json({ message: "User not found" }, { status: 404 });
+      }
       const pass = String(body.password).trim();
-      if (pass.length < 6) {
-        return NextResponse.json({ message: "Password must be at least 6 characters long" }, { status: 400 });
+      const check = validatePasswordComplexity(pass, existingUser.email);
+      if (!check.ok) {
+        return NextResponse.json({ message: check.message }, { status: 400 });
       }
       updates.password = await hashPassword(pass);
       updates.resetPasswordToken = null;

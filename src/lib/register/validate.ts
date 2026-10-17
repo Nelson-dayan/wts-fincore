@@ -1,4 +1,5 @@
 import { USER_ROLES, type UserRole } from "@/lib/db/types/roles";
+import { validatePasswordComplexity } from "@/lib/auth/password";
 
 const NAME_MAX = 100;
 const EMAIL_MAX = 254;
@@ -72,16 +73,11 @@ export function parseRegisterPayload(raw: unknown): ParseRegisterResult {
   }
 
   const password = typeof raw.password === "string" ? raw.password : "";
-  if (password.length < 8 || password.length > 72) {
+  const complexityCheck = validatePasswordComplexity(password, emailRaw);
+  if (!complexityCheck.ok) {
     return {
       ok: false,
-      message: "Password must be between 8 and 72 characters.",
-    };
-  }
-  if (!/[A-Za-z]/.test(password) || !/[0-9]/.test(password)) {
-    return {
-      ok: false,
-      message: "Password must include at least one letter and one number.",
+      message: complexityCheck.message || "Password does not meet complexity requirements.",
     };
   }
 

@@ -49,14 +49,19 @@ export class CompanyHierarchyService {
   /**
    * Fetches full hierarchical tree of active companies.
    */
-  static async getCompanyTree(): Promise<CompanyTreeNode[]> {
+  static async getCompanyTree(allowedCompanyIds?: string[]): Promise<CompanyTreeNode[]> {
     await connectDB();
     
-    let companies = await CompanyModel.find({ isActive: true, deletedAt: null })
+    const query: Record<string, any> = { isActive: true, deletedAt: null };
+    if (allowedCompanyIds && allowedCompanyIds.length > 0) {
+      query._id = { $in: allowedCompanyIds.map((id) => new Types.ObjectId(id)) };
+    }
+
+    let companies = await CompanyModel.find(query)
       .select("name code kind parentCompanyId taxId baseCurrency branding isActive isPrimary")
       .lean();
 
-    if (companies.length === 0) {
+    if (companies.length === 0 && (!allowedCompanyIds || allowedCompanyIds.length === 0)) {
       await this.resolveCompanyContext();
       companies = await CompanyModel.find({ isActive: true, deletedAt: null })
         .select("name code kind parentCompanyId taxId baseCurrency branding isActive isPrimary")

@@ -3,8 +3,10 @@ import { requireRole } from "@/lib/auth/require-role";
 import { connectDB } from "@/lib/db/connect";
 import { PurchaseOrderModel, QuotationModel } from "@/lib/db/models";
 import { apiSuccess, apiError } from "@/lib/api/response";
+import { authErrorResponse } from "@/lib/api/route-auth";
 import { parsePagination, parseSearch } from "@/lib/api/pagination";
 import { logActivity } from "@/lib/services/activity/log-activity.service";
+import { sanitizeObject } from "@/lib/security/sanitize";
 import {
   buildQuotationSnapshots,
   computeQuotationTotals,
@@ -130,15 +132,14 @@ export async function GET(req: Request) {
     });
     return apiSuccess({ items, page, limit, total, hasMore: skip + items.length < total });
   } catch (error) {
-    console.error("GET Quotations Error:", error);
-    return apiError("Failed to load quotations", 500);
+    return authErrorResponse(error, "Failed to load quotations");
   }
 }
 
 export async function POST(req: Request) {
   try {
     await connectDB();
-    const body = (await req.json()) as {
+    const body = sanitizeObject((await req.json())) as {
       projectId?: string;
       documentInfo?: {
         quotationCode?: string;

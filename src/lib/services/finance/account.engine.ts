@@ -13,17 +13,20 @@ export async function deposit(
   note: string = "",
   transferId?: string | Types.ObjectId
 ) {
+  const numAmount = Number(amount);
+  if (!Number.isFinite(numAmount) || numAmount <= 0) {
+    throw new Error("Deposit amount must be a positive number");
+  }
+
   const account = await AccountModel.findById(accountId).session(session);
   if (!account) throw new Error("Account not found");
 
   const balanceBefore = account.currentBalance;
   
   // Update Account Balance
-  // We use findOneAndUpdate to get the updated document in one go if possible, 
-  // but updateOne + findById is safer for session consistency in some Mongo versions.
   await AccountModel.updateOne(
     { _id: accountId },
-    { $inc: { currentBalance: amount } },
+    { $inc: { currentBalance: numAmount } },
     { session }
   );
 
@@ -32,6 +35,11 @@ export async function deposit(
   
   const balanceAfter = updatedAccount.currentBalance;
 
+  // Ledger Sanity Check: CREDIT must increase balance
+  if (balanceAfter <= balanceBefore) {
+    throw new Error("Ledger integrity failure: CREDIT must increase account balance");
+  }
+
   // Record Transaction
   await AccountTransactionModel.create([
     {
@@ -39,7 +47,7 @@ export async function deposit(
       paymentId,
       transferId,
       type: "CREDIT",
-      amount,
+      amount: numAmount,
       currency: account.currency,
       balanceBefore,
       balanceAfter,
@@ -63,17 +71,20 @@ export async function withdraw(
   note: string = "",
   transferId?: string | Types.ObjectId
 ) {
+  const numAmount = Number(amount);
+  if (!Number.isFinite(numAmount) || numAmount <= 0) {
+    throw new Error("Withdrawal amount must be a positive number");
+  }
+
   const account = await AccountModel.findById(accountId).session(session);
   if (!account) throw new Error("Account not found");
 
   const balanceBefore = account.currentBalance;
   
   // Update Account Balance (Negative increment for withdrawal)
-  const negativeAmount = typeof amount === "number" ? -amount : `-${amount}`;
-  
   await AccountModel.updateOne(
     { _id: accountId },
-    { $inc: { currentBalance: negativeAmount } },
+    { $inc: { currentBalance: -numAmount } },
     { session }
   );
 
@@ -82,6 +93,11 @@ export async function withdraw(
   
   const balanceAfter = updatedAccount.currentBalance;
 
+  // Ledger Sanity Check: DEBIT must decrease balance
+  if (balanceAfter >= balanceBefore) {
+    throw new Error("Ledger integrity failure: DEBIT must decrease account balance");
+  }
+
   // Record Transaction
   await AccountTransactionModel.create([
     {
@@ -89,7 +105,7 @@ export async function withdraw(
       paymentId,
       transferId,
       type: "DEBIT",
-      amount,
+      amount: numAmount,
       currency: account.currency,
       balanceBefore,
       balanceAfter,
