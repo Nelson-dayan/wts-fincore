@@ -4,7 +4,7 @@ import { connectDB } from "@/lib/db/connect";
 import { PurchaseOrderModel, QuotationModel } from "@/lib/db/models";
 import { apiSuccess, apiError } from "@/lib/api/response";
 import { authErrorResponse } from "@/lib/api/route-auth";
-import { parsePagination, parseSearch } from "@/lib/api/pagination";
+import { parsePagination, parseSearch, escapeRegex } from "@/lib/api/pagination";
 import { logActivity } from "@/lib/services/activity/log-activity.service";
 import { sanitizeObject } from "@/lib/security/sanitize";
 import {
@@ -55,7 +55,7 @@ export async function GET(req: Request) {
       ],
     };
 
-    if (q) filter.quotationNumber = { $regex: q, $options: "i" };
+    if (q) filter.quotationNumber = { $regex: escapeRegex(q), $options: "i" };
 
     if (session.user.role === "employee") {
       const employeeProjectIds = await getEmployeeAssignedProjectIdStrings(session.user.id);

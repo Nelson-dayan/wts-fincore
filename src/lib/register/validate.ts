@@ -1,5 +1,6 @@
 import { USER_ROLES, type UserRole } from "@/lib/db/types/roles";
 import { validatePasswordComplexity } from "@/lib/auth/password";
+import { sanitizeText } from "@/lib/security/sanitize";
 
 const NAME_MAX = 100;
 const EMAIL_MAX = 254;
@@ -52,7 +53,7 @@ export function parseRegisterPayload(raw: unknown): ParseRegisterResult {
   }
 
   const name =
-    typeof raw.name === "string" ? raw.name.trim().slice(0, NAME_MAX) : "";
+    typeof raw.name === "string" ? sanitizeText(raw.name).slice(0, NAME_MAX) : "";
   if (!name) {
     return { ok: false, message: "Please enter your name." };
   }

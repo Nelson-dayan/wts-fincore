@@ -15,6 +15,7 @@ import { authErrorResponse } from "@/lib/api/route-auth";
 import { logActivity } from "@/lib/services/activity/log-activity.service";
 
 import { authorizeResource } from "@/lib/auth/authorization";
+import { sanitizeText } from "@/lib/security/sanitize";
 
 interface RouteCtx {
   params: Promise<{ projectId: string }>;
@@ -104,8 +105,8 @@ export async function PATCH(req: Request, ctx: RouteCtx) {
     }
 
     const $set: Record<string, unknown> = {
-      name: body.name !== undefined ? String(body.name).trim() : undefined,
-      description: body.description !== undefined ? String(body.description) : undefined,
+      name: body.name !== undefined ? sanitizeText(body.name) : undefined,
+      description: body.description !== undefined ? sanitizeText(body.description) : undefined,
       priority: body.priority,
       budget: body.budget,
       assignedTo: body.assignedTo,
@@ -120,9 +121,9 @@ export async function PATCH(req: Request, ctx: RouteCtx) {
     }
     
     if (body.currency !== undefined) $set.currency = String(body.currency).trim().toUpperCase();
-    if (body.category !== undefined) $set.category = String(body.category).trim();
-    if (body.clientReference !== undefined) $set.clientReference = String(body.clientReference).trim();
-    if (body.notes !== undefined) $set.notes = String(body.notes).trim();
+    if (body.category !== undefined) $set.category = sanitizeText(body.category);
+    if (body.clientReference !== undefined) $set.clientReference = sanitizeText(body.clientReference);
+    if (body.notes !== undefined) $set.notes = sanitizeText(body.notes);
     if (body.startDate !== undefined) $set.startDate = body.startDate ? new Date(body.startDate) : null;
     if (body.targetEndDate !== undefined) $set.targetEndDate = body.targetEndDate ? new Date(body.targetEndDate) : null;
     if (body.actualEndDate !== undefined) $set.actualEndDate = body.actualEndDate ? new Date(body.actualEndDate) : null;

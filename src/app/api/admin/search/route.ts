@@ -10,14 +10,14 @@ import {
 } from "@/lib/db/models";
 import { authErrorResponse } from "@/lib/api/route-auth";
 import { authorizeResource } from "@/lib/auth/authorization";
-
+import { parseSearch, escapeRegex } from "@/lib/api/pagination";
 
 import { getEmployeeAssignedProjectIdStrings } from "@/lib/auth/employee-resource-access";
 
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
-    const q = searchParams.get("q")?.trim();
+    const q = parseSearch(searchParams);
 
     if (!q || q.length < 2) {
       return NextResponse.json({ items: [] });
@@ -52,7 +52,7 @@ export async function GET(req: Request) {
       employeeProjectFilter = { projectId: { $in: assignedProjectIds } };
     }
 
-    const regex = new RegExp(q, "i");
+    const regex = new RegExp(escapeRegex(q), "i");
 
     // Parallel search across all primary collections with strict company & employee isolation
     const [projects, invoices, clients, pos, quotes, expenses] = await Promise.all([

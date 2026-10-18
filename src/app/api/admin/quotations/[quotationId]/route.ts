@@ -14,6 +14,7 @@ import {
   toDecimal128,
 } from "@/lib/services/business/quotation.service";
 import { assertEmployeeCanAccessProject, assertEmployeeCanAccessQuotation } from "@/lib/auth/employee-resource-access";
+import { sanitizeObject } from "@/lib/security/sanitize";
 
 interface RouteCtx {
   params: Promise<{ quotationId: string }>;
@@ -123,7 +124,7 @@ export async function PATCH(req: Request, ctx: RouteCtx) {
       return apiError("Quotation not found", 404);
     }
 
-    const body = (await req.json()) as {
+    const body = sanitizeObject((await req.json())) as {
       projectId?: string;
       documentInfo?: {
         quotationCode?: string;

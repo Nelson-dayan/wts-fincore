@@ -4,13 +4,20 @@
  * before data is persisted to MongoDB.
  */
 
+const CONTROL_CHARS_REGEX = /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g;
+
 const DANGEROUS_BLOCK_TAGS_REGEX =
-  /<\s*(script|style|iframe|object|embed|svg|math|applet|meta|link|base)[^>]*>[\s\S]*?<\s*\/\s*\1\s*>/gi;
+  /<\s*(script|style|iframe|object|embed|svg|math|applet|meta|link|base|form|noscript|template|frame|frameset)\b[^>]*>[\s\S]*?(?:<\s*\/\s*\1\s*>|$)/gi;
 
 const DANGEROUS_SELF_CLOSING_TAGS_REGEX =
-  /<\s*(script|style|iframe|object|embed|svg|math|applet|meta|link|base)[^>]*\/?>/gi;
+  /<\s*(script|style|iframe|object|embed|svg|math|applet|meta|link|base|form|noscript|template|frame|frameset)\b[^>]*\/?>/gi;
 
-const ANY_TAG_REGEX = /<[^>]+>/g;
+const HTML_COMMENT_REGEX = /<!--[\s\S]*?(-->|$)/g;
+
+const HTML_DOCTYPE_OR_XML_REGEX = /<!(?:\[CDATA\[[\s\S]*?\]\]>|--[\s\S]*?--|DOCTYPE[^>]*>|[^>]*>)/gi;
+
+// Matches HTML tags (opening, closing, self-closing) where tag name begins immediately with an ASCII letter
+const HTML_TAG_REGEX = /<\/?([a-zA-Z][a-zA-Z0-9:-]*)(?:\s+[^>]*|\/[^>]*)?>/gi;
 
 const EVENT_HANDLER_REGEX = /\bon\w+\s*=\s*(?:'[^']*'|"[^"]*"|[^\s>]+)/gi;
 
@@ -18,7 +25,8 @@ const JS_PROTOCOL_REGEX = /(?:javascript|vbscript|data\s*:\s*text\/html)\s*:[^\s
 
 /**
  * Sanitizes a free-text string by stripping all HTML tags, script payloads,
- * event handlers, and executable pseudo-protocols.
+ * event handlers, and executable pseudo-protocols, while preserving
+ * legitimate mathematical comparisons (e.g. 5 < 10 and 10 > 5).
  */
 export function sanitizeText(input: unknown): string {
   if (typeof input !== "string") {
@@ -29,18 +37,34 @@ export function sanitizeText(input: unknown): string {
   let text = input.trim();
   if (!text) return "";
 
-  // 1. Strip dangerous tags with their contents (scripts, svg, styles, iframes)
-  text = text.replace(DANGEROUS_BLOCK_TAGS_REGEX, "");
-  text = text.replace(DANGEROUS_SELF_CLOSING_TAGS_REGEX, "");
+  // Strip null bytes and non-printable control characters
+  text = text.replace(CONTROL_CHARS_REGEX, "");
 
-  // 2. Strip any remaining HTML tags
-  text = text.replace(ANY_TAG_REGEX, "");
+  let prev = "";
+  let iterations = 0;
+  const maxIterations = 10;
 
-  // 3. Strip any residual inline event handlers (onerror, onclick, etc.)
-  text = text.replace(EVENT_HANDLER_REGEX, "");
+  while (text !== prev && iterations < maxIterations) {
+    prev = text;
+    iterations++;
 
-  // 4. Strip dangerous pseudo-protocols
-  text = text.replace(JS_PROTOCOL_REGEX, "");
+    // 1. Strip dangerous tags with their contents (scripts, svg, styles, iframes)
+    text = text.replace(DANGEROUS_BLOCK_TAGS_REGEX, "");
+    text = text.replace(DANGEROUS_SELF_CLOSING_TAGS_REGEX, "");
+
+    // 2. Strip comments and doctype / CDATA declarations
+    text = text.replace(HTML_COMMENT_REGEX, "");
+    text = text.replace(HTML_DOCTYPE_OR_XML_REGEX, "");
+
+    // 3. Strip any remaining HTML tags
+    text = text.replace(HTML_TAG_REGEX, "");
+
+    // 4. Strip any residual inline event handlers (onerror, onclick, etc.)
+    text = text.replace(EVENT_HANDLER_REGEX, "");
+
+    // 5. Strip dangerous pseudo-protocols
+    text = text.replace(JS_PROTOCOL_REGEX, "");
+  }
 
   return text.trim();
 }

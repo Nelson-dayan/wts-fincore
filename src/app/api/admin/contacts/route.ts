@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import { requireRole } from "@/lib/auth/require-role";
 import { authErrorResponse } from "@/lib/api/route-auth";
+import { parseSearch } from "@/lib/api/pagination";
 import { createContact, listContacts } from "@/lib/services/business/contact.service";
+import { sanitizeText } from "@/lib/security/sanitize";
 
 export async function GET(req: Request) {
   try {
@@ -9,7 +11,7 @@ export async function GET(req: Request) {
     const url = new URL(req.url);
     const companyId = url.searchParams.get("companyId") || undefined;
     const clientId = url.searchParams.get("clientId") || undefined;
-    const q = url.searchParams.get("q") || undefined;
+    const q = parseSearch(url.searchParams) || undefined;
     const status = (url.searchParams.get("status") as "ACTIVE" | "INACTIVE") || undefined;
 
     const items = await listContacts({ companyId, clientId, q, status });
@@ -24,8 +26,8 @@ export async function POST(req: Request) {
     const session = await requireRole(["admin", "employee"]);
     const body = await req.json();
 
-    const firstName = String(body.firstName || "").trim();
-    const lastName = String(body.lastName || "").trim();
+    const firstName = sanitizeText(body.firstName);
+    const lastName = sanitizeText(body.lastName);
 
     if (!firstName || !lastName) {
       return NextResponse.json({ message: "First name and last name are required." }, { status: 400 });

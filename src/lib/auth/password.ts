@@ -47,12 +47,12 @@ export function validatePasswordComplexity(
   if (email && typeof email === "string" && email.trim()) {
     const cleanEmail = email.trim().toLowerCase();
     const cleanPass = password.trim().toLowerCase();
-    if (cleanPass === cleanEmail) {
-      return { ok: false, message: "Password cannot be identical to your email address" };
+    if (cleanPass === cleanEmail || cleanPass.includes(cleanEmail)) {
+      return { ok: false, message: "Password cannot be identical to or contain your email address" };
     }
     const usernamePart = cleanEmail.split("@")[0];
-    if (usernamePart && usernamePart.length >= 3 && cleanPass === usernamePart) {
-      return { ok: false, message: "Password cannot be identical to your username" };
+    if (usernamePart && usernamePart.length >= 3 && (cleanPass === usernamePart || cleanPass.includes(usernamePart))) {
+      return { ok: false, message: "Password cannot be identical to or contain your username" };
     }
   }
 

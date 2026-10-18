@@ -4,7 +4,7 @@ import { requireRole } from "@/lib/auth/require-role";
 import { connectDB } from "@/lib/db/connect";
 import { InvoiceModel, PurchaseOrderModel } from "@/lib/db/models";
 import { authErrorResponse } from "@/lib/api/route-auth";
-import { parsePagination, parseSearch } from "@/lib/api/pagination";
+import { parsePagination, parseSearch, escapeRegex } from "@/lib/api/pagination";
 import { logActivity } from "@/lib/services/activity/log-activity.service";
 import { createInvoiceForPurchaseOrder } from "@/lib/services/business/invoice.service";
 import { decimalToNumber } from "@/lib/services/business/money";
@@ -47,7 +47,7 @@ export async function GET(req: Request) {
       isDeleted: { $ne: true },
       companyId: { $in: companyContext.allowedCompanyIds },
     };
-    if (q) filter.invoiceNumber = { $regex: q, $options: "i" };
+    if (q) filter.invoiceNumber = { $regex: escapeRegex(q), $options: "i" };
 
     if (session.user.role === "employee") {
       const employeeProjectIds = await getEmployeeAssignedProjectIdStrings(session.user.id);

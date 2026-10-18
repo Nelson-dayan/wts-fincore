@@ -3,7 +3,7 @@ import { requireRole } from "@/lib/auth/require-role";
 import { connectDB } from "@/lib/db/connect";
 import { ClientModel, ProjectModel } from "@/lib/db/models";
 import { authErrorResponse } from "@/lib/api/route-auth";
-import { parsePagination, parseSearch } from "@/lib/api/pagination";
+import { parsePagination, parseSearch, escapeRegex } from "@/lib/api/pagination";
 import { logActivity } from "@/lib/services/activity/log-activity.service";
 import { sanitizeText } from "@/lib/security/sanitize";
 
@@ -33,11 +33,12 @@ export async function GET(req: Request) {
     }
 
     if (q) {
+      const escaped = escapeRegex(q);
       const qCond = {
         $or: [
-          { name: { $regex: q, $options: "i" } },
-          { company: { $regex: q, $options: "i" } },
-          { email: { $regex: q, $options: "i" } },
+          { name: { $regex: escaped, $options: "i" } },
+          { company: { $regex: escaped, $options: "i" } },
+          { email: { $regex: escaped, $options: "i" } },
         ],
       };
       if (filter.$or) {

@@ -1,6 +1,8 @@
 import mongoose from "mongoose";
 import { connectDB } from "@/lib/db/connect";
 import { ContactModel, ProjectContactAssignmentModel } from "@/lib/db/models";
+import { escapeRegex } from "@/lib/api/pagination";
+import { sanitizeText } from "@/lib/security/sanitize";
 import type { ContactData } from "@/types/contact";
 
 export interface CreateContactInput {
@@ -36,14 +38,14 @@ export async function createContact(input: CreateContactInput): Promise<ContactD
   const created = await ContactModel.create({
     companyId: new mongoose.Types.ObjectId(input.companyId),
     clientId: input.clientId ? new mongoose.Types.ObjectId(input.clientId) : null,
-    firstName: input.firstName,
-    lastName: input.lastName,
-    email: input.email || "",
-    phone: input.phone || "",
-    alternatePhone: input.alternatePhone || "",
-    jobTitle: input.jobTitle || "",
-    department: input.department || "",
-    notes: input.notes || "",
+    firstName: sanitizeText(input.firstName),
+    lastName: sanitizeText(input.lastName),
+    email: sanitizeText(input.email || "").toLowerCase(),
+    phone: sanitizeText(input.phone || ""),
+    alternatePhone: sanitizeText(input.alternatePhone || ""),
+    jobTitle: sanitizeText(input.jobTitle || ""),
+    department: sanitizeText(input.department || ""),
+    notes: sanitizeText(input.notes || ""),
     status: input.status || "ACTIVE",
     createdBy: new mongoose.Types.ObjectId(input.createdBy),
   });
@@ -62,14 +64,14 @@ export async function updateContact(
   if (input.clientId !== undefined) {
     updateData.clientId = input.clientId ? new mongoose.Types.ObjectId(input.clientId) : null;
   }
-  if (input.firstName !== undefined) updateData.firstName = input.firstName;
-  if (input.lastName !== undefined) updateData.lastName = input.lastName;
-  if (input.email !== undefined) updateData.email = input.email;
-  if (input.phone !== undefined) updateData.phone = input.phone;
-  if (input.alternatePhone !== undefined) updateData.alternatePhone = input.alternatePhone;
-  if (input.jobTitle !== undefined) updateData.jobTitle = input.jobTitle;
-  if (input.department !== undefined) updateData.department = input.department;
-  if (input.notes !== undefined) updateData.notes = input.notes;
+  if (input.firstName !== undefined) updateData.firstName = sanitizeText(input.firstName);
+  if (input.lastName !== undefined) updateData.lastName = sanitizeText(input.lastName);
+  if (input.email !== undefined) updateData.email = sanitizeText(input.email).toLowerCase();
+  if (input.phone !== undefined) updateData.phone = sanitizeText(input.phone);
+  if (input.alternatePhone !== undefined) updateData.alternatePhone = sanitizeText(input.alternatePhone);
+  if (input.jobTitle !== undefined) updateData.jobTitle = sanitizeText(input.jobTitle);
+  if (input.department !== undefined) updateData.department = sanitizeText(input.department);
+  if (input.notes !== undefined) updateData.notes = sanitizeText(input.notes);
   if (input.status !== undefined) updateData.status = input.status;
 
   const updated = await ContactModel.findOneAndUpdate(
@@ -138,7 +140,8 @@ export async function listContacts(filter: ListContactsFilter = {}): Promise<Con
   }
 
   if (filter.q) {
-    const regex = new RegExp(filter.q.trim(), "i");
+    const escaped = escapeRegex(filter.q.trim());
+    const regex = new RegExp(escaped, "i");
     query.$or = [
       { firstName: regex },
       { lastName: regex },

@@ -3,7 +3,7 @@ import { requireRole } from "@/lib/auth/require-role";
 import { connectDB } from "@/lib/db/connect";
 import { InvoiceModel, PurchaseOrderModel, QuotationModel } from "@/lib/db/models";
 import { authErrorResponse } from "@/lib/api/route-auth";
-import { parsePagination, parseSearch } from "@/lib/api/pagination";
+import { parsePagination, parseSearch, escapeRegex } from "@/lib/api/pagination";
 import { logActivity } from "@/lib/services/activity/log-activity.service";
 import {
   createPurchaseOrder,
@@ -14,6 +14,7 @@ import mongoose from "mongoose";
 import {
   blobToPoDataUrl,
   formFileEntryToBlob,
+  validatePoFileUrl,
   validatePoDataUrlString,
 } from "@/lib/api/po-upload";
 import {
@@ -67,7 +68,7 @@ export async function GET(req: Request) {
       ],
     };
 
-    if (q) filter.poNumber = { $regex: q, $options: "i" };
+    if (q) filter.poNumber = { $regex: escapeRegex(q), $options: "i" };
 
     if (session.user.role === "employee") {
       const employeeProjectIds = await getEmployeeAssignedProjectIdStrings(session.user.id);
@@ -219,14 +220,8 @@ export async function POST(req: Request) {
     const externalPoNorm = String(externalPoNumber ?? "").trim();
 
     if (type === "client") {
-      if (fileDataUrlRaw) {
-        const checked = validatePoDataUrlString(fileDataUrlRaw);
-        if (!checked.ok) {
-          return NextResponse.json({ message: checked.message }, { status: 400 });
-        }
-        fileUrl = checked.dataUrl;
-      }
-      if (!fileUrl.trim()) {
+      const candidateUrl = (fileDataUrlRaw || fileUrl).trim();
+      if (!candidateUrl) {
         return NextResponse.json(
           {
             message: "Attach a PDF or image for a client PO.",
@@ -234,6 +229,11 @@ export async function POST(req: Request) {
           { status: 400 }
         );
       }
+      const checked = validatePoFileUrl(candidateUrl);
+      if (!checked.ok) {
+        return NextResponse.json({ message: checked.message }, { status: 400 });
+      }
+      fileUrl = checked.url;
     }
 
     const quotation = await QuotationModel.findById(quotationId).select("projectId companyId").lean();

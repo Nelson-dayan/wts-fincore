@@ -52,6 +52,11 @@ export class CompanyHierarchyService {
   static async getCompanyTree(allowedCompanyIds?: string[]): Promise<CompanyTreeNode[]> {
     await connectDB();
     
+    // Strict tenant boundary check: if an empty list of company IDs is passed, return empty tree
+    if (allowedCompanyIds !== undefined && allowedCompanyIds.length === 0) {
+      return [];
+    }
+
     const query: Record<string, any> = { isActive: true, deletedAt: null };
     if (allowedCompanyIds && allowedCompanyIds.length > 0) {
       query._id = { $in: allowedCompanyIds.map((id) => new Types.ObjectId(id)) };

@@ -15,6 +15,7 @@ import { logActivity } from "@/lib/services/activity/log-activity.service";
 import { decimalToNumber } from "@/lib/services/business/money";
 
 import { CompanyHierarchyService } from "@/lib/services/business/company-hierarchy.service";
+import { sanitizeText } from "@/lib/security/sanitize";
 
 export async function GET(req: Request) {
   try {
@@ -116,7 +117,7 @@ export async function POST(req: Request) {
     const session = await requireRole(["admin"]);
     await connectDB();
     const body = (await req.json()) as any;
-    const name = String(body.name ?? "").trim();
+    const name = sanitizeText(body.name);
     const clientId = String(body.clientId ?? "").trim();
     if (!name || !clientId) {
       return NextResponse.json(
@@ -157,7 +158,7 @@ export async function POST(req: Request) {
     const created = await ProjectModel.create({
       name,
       companyId: companyContext.companyId,
-      description: String(body.description ?? ""),
+      description: body.description !== undefined ? sanitizeText(body.description) : "",
       clientId,
       assignedTo: assignedUserIds,
       assignedMembers,
@@ -165,9 +166,9 @@ export async function POST(req: Request) {
       priority: body.priority ?? "medium",
       budget: body.budget,
       currency: String(body.currency ?? "AED").trim().toUpperCase(),
-      category: String(body.category ?? "Fixed Price").trim(),
-      clientReference: String(body.clientReference ?? "").trim(),
-      notes: String(body.notes ?? "").trim(),
+      category: body.category !== undefined ? sanitizeText(body.category) : "Fixed Price",
+      clientReference: body.clientReference !== undefined ? sanitizeText(body.clientReference) : "",
+      notes: body.notes !== undefined ? sanitizeText(body.notes) : "",
       startDate: body.startDate ? new Date(body.startDate) : undefined,
       targetEndDate: body.targetEndDate ? new Date(body.targetEndDate) : undefined,
       actualEndDate: body.actualEndDate ? new Date(body.actualEndDate) : undefined,

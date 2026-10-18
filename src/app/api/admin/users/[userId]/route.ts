@@ -5,6 +5,7 @@ import { requireRole } from "@/lib/auth/require-role";
 import { authErrorResponse } from "@/lib/api/route-auth";
 import { logActivity } from "@/lib/services/activity/log-activity.service";
 import { hashPassword, validatePasswordComplexity } from "@/lib/auth/password";
+import { sanitizeText } from "@/lib/security/sanitize";
 
 interface RouteCtx {
   params: Promise<{ userId: string }>;
@@ -25,7 +26,7 @@ export async function PATCH(req: Request, ctx: RouteCtx) {
     };
 
     const updates: Record<string, unknown> = {};
-    if (body.name !== undefined) updates.name = String(body.name).trim();
+    if (body.name !== undefined) updates.name = sanitizeText(body.name);
     if (body.role !== undefined) updates.role = body.role;
     if (body.phone !== undefined) {
       updates.phone = String(body.phone);

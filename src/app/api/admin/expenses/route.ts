@@ -3,7 +3,7 @@ import { requireRole } from "@/lib/auth/require-role";
 import { connectDB } from "@/lib/db/connect";
 import { ExpenseModel, ProjectModel, ClientModel, CompanyModel } from "@/lib/db/models";
 import { authErrorResponse } from "@/lib/api/route-auth";
-import { parsePagination, parseSearch } from "@/lib/api/pagination";
+import { parsePagination, parseSearch, escapeRegex } from "@/lib/api/pagination";
 import { logActivity } from "@/lib/services/activity/log-activity.service";
 import { decimalToNumber } from "@/lib/services/business/money";
 import { normalizeToBase } from "@/lib/services/finance/forex.engine";
@@ -13,6 +13,7 @@ import {
 } from "@/lib/auth/employee-resource-access";
 
 import { authorizeResource } from "@/lib/auth/authorization";
+import { sanitizeText } from "@/lib/security/sanitize";
 
 function formatExpenseRow(row: Record<string, unknown>) {
   const proj = row.projectId as unknown;
@@ -87,10 +88,11 @@ export async function GET(req: Request) {
     }
 
     if (q) {
+      const escaped = escapeRegex(q);
       parts.push({
         $or: [
-          { title: { $regex: q, $options: "i" } },
-          { category: { $regex: q, $options: "i" } },
+          { title: { $regex: escaped, $options: "i" } },
+          { category: { $regex: escaped, $options: "i" } },
         ],
       });
     }
@@ -125,11 +127,11 @@ export async function POST(req: Request) {
       projectId?: string;
       note?: string;
     };
-    const title = String(body.title ?? "").trim();
-    const category = String(body.category ?? "").trim();
+    const title = sanitizeText(body.title);
+    const category = sanitizeText(body.category);
     const amount = Number(body.amount ?? 0);
     const projectId = String(body.projectId ?? "").trim();
-    const note = String(body.note ?? "").trim();
+    const note = body.note !== undefined ? sanitizeText(body.note) : "";
 
     if (!title || !category || amount <= 0) {
       return NextResponse.json(

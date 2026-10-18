@@ -4,6 +4,11 @@ import { connectDB } from "@/lib/db/connect";
 import { UserModel } from "@/lib/db/models";
 import { verifyPassword } from "@/lib/auth/password";
 import { isLoginLocked, recordFailedLogin, clearFailedLogin } from "@/lib/rate-limit/memory";
+import {
+  checkUserLockout,
+  recordFailedLoginPersistent,
+  clearFailedLoginPersistent,
+} from "@/lib/auth/persistent-lockout";
 import GoogleProvider from "next-auth/providers/google";
 
 const googleClientId = process.env.GOOGLE_CLIENT_ID?.trim();
@@ -31,32 +36,45 @@ export const authOptions: NextAuthOptions = {
         const password = credentials?.password;
         if (!email || !password) return null;
 
-        // Disallow identical email as password (Finding #06)
-        if (password.trim().toLowerCase() === email) {
+        // Disallow identical or containing email as password (Finding #06)
+        const cleanPass = password.trim().toLowerCase();
+        if (cleanPass === email || cleanPass.includes(email)) {
           throw new Error("Default weak credentials disallowed. Please reset your password.");
         }
 
-        const lockKey = `login:${email}`;
-        const lockStatus = isLoginLocked(lockKey);
-        if (lockStatus.locked) {
-          const minutesLeft = Math.ceil(lockStatus.retryAfterMs / 60000);
+        await connectDB();
+
+        // 1. Check persistent lockout first (concurrency & multi-instance safe)
+        const persistentStatus = await checkUserLockout(email);
+        if (persistentStatus.locked) {
+          const minutesLeft = Math.ceil(persistentStatus.retryAfterMs / 60000);
           throw new Error(`Account temporarily locked due to multiple failed login attempts. Try again in ${minutesLeft} minute(s).`);
         }
 
-        await connectDB();
+        // 2. In-memory check fallback
+        const lockKey = `login:${email}`;
+        const memStatus = isLoginLocked(lockKey);
+        if (memStatus.locked) {
+          const minutesLeft = Math.ceil(memStatus.retryAfterMs / 60000);
+          throw new Error(`Account temporarily locked due to multiple failed login attempts. Try again in ${minutesLeft} minute(s).`);
+        }
+
         const user = await UserModel.findOne({ email }).select("+password");
         if (!user?.isActive) {
+          await recordFailedLoginPersistent(email);
           recordFailedLogin(lockKey);
           return null;
         }
 
         const valid = await verifyPassword(password, user.password);
         if (!valid) {
+          await recordFailedLoginPersistent(email);
           recordFailedLogin(lockKey);
           return null;
         }
 
         // Reset failed login attempts upon successful authentication
+        await clearFailedLoginPersistent(email);
         clearFailedLogin(lockKey);
 
         return {

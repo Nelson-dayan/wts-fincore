@@ -9,6 +9,7 @@ import mongoose from "mongoose";
 import {
   blobToPoDataUrl,
   formFileEntryToBlob,
+  validatePoFileUrl,
   validatePoDataUrlString,
 } from "@/lib/api/po-upload";
 import { assertEmployeeCanAccessPurchaseOrder } from "@/lib/auth/employee-resource-access";
@@ -196,18 +197,12 @@ export async function PATCH(req: Request, ctx: Ctx) {
           { status: 400 }
         );
       }
-      let nextUrl = incomingUrl;
-      if (incomingDataUrl) {
-        const checked = validatePoDataUrlString(incomingDataUrl);
-        if (!checked.ok) {
-          return NextResponse.json({ message: checked.message }, { status: 400 });
-        }
-        nextUrl = checked.dataUrl;
+      const rawCandidate = (incomingDataUrl || incomingUrl).trim();
+      const checked = validatePoFileUrl(rawCandidate);
+      if (!checked.ok) {
+        return NextResponse.json({ message: checked.message }, { status: 400 });
       }
-      if (!nextUrl) {
-        return NextResponse.json({ message: "fileUrl or fileDataUrl required" }, { status: 400 });
-      }
-      po.fileUrl = nextUrl;
+      po.fileUrl = checked.url;
     }
 
     await po.save();
