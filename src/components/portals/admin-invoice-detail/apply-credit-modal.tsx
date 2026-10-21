@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { X, Check, Loader2, AlertCircle, Sparkles, Receipt } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -41,6 +42,11 @@ export function ApplyCreditModal({
   creditPayments,
   apiPrefix,
 }: ApplyCreditModalProps) {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   const [selectedPaymentId, setSelectedPaymentId] = useState("");
   const [amountToApply, setAmountToApply] = useState(0);
   const [submitting, setSubmitting] = useState(false);
@@ -127,11 +133,33 @@ export function ApplyCreditModal({
     }
   };
 
-  if (!isOpen) return null;
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !submitting) onClose();
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      document.body.style.overflow = originalOverflow;
+    };
+  }, [isOpen, submitting, onClose]);
 
-  return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="relative bg-card w-full max-w-lg rounded-2xl shadow-2xl border border-border/60 flex flex-col overflow-hidden max-h-[90vh]">
+  if (!isOpen || !mounted) return null;
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[9999] flex items-center justify-center p-3 sm:p-4 md:p-6 overflow-y-auto"
+      role="dialog"
+      aria-modal="true"
+    >
+      <div
+        className="fixed inset-0 bg-black/75 backdrop-blur-sm transition-opacity"
+        onClick={() => !submitting && onClose()}
+      />
+      <div className="relative z-10 bg-card w-full max-w-lg rounded-2xl shadow-2xl border border-border/80 flex flex-col overflow-hidden max-h-[88vh] my-auto animate-in fade-in zoom-in-95 duration-200">
         {/* Header */}
         <div className="px-6 py-4 border-b flex items-center justify-between bg-muted/10">
           <div className="flex items-center gap-2 text-primary">
@@ -265,6 +293,7 @@ export function ApplyCreditModal({
           </Button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

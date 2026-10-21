@@ -203,7 +203,7 @@ export function TransferFundsModal({ isOpen, onClose, onSuccess, apiPrefix }: Tr
     e.preventDefault();
     if (!fromAccountId || !toAccountId) return setError("Please select both accounts.");
     if (fromAccountId === toAccountId) return setError("Source and destination accounts must be different.");
-    
+
     if (isNaN(fromAmountNum) || fromAmountNum <= 0) return setError("Please enter a valid transfer amount greater than 0.");
     if (fromAccount && fromAmountNum > fromAccount.currentBalance) {
       return setError(`Insufficient funds. Available balance in "${fromAccount.name}" is ${fromAccount.currentBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })} ${fromAccount.currency}.`);
@@ -265,7 +265,7 @@ export function TransferFundsModal({ isOpen, onClose, onSuccess, apiPrefix }: Tr
         onClick={() => !submitting && onClose()}
       />
       <div className="relative z-10 w-full max-w-[96vw] sm:max-w-[560px] bg-card rounded-2xl shadow-2xl border border-border/80 overflow-hidden flex flex-col max-h-[88vh] animate-in fade-in zoom-in-95 duration-200 my-auto">
-        
+
         {/* Header (Always Visible) */}
         <div className="px-5 py-4 sm:px-6 sm:py-4.5 border-b bg-muted/20 flex items-center justify-between flex-shrink-0">
           <div className="flex items-center gap-3">
@@ -277,10 +277,10 @@ export function TransferFundsModal({ isOpen, onClose, onSuccess, apiPrefix }: Tr
               <p className="text-xs text-muted-foreground">Move money between internal company accounts</p>
             </div>
           </div>
-          <button 
-            type="button" 
-            onClick={onClose} 
-            className="p-1.5 sm:p-2 rounded-xl hover:bg-muted text-muted-foreground hover:text-foreground transition-colors" 
+          <button
+            type="button"
+            onClick={onClose}
+            className="p-1.5 sm:p-2 rounded-xl hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
             aria-label="Close modal"
           >
             <X className="w-5 h-5" />
@@ -304,207 +304,206 @@ export function TransferFundsModal({ isOpen, onClose, onSuccess, apiPrefix }: Tr
               {/* From & To Dropdowns */}
               <div className="space-y-1.5">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-                <div className="space-y-1.5">
-                  <Label className="text-xs">From Account</Label>
-                  <Select
-                    value={fromAccountId}
-                    onChange={(e) => setFromAccountId(e.target.value)}
-                    options={accounts.map((a) => ({
-                      value: a._id,
-                      label: `${a.name} (${a.currency})`,
-                    }))}
-                  />
-                  {fromAccount && (
-                    <span className="text-[10px] text-muted-foreground pl-1 block">
-                      Bal: {fromAccount.currency} {fromAccount.currentBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                    </span>
-                  )}
-                </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">From Account</Label>
+                    <Select
+                      value={fromAccountId}
+                      onChange={(e) => setFromAccountId(e.target.value)}
+                      options={accounts.map((a) => ({
+                        value: a._id,
+                        label: `${a.name} (${a.currency})`,
+                      }))}
+                    />
+                    {fromAccount && (
+                      <span className="text-[10px] text-muted-foreground pl-1 block">
+                        Bal: {fromAccount.currency} {fromAccount.currentBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                      </span>
+                    )}
+                  </div>
 
-                <div className="space-y-1.5">
-                  <Label className="text-xs">To Account</Label>
-                  <Select
-                    value={toAccountId}
-                    onChange={(e) => setToAccountId(e.target.value)}
-                    options={accounts.map((a) => ({
-                      value: a._id,
-                      label: `${a.name} (${a.currency})`,
-                    }))}
-                  />
-                  {toAccount && (
-                    <span className="text-[10px] text-muted-foreground pl-1 block">
-                      Bal: {toAccount.currency} {toAccount.currentBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                    </span>
-                  )}
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">To Account</Label>
+                    <Select
+                      value={toAccountId}
+                      onChange={(e) => setToAccountId(e.target.value)}
+                      options={accounts.map((a) => ({
+                        value: a._id,
+                        label: `${a.name} (${a.currency})`,
+                      }))}
+                    />
+                    {toAccount && (
+                      <span className="text-[10px] text-muted-foreground pl-1 block">
+                        Bal: {toAccount.currency} {toAccount.currentBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                      </span>
+                    )}
+                  </div>
                 </div>
-              </div>
-              {accountsError && (
-                <p className="text-[11px] text-destructive font-medium pl-0.5">{accountsError}</p>
-              )}
-            </div>
-
-            {/* Sent & Received Amounts */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 pt-1">
-              <div className="space-y-1.5">
-                <Label className="text-xs">Sent Amount {fromAccount ? `(${fromAccount.currency})` : ""}</Label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  min="0.01"
-                  required
-                  placeholder="0.00"
-                  value={fromAmount}
-                  onChange={(e) => handleFromAmountChange(e.target.value)}
-                  className={fromAmountError ? "border-destructive focus-visible:ring-destructive" : ""}
-                />
-                {fromAmountError && (
-                  <p className="text-[11px] text-destructive font-medium">{fromAmountError}</p>
+                {accountsError && (
+                  <p className="text-[11px] text-destructive font-medium pl-0.5">{accountsError}</p>
                 )}
               </div>
 
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <Label className="text-xs">Received Amount {toAccount ? `(${toAccount.currency})` : ""}</Label>
-                  <span className="text-[10px] text-muted-foreground font-medium flex items-center gap-1">
-                    <Lock className="w-2.5 h-2.5" /> Auto-calculated
-                  </span>
-                </div>
-                <Input
-                  type="text"
-                  readOnly
-                  placeholder="0.00"
-                  value={toAmount ? `${toAmount} ${toAccount?.currency || ""}` : ""}
-                  className="bg-muted/40 cursor-default font-medium text-foreground select-none"
-                />
-              </div>
-            </div>
-
-            {/* Exchange Rate & Fees */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <Label className="text-xs">Exchange Rate</Label>
-                  {isSameCurrency && (
-                    <span className="text-[10px] text-muted-foreground font-medium">1:1 Same Currency</span>
-                  )}
-                </div>
-                <div className="relative">
+              {/* Sent & Received Amounts */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 pt-1">
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Sent Amount {fromAccount ? `(${fromAccount.currency})` : ""}</Label>
                   <Input
                     type="number"
-                    step="0.0001"
-                    min="0.0001"
+                    step="0.01"
+                    min="0.01"
                     required
-                    value={exchangeRate}
-                    onChange={(e) => handleExchangeRateChange(e.target.value)}
-                    disabled={isSameCurrency}
-                    className={`pr-9 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${
-                      rateError ? "border-destructive focus-visible:ring-destructive" : ""
-                    }`}
+                    placeholder="0.00"
+                    value={fromAmount}
+                    onChange={(e) => handleFromAmountChange(e.target.value)}
+                    className={fromAmountError ? "border-destructive focus-visible:ring-destructive" : ""}
                   />
-                  <button
-                    type="button"
-                    onClick={handleResetExchangeRate}
-                    disabled={isSameCurrency}
-                    title="Reset to benchmark exchange rate"
-                    className="absolute inset-y-0 right-0 pr-2.5 flex items-center text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:pointer-events-none transition-colors group cursor-pointer"
-                  >
-                    <RefreshCw className="w-3.5 h-3.5 transition-transform duration-300 group-hover:rotate-180 group-active:scale-90" />
-                  </button>
+                  {fromAmountError && (
+                    <p className="text-[11px] text-destructive font-medium">{fromAmountError}</p>
+                  )}
                 </div>
-                {rateError && (
-                  <p className="text-[11px] text-destructive font-medium">{rateError}</p>
-                )}
-              </div>
 
-              <div className="space-y-1.5">
-                <Label className="text-xs">Fees {fromAccount ? `(${fromAccount.currency})` : ""}</Label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={fees}
-                  onChange={(e) => handleFeesChange(e.target.value)}
-                  className={feesError ? "border-destructive focus-visible:ring-destructive" : ""}
-                />
-                {feesError && (
-                  <p className="text-[11px] text-destructive font-medium">{feesError}</p>
-                )}
-              </div>
-            </div>
-
-            {/* Calculation Breakdown Card */}
-            {fromAmountNum > 0 && rateNum > 0 && feesNum >= 0 && feesNum < fromAmountNum && (
-              <div className="p-3.5 rounded-xl bg-muted/30 border border-border/70 text-xs space-y-1.5">
-                <div className="flex justify-between text-muted-foreground">
-                  <span>Transfer Amount:</span>
-                  <span className="font-mono text-foreground font-medium">
-                    {fromAmountNum.toLocaleString(undefined, { minimumFractionDigits: 2 })} {fromAccount?.currency}
-                  </span>
-                </div>
-                {feesNum > 0 && (
-                  <div className="flex justify-between text-muted-foreground">
-                    <span>Less Transfer / Wire Fees:</span>
-                    <span className="font-mono text-destructive font-medium">
-                      - {feesNum.toLocaleString(undefined, { minimumFractionDigits: 2 })} {fromAccount?.currency}
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-xs">Received Amount {toAccount ? `(${toAccount.currency})` : ""}</Label>
+                    <span className="text-[10px] text-muted-foreground font-medium flex items-center gap-1">
+                      <Lock className="w-2.5 h-2.5" /> Auto-calculated
                     </span>
                   </div>
-                )}
-                <div className="flex justify-between text-muted-foreground">
-                  <span>Net Converted:</span>
-                  <span className="font-mono text-foreground font-medium">
-                    {(fromAmountNum - feesNum).toLocaleString(undefined, { minimumFractionDigits: 2 })} {fromAccount?.currency}
-                  </span>
-                </div>
-                <div className="flex justify-between text-muted-foreground">
-                  <span>Exchange Rate:</span>
-                  <span className="font-mono text-foreground font-medium">
-                    × {rateNum.toFixed(4)}
-                  </span>
-                </div>
-                <div className="pt-1.5 border-t border-border/60 flex justify-between font-semibold">
-                  <span className="text-foreground">Total Received:</span>
-                  <span className="font-mono text-primary text-sm font-bold">
-                    {toAmount} {toAccount?.currency}
-                  </span>
+                  <Input
+                    type="text"
+                    readOnly
+                    placeholder="0.00"
+                    value={toAmount ? `${toAmount} ${toAccount?.currency || ""}` : ""}
+                    className="bg-muted/40 cursor-default font-medium text-foreground select-none"
+                  />
                 </div>
               </div>
-            )}
 
-            {/* Override Reason (Cross-Currency) */}
-            {!isSameCurrency && (
+              {/* Exchange Rate & Fees */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-xs">Exchange Rate</Label>
+                    {isSameCurrency && (
+                      <span className="text-[10px] text-muted-foreground font-medium">1:1 Same Currency</span>
+                    )}
+                  </div>
+                  <div className="relative">
+                    <Input
+                      type="number"
+                      step="0.0001"
+                      min="0.0001"
+                      required
+                      value={exchangeRate}
+                      onChange={(e) => handleExchangeRateChange(e.target.value)}
+                      disabled={isSameCurrency}
+                      className={`pr-9 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${rateError ? "border-destructive focus-visible:ring-destructive" : ""
+                        }`}
+                    />
+                    <button
+                      type="button"
+                      onClick={handleResetExchangeRate}
+                      disabled={isSameCurrency}
+                      title="Reset to benchmark exchange rate"
+                      className="absolute inset-y-0 right-0 pr-2.5 flex items-center text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:pointer-events-none transition-colors group cursor-pointer"
+                    >
+                      <RefreshCw className="w-3.5 h-3.5 transition-transform duration-300 group-hover:rotate-180 group-active:scale-90" />
+                    </button>
+                  </div>
+                  {rateError && (
+                    <p className="text-[11px] text-destructive font-medium">{rateError}</p>
+                  )}
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Fees {fromAccount ? `(${fromAccount.currency})` : ""}</Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={fees}
+                    onChange={(e) => handleFeesChange(e.target.value)}
+                    className={feesError ? "border-destructive focus-visible:ring-destructive" : ""}
+                  />
+                  {feesError && (
+                    <p className="text-[11px] text-destructive font-medium">{feesError}</p>
+                  )}
+                </div>
+              </div>
+
+              {/* Calculation Breakdown Card */}
+              {fromAmountNum > 0 && rateNum > 0 && feesNum >= 0 && feesNum < fromAmountNum && (
+                <div className="p-3.5 rounded-xl bg-muted/30 border border-border/70 text-xs space-y-1.5">
+                  <div className="flex justify-between text-muted-foreground">
+                    <span>Transfer Amount:</span>
+                    <span className="font-mono text-foreground font-medium">
+                      {fromAmountNum.toLocaleString(undefined, { minimumFractionDigits: 2 })} {fromAccount?.currency}
+                    </span>
+                  </div>
+                  {feesNum > 0 && (
+                    <div className="flex justify-between text-muted-foreground">
+                      <span>Less Transfer / Wire Fees:</span>
+                      <span className="font-mono text-destructive font-medium">
+                        - {feesNum.toLocaleString(undefined, { minimumFractionDigits: 2 })} {fromAccount?.currency}
+                      </span>
+                    </div>
+                  )}
+                  <div className="flex justify-between text-muted-foreground">
+                    <span>Net Converted:</span>
+                    <span className="font-mono text-foreground font-medium">
+                      {(fromAmountNum - feesNum).toLocaleString(undefined, { minimumFractionDigits: 2 })} {fromAccount?.currency}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-muted-foreground">
+                    <span>Exchange Rate:</span>
+                    <span className="font-mono text-foreground font-medium">
+                      × {rateNum.toFixed(4)}
+                    </span>
+                  </div>
+                  <div className="pt-1.5 border-t border-border/60 flex justify-between font-semibold">
+                    <span className="text-foreground">Total Received:</span>
+                    <span className="font-mono text-primary text-sm font-bold">
+                      {toAmount} {toAccount?.currency}
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {/* Override Reason (Cross-Currency) */}
+              {!isSameCurrency && (
+                <div className="space-y-1.5">
+                  <Label className="text-xs">
+                    Exchange Rate Override Reason / Bank Quote Ref
+                    <span className="text-muted-foreground font-normal ml-1">(Required if deviating &gt;10%)</span>
+                  </Label>
+                  <Input
+                    placeholder="e.g. Bank spot wire quote #FX-9821, treasury contract ref"
+                    value={overrideReason}
+                    onChange={(e) => setOverrideReason(e.target.value)}
+                  />
+                </div>
+              )}
+
+              {/* Reference */}
               <div className="space-y-1.5">
-                <Label className="text-xs">
-                  Exchange Rate Override Reason / Bank Quote Ref
-                  <span className="text-muted-foreground font-normal ml-1">(Required if deviating &gt;10%)</span>
-                </Label>
+                <Label className="text-xs">Reference Number</Label>
                 <Input
-                  placeholder="e.g. Bank spot wire quote #FX-9821, treasury contract ref"
-                  value={overrideReason}
-                  onChange={(e) => setOverrideReason(e.target.value)}
+                  placeholder="e.g. Wire ID, TXN ID"
+                  value={reference}
+                  onChange={(e) => setReference(e.target.value)}
                 />
               </div>
-            )}
 
-            {/* Reference */}
-            <div className="space-y-1.5">
-              <Label className="text-xs">Reference Number</Label>
-              <Input
-                placeholder="e.g. Wire ID, TXN ID"
-                value={reference}
-                onChange={(e) => setReference(e.target.value)}
-              />
-            </div>
-
-            {/* Internal Note */}
-            <div className="space-y-1.5">
-              <Label className="text-xs">Internal Notes</Label>
-              <textarea
-                className="w-full min-h-[70px] rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
-                placeholder="Narrative describing this transfer..."
-                value={note}
-                onChange={(e) => setNote(e.target.value)}
-              />
-            </div>
+              {/* Internal Note */}
+              <div className="space-y-1.5">
+                <Label className="text-xs">Internal Notes</Label>
+                <textarea
+                  className="w-full min-h-[70px] rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
+                  placeholder="Narrative describing this transfer..."
+                  value={note}
+                  onChange={(e) => setNote(e.target.value)}
+                />
+              </div>
 
             </div>
 

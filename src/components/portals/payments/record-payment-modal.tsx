@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { X, CreditCard, Loader2, Calculator, Lock, Plus, Trash2, CheckCircle2, AlertTriangle, Info, TrendingUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -76,6 +77,11 @@ export function RecordPaymentModal({
   initialProjectId = "",
   initialInvoiceId = ""
 }: RecordPaymentModalProps) {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   const [projectId, setProjectId] = useState(initialProjectId);
   const [accountId, setAccountId] = useState("");
   
@@ -575,12 +581,33 @@ export function RecordPaymentModal({
     }
   };
 
-  if (!isOpen) return null;
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !submitting) onClose();
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      document.body.style.overflow = originalOverflow;
+    };
+  }, [isOpen, submitting, onClose]);
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4">
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full max-w-[96vw] sm:max-w-[600px] bg-card rounded-2xl shadow-2xl border border-border overflow-hidden flex flex-col max-h-[94vh] animate-in fade-in duration-200">
+  if (!isOpen || !mounted) return null;
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[9999] flex items-center justify-center p-3 sm:p-4 md:p-6 overflow-y-auto"
+      role="dialog"
+      aria-modal="true"
+    >
+      <div
+        className="fixed inset-0 bg-black/75 backdrop-blur-sm transition-opacity"
+        onClick={() => !submitting && onClose()}
+      />
+      <div className="relative z-10 w-full max-w-[96vw] sm:max-w-[620px] bg-card rounded-2xl shadow-2xl border border-border/80 overflow-hidden flex flex-col max-h-[88vh] animate-in fade-in zoom-in-95 duration-200 my-auto">
         
         {/* Header */}
         <div className="px-4 py-3 sm:px-6 sm:py-5 border-b bg-muted/10 flex items-center justify-between gap-2">
@@ -1260,6 +1287,7 @@ export function RecordPaymentModal({
           </Button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

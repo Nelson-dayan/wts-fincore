@@ -135,6 +135,16 @@ export const authOptions: NextAuthOptions = {
       } else if (user && "role" in user) {
         token.role = user.role as string;
         token.sub = user.id;
+      } else if (token.sub) {
+        try {
+          await connectDB();
+          const dbUser = await UserModel.findById(token.sub).select("role").lean();
+          if (dbUser && dbUser.role) {
+            token.role = dbUser.role as string;
+          }
+        } catch {
+          // Keep existing token.role if DB check encounters transient error
+        }
       }
       return token;
     },

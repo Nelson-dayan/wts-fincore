@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
+import { createPortal } from "react-dom";
 import { X, Receipt, Landmark, Calendar, Download, Printer, ArrowDownRight, ArrowUpRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -13,9 +14,28 @@ interface ClientStatementModalProps {
 }
 
 export function ClientStatementModal({ clientId, isOpen, onClose, apiPrefix }: ClientStatementModalProps) {
+  const [mounted, setMounted] = useState(false);
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      document.body.style.overflow = originalOverflow;
+    };
+  }, [isOpen, onClose]);
 
   useEffect(() => {
     if (isOpen && clientId) {
@@ -97,11 +117,19 @@ export function ClientStatementModal({ clientId, isOpen, onClose, apiPrefix }: C
     };
   }, [ledgerTimeline]);
 
-  if (!isOpen) return null;
+  if (!isOpen || !mounted) return null;
 
-  return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="relative bg-card w-full max-w-5xl rounded-2xl shadow-2xl border border-border/60 flex flex-col max-h-[95vh] overflow-hidden">
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[9999] flex items-center justify-center p-3 sm:p-4 md:p-6 overflow-y-auto"
+      role="dialog"
+      aria-modal="true"
+    >
+      <div
+        className="fixed inset-0 bg-black/75 backdrop-blur-sm transition-opacity"
+        onClick={onClose}
+      />
+      <div className="relative z-10 bg-card w-full max-w-5xl rounded-2xl shadow-2xl border border-border/80 flex flex-col max-h-[88vh] overflow-hidden my-auto animate-in fade-in zoom-in-95 duration-200">
         
         {/* Header */}
         <div className="px-8 py-5 border-b flex items-center justify-between bg-muted/10 shrink-0 print:hidden">
@@ -302,6 +330,7 @@ export function ClientStatementModal({ clientId, isOpen, onClose, apiPrefix }: C
         </div>
 
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

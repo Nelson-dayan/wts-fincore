@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { Plus, User, Mail, Phone, Briefcase, Building2, FileText, Pencil, Trash2, CheckCircle2, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,10 +18,29 @@ export interface ClientContactsCardProps {
 export function ClientContactsCard({ clientId, clientName }: ClientContactsCardProps) {
   const [contacts, setContacts] = useState<ContactData[]>([]);
   const [loading, setLoading] = useState(true);
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingContact, setEditingContact] = useState<ContactData | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isModalOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !saving) setIsModalOpen(false);
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      document.body.style.overflow = originalOverflow;
+    };
+  }, [isModalOpen, saving]);
 
   // Form states
   const [firstName, setFirstName] = useState("");
@@ -261,9 +281,17 @@ export function ClientContactsCard({ clientId, clientName }: ClientContactsCardP
         )}
 
         {/* Modal Form */}
-        {isModalOpen ? (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-2 sm:p-4">
-            <div className="w-full max-w-[96vw] sm:max-w-lg rounded-xl border border-border bg-card p-4 sm:p-6 shadow-xl space-y-4 max-h-[92vh] overflow-y-auto">
+        {mounted && isModalOpen ? createPortal(
+          <div
+            className="fixed inset-0 z-[9999] flex items-center justify-center p-3 sm:p-4 md:p-6 overflow-y-auto"
+            role="dialog"
+            aria-modal="true"
+          >
+            <div
+              className="fixed inset-0 bg-black/75 backdrop-blur-sm transition-opacity"
+              onClick={() => !saving && setIsModalOpen(false)}
+            />
+            <div className="relative z-10 w-full max-w-[96vw] sm:max-w-lg rounded-2xl border border-border/80 bg-card p-4 sm:p-6 shadow-2xl space-y-4 max-h-[88vh] overflow-y-auto my-auto animate-in fade-in zoom-in-95 duration-200">
               <div className="flex items-center justify-between border-b pb-3">
                 <h3 className="font-semibold text-lg text-foreground">
                   {editingContact ? "Edit Contact" : "Add New Contact"}
@@ -341,7 +369,8 @@ export function ClientContactsCard({ clientId, clientName }: ClientContactsCardP
                 </div>
               </form>
             </div>
-          </div>
+          </div>,
+          document.body
         ) : null}
       </CardContent>
     </Card>

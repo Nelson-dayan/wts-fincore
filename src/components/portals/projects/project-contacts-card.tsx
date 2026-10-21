@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { UserCheck, Plus, Pencil, Trash2, Mail, Phone, ShieldCheck, Check, PlusCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -28,6 +29,11 @@ export function ProjectContactsCard({ projectId, projectName, clientId }: Projec
   const [loading, setLoading] = useState(true);
 
   // Modals
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
   const [isNewContactModalOpen, setIsNewContactModalOpen] = useState(false);
 
@@ -35,6 +41,23 @@ export function ProjectContactsCard({ projectId, projectName, clientId }: Projec
   const [selectedContactId, setSelectedContactId] = useState("");
   const [selectedRoles, setSelectedRoles] = useState<ProjectContactRole[]>([]);
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!isAssignModalOpen && !isNewContactModalOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !saving) {
+        setIsAssignModalOpen(false);
+        setIsNewContactModalOpen(false);
+      }
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      document.body.style.overflow = originalOverflow;
+    };
+  }, [isAssignModalOpen, isNewContactModalOpen, saving]);
 
   // Create New Contact Modal state
   const [newFirstName, setNewFirstName] = useState("");
@@ -290,9 +313,17 @@ export function ProjectContactsCard({ projectId, projectName, clientId }: Projec
         )}
 
         {/* Modal: Assign / Edit Roles */}
-        {isAssignModalOpen ? (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-2 sm:p-4">
-            <div className="w-full max-w-[96vw] sm:max-w-lg rounded-xl border border-border bg-card p-4 sm:p-6 shadow-xl space-y-4 max-h-[92vh] overflow-y-auto">
+        {mounted && isAssignModalOpen ? createPortal(
+          <div
+            className="fixed inset-0 z-[9999] flex items-center justify-center p-3 sm:p-4 md:p-6 overflow-y-auto"
+            role="dialog"
+            aria-modal="true"
+          >
+            <div
+              className="fixed inset-0 bg-black/75 backdrop-blur-sm transition-opacity"
+              onClick={() => !saving && setIsAssignModalOpen(false)}
+            />
+            <div className="relative z-10 w-full max-w-[96vw] sm:max-w-lg rounded-2xl border border-border/80 bg-card p-4 sm:p-6 shadow-2xl space-y-4 max-h-[88vh] overflow-y-auto my-auto animate-in fade-in zoom-in-95 duration-200">
               <div className="flex items-center justify-between border-b pb-3">
                 <h3 className="font-semibold text-lg text-foreground">
                   Assign Roles to Project Contact
@@ -358,13 +389,22 @@ export function ProjectContactsCard({ projectId, projectName, clientId }: Projec
                 </div>
               </form>
             </div>
-          </div>
+          </div>,
+          document.body
         ) : null}
 
         {/* Modal: Create New Contact */}
-        {isNewContactModalOpen ? (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-2 sm:p-4">
-            <div className="w-full max-w-[96vw] sm:max-w-lg rounded-xl border border-border bg-card p-4 sm:p-6 shadow-xl space-y-4 max-h-[92vh] overflow-y-auto">
+        {mounted && isNewContactModalOpen ? createPortal(
+          <div
+            className="fixed inset-0 z-[9999] flex items-center justify-center p-3 sm:p-4 md:p-6 overflow-y-auto"
+            role="dialog"
+            aria-modal="true"
+          >
+            <div
+              className="fixed inset-0 bg-black/75 backdrop-blur-sm transition-opacity"
+              onClick={() => !saving && setIsNewContactModalOpen(false)}
+            />
+            <div className="relative z-10 w-full max-w-[96vw] sm:max-w-lg rounded-2xl border border-border/80 bg-card p-4 sm:p-6 shadow-2xl space-y-4 max-h-[88vh] overflow-y-auto my-auto animate-in fade-in zoom-in-95 duration-200">
               <div className="flex items-center justify-between border-b pb-3">
                 <h3 className="font-semibold text-lg text-foreground">Create Contact & Assign to Project</h3>
                 <Button size="sm" variant="ghost" onClick={() => setIsNewContactModalOpen(false)}>
@@ -416,7 +456,8 @@ export function ProjectContactsCard({ projectId, projectName, clientId }: Projec
                 </div>
               </form>
             </div>
-          </div>
+          </div>,
+          document.body
         ) : null}
       </CardContent>
     </Card>

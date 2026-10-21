@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { 
   Users, 
   ShieldCheck, 
@@ -102,12 +103,30 @@ export function ProjectTeamPermissions({
       permissions: m.permissions || DEFAULT_PERMISSIONS,
     }));
   });
-
+  const [mounted, setMounted] = useState(false);
   const [editingMember, setEditingMember] = useState<AssignedMember | null>(null);
   const [selectedUserId, setSelectedUserId] = useState<string>("");
   const [isSaving, setIsSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!editingMember) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !isSaving) setEditingMember(null);
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      document.body.style.overflow = originalOverflow;
+    };
+  }, [editingMember, isSaving]);
 
   const handleOpenAddModal = (user: { _id: string; name: string; email: string; role: string }) => {
     setSelectedUserId(user._id);
@@ -366,9 +385,17 @@ export function ProjectTeamPermissions({
       )}
 
       {/* Permission Modal / Drawer */}
-      {editingMember && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-2 sm:p-4 backdrop-blur-xs">
-          <div className="w-full max-w-[96vw] sm:max-w-xl max-h-[92vh] overflow-y-auto rounded-2xl border border-border bg-card p-4 sm:p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+      {mounted && editingMember && createPortal(
+        <div
+          className="fixed inset-0 z-[9999] flex items-center justify-center p-3 sm:p-4 md:p-6 overflow-y-auto"
+          role="dialog"
+          aria-modal="true"
+        >
+          <div
+            className="fixed inset-0 bg-black/75 backdrop-blur-sm transition-opacity"
+            onClick={() => !isSaving && setEditingMember(null)}
+          />
+          <div className="relative z-10 w-full max-w-[96vw] sm:max-w-xl max-h-[88vh] overflow-y-auto rounded-2xl border border-border/80 bg-card p-4 sm:p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-200 my-auto">
             <div className="flex items-center justify-between border-b border-border/60 pb-4">
               <div>
                 <h4 className="text-lg font-bold text-foreground">
@@ -539,7 +566,8 @@ export function ProjectTeamPermissions({
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

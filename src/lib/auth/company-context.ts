@@ -20,11 +20,11 @@ export async function resolveAuthCompanyContext(
   requestedScopeMode?: "single" | "group" | null
 ): Promise<ResolvedAuthContext> {
   const globalRole = (sessionUser.role as "super_admin" | "admin" | "employee") || "employee";
-  
-  const canAccessGroupView = hasPermissionForRole(globalRole, "groupView.access", sessionUser.customPermissions);
-  const canManageGroup = hasPermissionForRole(globalRole, "companyHierarchy.manage", sessionUser.customPermissions);
-
   const userAccess = await getUserAccessInfo(sessionUser.id, globalRole);
+  const effectiveRole = userAccess.isSuperAdmin ? "super_admin" : globalRole;
+
+  const canAccessGroupView = hasPermissionForRole(effectiveRole, "groupView.access", sessionUser.customPermissions);
+  const canManageGroup = hasPermissionForRole(effectiveRole, "companyHierarchy.manage", sessionUser.customPermissions);
 
   let isRequestedCompanyUnauthorized = false;
   // Validate target company request against user's assigned companies
@@ -54,7 +54,7 @@ export async function resolveAuthCompanyContext(
 
   return {
     userId: sessionUser.id,
-    globalRole,
+    globalRole: effectiveRole,
     scopeMode: effectiveScopeMode,
     canAccessGroupView,
     canManageGroup,
