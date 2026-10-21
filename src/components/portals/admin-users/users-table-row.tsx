@@ -224,7 +224,7 @@ export function UsersTableRow({
             </>
           ) : (
             <>
-              {onOpenAccessModal && (
+              {!isProtectedAccount && onOpenAccessModal && (
                 <Button
                   size="sm"
                   variant="outline"
@@ -236,10 +236,12 @@ export function UsersTableRow({
                   Access
                 </Button>
               )}
-              <Button size="sm" variant="outline" className="h-8 w-8 rounded-lg p-0" onClick={() => onStartEdit(user)} title="Edit user profile" aria-label="Edit user profile">
-                <Pencil className="size-3.5" aria-hidden />
-              </Button>
-              {onResetPassword && (
+              {!isProtectedAccount && (
+                <Button size="sm" variant="outline" className="h-8 w-8 rounded-lg p-0" onClick={() => onStartEdit(user)} title="Edit user profile" aria-label="Edit user profile">
+                  <Pencil className="size-3.5" aria-hidden />
+                </Button>
+              )}
+              {!isProtectedAccount && onResetPassword && (
                 <Button
                   size="sm"
                   variant="outline"
@@ -251,7 +253,7 @@ export function UsersTableRow({
                   <KeyRound className="size-3.5" aria-hidden />
                 </Button>
               )}
-              {!user.isActive && onReactivate && (
+              {!user.isActive && onReactivate && !isProtectedAccount && (
                 <Button
                   size="sm"
                   variant="outline"
@@ -267,17 +269,19 @@ export function UsersTableRow({
               <Button
                 size="sm"
                 variant={user.isActive ? "destructive" : "outline"}
-                className={`h-8 w-8 rounded-lg p-0 ${!user.isActive ? "text-destructive border-destructive/30 hover:bg-destructive/10" : ""}`}
-                onClick={() => onDelete(user._id)}
-                disabled={savingId === user._id || user._id === currentUserId}
+                className={`h-8 w-8 rounded-lg p-0 ${!user.isActive ? "text-muted-foreground border-border/40 opacity-50 cursor-not-allowed" : ""}`}
+                onClick={() => user.isActive && onDelete(user._id)}
+                disabled={savingId === user._id || user._id === currentUserId || isProtectedAccount || !user.isActive}
                 title={
                   user._id === currentUserId
-                    ? "You cannot deactivate or delete your own account"
-                    : user.isActive
-                    ? "Deactivate account (Safe Soft Delete)"
-                    : "Permanently delete user record"
+                    ? "You cannot deactivate your own account"
+                    : isProtectedAccount
+                    ? "Only a Super Admin can manage this account"
+                    : !user.isActive
+                    ? "Account is already deactivated"
+                    : "Deactivate account (Safe Soft Delete)"
                 }
-                aria-label={user.isActive ? "Deactivate user" : "Permanently delete user"}
+                aria-label={user.isActive ? "Deactivate user" : "User deactivated"}
               >
                 <Trash2 className="size-3.5" aria-hidden />
               </Button>

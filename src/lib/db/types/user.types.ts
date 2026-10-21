@@ -22,6 +22,10 @@ export interface IUser {
   signatureUrl?: string;
   companyMemberships?: ICompanyMembership[];
   defaultCompanyId?: Types.ObjectId | null;
+  companyIds?: Types.ObjectId[];
+  primaryCompanyId?: Types.ObjectId | null;
+  groupIds?: Types.ObjectId[];
+  groupViewAccess?: boolean;
   resetPasswordToken?: string | null;
   resetPasswordExpires?: Date | null;
   failedLoginAttempts?: number;

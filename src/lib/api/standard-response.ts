@@ -63,6 +63,12 @@ export function standardAuthError(error: unknown, fallbackMessage = "Unauthorize
     if (error.message === "UNAUTHORIZED") {
       return apiError("Unauthorized", 401);
     }
+    if (error.message === "FORBIDDEN") {
+      return apiError("Forbidden: Insufficient privileges", 403);
+    }
+    if ((error as any).name === "CastError") {
+      return apiError("Invalid identifier format", 400);
+    }
     if (
       error.message === "Invalid search parameter" ||
       error.name === "InvalidSearchParameterError" ||

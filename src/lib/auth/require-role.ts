@@ -2,12 +2,36 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth/options";
 import { connection } from "next/server";
 
+import { connectDB } from "@/lib/db/connect";
+import { UserModel } from "@/lib/db/models";
+
+let _testSessionOverride: any = null;
+export function __setTestSession(session: any) {
+  if (process.env.NODE_ENV === "production") return;
+  _testSessionOverride = session;
+}
+
 export async function requireSession() {
-  await connection();
-  const session = await getServerSession(authOptions);
+  if (!_testSessionOverride) {
+    await connection();
+  }
+  const session = _testSessionOverride ? { ..._testSessionOverride } : await getServerSession(authOptions);
   if (!session?.user?.id) {
     throw new Error("UNAUTHORIZED");
   }
+
+  // Authoritative database check to guarantee immediate session revocation on deactivation
+  await connectDB();
+  const user = await UserModel.findById(session.user.id).select("isActive role").lean();
+  if (!user || user.isActive === false) {
+    throw new Error("UNAUTHORIZED");
+  }
+
+  // Synchronize authoritative role
+  if (user.role) {
+    session.user.role = user.role;
+  }
+
   return session;
 }
 

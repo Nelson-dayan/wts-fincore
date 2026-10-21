@@ -190,14 +190,13 @@ export function AdminUsersClient() {
     setSavingId(user._id);
     setError("");
     try {
-      const mode = user.isActive ? "deactivate" : "permanent";
-      await apiFetch<{ message?: string }>(`/api/admin/users/${user._id}?mode=${mode}`, {
+      await apiFetch<{ message?: string }>(`/api/admin/users/${user._id}?mode=deactivate`, {
         method: "DELETE",
       });
       await loadUsers(page, query);
       return true;
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to process user removal");
+      setError(e instanceof Error ? e.message : "Failed to deactivate user");
       return false;
     } finally {
       setSavingId("");
@@ -226,18 +225,10 @@ export function AdminUsersClient() {
         onOpenChange={(o) => {
           if (!o) setDeleteTargetUser(null);
         }}
-        title={
-          deleteTargetUser?.isActive
-            ? `Deactivate account for ${deleteTargetUser.name}?`
-            : `Permanently delete ${deleteTargetUser?.name}?`
-        }
-        description={
-          deleteTargetUser?.isActive
-            ? "Safe Deactivation (Recommended): This revokes active login access immediately and marks the user as Inactive. All historical vouchers, invoices, and ledger records will preserve their author reference for financial audit compliance."
-            : "Permanent Deletion: This permanently removes the user record from the database. Note: If this user is referenced by historical financial records (transfers, payments, invoices, or ledger vouchers), permanent deletion will be prevented to maintain audit integrity."
-        }
-        confirmLabel={deleteTargetUser?.isActive ? "Deactivate User" : "Permanently Delete"}
-        variant={deleteTargetUser?.isActive ? "default" : "destructive"}
+        title={`Deactivate account for ${deleteTargetUser?.name}?`}
+        description="Safe Deactivation: This revokes active login access immediately and marks the user as Inactive. All historical vouchers, invoices, and ledger records will preserve their author reference for financial audit compliance."
+        confirmLabel="Deactivate User"
+        variant="destructive"
         loading={Boolean(deleteTargetUser && savingId === deleteTargetUser._id)}
         onConfirm={async () => {
           if (!deleteTargetUser) return;

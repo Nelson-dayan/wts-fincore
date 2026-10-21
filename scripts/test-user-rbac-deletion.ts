@@ -1,6 +1,17 @@
+/**
+ * FinCore User Management & RBAC Security Integration Suite
+ * Verifies post-audit remediation across priorities:
+ *   - Priority 1: Session invalidation and deactivation enforcement (HTTP 401)
+ *   - Priority 2: Privilege escalation prevention on self-PATCH & company scoping (HTTP 403)
+ *   - Priority 3: Disabling of unsafe permanent deletion (HTTP 400)
+ *   - Priority 4: Concurrency-safe last active Super Admin protection
+ *   - Priority 6: Error handling (Malformed IDs -> HTTP 400, Missing -> HTTP 404)
+ */
+
 import fs from "fs";
 import path from "path";
 
+// Load .env
 try {
   const envPath = path.resolve(process.cwd(), ".env");
   if (fs.existsSync(envPath)) {
@@ -21,21 +32,14 @@ try {
 }
 
 import { connectDB } from "../src/lib/db/connect";
-import {
-  UserModel,
-  TransferModel,
-  InvoiceModel,
-  PaymentModel,
-  PurchaseOrderModel,
-  QuotationModel,
-  ExpenseModel,
-  AccountTransactionModel,
-} from "../src/lib/db/models";
-import mongoose from "mongoose";
+import { UserModel, CompanyModel, CounterModel } from "../src/lib/db/models";
+import { PATCH, DELETE } from "../src/app/api/admin/users/[userId]/route";
+import { __setTestSession } from "../src/lib/auth/require-role";
+import mongoose, { Types } from "mongoose";
 
-async function runRbacAndDeletionTests() {
+async function runRealApiSecuritySuite() {
   console.log("=======================================================================");
-  console.log("   FINCORE USER RBAC & SAFE DELETION INVARIANT TEST SUITE             ");
+  console.log("  FINCORE REAL API USER RBAC & SESSION SECURITY REGRESSION SUITE       ");
   console.log("=======================================================================\n");
 
   await connectDB();
@@ -54,21 +58,31 @@ async function runRbacAndDeletionTests() {
   }
 
   const testSuffix = Date.now();
+  const companyAId = new mongoose.Types.ObjectId();
+  const companyBId = new mongoose.Types.ObjectId();
+
   const superAdmin1Id = new mongoose.Types.ObjectId();
   const superAdmin2Id = new mongoose.Types.ObjectId();
-  const admin1Id = new mongoose.Types.ObjectId();
-  const admin2Id = new mongoose.Types.ObjectId();
-  const employeeCleanId = new mongoose.Types.ObjectId();
-  const employeeLinkedId = new mongoose.Types.ObjectId();
+  const adminAId = new mongoose.Types.ObjectId();
+  const adminBId = new mongoose.Types.ObjectId();
+  const employeeAId = new mongoose.Types.ObjectId();
+  const employeeBId = new mongoose.Types.ObjectId();
+  let otherSuperAdminIds: any[] = [];
 
   try {
-    // Setup test users
+    // 1. Setup isolated test companies
+    await CompanyModel.create([
+      { _id: companyAId, name: `Company A ${testSuffix}`, code: `CA_${testSuffix}`, isActive: true, deletedAt: null },
+      { _id: companyBId, name: `Company B ${testSuffix}`, code: `CB_${testSuffix}`, isActive: true, deletedAt: null },
+    ]);
+
+    // 2. Setup isolated test users
     await UserModel.create([
       {
         _id: superAdmin1Id,
         name: "Test SuperAdmin 1",
         email: `super1_${testSuffix}@fincore-test.com`,
-        password: "hashedPassword123!",
+        password: "HashedPassword123!",
         role: "super_admin",
         isActive: true,
       },
@@ -76,178 +90,328 @@ async function runRbacAndDeletionTests() {
         _id: superAdmin2Id,
         name: "Test SuperAdmin 2",
         email: `super2_${testSuffix}@fincore-test.com`,
-        password: "hashedPassword123!",
+        password: "HashedPassword123!",
         role: "super_admin",
         isActive: true,
       },
       {
-        _id: admin1Id,
-        name: "Test Admin 1",
-        email: `admin1_${testSuffix}@fincore-test.com`,
-        password: "hashedPassword123!",
+        _id: adminAId,
+        name: "Test Admin A",
+        email: `adminA_${testSuffix}@fincore-test.com`,
+        password: "HashedPassword123!",
         role: "admin",
+        companyIds: [companyAId],
+        primaryCompanyId: companyAId,
+        companyMemberships: [{ companyId: companyAId, role: "company_admin", isDefault: true }],
         isActive: true,
       },
       {
-        _id: admin2Id,
-        name: "Test Admin 2",
-        email: `admin2_${testSuffix}@fincore-test.com`,
-        password: "hashedPassword123!",
+        _id: adminBId,
+        name: "Test Admin B",
+        email: `adminB_${testSuffix}@fincore-test.com`,
+        password: "HashedPassword123!",
         role: "admin",
+        companyIds: [companyBId],
+        primaryCompanyId: companyBId,
+        companyMemberships: [{ companyId: companyBId, role: "company_admin", isDefault: true }],
         isActive: true,
       },
       {
-        _id: employeeCleanId,
-        name: "Test Employee Clean",
-        email: `emp_clean_${testSuffix}@fincore-test.com`,
-        password: "hashedPassword123!",
+        _id: employeeAId,
+        name: "Test Employee A",
+        email: `empA_${testSuffix}@fincore-test.com`,
+        password: "HashedPassword123!",
         role: "employee",
+        companyIds: [companyAId],
+        primaryCompanyId: companyAId,
+        companyMemberships: [{ companyId: companyAId, role: "employee", isDefault: true }],
         isActive: true,
       },
       {
-        _id: employeeLinkedId,
-        name: "Test Employee Linked",
-        email: `emp_linked_${testSuffix}@fincore-test.com`,
-        password: "hashedPassword123!",
+        _id: employeeBId,
+        name: "Test Employee B",
+        email: `empB_${testSuffix}@fincore-test.com`,
+        password: "HashedPassword123!",
         role: "employee",
+        companyIds: [companyBId],
+        primaryCompanyId: companyBId,
+        companyMemberships: [{ companyId: companyBId, role: "employee", isDefault: true }],
         isActive: true,
       },
     ]);
 
-    // Create a mock financial record for employeeLinkedId
-    await TransferModel.create({
-      transferNumber: `TR-TEST-${testSuffix}`,
-      fromAccountId: new mongoose.Types.ObjectId(),
-      toAccountId: new mongoose.Types.ObjectId(),
-      fromCurrency: "AED",
-      toCurrency: "AED",
-      fromAmount: 100,
-      toAmount: 100,
-      exchangeRate: 1,
-      transferFee: 0,
-      transferDate: new Date(),
-      status: "COMPLETED",
-      reference: "RBAC Test Transfer",
-      createdBy: employeeLinkedId,
-    });
-
-    console.log("--- SECTION 1: Self-Deletion and Hierarchy Guards ---");
-
-    // Guard 1: User cannot delete self
-    const isSelf = superAdmin1Id.toString() === superAdmin1Id.toString();
-    assert(isSelf, "Self-deletion detected: User ID matches session user ID");
-
-    // Guard 2: Admin cannot delete another Admin
-    const callerAdmin = await UserModel.findById(admin1Id).lean();
-    const targetAdmin = await UserModel.findById(admin2Id).lean();
-    const isCallerSuperAdmin = callerAdmin?.role === "super_admin";
-    const canAdminDeleteAdmin = isCallerSuperAdmin || targetAdmin?.role !== "admin";
-    assert(!canAdminDeleteAdmin, "Admin cannot deactivate or delete peer Admin");
-
-    // Guard 3: Admin cannot delete Super Admin
-    const targetSuperAdmin = await UserModel.findById(superAdmin1Id).lean();
-    const canAdminDeleteSuper = isCallerSuperAdmin || targetSuperAdmin?.role !== "super_admin";
-    assert(!canAdminDeleteSuper, "Admin cannot deactivate or delete Super Admin");
-
-    // Guard 4: Super Admin can delete Admin
-    const canSuperDeleteAdmin = true; // Super admin has override permissions
-    assert(canSuperDeleteAdmin, "Super Admin can manage and deactivate/delete Admin accounts");
-
-    // Guard 5: Last Super Admin Protection
-    // Logic: if otherActiveSuperAdmins === 0, reject with 400
-    const evaluateSuperAdminDeactivation = async (
-      targetId: mongoose.Types.ObjectId,
-      testPoolIds: mongoose.Types.ObjectId[]
-    ) => {
-      const otherActiveCount = await UserModel.countDocuments({
-        _id: { $ne: targetId, $in: testPoolIds },
-        role: "super_admin",
-        isActive: { $ne: false },
+    // Helper for creating synthetic requests
+    function makeRequest(method: string, url: string, body?: any) {
+      return new Request(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: body ? JSON.stringify(body) : undefined,
       });
-      return { allowed: otherActiveCount > 0, otherActiveCount };
-    };
-
-    // When superAdmin1 is active, superAdmin2 can be deleted/deactivated
-    const check1 = await evaluateSuperAdminDeactivation(superAdmin2Id, [superAdmin1Id]);
-    assert(check1.allowed === true, "SuperAdmin 2 can be deactivated/deleted when another Super Admin is active");
-
-    // Deactivate superAdmin1
-    await UserModel.findByIdAndUpdate(superAdmin1Id, { isActive: false });
-    const check2 = await evaluateSuperAdminDeactivation(superAdmin2Id, [superAdmin1Id]);
-    assert(check2.allowed === false, "Sole remaining active Super Admin cannot be deactivated or deleted");
-
-    console.log("\n--- SECTION 2: Safe Deactivation vs Hard Deletion ---");
-
-    // Test Safe Deactivation
-    await UserModel.findByIdAndUpdate(employeeCleanId, { isActive: false });
-    const deactivatedUser = await UserModel.findById(employeeCleanId).lean();
-    assert(deactivatedUser?.isActive === false, "User successfully deactivated without deleting record");
-
-    // Test Reactivation
-    await UserModel.findByIdAndUpdate(employeeCleanId, { isActive: true });
-    const reactivatedUser = await UserModel.findById(employeeCleanId).lean();
-    assert(reactivatedUser?.isActive === true, "User successfully reactivated");
-
-    console.log("\n--- SECTION 3: Financial Linkage Check on Permanent Delete ---");
-
-    // Check financial links for employeeLinkedId
-    const hasLinkedFinancialRecords = async (userId: string) => {
-      const [
-        hasTransfers,
-        hasPayments,
-        hasInvoices,
-        hasPOs,
-        hasQuotations,
-        hasExpenses,
-        hasAccountTx,
-      ] = await Promise.all([
-        TransferModel.exists({ $or: [{ createdBy: userId }, { approvedBy: userId }] }),
-        PaymentModel.exists({ createdBy: userId }),
-        InvoiceModel.exists({ createdBy: userId }),
-        PurchaseOrderModel.exists({ createdBy: userId }),
-        QuotationModel.exists({ createdBy: userId }),
-        ExpenseModel.exists({ createdBy: userId }),
-        AccountTransactionModel.exists({ $or: [{ createdBy: userId }, { userId }] }),
-      ]);
-      return Boolean(
-        hasTransfers || hasPayments || hasInvoices || hasPOs || hasQuotations || hasExpenses || hasAccountTx
-      );
-    };
-
-    const linkedCheck = await hasLinkedFinancialRecords(employeeLinkedId.toString());
-    assert(linkedCheck === true, "Linked financial record accurately detected for employee with transfer");
-
-    // Verify rejection of hard delete for linked user
-    if (linkedCheck) {
-      console.log("✅ PASS: Blocked permanent delete due to historical financial records (soft deactivate required)");
-      passed++;
-    } else {
-      console.error("❌ FAIL: Did not block permanent delete of linked user");
-      failed++;
     }
 
-    // Check clean user (has no financial records)
-    const cleanCheck = await hasLinkedFinancialRecords(employeeCleanId.toString());
-    assert(cleanCheck === false, "No financial record detected for unlinked employee");
+    console.log("--- PRIORITY 1: SESSION INVALIDATION & DEACTIVATION ENFORCEMENT ---");
 
-    // Clean user can be permanently deleted
-    if (!cleanCheck) {
-      await UserModel.findByIdAndDelete(employeeCleanId);
-      const postDeleteUser = await UserModel.findById(employeeCleanId);
-      assert(!postDeleteUser, "Clean user without financial records successfully deleted permanently");
+    // Test 1: Active admin can access API
+    __setTestSession({ user: { id: adminAId.toString(), role: "admin" } });
+    const resActive = await PATCH(
+      makeRequest("PATCH", `http://localhost/api/admin/users/${employeeAId}`, { name: "Updated Name" }),
+      { params: Promise.resolve({ userId: employeeAId.toString() }) }
+    );
+    assert(resActive.status === 200, "Active admin session successfully accesses API (HTTP 200)");
+
+    // Deactivate adminA directly in DB
+    await UserModel.findByIdAndUpdate(adminAId, { isActive: false });
+
+    // Test 2: Deactivated admin attempt to call API with existing session
+    const resDeactivated = await PATCH(
+      makeRequest("PATCH", `http://localhost/api/admin/users/${employeeAId}`, { name: "Attack While Inactive" }),
+      { params: Promise.resolve({ userId: employeeAId.toString() }) }
+    );
+    assert(
+      resDeactivated.status === 401,
+      "Immediate session invalidation: Deactivated user receives HTTP 401 Unauthorized"
+    );
+
+    // Reactivate adminA
+    await UserModel.findByIdAndUpdate(adminAId, { isActive: true });
+    const resReactivated = await PATCH(
+      makeRequest("PATCH", `http://localhost/api/admin/users/${employeeAId}`, { name: "Employee A Valid" }),
+      { params: Promise.resolve({ userId: employeeAId.toString() }) }
+    );
+    assert(resReactivated.status === 200, "Reactivated user can access API again (HTTP 200)");
+
+    console.log("\n--- PRIORITY 2: PRIVILEGE ESCALATION PREVENTION (SELF-PATCH & SCOPE) ---");
+
+    // Test 3: Standard Admin attempting to escalate own role to super_admin
+    const resSelfRole = await PATCH(
+      makeRequest("PATCH", `http://localhost/api/admin/users/${adminAId}`, { role: "super_admin" }),
+      { params: Promise.resolve({ userId: adminAId.toString() }) }
+    );
+    assert(resSelfRole.status === 403, "Self-PATCH: Disallow role change on own account (HTTP 403)");
+
+    // Test 4: Standard Admin attempting to grant themselves groupViewAccess
+    const resSelfGroupView = await PATCH(
+      makeRequest("PATCH", `http://localhost/api/admin/users/${adminAId}`, { groupViewAccess: true }),
+      { params: Promise.resolve({ userId: adminAId.toString() }) }
+    );
+    assert(
+      resSelfGroupView.status === 403,
+      "Self-PATCH: Disallow granting groupViewAccess on own account (HTTP 403)"
+    );
+
+    // Test 5: Standard Admin attempting to assign unauthorized company to themselves
+    const resSelfCompany = await PATCH(
+      makeRequest("PATCH", `http://localhost/api/admin/users/${adminAId}`, { companyIds: [companyBId.toString()] }),
+      { params: Promise.resolve({ userId: adminAId.toString() }) }
+    );
+    assert(
+      resSelfCompany.status === 403,
+      "Self-PATCH: Disallow altering company scopes on own account (HTTP 403)"
+    );
+
+    // Test 6: Standard Admin legitimate self-service profile update (name, phone)
+    const resSelfValid = await PATCH(
+      makeRequest("PATCH", `http://localhost/api/admin/users/${adminAId}`, { name: "Admin A Updated", phone: "+971501112233" }),
+      { params: Promise.resolve({ userId: adminAId.toString() }) }
+    );
+    assert(
+      resSelfValid.status === 200,
+      "Self-PATCH: Legitimate profile update (name, phone) allowed (HTTP 200)"
+    );
+
+    console.log("\n--- PRIORITY 2: PEER & SUPER ADMIN PROTECTION ---");
+
+    // Test 7: Standard Admin attempting to modify peer Admin
+    const resAdminModAdmin = await PATCH(
+      makeRequest("PATCH", `http://localhost/api/admin/users/${adminBId}`, { name: "Tampered Peer" }),
+      { params: Promise.resolve({ userId: adminBId.toString() }) }
+    );
+    assert(resAdminModAdmin.status === 403, "Admin cannot modify peer Admin account (HTTP 403)");
+
+    // Test 8: Standard Admin attempting to modify Super Admin
+    const resAdminModSuper = await PATCH(
+      makeRequest("PATCH", `http://localhost/api/admin/users/${superAdmin1Id}`, { name: "Tampered Super" }),
+      { params: Promise.resolve({ userId: superAdmin1Id.toString() }) }
+    );
+    assert(resAdminModSuper.status === 403, "Admin cannot modify Super Admin account (HTTP 403)");
+
+    // Test 9: Standard Admin attempting to deactivate peer Admin
+    const resAdminDeactivateAdmin = await DELETE(
+      makeRequest("DELETE", `http://localhost/api/admin/users/${adminBId}`),
+      { params: Promise.resolve({ userId: adminBId.toString() }) }
+    );
+    assert(resAdminDeactivateAdmin.status === 403, "Admin cannot deactivate peer Admin account (HTTP 403)");
+
+    // Test 10: Standard Admin attempting to deactivate Super Admin
+    const resAdminDeactivateSuper = await DELETE(
+      makeRequest("DELETE", `http://localhost/api/admin/users/${superAdmin1Id}`),
+      { params: Promise.resolve({ userId: superAdmin1Id.toString() }) }
+    );
+    assert(resAdminDeactivateSuper.status === 403, "Admin cannot deactivate Super Admin account (HTTP 403)");
+
+    console.log("\n--- PRIORITY 2: CROSS-COMPANY ISOLATION ---");
+
+    // Test 11: Admin A attempting to manage Employee B (outside Company A scope)
+    const resCrossCompany = await PATCH(
+      makeRequest("PATCH", `http://localhost/api/admin/users/${employeeBId}`, { name: "Tampered Employee B" }),
+      { params: Promise.resolve({ userId: employeeBId.toString() }) }
+    );
+    assert(
+      resCrossCompany.status === 403,
+      "Cross-Company Isolation: Admin cannot manage user outside authorized scope (HTTP 403)"
+    );
+
+    // Test 12: Admin A attempting to assign unauthorized Company B to Employee A
+    const resAssignUnauthorizedComp = await PATCH(
+      makeRequest("PATCH", `http://localhost/api/admin/users/${employeeAId}`, { companyIds: [companyAId.toString(), companyBId.toString()] }),
+      { params: Promise.resolve({ userId: employeeAId.toString() }) }
+    );
+    assert(
+      resAssignUnauthorizedComp.status === 403,
+      "Scope Boundary: Admin cannot assign companies outside authorized scope (HTTP 403)"
+    );
+
+    console.log("\n--- PRIORITY 3: PERMANENT DELETION BEING DISABLED ---");
+
+    // Switch to Super Admin session for deletion tests
+    __setTestSession({ user: { id: superAdmin1Id.toString(), role: "super_admin" } });
+
+    // Test 13: Attempt permanent deletion mode
+    const resPermanentDelete = await DELETE(
+      makeRequest("DELETE", `http://localhost/api/admin/users/${employeeAId}?mode=permanent`),
+      { params: Promise.resolve({ userId: employeeAId.toString() }) }
+    );
+    assert(
+      resPermanentDelete.status === 400,
+      "Permanent deletion is disabled by policy to maintain audit immutability (HTTP 400)"
+    );
+    const bodyPerm = await resPermanentDelete.json();
+    assert(
+      bodyPerm.message.includes("disabled in FinCore ERP"),
+      "API explicitly explains ledger immutability and directs to safe deactivation"
+    );
+
+    // Verify user is still in DB
+    const empStillExists = await UserModel.findById(employeeAId);
+    assert(Boolean(empStillExists), "User record remains intact in database");
+
+    // Test 14: User cannot deactivate self
+    const resSelfDeactivate = await DELETE(
+      makeRequest("DELETE", `http://localhost/api/admin/users/${superAdmin1Id}`),
+      { params: Promise.resolve({ userId: superAdmin1Id.toString() }) }
+    );
+    assert(resSelfDeactivate.status === 400, "Users cannot deactivate their own account (HTTP 400)");
+
+    console.log("\n--- PRIORITY 4: LAST ACTIVE SUPER ADMIN & CONCURRENCY PROTECTION ---");
+
+    // Test 15 & 16: Last active Super Admin Protection
+    // Isolate external DB super admins so only superAdmin1 & superAdmin2 are active
+    const externalSuperAdmins = await UserModel.find({
+      _id: { $nin: [superAdmin1Id, superAdmin2Id] },
+      role: "super_admin",
+      isActive: { $ne: false },
+    }).select("_id").lean();
+    otherSuperAdminIds = externalSuperAdmins.map((u) => u._id);
+
+    if (otherSuperAdminIds.length > 0) {
+      await UserModel.updateMany({ _id: { $in: otherSuperAdminIds } }, { $set: { isActive: false } });
     }
+
+    // Ensure superAdmin1 & superAdmin2 are both active
+    await UserModel.findByIdAndUpdate(superAdmin1Id, { isActive: true, role: "super_admin" });
+    await UserModel.findByIdAndUpdate(superAdmin2Id, { isActive: true, role: "super_admin" });
+
+    // Test 15: SuperAdmin 1 deactivates SuperAdmin 2 -> succeeds because SuperAdmin 1 remains
+    __setTestSession({ user: { id: superAdmin1Id.toString(), role: "super_admin" } });
+    const resDeactivateSuper2 = await DELETE(
+      makeRequest("DELETE", `http://localhost/api/admin/users/${superAdmin2Id}`),
+      { params: Promise.resolve({ userId: superAdmin2Id.toString() }) }
+    );
+    assert(
+      resDeactivateSuper2.status === 200,
+      "Super Admin 2 deactivation succeeds because Super Admin 1 remains active (HTTP 200)"
+    );
+
+    // Test 16: SuperAdmin 1 is now the SOLE active Super Admin in the entire database.
+    // Attempting to demote SuperAdmin 1 to 'employee' is blocked
+    const resDemoteSoleSuper = await PATCH(
+      makeRequest("PATCH", `http://localhost/api/admin/users/${superAdmin1Id}`, { role: "employee" }),
+      { params: Promise.resolve({ userId: superAdmin1Id.toString() }) }
+    );
+    assert(
+      resDemoteSoleSuper.status === 400 || resDemoteSoleSuper.status === 403,
+      "Demotion of the sole remaining Super Admin is blocked (HTTP 400/403)"
+    );
+
+    // Test 17: Concurrent Race Condition Test
+    // Reactivate Super Admin 2 so exactly 2 exist
+    await UserModel.findByIdAndUpdate(superAdmin2Id, { isActive: true, role: "super_admin" });
+
+    __setTestSession({ user: { id: superAdmin1Id.toString(), role: "super_admin" } });
+    const p1 = DELETE(
+      makeRequest("DELETE", `http://localhost/api/admin/users/${superAdmin2Id}`),
+      { params: Promise.resolve({ userId: superAdmin2Id.toString() }) }
+    );
+
+    // Concurrent request targeting Super Admin 1
+    const p2 = DELETE(
+      makeRequest("DELETE", `http://localhost/api/admin/users/${superAdmin1Id}`),
+      { params: Promise.resolve({ userId: superAdmin1Id.toString() }) }
+    );
+
+    const [r1, r2] = await Promise.all([p1, p2]);
+
+    // Check that both didn't succeed (one must fail or be blocked by self-action/mutex)
+    const activeSuperAdminsRemaining = await UserModel.countDocuments({
+      _id: { $in: [superAdmin1Id, superAdmin2Id] },
+      role: "super_admin",
+      isActive: { $ne: false },
+    });
+    assert(
+      activeSuperAdminsRemaining >= 1,
+      `Concurrency Invariant Preserved: ${activeSuperAdminsRemaining} Super Admin(s) remain active (never 0)`
+    );
+
+    console.log("\n--- PRIORITY 6: ERROR HANDLING & MALFORMED IDENTIFIERS ---");
+
+    // Test 18: Malformed user ID (invalid ObjectId)
+    const resMalformed = await PATCH(
+      makeRequest("PATCH", `http://localhost/api/admin/users/not-a-valid-objectid`, { name: "Malformed" }),
+      { params: Promise.resolve({ userId: "not-a-valid-objectid" }) }
+    );
+    assert(
+      resMalformed.status === 400,
+      "Malformed User ID returns HTTP 400 without internal crash"
+    );
+
+    // Test 19: Nonexistent user ID
+    const nonExistentId = new mongoose.Types.ObjectId().toString();
+    const resNonExistent = await PATCH(
+      makeRequest("PATCH", `http://localhost/api/admin/users/${nonExistentId}`, { name: "Ghost" }),
+      { params: Promise.resolve({ userId: nonExistentId }) }
+    );
+    assert(
+      resNonExistent.status === 404,
+      "Nonexistent User ID returns HTTP 404 Not Found"
+    );
 
   } finally {
-    // Cleanup test artifacts
+    // Cleanup test data
+    __setTestSession(null);
+    if (otherSuperAdminIds.length > 0) {
+      await UserModel.updateMany({ _id: { $in: otherSuperAdminIds } }, { $set: { isActive: true } });
+    }
     await UserModel.deleteMany({
-      _id: { $in: [superAdmin1Id, superAdmin2Id, admin1Id, admin2Id, employeeCleanId, employeeLinkedId] },
+      _id: { $in: [superAdmin1Id, superAdmin2Id, adminAId, adminBId, employeeAId, employeeBId] },
     });
-    await TransferModel.deleteMany({ createdBy: employeeLinkedId });
+    await CompanyModel.deleteMany({
+      _id: { $in: [companyAId, companyBId] },
+    });
     await mongoose.disconnect();
   }
 
   console.log("\n=======================================================================");
-  console.log(`  RBAC & SAFE DELETION TESTS: ${passed} PASSED, ${failed} FAILED`);
+  console.log(`  REAL API REGRESSION TESTS: ${passed} PASSED, ${failed} FAILED`);
   console.log("=======================================================================\n");
 
   if (failed > 0) {
@@ -255,7 +419,7 @@ async function runRbacAndDeletionTests() {
   }
 }
 
-runRbacAndDeletionTests().catch((err) => {
-  console.error("Test execution failed:", err);
+runRealApiSecuritySuite().catch((err) => {
+  console.error("Test execution failed with error:", err);
   process.exit(1);
 });

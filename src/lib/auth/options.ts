@@ -138,9 +138,14 @@ export const authOptions: NextAuthOptions = {
       } else if (token.sub) {
         try {
           await connectDB();
-          const dbUser = await UserModel.findById(token.sub).select("role").lean();
-          if (dbUser && dbUser.role) {
+          const dbUser = await UserModel.findById(token.sub).select("role isActive").lean();
+          if (!dbUser || dbUser.isActive === false) {
+            token.role = undefined;
+            token.sub = undefined;
+            (token as any).isDeactivated = true;
+          } else if (dbUser.role) {
             token.role = dbUser.role as string;
+            (token as any).isDeactivated = false;
           }
         } catch {
           // Keep existing token.role if DB check encounters transient error
@@ -149,6 +154,10 @@ export const authOptions: NextAuthOptions = {
       return token;
     },
     async session({ session, token }) {
+      if ((token as any).isDeactivated || !token.sub || !token.role) {
+        session.user = { id: "", role: "", email: "", name: "" } as any;
+        return session;
+      }
       if (session.user) {
         session.user.id = token.sub ?? "";
         session.user.role = (token.role as string) ?? "employee";

@@ -37,7 +37,7 @@ export async function getUserAccessInfo(
   }
 
   const userDoc = await UserModel.findById(userId)
-    .select("role companyMemberships defaultCompanyId")
+    .select("role companyMemberships defaultCompanyId companyIds primaryCompanyId")
     .lean();
 
   if (!userDoc) {
@@ -71,6 +71,16 @@ export async function getUserAccessInfo(
 
   if (userDoc.defaultCompanyId) {
     assignedIdsSet.add(userDoc.defaultCompanyId.toString());
+  }
+
+  if (Array.isArray((userDoc as any).companyIds)) {
+    (userDoc as any).companyIds.forEach((cId: any) => {
+      if (cId) assignedIdsSet.add(cId.toString());
+    });
+  }
+
+  if ((userDoc as any).primaryCompanyId) {
+    assignedIdsSet.add((userDoc as any).primaryCompanyId.toString());
   }
 
   let assignedCompanyIds = Array.from(assignedIdsSet);
