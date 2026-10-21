@@ -22,8 +22,11 @@ async function updateSuperAdminWithAtomicGuard(
   updates: Record<string, unknown>
 ): Promise<void> {
   const db = await connectDB();
-  const topology = (db.connection as any).client?.topology?.description?.type;
-  const supportsTransactions = topology === "ReplicaSetWithPrimary" || topology === "Sharded";
+  const client = (db.connection as any).client || (mongoose.connection as any).client;
+  const topology = client?.topology?.description?.type;
+  const supportsTransactions =
+    (topology === "ReplicaSetWithPrimary" || topology === "Sharded") &&
+    typeof db.startSession === "function";
 
   if (supportsTransactions) {
     const session = await db.startSession();
@@ -54,18 +57,13 @@ async function updateSuperAdminWithAtomicGuard(
       await session.endSession();
     }
   } else {
-    // Standalone fallback
-    const otherActiveSuperAdmins = await UserModel.countDocuments({
-      _id: { $ne: targetUserId },
-      role: "super_admin",
-      isActive: { $ne: false },
-    });
-    if (otherActiveSuperAdmins === 0) {
-      const err = new Error("Cannot demote or deactivate the only active Super Admin. At least one Super Admin must remain active.");
-      (err as any).statusCode = 400;
-      throw err;
-    }
-    await UserModel.findByIdAndUpdate(targetUserId, { $set: updates });
+    // Standalone MongoDB instances do not support multi-document ACID transactions or mutex-guaranteed atomic guards.
+    // Fail closed to prevent TOCTOU race conditions from destroying the sole remaining Super Admin account.
+    const err = new Error(
+      "Configuration Error: Super Admin role modifications and deactivations require a replica set or sharded MongoDB cluster to guarantee atomicity. Standalone MongoDB topology does not support multi-document transactions."
+    );
+    (err as any).statusCode = 500;
+    throw err;
   }
 }
 

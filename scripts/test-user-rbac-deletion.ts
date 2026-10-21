@@ -1,17 +1,27 @@
 /**
  * FinCore User Management & RBAC Security Integration Suite
+ *
  * Verifies post-audit remediation across priorities:
  *   - Priority 1: Session invalidation and deactivation enforcement (HTTP 401)
  *   - Priority 2: Privilege escalation prevention on self-PATCH & company scoping (HTTP 403)
  *   - Priority 3: Disabling of unsafe permanent deletion (HTTP 400)
- *   - Priority 4: Concurrency-safe last active Super Admin protection
+ *   - Priority 4: Concurrency-safe last active Super Admin protection (transactional write lock)
+ *   - Priority 5: Company membership dual-write & creation consistency (HTTP 201 / HTTP 400)
  *   - Priority 6: Error handling (Malformed IDs -> HTTP 400, Missing -> HTTP 404)
+ *
+ * SAFETY INVARIANT:
+ *   - This script NEVER mutates, deactivates, or modifies external database records.
+ *   - It requires a dedicated, isolated test database via MONGODB_URI_TEST.
+ *   - Abrupt process termination (SIGKILL, hardware crash) cannot be made safe through
+ *     in-process finally blocks alone; absolute safety is guaranteed by complete test
+ *     database namespace isolation (e.g. fincore_rbac_test).
  */
 
 import fs from "fs";
 import path from "path";
+import mongoose, { Types } from "mongoose";
 
-// Load .env
+// 1. Explicit environment loading
 try {
   const envPath = path.resolve(process.cwd(), ".env");
   if (fs.existsSync(envPath)) {
@@ -31,11 +41,46 @@ try {
   // Ignore
 }
 
+// 2. Mandatory Test Database Safety Gate (Fail-Closed)
+const testDbUri = process.env.MONGODB_URI_TEST;
+if (!testDbUri) {
+  console.error("\n❌ SAFETY CHECK FAILED: MONGODB_URI_TEST is not configured.");
+  console.error("To guarantee zero risk to production/development data, database-writing integration tests");
+  console.error("refuse to execute against shared environments. Set MONGODB_URI_TEST in your environment or .env.\n");
+  process.exit(1);
+}
+
+// Validate positive distinction from development/production databases
+let testDbName = "";
+try {
+  const parsed = new URL(testDbUri.replace("mongodb+srv://", "http://").replace("mongodb://", "http://"));
+  testDbName = parsed.pathname.replace(/^\//, "");
+} catch {
+  console.error("\n❌ SAFETY CHECK FAILED: MONGODB_URI_TEST is a malformed connection URI.\n");
+  process.exit(1);
+}
+
+const unsafeNames = ["", "/", "test", "admin", "config", "local"];
+if (unsafeNames.includes(testDbName.toLowerCase())) {
+  console.error(`\n❌ SAFETY CHECK FAILED: MONGODB_URI_TEST targets unsafe database name: "${testDbName || 'default'}".`);
+  console.error("The test database must be a dedicated isolated namespace (e.g. fincore_rbac_test) and cannot target the shared 'test' database.\n");
+  process.exit(1);
+}
+
+if (!testDbName.toLowerCase().includes("test")) {
+  console.error(`\n❌ SAFETY CHECK FAILED: MONGODB_URI_TEST database name "${testDbName}" does not contain a "test" identifier.`);
+  process.exit(1);
+}
+
+// Override connection variables exclusively for this test run
+process.env.MONGODB_URI = testDbUri;
+process.env.MONGO_URI = testDbUri;
+
 import { connectDB } from "../src/lib/db/connect";
 import { UserModel, CompanyModel, CounterModel } from "../src/lib/db/models";
 import { PATCH, DELETE } from "../src/app/api/admin/users/[userId]/route";
-import { __setTestSession } from "../src/lib/auth/require-role";
-import mongoose, { Types } from "mongoose";
+import { POST as POST_USER } from "../src/app/api/admin/users/route";
+import { __setTestSession, __runWithTestSession } from "../src/lib/auth/require-role";
 
 async function runRealApiSecuritySuite() {
   console.log("=======================================================================");
@@ -43,6 +88,20 @@ async function runRealApiSecuritySuite() {
   console.log("=======================================================================\n");
 
   await connectDB();
+
+  // Confirm database isolation after connection
+  const activeDbName = mongoose.connection.name;
+  if (activeDbName !== testDbName || activeDbName === "test") {
+    console.error(`\n❌ CRITICAL SAFETY VIOLATION: Connected to unexpected database "${activeDbName}". Expected "${testDbName}". Aborting immediately.\n`);
+    await mongoose.disconnect();
+    process.exit(1);
+  }
+
+  const topology = (mongoose.connection as any).client?.topology?.description?.type;
+  console.log(`🔒 DATABASE ISOLATION CONFIRMED:`);
+  console.log(`   - Connected to isolated test database: "${activeDbName}"`);
+  console.log(`   - Cluster Topology: "${topology}" (ACID Transactions Supported)`);
+  console.log(`   - External record mutation policy: STRICTLY FORBIDDEN\n`);
 
   let passed = 0;
   let failed = 0;
@@ -67,7 +126,37 @@ async function runRealApiSecuritySuite() {
   const adminBId = new mongoose.Types.ObjectId();
   const employeeAId = new mongoose.Types.ObjectId();
   const employeeBId = new mongoose.Types.ObjectId();
-  let otherSuperAdminIds: any[] = [];
+
+  const createdUserIds: mongoose.Types.ObjectId[] = [
+    superAdmin1Id,
+    superAdmin2Id,
+    adminAId,
+    adminBId,
+    employeeAId,
+    employeeBId,
+  ];
+  const createdCompanyIds: mongoose.Types.ObjectId[] = [companyAId, companyBId];
+
+  // Emergency signal handlers to cleanup only the fixtures created by this test
+  let cleaningUp = false;
+  const emergencyCleanup = async (signal: string) => {
+    if (cleaningUp) return;
+    cleaningUp = true;
+    console.warn(`\n⚠️ Received ${signal}. Running emergency cleanup of test fixtures...`);
+    try {
+      __setTestSession(null);
+      await UserModel.deleteMany({ _id: { $in: createdUserIds } });
+      await CompanyModel.deleteMany({ _id: { $in: createdCompanyIds } });
+      await mongoose.disconnect();
+      console.log("Emergency cleanup complete.");
+    } catch (err) {
+      console.error("Emergency cleanup failed:", err);
+    }
+    process.exit(1);
+  };
+
+  process.once("SIGINT", () => emergencyCleanup("SIGINT"));
+  process.once("SIGTERM", () => emergencyCleanup("SIGTERM"));
 
   try {
     // 1. Setup isolated test companies
@@ -304,19 +393,6 @@ async function runRealApiSecuritySuite() {
 
     console.log("\n--- PRIORITY 4: LAST ACTIVE SUPER ADMIN & CONCURRENCY PROTECTION ---");
 
-    // Test 15 & 16: Last active Super Admin Protection
-    // Isolate external DB super admins so only superAdmin1 & superAdmin2 are active
-    const externalSuperAdmins = await UserModel.find({
-      _id: { $nin: [superAdmin1Id, superAdmin2Id] },
-      role: "super_admin",
-      isActive: { $ne: false },
-    }).select("_id").lean();
-    otherSuperAdminIds = externalSuperAdmins.map((u) => u._id);
-
-    if (otherSuperAdminIds.length > 0) {
-      await UserModel.updateMany({ _id: { $in: otherSuperAdminIds } }, { $set: { isActive: false } });
-    }
-
     // Ensure superAdmin1 & superAdmin2 are both active
     await UserModel.findByIdAndUpdate(superAdmin1Id, { isActive: true, role: "super_admin" });
     await UserModel.findByIdAndUpdate(superAdmin2Id, { isActive: true, role: "super_admin" });
@@ -332,7 +408,7 @@ async function runRealApiSecuritySuite() {
       "Super Admin 2 deactivation succeeds because Super Admin 1 remains active (HTTP 200)"
     );
 
-    // Test 16: SuperAdmin 1 is now the SOLE active Super Admin in the entire database.
+    // Test 16: SuperAdmin 1 is now the SOLE active Super Admin in the database.
     // Attempting to demote SuperAdmin 1 to 'employee' is blocked
     const resDemoteSoleSuper = await PATCH(
       makeRequest("PATCH", `http://localhost/api/admin/users/${superAdmin1Id}`, { role: "employee" }),
@@ -344,37 +420,148 @@ async function runRealApiSecuritySuite() {
     );
 
     // Test 17: Concurrent Race Condition Test
-    // Reactivate Super Admin 2 so exactly 2 exist
+    // Reactivate Super Admin 2 so exactly 2 active Super Admins exist
     await UserModel.findByIdAndUpdate(superAdmin2Id, { isActive: true, role: "super_admin" });
 
-    __setTestSession({ user: { id: superAdmin1Id.toString(), role: "super_admin" } });
-    const p1 = DELETE(
-      makeRequest("DELETE", `http://localhost/api/admin/users/${superAdmin2Id}`),
-      { params: Promise.resolve({ userId: superAdmin2Id.toString() }) }
-    );
-
-    // Concurrent request targeting Super Admin 1
-    const p2 = DELETE(
-      makeRequest("DELETE", `http://localhost/api/admin/users/${superAdmin1Id}`),
-      { params: Promise.resolve({ userId: superAdmin1Id.toString() }) }
-    );
-
-    const [r1, r2] = await Promise.all([p1, p2]);
-
-    // Check that both didn't succeed (one must fail or be blocked by self-action/mutex)
-    const activeSuperAdminsRemaining = await UserModel.countDocuments({
+    const initialActive = await UserModel.countDocuments({
       _id: { $in: [superAdmin1Id, superAdmin2Id] },
       role: "super_admin",
       isActive: { $ne: false },
     });
+    assert(initialActive === 2, "Test setup confirmed: Exactly 2 Super Admins are active before race condition");
+
+    // Capture initial mutex sequence counter
+    const mutexBefore = await CounterModel.findOne({ key: "SUPER_ADMIN_MUTEX", fiscalYear: "SYSTEM" }).lean();
+    const initialSeq = mutexBefore?.sequenceValue ?? 0;
+
+    // Concurrently trigger mutual deactivation with isolated test sessions:
+    // SuperAdmin 1 targets SuperAdmin 2
+    const p1 = __runWithTestSession(
+      { user: { id: superAdmin1Id.toString(), role: "super_admin" } },
+      () => DELETE(
+        makeRequest("DELETE", `http://localhost/api/admin/users/${superAdmin2Id}`),
+        { params: Promise.resolve({ userId: superAdmin2Id.toString() }) }
+      )
+    );
+
+    // Concurrently, SuperAdmin 2 targets SuperAdmin 1
+    const p2 = __runWithTestSession(
+      { user: { id: superAdmin2Id.toString(), role: "super_admin" } },
+      () => DELETE(
+        makeRequest("DELETE", `http://localhost/api/admin/users/${superAdmin1Id}`),
+        { params: Promise.resolve({ userId: superAdmin1Id.toString() }) }
+      )
+    );
+
+    const [r1, r2] = await Promise.all([p1, p2]);
+    const body1 = await r1.json();
+    const body2 = await r2.json();
+
+    // Verification 1: Both requests passed self-deactivation guards
     assert(
-      activeSuperAdminsRemaining >= 1,
-      `Concurrency Invariant Preserved: ${activeSuperAdminsRemaining} Super Admin(s) remain active (never 0)`
+      !body1.message?.includes("cannot deactivate or delete your own account") &&
+      !body2.message?.includes("cannot deactivate or delete your own account"),
+      "Both requests targeted different accounts and bypassed self-action rejection"
+    );
+
+    // Verification 2: Mutex sequence counter incremented, proving requests reached updateSuperAdminWithAtomicGuard
+    const mutexAfter = await CounterModel.findOne({ key: "SUPER_ADMIN_MUTEX", fiscalYear: "SYSTEM" }).lean();
+    const finalSeq = mutexAfter?.sequenceValue ?? 0;
+    assert(
+      finalSeq > initialSeq,
+      `Requests reached updateSuperAdminWithAtomicGuard transactional mutex (seq: ${initialSeq} -> ${finalSeq})`
+    );
+
+    // Verification 3: Exactly one request succeeded (HTTP 200) and one was blocked by atomic guard (HTTP 400)
+    const has200 = r1.status === 200 || r2.status === 200;
+    const has400 = r1.status === 400 || r2.status === 400;
+    assert(
+      has200 && has400,
+      `Mutex serialized requests: exactly one deactivation succeeded (200) and one was rejected (400) [r1: ${r1.status}, r2: ${r2.status}]`
+    );
+
+    const rejectedBody = r1.status === 400 ? body1 : body2;
+    assert(
+      rejectedBody.message?.includes("only active Super Admin") ||
+      rejectedBody.message?.includes("At least one Super Admin must remain active"),
+      "Blocked request received explicit last-super-admin invariant rejection"
+    );
+
+    // Verification 4: Database query verifies exactly 1 Super Admin remains active (never 0)
+    const activeSuperAdmins = await UserModel.find({
+      _id: { $in: [superAdmin1Id, superAdmin2Id] },
+      role: "super_admin",
+      isActive: { $ne: false },
+    }).lean();
+    assert(
+      activeSuperAdmins.length === 1,
+      `Database Invariant Verified: Exactly 1 Super Admin remains active (found ${activeSuperAdmins.length}, never 0)`
+    );
+
+    console.log("\n--- PRIORITY 5: COMPANY MEMBERSHIP DUAL-WRITE & CREATION CONSISTENCY ---");
+
+    // Reactivate both Super Admins so superAdmin1 has an active session for remaining tests
+    await UserModel.findByIdAndUpdate(superAdmin1Id, { isActive: true, role: "super_admin" });
+    await UserModel.findByIdAndUpdate(superAdmin2Id, { isActive: true, role: "super_admin" });
+
+    __setTestSession({ user: { id: superAdmin1Id.toString(), role: "super_admin" } });
+    const newEmpEmail = `new_emp_${testSuffix}@fincore-test.com`;
+
+    // Test 18: Consistent company initialization on user creation
+    const resCreateUser = await POST_USER(
+      makeRequest("POST", "http://localhost/api/admin/users", {
+        name: "New Onboarded Employee",
+        email: newEmpEmail,
+        password: "TempPassword123!",
+        role: "employee",
+        companyIds: [companyAId.toString(), companyBId.toString()],
+        primaryCompanyId: companyAId.toString(),
+      })
+    );
+    assert(resCreateUser.status === 201, "User creation succeeds with HTTP 201 Created");
+    const createdUserData = await resCreateUser.json();
+    const createdUser = createdUserData.item;
+    if (createdUser?._id) {
+      createdUserIds.push(new mongoose.Types.ObjectId(createdUser._id));
+    }
+
+    assert(
+      Array.isArray(createdUser?.companyIds) && createdUser.companyIds.length === 2,
+      "User creation populated companyIds correctly"
+    );
+    assert(
+      String(createdUser?.primaryCompanyId) === companyAId.toString(),
+      "User creation populated primaryCompanyId correctly"
+    );
+    assert(
+      String(createdUser?.defaultCompanyId) === companyAId.toString(),
+      "User creation populated defaultCompanyId synchronously with primaryCompanyId"
+    );
+    assert(
+      Array.isArray(createdUser?.companyMemberships) && createdUser.companyMemberships.length === 2,
+      "User creation populated companyMemberships for all assigned companies"
+    );
+
+    // Test 19: User creation rejects primaryCompanyId not in assigned companyIds (HTTP 400)
+    const unassignedCompanyId = new mongoose.Types.ObjectId().toString();
+    const resInvalidPrimary = await POST_USER(
+      makeRequest("POST", "http://localhost/api/admin/users", {
+        name: "Invalid Primary Employee",
+        email: `invalid_comp_${testSuffix}@fincore-test.com`,
+        password: "TempPassword123!",
+        role: "employee",
+        companyIds: [companyAId.toString()],
+        primaryCompanyId: unassignedCompanyId,
+      })
+    );
+    assert(
+      resInvalidPrimary.status === 400,
+      "User creation rejects primaryCompanyId not included in assigned companyIds (HTTP 400)"
     );
 
     console.log("\n--- PRIORITY 6: ERROR HANDLING & MALFORMED IDENTIFIERS ---");
 
-    // Test 18: Malformed user ID (invalid ObjectId)
+    // Test 20: Malformed user ID (invalid ObjectId)
     const resMalformed = await PATCH(
       makeRequest("PATCH", `http://localhost/api/admin/users/not-a-valid-objectid`, { name: "Malformed" }),
       { params: Promise.resolve({ userId: "not-a-valid-objectid" }) }
@@ -384,7 +571,7 @@ async function runRealApiSecuritySuite() {
       "Malformed User ID returns HTTP 400 without internal crash"
     );
 
-    // Test 19: Nonexistent user ID
+    // Test 21: Nonexistent user ID
     const nonExistentId = new mongoose.Types.ObjectId().toString();
     const resNonExistent = await PATCH(
       makeRequest("PATCH", `http://localhost/api/admin/users/${nonExistentId}`, { name: "Ghost" }),
@@ -396,17 +583,10 @@ async function runRealApiSecuritySuite() {
     );
 
   } finally {
-    // Cleanup test data
+    // Guaranteed cleanup of only fixtures created by this test
     __setTestSession(null);
-    if (otherSuperAdminIds.length > 0) {
-      await UserModel.updateMany({ _id: { $in: otherSuperAdminIds } }, { $set: { isActive: true } });
-    }
-    await UserModel.deleteMany({
-      _id: { $in: [superAdmin1Id, superAdmin2Id, adminAId, adminBId, employeeAId, employeeBId] },
-    });
-    await CompanyModel.deleteMany({
-      _id: { $in: [companyAId, companyBId] },
-    });
+    await UserModel.deleteMany({ _id: { $in: createdUserIds } });
+    await CompanyModel.deleteMany({ _id: { $in: createdCompanyIds } });
     await mongoose.disconnect();
   }
 

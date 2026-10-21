@@ -1,21 +1,32 @@
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth/options";
 import { connection } from "next/server";
+import { AsyncLocalStorage } from "async_hooks";
 
 import { connectDB } from "@/lib/db/connect";
 import { UserModel } from "@/lib/db/models";
 
+export const testSessionStorage = new AsyncLocalStorage<any>();
 let _testSessionOverride: any = null;
+
 export function __setTestSession(session: any) {
   if (process.env.NODE_ENV === "production") return;
   _testSessionOverride = session;
 }
 
+export function __runWithTestSession<T>(session: any, fn: () => T): T {
+  if (process.env.NODE_ENV === "production") return fn();
+  return testSessionStorage.run(session, fn);
+}
+
 export async function requireSession() {
-  if (!_testSessionOverride) {
+  const localOverride = testSessionStorage.getStore();
+  const effectiveOverride = localOverride || _testSessionOverride;
+
+  if (!effectiveOverride) {
     await connection();
   }
-  const session = _testSessionOverride ? { ..._testSessionOverride } : await getServerSession(authOptions);
+  const session = effectiveOverride ? { ...effectiveOverride } : await getServerSession(authOptions);
   if (!session?.user?.id) {
     throw new Error("UNAUTHORIZED");
   }

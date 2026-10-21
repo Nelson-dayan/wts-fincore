@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { Types } from "mongoose";
 import { connectDB } from "@/lib/db/connect";
 import { UserModel } from "@/lib/db/models";
 import { requireRole } from "@/lib/auth/require-role";
@@ -47,27 +48,37 @@ export async function GET(req: Request) {
 
     const [usersRaw, total] = await Promise.all([
       UserModel.find(filter)
-      .select("name email role isActive phone phoneNumber companyIds groupIds groupViewAccess primaryCompanyId signatureUrl createdAt updatedAt")
+      .select("name email role isActive phone phoneNumber companyIds groupIds groupViewAccess primaryCompanyId defaultCompanyId companyMemberships signatureUrl createdAt updatedAt")
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit)
       .lean(),
       UserModel.countDocuments(filter),
     ]);
-    const users = usersRaw.map((user) => ({
-      ...user,
-      role: user.role ?? "employee",
-      companyIds: (user.companyIds || []).map(String),
-      groupIds: (user.groupIds || []).map(String),
-      groupViewAccess: Boolean(user.groupViewAccess),
-      primaryCompanyId: user.primaryCompanyId ? String(user.primaryCompanyId) : "",
-      phone:
-        String(
-          (user as { phone?: string }).phone ??
-            (user as { phoneNumber?: string }).phoneNumber ??
-            ""
-        ) || "",
-    }));
+    const users = usersRaw.map((user) => {
+      const assignedFromMemberships = ((user as any).companyMemberships || []).map((m: any) => String(m.companyId));
+      const directCompanyIds = (user.companyIds || []).map(String);
+      const unifiedCompanyIds = Array.from(new Set([...directCompanyIds, ...assignedFromMemberships]));
+      const primaryCompanyId = user.primaryCompanyId
+        ? String(user.primaryCompanyId)
+        : ((user as any).defaultCompanyId ? String((user as any).defaultCompanyId) : (unifiedCompanyIds[0] || ""));
+
+      return {
+        ...user,
+        role: user.role ?? "employee",
+        companyIds: unifiedCompanyIds,
+        groupIds: (user.groupIds || []).map(String),
+        groupViewAccess: Boolean(user.groupViewAccess),
+        primaryCompanyId,
+        defaultCompanyId: primaryCompanyId || null,
+        phone:
+          String(
+            (user as { phone?: string }).phone ??
+              (user as { phoneNumber?: string }).phoneNumber ??
+              ""
+          ) || "",
+      };
+    });
     return NextResponse.json({
       users,
       items: users,
@@ -149,7 +160,17 @@ export async function POST(req: Request) {
           { status: 403 }
         );
       }
-      if (!body.primaryCompanyId && body.companyIds.length > 0) {
+    }
+
+    // Validate that the primary/default company is one of the assigned companies
+    if (Array.isArray(body.companyIds) && body.companyIds.length > 0) {
+      if (body.primaryCompanyId && !body.companyIds.includes(body.primaryCompanyId)) {
+        return NextResponse.json(
+          { message: "Primary company must be one of the assigned companies." },
+          { status: 400 }
+        );
+      }
+      if (!body.primaryCompanyId) {
         body.primaryCompanyId = body.companyIds[0];
       }
     }
@@ -168,21 +189,43 @@ export async function POST(req: Request) {
 
     await connectDB();
 
-    const updateFields: Record<string, unknown> = {};
-    if (body.role && ["admin", "employee", "super_admin"].includes(body.role)) {
-      updateFields.role = body.role;
-    }
+    const targetRole = (body.role && ["admin", "employee", "super_admin"].includes(body.role))
+      ? body.role
+      : "employee";
+
+    const updateFields: Record<string, unknown> = {
+      role: targetRole,
+    };
+
     if (Array.isArray(body.companyIds)) {
-      updateFields.companyIds = body.companyIds;
+      const validCompanyIds = body.companyIds.filter((id) => Types.ObjectId.isValid(id));
+      updateFields.companyIds = validCompanyIds.map((cId) => new Types.ObjectId(cId));
+
+      const primaryCompIdStr = body.primaryCompanyId && Types.ObjectId.isValid(body.primaryCompanyId)
+        ? String(body.primaryCompanyId)
+        : (validCompanyIds[0] ? String(validCompanyIds[0]) : null);
+
+      const membershipRole = targetRole === "admin"
+        ? "company_admin"
+        : (targetRole === "super_admin" ? "group_admin" : "employee");
+
+      updateFields.companyMemberships = validCompanyIds.map((cId) => ({
+        companyId: new Types.ObjectId(cId),
+        role: membershipRole,
+        permissions: [],
+        isDefault: primaryCompIdStr ? String(cId) === primaryCompIdStr : false,
+        joinedAt: new Date(),
+      }));
+
+      updateFields.primaryCompanyId = primaryCompIdStr ? new Types.ObjectId(primaryCompIdStr) : null;
+      updateFields.defaultCompanyId = primaryCompIdStr ? new Types.ObjectId(primaryCompIdStr) : null;
     }
+
     if (Array.isArray(body.groupIds)) {
-      updateFields.groupIds = body.groupIds;
+      updateFields.groupIds = body.groupIds.filter((id) => Types.ObjectId.isValid(id)).map((gId) => new Types.ObjectId(gId));
     }
     if (typeof body.groupViewAccess === "boolean") {
-      updateFields.groupViewAccess = body.groupViewAccess;
-    }
-    if (body.primaryCompanyId) {
-      updateFields.primaryCompanyId = body.primaryCompanyId;
+      updateFields.groupViewAccess = isSuperAdmin ? body.groupViewAccess : false;
     }
 
     let created = await UserModel.findOneAndUpdate(
@@ -190,7 +233,7 @@ export async function POST(req: Request) {
       { $set: updateFields },
       { returnDocument: "after" }
     )
-      .select("_id name email role isActive phone companyIds groupIds groupViewAccess primaryCompanyId createdAt")
+      .select("_id name email role isActive phone companyIds groupIds groupViewAccess primaryCompanyId defaultCompanyId companyMemberships createdAt")
       .lean();
 
     if (created?._id) {
