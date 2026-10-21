@@ -1,10 +1,12 @@
 import { requireRole } from "@/lib/auth/require-role";
+import mongoose from "mongoose";
 import { connectDB } from "@/lib/db/connect";
 import { assessTransitions } from "@/lib/services/orchestration";
 import { QuotationModel, PurchaseOrderModel, InvoiceModel, ProjectModel } from "@/lib/db/models";
 import { apiSuccess, apiError } from "@/lib/api/response";
 import { isNextInternalError } from "@/lib/api/standard-response";
-import mongoose from "mongoose";
+import { authorizeResource } from "@/lib/auth/authorization";
+import type { ResourceAction } from "@/lib/auth/permissions";
 
 export async function GET(req: Request) {
   try {
@@ -44,6 +46,26 @@ export async function GET(req: Request) {
     const doc = await model.findById(entityId).lean();
     if (!doc) {
       return apiError(`${entityType} document not found.`, 404);
+    }
+
+    const targetCompanyId = (doc as any).companyId ? String((doc as any).companyId) : undefined;
+    const targetProjectId = (doc as any).projectId ? String((doc as any).projectId) : (entityType === "project" ? String(doc._id) : undefined);
+
+    const permissionMap: Record<string, ResourceAction> = {
+      quotation: "quotations.view",
+      purchase_order: "purchaseOrders.view",
+      invoice: "invoices.view",
+      project: "projects.view",
+    };
+
+    const auth = await authorizeResource({
+      permission: permissionMap[entityType] || "projects.view",
+      companyId: targetCompanyId,
+      projectId: targetProjectId,
+    });
+
+    if (!auth.authorized) {
+      return apiError(auth.reason || "Forbidden", 403, auth.code);
     }
 
     const recommendations = await assessTransitions({

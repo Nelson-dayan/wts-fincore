@@ -1,44 +1,47 @@
 import { NextResponse } from "next/server";
 import { requireRole } from "@/lib/auth/require-role";
 import { connectDB } from "@/lib/db/connect";
-import { ClientModel, ProjectModel } from "@/lib/db/models";
+import { CompanyModel, ClientModel, ProjectModel } from "@/lib/db/models";
 import { authErrorResponse } from "@/lib/api/route-auth";
 import { parsePagination, parseSearch, escapeRegex } from "@/lib/api/pagination";
 import { logActivity } from "@/lib/services/activity/log-activity.service";
 import { sanitizeText } from "@/lib/security/sanitize";
-
-import { CompanyHierarchyService } from "@/lib/services/business/company-hierarchy.service";
+import { resolveAuthCompanyContext } from "@/lib/auth/company-context";
 
 export async function GET(req: Request) {
   try {
-    await requireRole(["admin"]);
-    await connectDB();
     const url = new URL(req.url);
     const { page, limit, skip } = parsePagination(url.searchParams);
     const q = parseSearch(url.searchParams);
+    const session = await requireRole(["admin"]);
+    await connectDB();
     const targetCompanyId = req.headers.get("x-company-id") || url.searchParams.get("companyId");
     const scopeMode = (req.headers.get("x-scope-mode") || url.searchParams.get("scopeMode")) as "single" | "group" || "single";
 
-    const companyContext = await CompanyHierarchyService.resolveCompanyContext(targetCompanyId, scopeMode);
+    const companyContext = await resolveAuthCompanyContext(session.user, targetCompanyId, scopeMode);
+    const allowedCompanyIds = companyContext.allowedCompanyIds;
+
+    const primaryCompany = await CompanyModel.findOne({ isPrimary: true, isActive: true, deletedAt: null }).select("_id").lean();
+    const isPrimaryActive = primaryCompany && allowedCompanyIds.includes(String(primaryCompany._id));
 
     const filter: Record<string, unknown> = {};
-    if (companyContext.activeCompany?.isPrimary) {
+    if (isPrimaryActive) {
       filter.$or = [
-        { companyId: { $in: companyContext.allowedCompanyIds } },
+        { companyId: { $in: allowedCompanyIds } },
         { companyId: { $exists: false } },
         { companyId: null },
       ];
     } else {
-      filter.companyId = { $in: companyContext.allowedCompanyIds };
+      filter.companyId = { $in: allowedCompanyIds };
     }
 
     if (q) {
-      const escaped = escapeRegex(q);
+      const safeQ = escapeRegex(q);
       const qCond = {
         $or: [
-          { name: { $regex: escaped, $options: "i" } },
-          { company: { $regex: escaped, $options: "i" } },
-          { email: { $regex: escaped, $options: "i" } },
+          { name: { $regex: safeQ, $options: "i" } },
+          { company: { $regex: safeQ, $options: "i" } },
+          { email: { $regex: safeQ, $options: "i" } },
         ],
       };
       if (filter.$or) {
@@ -81,9 +84,6 @@ export async function POST(req: Request) {
     const session = await requireRole(["admin"]);
     await connectDB();
     const url = new URL(req.url);
-    const targetCompanyId = req.headers.get("x-company-id") || url.searchParams.get("companyId");
-    const companyContext = await CompanyHierarchyService.resolveCompanyContext(targetCompanyId, "single");
-
     const body = (await req.json()) as {
       name?: string;
       company?: string;
@@ -106,11 +106,22 @@ export async function POST(req: Request) {
       companyId?: string;
       parentCompanyId?: string;
     };
-    const name = sanitizeText(body.name);
-    const company = sanitizeText(body.company);
-    const email = sanitizeText(body.email).toLowerCase();
-    const phone = sanitizeText(body.phone);
-    const address = sanitizeText(body.address);
+
+    const targetCompanyId = body.companyId || req.headers.get("x-company-id") || url.searchParams.get("companyId");
+    const companyContext = await resolveAuthCompanyContext(session.user, targetCompanyId, "single");
+
+    const effectiveCompanyId = body.companyId || companyContext.activeCompanyId;
+    if (!companyContext.allowedCompanyIds.includes(String(effectiveCompanyId))) {
+      return NextResponse.json(
+        { message: "Target company is outside your authorized operating scope." },
+        { status: 403 }
+      );
+    }
+    const name = sanitizeText(body.name).trim();
+    const company = sanitizeText(body.company).trim();
+    const email = sanitizeText(body.email).trim().toLowerCase();
+    const phone = sanitizeText(body.phone).trim();
+    const address = sanitizeText(body.address).trim();
     if (!name || !company || !email || !phone || !address) {
       return NextResponse.json(
         {
@@ -124,24 +135,24 @@ export async function POST(req: Request) {
     const created = await ClientModel.create({
       name,
       company,
-      website: sanitizeText(body.website),
+      website: sanitizeText(body.website).trim(),
       address,
       email,
       phone,
-      clientLogoUrl: sanitizeText(body.clientLogoText),
-      clientLogoText: sanitizeText(body.clientLogoText),
-      clientSignatureText: sanitizeText(body.clientSignatureText),
-      taxId: sanitizeText(body.taxId),
-      currency: sanitizeText(body.currency || "AED").toUpperCase(),
-      paymentTerms: sanitizeText(body.paymentTerms),
-      notes: sanitizeText(body.notes),
-      billingAddress: sanitizeText(body.billingAddress),
-      shippingAddress: sanitizeText(body.shippingAddress),
-      country: sanitizeText(body.country),
-      state: sanitizeText(body.state),
-      city: sanitizeText(body.city),
-      zipCode: sanitizeText(body.zipCode),
-      companyId: body.companyId ? body.companyId : companyContext.companyId,
+      clientLogoUrl: sanitizeText(body.clientLogoText).trim(),
+      clientLogoText: sanitizeText(body.clientLogoText).trim(),
+      clientSignatureText: sanitizeText(body.clientSignatureText).trim(),
+      taxId: sanitizeText(body.taxId).trim(),
+      currency: sanitizeText(body.currency ?? "AED").trim().toUpperCase(),
+      paymentTerms: sanitizeText(body.paymentTerms).trim(),
+      notes: sanitizeText(body.notes).trim(),
+      billingAddress: sanitizeText(body.billingAddress).trim(),
+      shippingAddress: sanitizeText(body.shippingAddress).trim(),
+      country: sanitizeText(body.country).trim(),
+      state: sanitizeText(body.state).trim(),
+      city: sanitizeText(body.city).trim(),
+      zipCode: sanitizeText(body.zipCode).trim(),
+      companyId: effectiveCompanyId,
       parentCompanyId: body.parentCompanyId ? body.parentCompanyId : undefined,
       createdBy: session.user.id,
     });

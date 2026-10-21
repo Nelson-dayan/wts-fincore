@@ -47,7 +47,16 @@ export function LoginForm() {
     setPending(false);
 
     if (res?.error) {
-      setError("Invalid email or password.");
+      if (
+        res.error.includes("AccountLocked") ||
+        res.error.toLowerCase().includes("locked")
+      ) {
+        setError(
+          "Account is temporarily locked due to multiple failed login attempts. Please try again in 15 minutes."
+        );
+      } else {
+        setError("Invalid email or password.");
+      }
       return;
     }
 

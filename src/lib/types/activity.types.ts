@@ -12,6 +12,8 @@ export const ACTIVITY_ACTIONS = [
   "EXPENSE_CREATED",
   "PAYMENT_DELETED",
   "TRANSFER_CREATED",
+  "TRANSFER_APPROVED",
+  "TRANSFER_REJECTED",
   "created_client",
   "updated_client",
   "deleted_client",

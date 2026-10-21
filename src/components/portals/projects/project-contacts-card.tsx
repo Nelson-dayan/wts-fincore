@@ -291,8 +291,8 @@ export function ProjectContactsCard({ projectId, projectName, clientId }: Projec
 
         {/* Modal: Assign / Edit Roles */}
         {isAssignModalOpen ? (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4">
-            <div className="w-full max-w-lg rounded-xl border border-border bg-card p-6 shadow-xl space-y-4">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-2 sm:p-4">
+            <div className="w-full max-w-[96vw] sm:max-w-lg rounded-xl border border-border bg-card p-4 sm:p-6 shadow-xl space-y-4 max-h-[92vh] overflow-y-auto">
               <div className="flex items-center justify-between border-b pb-3">
                 <h3 className="font-semibold text-lg text-foreground">
                   Assign Roles to Project Contact
@@ -320,7 +320,7 @@ export function ProjectContactsCard({ projectId, projectName, clientId }: Projec
                   <Label className="text-sm font-medium text-foreground">
                     Assign Roles (One contact can have multiple roles):
                   </Label>
-                  <div className="grid grid-cols-2 gap-2 max-h-56 overflow-y-auto p-1 border rounded-md">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-56 overflow-y-auto p-1 border rounded-md">
                     {ROLE_OPTIONS.map((role) => {
                       const isSelected = selectedRoles.includes(role);
                       return (
@@ -363,8 +363,8 @@ export function ProjectContactsCard({ projectId, projectName, clientId }: Projec
 
         {/* Modal: Create New Contact */}
         {isNewContactModalOpen ? (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4">
-            <div className="w-full max-w-lg rounded-xl border border-border bg-card p-6 shadow-xl space-y-4">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-2 sm:p-4">
+            <div className="w-full max-w-[96vw] sm:max-w-lg rounded-xl border border-border bg-card p-4 sm:p-6 shadow-xl space-y-4 max-h-[92vh] overflow-y-auto">
               <div className="flex items-center justify-between border-b pb-3">
                 <h3 className="font-semibold text-lg text-foreground">Create Contact & Assign to Project</h3>
                 <Button size="sm" variant="ghost" onClick={() => setIsNewContactModalOpen(false)}>
@@ -373,7 +373,7 @@ export function ProjectContactsCard({ projectId, projectName, clientId }: Projec
               </div>
 
               <form onSubmit={handleCreateNewContact} className="space-y-4">
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="space-y-1.5">
                     <Label htmlFor="nc-fn">First Name *</Label>
                     <Input id="nc-fn" value={newFirstName} onChange={(e) => setNewFirstName(e.target.value)} required />
@@ -384,7 +384,7 @@ export function ProjectContactsCard({ projectId, projectName, clientId }: Projec
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="space-y-1.5">
                     <Label htmlFor="nc-email">Email</Label>
                     <Input id="nc-email" type="email" value={newEmail} onChange={(e) => setNewEmail(e.target.value)} />
@@ -395,7 +395,7 @@ export function ProjectContactsCard({ projectId, projectName, clientId }: Projec
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="space-y-1.5">
                     <Label htmlFor="nc-job">Job Title</Label>
                     <Input id="nc-job" value={newJobTitle} onChange={(e) => setNewJobTitle(e.target.value)} placeholder="e.g. Technical Director" />

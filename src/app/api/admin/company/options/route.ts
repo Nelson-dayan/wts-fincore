@@ -3,20 +3,20 @@ import { requireRole } from "@/lib/auth/require-role";
 import { connectDB } from "@/lib/db/connect";
 import { CompanyModel } from "@/lib/db/models";
 import { authErrorResponse } from "@/lib/api/route-auth";
-import { CompanyHierarchyService } from "@/lib/services/business/company-hierarchy.service";
+import { resolveAuthCompanyContext } from "@/lib/auth/company-context";
 
 export async function GET(req: NextRequest) {
   try {
-    await requireRole(["admin"]);
+    const session = await requireRole(["admin", "employee"]);
     await connectDB();
 
     const targetCompanyId = req.headers.get("x-company-id");
     const scopeMode = (req.headers.get("x-scope-mode") as "single" | "group") || "single";
 
-    const context = await CompanyHierarchyService.resolveCompanyContext(targetCompanyId, scopeMode);
+    const companyContext = await resolveAuthCompanyContext(session.user, targetCompanyId, scopeMode);
 
     const items = await CompanyModel.find({
-      _id: { $in: context.allowedCompanyIds },
+      _id: { $in: companyContext.allowedCompanyIds },
       isActive: true,
       deletedAt: null,
     })
@@ -24,7 +24,7 @@ export async function GET(req: NextRequest) {
       .sort({ isPrimary: -1, name: 1 })
       .lean();
 
-    return NextResponse.json({ items, context });
+    return NextResponse.json({ items, context: companyContext });
   } catch (error) {
     return authErrorResponse(error, "Failed to load company options");
   }

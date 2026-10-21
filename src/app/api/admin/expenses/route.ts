@@ -11,7 +11,6 @@ import {
   assertEmployeeCanAccessProject,
   getEmployeeAssignedProjectIdStrings,
 } from "@/lib/auth/employee-resource-access";
-
 import { authorizeResource } from "@/lib/auth/authorization";
 import { sanitizeText } from "@/lib/security/sanitize";
 
@@ -41,6 +40,9 @@ function formatExpenseRow(row: Record<string, unknown>) {
 export async function GET(req: Request) {
   try {
     const url = new URL(req.url);
+    const { page, limit, skip } = parsePagination(url.searchParams);
+    const q = parseSearch(url.searchParams);
+
     const targetCompanyId = req.headers.get("x-company-id") || url.searchParams.get("companyId") || undefined;
     const projectId = url.searchParams.get("projectId") || undefined;
 
@@ -57,18 +59,24 @@ export async function GET(req: Request) {
     const session = auth.session;
     const companyContext = auth.context;
     await connectDB();
-    const { page, limit, skip } = parsePagination(url.searchParams);
-    const q = parseSearch(url.searchParams);
 
     const parts: Record<string, unknown>[] = [];
     parts.push({ isDeleted: { $ne: true } });
-    parts.push({
-      $or: [
-        { companyId: { $in: companyContext.allowedCompanyIds } },
-        { companyId: { $exists: false } },
-        { companyId: null },
-      ],
-    });
+
+    const primaryCompany = await CompanyModel.findOne({ isPrimary: true, isActive: true, deletedAt: null }).select("_id").lean();
+    const isPrimaryActive = primaryCompany && companyContext.allowedCompanyIds.includes(String(primaryCompany._id));
+
+    parts.push(
+      isPrimaryActive
+        ? {
+            $or: [
+              { companyId: { $in: companyContext.allowedCompanyIds } },
+              { companyId: { $exists: false } },
+              { companyId: null },
+            ],
+          }
+        : { companyId: { $in: companyContext.allowedCompanyIds } }
+    );
 
     if (session.user.role === "employee") {
       const employeeProjectIds = await getEmployeeAssignedProjectIdStrings(session.user.id);
@@ -88,11 +96,11 @@ export async function GET(req: Request) {
     }
 
     if (q) {
-      const escaped = escapeRegex(q);
+      const safeQ = escapeRegex(q);
       parts.push({
         $or: [
-          { title: { $regex: escaped, $options: "i" } },
-          { category: { $regex: escaped, $options: "i" } },
+          { title: { $regex: safeQ, $options: "i" } },
+          { category: { $regex: safeQ, $options: "i" } },
         ],
       });
     }

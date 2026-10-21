@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
-import { requireRole } from "@/lib/auth/require-role";
 import { connectDB } from "@/lib/db/connect";
-import { PurchaseOrderModel, QuotationModel } from "@/lib/db/models";
+import { CompanyModel, PurchaseOrderModel, QuotationModel, ProjectModel } from "@/lib/db/models";
 import { apiSuccess, apiError } from "@/lib/api/response";
 import { authErrorResponse } from "@/lib/api/route-auth";
 import { parsePagination, parseSearch, escapeRegex } from "@/lib/api/pagination";
@@ -19,13 +18,15 @@ import { decimalToNumber } from "@/lib/services/business/money";
 import { getEmployeeAssignedProjectIdStrings } from "@/lib/auth/employee-resource-access";
 import { updateSequenceReservationEntity } from "@/lib/services/business/counter.service";
 
-
 import { authorizeResource } from "@/lib/auth/authorization";
-import { CompanyHierarchyService } from "@/lib/services/business/company-hierarchy.service";
+import { sanitizeText } from "@/lib/utils/sanitize-input";
 
 export async function GET(req: Request) {
   try {
     const url = new URL(req.url);
+    const { page, limit, skip } = parsePagination(url.searchParams);
+    const q = parseSearch(url.searchParams);
+
     const targetCompanyId = req.headers.get("x-company-id") || url.searchParams.get("companyId") || undefined;
     const scopeMode = (req.headers.get("x-scope-mode") || url.searchParams.get("scopeMode")) as "single" | "group" || "single";
     const projectId = String(url.searchParams.get("projectId") ?? "").trim() || undefined;
@@ -44,17 +45,19 @@ export async function GET(req: Request) {
     const session = auth.session;
     const companyContext = auth.context;
     await connectDB();
-    const { page, limit, skip } = parsePagination(url.searchParams);
-    const q = parseSearch(url.searchParams);
 
-    const filter: Record<string, unknown> = {
-      $or: [
-        { companyId: { $in: companyContext.allowedCompanyIds } },
-        { companyId: { $exists: false } },
-        { companyId: null },
-      ],
-    };
+    const primaryCompany = await CompanyModel.findOne({ isPrimary: true, isActive: true, deletedAt: null }).select("_id").lean();
+    const isPrimaryActive = primaryCompany && companyContext.allowedCompanyIds.includes(String(primaryCompany._id));
 
+    const filter: Record<string, unknown> = isPrimaryActive
+      ? {
+          $or: [
+            { companyId: { $in: companyContext.allowedCompanyIds } },
+            { companyId: { $exists: false } },
+            { companyId: null },
+          ],
+        }
+      : { companyId: { $in: companyContext.allowedCompanyIds } };
     if (q) filter.quotationNumber = { $regex: escapeRegex(q), $options: "i" };
 
     if (session.user.role === "employee") {
@@ -131,7 +134,10 @@ export async function GET(req: Request) {
       }
     });
     return apiSuccess({ items, page, limit, total, hasMore: skip + items.length < total });
-  } catch (error) {
+  } catch (error: unknown) {
+    if (error instanceof Error && ((error as any).statusCode === 400 || error.name === "InvalidQueryParamError" || error.name === "InvalidSearchParameterError")) {
+      return apiError(error.message, 400);
+    }
     return authErrorResponse(error, "Failed to load quotations");
   }
 }
@@ -192,9 +198,16 @@ export async function POST(req: Request) {
     if (!projectId) {
       return apiError("projectId is required", 400);
     }
+    if (!mongoose.Types.ObjectId.isValid(projectId)) {
+      return apiError("Invalid project id", 400);
+    }
 
-    const url = new URL(req.url);
-    const targetCompanyId = req.headers.get("x-company-id") || url.searchParams.get("companyId") || undefined;
+    const projectDoc = await ProjectModel.findById(projectId).select("companyId clientId").lean();
+    if (!projectDoc) {
+      return apiError("Project not found", 404);
+    }
+
+    const targetCompanyId = projectDoc.companyId ? String(projectDoc.companyId) : undefined;
 
     const auth = await authorizeResource({
       permission: "quotations.create",
@@ -227,21 +240,21 @@ export async function POST(req: Request) {
     const co = body.companySnapshot ?? {};
     const clientSnapshot = {
       ...built.clientSnapshot,
-      ...(cs.name !== undefined ? { name: String(cs.name) } : {}),
-      ...(cs.company !== undefined ? { company: String(cs.company) } : {}),
-      ...(cs.address !== undefined ? { address: String(cs.address) } : {}),
-      ...(cs.logoText !== undefined ? { logoText: String(cs.logoText) } : {}),
-      ...(cs.signatureText !== undefined ? { signatureText: String(cs.signatureText) } : {}),
+      ...(cs.name !== undefined ? { name: sanitizeText(cs.name).trim() } : {}),
+      ...(cs.company !== undefined ? { company: sanitizeText(cs.company).trim() } : {}),
+      ...(cs.address !== undefined ? { address: sanitizeText(cs.address).trim() } : {}),
+      ...(cs.logoText !== undefined ? { logoText: sanitizeText(cs.logoText).trim() } : {}),
+      ...(cs.signatureText !== undefined ? { signatureText: sanitizeText(cs.signatureText).trim() } : {}),
     };
     const companySnapshot = {
       ...built.companySnapshot,
-      ...(co.name !== undefined ? { name: String(co.name) } : {}),
-      ...(co.address !== undefined ? { address: String(co.address) } : {}),
-      ...(co.email !== undefined ? { email: String(co.email) } : {}),
-      ...(co.website !== undefined ? { website: String(co.website) } : {}),
-      ...(co.logoUrl !== undefined ? { logoUrl: String(co.logoUrl) } : {}),
-      ...(co.logoText !== undefined ? { logoText: String(co.logoText) } : {}),
-      ...(co.signatureText !== undefined ? { signatureText: String(co.signatureText) } : {}),
+      ...(co.name !== undefined ? { name: sanitizeText(co.name).trim() } : {}),
+      ...(co.address !== undefined ? { address: sanitizeText(co.address).trim() } : {}),
+      ...(co.email !== undefined ? { email: String(co.email).trim() } : {}),
+      ...(co.website !== undefined ? { website: sanitizeText(co.website).trim() } : {}),
+      ...(co.logoUrl !== undefined ? { logoUrl: sanitizeText(co.logoUrl).trim() } : {}),
+      ...(co.logoText !== undefined ? { logoText: sanitizeText(co.logoText).trim() } : {}),
+      ...(co.signatureText !== undefined ? { signatureText: sanitizeText(co.signatureText).trim() } : {}),
     };
     const { quotationNumber, seqValue, year } = await generateQuotationNumber(session.user.id);
 
@@ -249,9 +262,9 @@ export async function POST(req: Request) {
       pageNumber: p.pageNumber,
       items: p.items.map((item) => ({
         number: item.number,
-        name: item.name,
-        displayName: item.displayName ?? "",
-        description: item.description ?? "",
+        name: sanitizeText(item.name).trim(),
+        displayName: sanitizeText(item.displayName ?? "").trim(),
+        description: sanitizeText(item.description ?? "").trim(),
         length: item.length,
         width: item.width,
         quantity: item.quantity,
@@ -268,18 +281,18 @@ export async function POST(req: Request) {
     const branding = body.branding ?? {};
     const created = await QuotationModel.create({
       quotationNumber,
-      companyId: companyContext.activeCompanyId,
+      companyId: projectDoc.companyId || companyContext.activeCompanyId,
       projectId: new mongoose.Types.ObjectId(projectId),
       createdBy: new mongoose.Types.ObjectId(session.user.id),
       documentInfo: {
-        quotationCode: String(
+        quotationCode: sanitizeText(
           body.documentInfo?.quotationCode ?? body.documentInfo?.geCode ?? ""
-        ),
+        ).trim(),
         geCode: "",
         date: docDate,
-        subject: String(body.documentInfo?.subject ?? ""),
-        title: String(body.documentInfo?.title ?? ""),
-        description: String(body.documentInfo?.description ?? ""),
+        subject: sanitizeText(body.documentInfo?.subject ?? "").trim(),
+        title: sanitizeText(body.documentInfo?.title ?? "").trim(),
+        description: sanitizeText(body.documentInfo?.description ?? "").trim(),
         taxRate,
         taxEnabled,
       },
@@ -292,24 +305,24 @@ export async function POST(req: Request) {
         total: toDecimal128(total),
       },
       quotationInfo: {
-        leadTime: String(quotationInfo.leadTime ?? ""),
+        leadTime: sanitizeText(quotationInfo.leadTime ?? "").trim(),
         confirmDate: confirmDate && !Number.isNaN(confirmDate.getTime()) ? confirmDate : undefined,
-        terms: String(quotationInfo.terms ?? ""),
-        validity: String(quotationInfo.validity ?? ""),
+        terms: sanitizeText(quotationInfo.terms ?? "").trim(),
+        validity: sanitizeText(quotationInfo.validity ?? "").trim(),
         remainingAmount:
           quotationInfo.remainingAmount !== undefined
             ? toDecimal128(Number(quotationInfo.remainingAmount))
             : undefined,
-        remainingText: String(quotationInfo.remainingText ?? ""),
+        remainingText: sanitizeText(quotationInfo.remainingText ?? "").trim(),
       },
       branding: {
         useCompanyLogo: branding.useCompanyLogo !== false,
         useCompanySignature: branding.useCompanySignature !== false,
         showClientSignature: branding.showClientSignature !== false,
-        customLogoText: String(branding.customLogoText ?? ""),
-        customSignatureText: String(branding.customSignatureText ?? ""),
+        customLogoText: sanitizeText(branding.customLogoText ?? "").trim(),
+        customSignatureText: sanitizeText(branding.customSignatureText ?? "").trim(),
       },
-      internalNotes: String(body.internalNotes ?? ""),
+      internalNotes: sanitizeText(body.internalNotes ?? "").trim(),
       currency: String(body.currency || "").trim() || undefined,
       status: body.status ?? "draft",
     });

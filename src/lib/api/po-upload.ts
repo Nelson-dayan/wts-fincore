@@ -55,8 +55,6 @@ function normalizeToDottedDecimalIpv4(h: string): string | null {
     return `${(n >>> 24) & 0xff}.${(n >>> 16) & 0xff}.${(n >>> 8) & 0xff}.${n & 0xff}`;
   }
   // Octal or hex dotted quads, possibly mixed with plain decimals:
-  // e.g. 0177.0.0.1 (octal first part), 0x7f.0x0.0x0.0x1 (hex parts)
-  // A quad is "alternate" if at least one part is non-standard (octal/hex).
   const parts = h.split(".");
   if (parts.length === 4) {
     let hasAlt = false;
@@ -219,7 +217,7 @@ export function verifyBufferMagicBytes(buf: Buffer, expectedMime: string): boole
     );
   }
 
-  if (normalized === "image/jpeg" || normalized === "image/jpg") {
+  if (normalized === "image/jpeg" || normalized === "image/jpg" || normalized === "image/pjpeg") {
     return (
       buf[0] === 0xff &&
       buf[1] === 0xd8 &&
@@ -237,6 +235,26 @@ export function verifyBufferMagicBytes(buf: Buffer, expectedMime: string): boole
   }
 
   return false;
+}
+
+/**
+ * Validates file buffer magic bytes (Finding #05).
+ */
+export function validateFileMagicBytes(
+  buf: Buffer,
+  declaredMime: string
+): { valid: boolean; error?: string } {
+  if (!buf || buf.length < 4) {
+    return { valid: false, error: "File buffer is too small or empty" };
+  }
+  if (containsMaliciousMarkup(buf)) {
+    return { valid: false, error: "SVG or HTML file upload is forbidden (XSS prevention)" };
+  }
+  const valid = verifyBufferMagicBytes(buf, declaredMime);
+  if (!valid) {
+    return { valid: false, error: "File signature does not match declared type or contains prohibited markup" };
+  }
+  return { valid: true };
 }
 
 /**
@@ -275,7 +293,6 @@ export function validatePoFileUrl(
     }
 
     const base64Content = match[2]?.replace(/\s+/g, "") || "";
-    // Verify valid base64 character set
     if (!/^[A-Za-z0-9+/=]+$/.test(base64Content)) {
       return { ok: false, message: "Malformed base64 file data" };
     }
@@ -322,7 +339,7 @@ export function validatePoFileUrl(
       return { ok: false, message: "Only HTTPS remote URLs are supported" };
     }
 
-    // Reject URLs embedding credentials (user:pass@host) — CVE-class: credential leakage / confused deputy
+    // Reject URLs embedding credentials (user:pass@host)
     if (hasEmbeddedCredentials(parsed)) {
       return { ok: false, message: "Remote URL must not contain embedded credentials" };
     }
@@ -364,8 +381,7 @@ export function validatePoDataUrlString(
 }
 
 /**
- * Next.js / undici may return a `Blob` instead of a `File` from `FormData` — `instanceof File` can fail.
- * This path handles both.
+ * Next.js / undici may return a `Blob` instead of a `File` from `FormData`.
  */
 export async function blobToPoDataUrl(
   blob: Blob,
@@ -405,7 +421,7 @@ export async function fileToPoDataUrl(
   return blobToPoDataUrl(file, name);
 }
 
-/** `form.get("file")` — string / null safe; Blob + File dono. */
+/** `form.get("file")` — string / null safe; Blob + File handling. */
 export function formFileEntryToBlob(
   entry: FormDataEntryValue | null
 ): { blob: Blob; filename: string } | null {

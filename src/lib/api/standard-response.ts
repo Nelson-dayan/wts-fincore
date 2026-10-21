@@ -73,6 +73,9 @@ export function standardAuthError(error: unknown, fallbackMessage = "Unauthorize
         { status: 400 }
       );
     }
+    if ((error as any).statusCode === 400 || (error as any).name === "InvalidQueryParamError") {
+      return apiError(error.message, 400);
+    }
     if (error.message.includes("is required")) {
       return apiError(error.message, 400);
     }

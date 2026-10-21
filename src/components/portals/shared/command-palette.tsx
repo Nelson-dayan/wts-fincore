@@ -12,7 +12,8 @@ import {
   ShoppingCart, 
   Loader2,
   ChevronRight,
-  Wallet
+  Wallet,
+  UserCircle
 } from "lucide-react";
 import { usePortalConfig } from "@/components/portals/portal-config-context";
 import { cn } from "@/lib/utils/cn";
@@ -22,6 +23,8 @@ type SearchResult = {
   type: "Project" | "Invoice" | "Client" | "Purchase Order" | "Quotation" | "Expense";
   title: string;
   subtitle: string;
+  companyId?: string;
+  companyCode?: string;
   url: string;
 };
 
@@ -151,10 +154,11 @@ export function CommandPalette() {
               <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-3 px-2">Quick Navigation</p>
               <div className="grid grid-cols-2 gap-2">
                 {[
-                  { label: "Projects", url: "/admin/projects", icon: Briefcase },
-                  { label: "Invoices", url: "/admin/invoices", icon: FileText },
-                  { label: "Payments", url: "/admin/payments", icon: ShoppingCart },
-                  { label: "Clients", url: "/admin/clients", icon: Users },
+                  { label: "My Profile", url: `${pathPrefix}/profile`, icon: UserCircle },
+                  { label: "Projects", url: `${pathPrefix}/projects`, icon: Briefcase },
+                  { label: "Invoices", url: `${pathPrefix}/invoices`, icon: FileText },
+                  { label: "Clients", url: `${pathPrefix}/clients`, icon: Users },
+                  { label: "Payments", url: `${pathPrefix}/payments`, icon: ShoppingCart },
                 ].map((link) => (
                   <button
                     key={link.label}
@@ -211,6 +215,16 @@ export function CommandPalette() {
                         )}>{item.subtitle}</p>
                       </div>
                       <div className="shrink-0 flex items-center gap-2">
+                        {item.companyCode && (
+                          <span className={cn(
+                            "text-[9px] font-mono font-bold uppercase px-1.5 py-0.5 rounded border",
+                            idx === selectedIndex 
+                              ? "border-white/30 bg-white/20 text-white" 
+                              : "border-border/60 bg-muted/80 text-foreground"
+                          )}>
+                            {item.companyCode}
+                          </span>
+                        )}
                         <span className={cn(
                           "text-[9px] font-bold uppercase px-1.5 py-0.5 rounded",
                           idx === selectedIndex ? "bg-white/20 text-white" : "bg-muted text-muted-foreground"

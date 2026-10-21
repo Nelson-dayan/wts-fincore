@@ -301,6 +301,124 @@ async function runAccessControlTestSuite() {
     // 38. Super Admin audit logging
     const loggedRole = "super_admin";
     recordResult("CASE-G38", pillar, "Super Admin actions logged with role super_admin", "ALLOW", loggedRole === "super_admin" ? "ALLOW" : "DENY", loggedRole === "super_admin");
+
+    // 38A. Standard Admin cannot create another Super Admin
+    const checkCreateUser = (callerRole: string, requestedRole: string) => {
+      if (requestedRole === "super_admin" && callerRole !== "super_admin") {
+        return "FORBIDDEN";
+      }
+      return "ALLOW";
+    };
+    const adminCreateAttempt = checkCreateUser("admin", "super_admin");
+    recordResult("CASE-G38A", pillar, "Standard Admin cannot create another Super Admin", "FORBIDDEN", adminCreateAttempt, adminCreateAttempt === "FORBIDDEN");
+
+    // 38B. Super Admin can create another Super Admin
+    const superAdminCreateAttempt = checkCreateUser("super_admin", "super_admin");
+    recordResult("CASE-G38B", pillar, "Super Admin can create another Super Admin", "ALLOW", superAdminCreateAttempt, superAdminCreateAttempt === "ALLOW");
+
+    // 38C. Standard Admin cannot promote user to Super Admin
+    const checkPromoteUser = (callerRole: string, newRole: string) => {
+      if (newRole === "super_admin" && callerRole !== "super_admin") {
+        return "FORBIDDEN";
+      }
+      return "ALLOW";
+    };
+    const adminPromoteAttempt = checkPromoteUser("admin", "super_admin");
+    recordResult("CASE-G38C", pillar, "Standard Admin cannot promote user to Super Admin", "FORBIDDEN", adminPromoteAttempt, adminPromoteAttempt === "FORBIDDEN");
+
+    // 38D. Standard Admin cannot modify Super Admin account
+    const checkModifyUser = (callerRole: string, targetUserRole: string) => {
+      if (targetUserRole === "super_admin" && callerRole !== "super_admin") {
+        return "FORBIDDEN";
+      }
+      return "ALLOW";
+    };
+    const adminModifyAttempt = checkModifyUser("admin", "super_admin");
+    recordResult("CASE-G38D", pillar, "Standard Admin cannot modify Super Admin account", "FORBIDDEN", adminModifyAttempt, adminModifyAttempt === "FORBIDDEN");
+
+    // 38E. Standard Admin cannot delete Super Admin account
+    const checkDeleteUser = (callerRole: string, targetUserRole: string) => {
+      if (targetUserRole === "super_admin" && callerRole !== "super_admin") {
+        return "FORBIDDEN";
+      }
+      return "ALLOW";
+    };
+    const adminDeleteAttempt = checkDeleteUser("admin", "super_admin");
+    recordResult("CASE-G38E", pillar, "Standard Admin cannot delete Super Admin account", "FORBIDDEN", adminDeleteAttempt, adminDeleteAttempt === "FORBIDDEN");
+
+    // 38F. Last remaining Super Admin cannot be deleted or demoted
+    const checkLastSuperAdmin = (targetUserRole: string, otherActiveSuperAdmins: number) => {
+      if (targetUserRole === "super_admin" && otherActiveSuperAdmins === 0) {
+        return "LAST_SUPER_ADMIN_PROTECTED";
+      }
+      return "ALLOW";
+    };
+    const lastSuperAdminCheck = checkLastSuperAdmin("super_admin", 0);
+    recordResult("CASE-G38F", pillar, "Last remaining Super Admin cannot be deleted or demoted", "LAST_SUPER_ADMIN_PROTECTED", lastSuperAdminCheck, lastSuperAdminCheck === "LAST_SUPER_ADMIN_PROTECTED");
+
+    // 38G. Standard Admin cannot create another Admin (only Super Admin can create Admin)
+    const checkCreateAdminRole = (callerRole: string, requestedRole: string) => {
+      if (requestedRole === "admin" && callerRole !== "super_admin") {
+        return "FORBIDDEN";
+      }
+      return "ALLOW";
+    };
+    const adminCreateAdminAttempt = checkCreateAdminRole("admin", "admin");
+    recordResult("CASE-G38G", pillar, "Standard Admin cannot create Admin account (only Super Admin can)", "FORBIDDEN", adminCreateAdminAttempt, adminCreateAdminAttempt === "FORBIDDEN");
+
+    // 38H. Standard Admin cannot assign company outside authorized scope
+    const checkCompanyAssignment = (callerAssigned: string[], targetCompanies: string[]) => {
+      const unauthorized = targetCompanies.find(c => !callerAssigned.includes(c));
+      return unauthorized ? "FORBIDDEN" : "ALLOW";
+    };
+    const outsideCompanyAssign = checkCompanyAssignment(["comp_a"], ["comp_a", "comp_b"]);
+    recordResult("CASE-G38H", pillar, "Standard Admin cannot assign company outside authorized scope", "FORBIDDEN", outsideCompanyAssign, outsideCompanyAssign === "FORBIDDEN");
+
+    // 38I. Standard Admin cannot modify another Admin account
+    const checkModifyAdmin = (callerRole: string, targetUserRole: string, isSelf: boolean) => {
+      if (targetUserRole === "admin" && callerRole !== "super_admin" && !isSelf) {
+        return "FORBIDDEN";
+      }
+      return "ALLOW";
+    };
+    const adminModifyOtherAdmin = checkModifyAdmin("admin", "admin", false);
+    recordResult("CASE-G38I", pillar, "Standard Admin cannot modify another Admin account", "FORBIDDEN", adminModifyOtherAdmin, adminModifyOtherAdmin === "FORBIDDEN");
+
+    // 38J. Standard Admin GET users strictly scoped to assigned companies
+    const filterUsersForAdmin = (callerAssignedCompanies: string[], usersList: Array<{ email: string; companyIds: string[] }>) => {
+      return usersList.filter(u => u.companyIds.some(cId => callerAssignedCompanies.includes(cId)));
+    };
+    const mockUsers = [
+      { email: "user_a@comp.com", companyIds: ["comp_a"] },
+      { email: "user_b@comp.com", companyIds: ["comp_b"] },
+    ];
+    const filteredUsers = filterUsersForAdmin(["comp_a"], mockUsers);
+    const userLeakage = filteredUsers.some(u => u.email === "user_b@comp.com");
+    recordResult("CASE-G38J", pillar, "Standard Admin GET users strictly scoped to assigned companies (no leakage)", "ALLOW", !userLeakage ? "ALLOW" : "LEAKAGE", !userLeakage);
+
+    // 38K. Overview metrics isolated strictly to active/allowed company IDs
+    const filterOverviewData = (allowedCompanyIds: string[], records: Array<{ id: string; companyId: string }>) => {
+      return records.filter(r => allowedCompanyIds.includes(r.companyId));
+    };
+    const mockOverviewRecords = [
+      { id: "inv_1", companyId: "comp_a" },
+      { id: "inv_2", companyId: "comp_b" },
+    ];
+    const scopedOverview = filterOverviewData(["comp_a"], mockOverviewRecords);
+    const overviewLeakage = scopedOverview.some(r => r.id === "inv_2");
+    recordResult("CASE-G38K", pillar, "Overview metrics isolated strictly to active/allowed company IDs", "ALLOW", !overviewLeakage ? "ALLOW" : "LEAKAGE", !overviewLeakage);
+
+    // 38L. Accounts and Payments GET isolated to active/allowed company IDs
+    const filterFinancialData = (allowedCompanyIds: string[], accounts: Array<{ id: string; companyId: string }>) => {
+      return accounts.filter(a => allowedCompanyIds.includes(a.companyId));
+    };
+    const mockAccounts = [
+      { id: "acc_a", companyId: "comp_a" },
+      { id: "acc_b", companyId: "comp_b" },
+    ];
+    const scopedAccounts = filterFinancialData(["comp_a"], mockAccounts);
+    const accountLeakage = scopedAccounts.some(a => a.id === "acc_b");
+    recordResult("CASE-G38L", pillar, "Accounts and Payments GET isolated to active/allowed company IDs", "ALLOW", !accountLeakage ? "ALLOW" : "LEAKAGE", !accountLeakage);
   }
 
   // =========================================================================

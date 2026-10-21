@@ -77,7 +77,7 @@ export async function updateContact(
   const updated = await ContactModel.findOneAndUpdate(
     { _id: contactId, isDeleted: { $ne: true } },
     { $set: updateData },
-    { new: true }
+    { returnDocument: "after" }
   ).lean();
 
   if (!updated) return null;
@@ -114,6 +114,7 @@ export async function getContactById(contactId: string): Promise<ContactData | n
 
 export interface ListContactsFilter {
   companyId?: string;
+  companyIds?: string[];
   clientId?: string;
   q?: string;
   status?: "ACTIVE" | "INACTIVE";
@@ -123,7 +124,9 @@ export async function listContacts(filter: ListContactsFilter = {}): Promise<Con
   await connectDB();
   const query: Record<string, unknown> = { isDeleted: { $ne: true } };
 
-  if (filter.companyId && mongoose.Types.ObjectId.isValid(filter.companyId)) {
+  if (filter.companyIds && filter.companyIds.length > 0) {
+    query.companyId = { $in: filter.companyIds.filter(id => mongoose.Types.ObjectId.isValid(id)).map(id => new mongoose.Types.ObjectId(id)) };
+  } else if (filter.companyId && mongoose.Types.ObjectId.isValid(filter.companyId)) {
     query.companyId = new mongoose.Types.ObjectId(filter.companyId);
   }
 

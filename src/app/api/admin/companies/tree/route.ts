@@ -64,6 +64,24 @@ export async function GET(req: Request) {
       ? (activeId || authContext.activeCompanyId)
       : authContext.activeCompanyId;
 
+    function filterTree<T extends { _id: { toString(): string }; children?: T[] }>(
+      nodes: T[],
+      allowedSet: Set<string>
+    ): T[] {
+      const result: T[] = [];
+      for (const node of nodes) {
+        const filteredChildren = filterTree(node.children || [], allowedSet);
+        if (allowedSet.has(node._id.toString()) || filteredChildren.length > 0) {
+          result.push({
+            ...node,
+            children: filteredChildren,
+          });
+        }
+      }
+      return result;
+    }
+
+    const filteredTree = isSuperAdmin ? tree : filterTree(tree, new Set(allowedIds));
     const context = await CompanyHierarchyService.resolveCompanyContext(targetContextId, authContext.scopeMode);
 
     // 5. Ensure context metadata never contains foreign tenant company IDs
@@ -73,10 +91,18 @@ export async function GET(req: Request) {
       );
     }
 
+    const sanitizedContext = {
+      ...context,
+      allowedCompanyIds: authContext.allowedCompanyIds,
+      availableIssuingCompanies: isSuperAdmin
+        ? context.availableIssuingCompanies
+        : context.availableIssuingCompanies.filter((c) => allowedIds.includes(c._id.toString())),
+    };
+
     return NextResponse.json({
-      tree,
+      tree: filteredTree,
       companies: userCompanies,
-      context,
+      context: sanitizedContext,
       canAccessGroupView: authContext.canAccessGroupView,
       canManageGroup: authContext.canManageGroup,
       isSuperAdmin,

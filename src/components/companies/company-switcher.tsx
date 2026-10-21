@@ -1,7 +1,24 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { Building2, ChevronDown, Check, Layers, Network, ShieldCheck, Lock, AlertCircle, Loader2, X } from "lucide-react";
+import { createPortal } from "react-dom";
+import { useSession } from "next-auth/react";
+import {
+  Building2,
+  ChevronDown,
+  Check,
+  Layers,
+  Network,
+  ShieldCheck,
+  Lock,
+  AlertCircle,
+  Loader2,
+  X,
+  ArrowRight,
+  Eye,
+  EyeOff,
+  KeyRound,
+} from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 
 export interface CompanyOption {
@@ -15,6 +32,8 @@ export interface CompanyOption {
 }
 
 export function CompanySwitcher() {
+  const { data: session } = useSession();
+  const [mounted, setMounted] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
   const [companies, setCompanies] = useState<CompanyOption[]>([]);
   const [activeCompany, setActiveCompany] = useState<CompanyOption | null>(null);
@@ -26,8 +45,24 @@ export function CompanySwitcher() {
   // Password verification modal state
   const [pendingCompany, setPendingCompany] = useState<CompanyOption | null>(null);
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [verifying, setVerifying] = useState(false);
   const [verifyError, setVerifyError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!pendingCompany) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !verifying) {
+        setPendingCompany(null);
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [pendingCompany, verifying]);
 
   useEffect(() => {
     async function loadCompanies() {
@@ -72,6 +107,7 @@ export function CompanySwitcher() {
     // Open password confirmation modal
     setPendingCompany(comp);
     setPassword("");
+    setShowPassword(false);
     setVerifyError(null);
     setIsOpen(false);
   };
@@ -96,7 +132,12 @@ export function CompanySwitcher() {
       const data = await res.json();
 
       if (!res.ok || !data.success) {
-        setVerifyError(data.error || "Password verification failed");
+        const errorMsg =
+          data.error?.message ||
+          (typeof data.error === "string" ? data.error : null) ||
+          data.message ||
+          "Password verification failed. Please check your credentials.";
+        setVerifyError(errorMsg);
         setVerifying(false);
         return;
       }
@@ -106,7 +147,11 @@ export function CompanySwitcher() {
         setActiveCompany(pendingCompany);
         localStorage.setItem("activeCompanyId", pendingCompany._id);
         setPendingCompany(null);
-        window.dispatchEvent(new CustomEvent("companyContextChanged", { detail: { companyId: pendingCompany._id, scopeMode } }));
+        window.dispatchEvent(
+          new CustomEvent("companyContextChanged", {
+            detail: { companyId: pendingCompany._id, scopeMode },
+          })
+        );
         window.location.reload();
       });
     } catch (err) {
@@ -313,89 +358,180 @@ export function CompanySwitcher() {
       </div>
 
       {/* Password Authorization Verification Modal */}
-      {pendingCompany && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in-50">
-          <div className="relative w-full max-w-md rounded-2xl border border-border bg-card p-6 shadow-2xl animate-in zoom-in-95">
-            <button
-              type="button"
-              onClick={() => setPendingCompany(null)}
-              className="absolute right-4 top-4 rounded-full p-1 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-            >
-              <X className="h-5 w-5" />
-            </button>
+      {mounted && pendingCompany && createPortal(
+        <div
+          className="fixed inset-0 z-[9999] flex items-center justify-center p-4 sm:p-6"
+          role="presentation"
+        >
+          {/* Backdrop with click-to-cancel */}
+          <button
+            type="button"
+            aria-label="Cancel context switch"
+            disabled={verifying}
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity dark:bg-black/75 cursor-default"
+            onClick={() => !verifying && setPendingCompany(null)}
+          />
 
-            <div className="flex items-center gap-3 border-b border-border pb-4 mb-4">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                <Lock className="h-5 w-5" />
+          {/* Modal Card */}
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="company-switch-title"
+            className="relative z-10 w-full max-w-lg rounded-2xl border border-border/80 bg-card p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-200"
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-border/60 pb-4 mb-4">
+              <div className="flex items-center gap-3">
+                <div className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary ring-1 ring-primary/20 shadow-xs">
+                  <ShieldCheck className="size-5.5 text-primary" />
+                </div>
+                <div>
+                  <h3 id="company-switch-title" className="font-bold text-base text-foreground">
+                    Re-Authenticate Context Switch
+                  </h3>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Enterprise Multi-Tenant Security Verification
+                  </p>
+                </div>
               </div>
-              <div>
-                <h3 className="font-semibold text-base text-foreground">Confirm Context Switch</h3>
-                <p className="text-xs text-muted-foreground">Security authentication required</p>
-              </div>
+              <button
+                type="button"
+                onClick={() => !verifying && setPendingCompany(null)}
+                disabled={verifying}
+                aria-label="Close dialog"
+                className="rounded-lg p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors disabled:opacity-50"
+              >
+                <X className="size-4" />
+              </button>
             </div>
 
             <form onSubmit={handleConfirmPasswordSwitch} className="space-y-4">
-              <div className="rounded-xl border border-border/60 bg-muted/40 p-3 text-xs space-y-1">
-                <div className="text-muted-foreground font-medium">Target Company:</div>
-                <div className="font-semibold text-foreground text-sm">{pendingCompany.name}</div>
-                <div className="text-[11px] text-muted-foreground font-mono">
-                  Code: {pendingCompany.code} | Type: {pendingCompany.kind.toUpperCase()}
+              {/* Context Transition Badge */}
+              <div className="rounded-xl border border-border/70 bg-muted/20 p-3.5 space-y-2">
+                <div className="flex items-center justify-between text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
+                  <span className="flex items-center gap-1.5">
+                    <Building2 className="size-3.5 text-primary" />
+                    Operating Scope Transition
+                  </span>
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20 font-semibold">
+                    Multi-Tenant Guard
+                  </span>
+                </div>
+                <div className="grid grid-cols-[1fr,auto,1fr] items-center gap-2.5">
+                  <div className="flex flex-col min-w-0 rounded-xl border border-border/60 bg-background/60 p-2.5">
+                    <span className="text-[10px] text-muted-foreground font-semibold uppercase">Current Entity</span>
+                    <span className="font-bold text-xs text-foreground truncate mt-0.5">
+                      {activeCompany?.name || "Active Workspace"}
+                    </span>
+                    <span className="text-[10px] font-mono text-muted-foreground mt-0.5 truncate">
+                      [{activeCompany?.code || "CURR"}] {activeCompany?.kind ? `• ${activeCompany.kind.toUpperCase()}` : ""}
+                    </span>
+                  </div>
+
+                  <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary ring-1 ring-primary/20">
+                    <ArrowRight className="size-4" />
+                  </div>
+
+                  <div className="flex flex-col min-w-0 rounded-xl border border-primary/40 bg-primary/10 p-2.5 text-right">
+                    <span className="text-[10px] text-primary font-bold uppercase">Target Entity</span>
+                    <span className="font-bold text-xs text-primary truncate mt-0.5">
+                      {pendingCompany.name}
+                    </span>
+                    <span className="text-[10px] font-mono text-primary/90 font-semibold mt-0.5 truncate">
+                      [{pendingCompany.code}] • {pendingCompany.kind.toUpperCase()}
+                    </span>
+                  </div>
                 </div>
               </div>
 
               {verifyError && (
-                <div className="flex items-center gap-2 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive">
-                  <AlertCircle className="h-4 w-4 shrink-0" />
-                  <span>{verifyError}</span>
+                <div className="flex items-center gap-2.5 rounded-xl border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive animate-in fade-in">
+                  <AlertCircle className="size-4 shrink-0 text-destructive" />
+                  <span className="leading-relaxed">{verifyError}</span>
                 </div>
               )}
 
+              {/* Password field */}
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-foreground">Account Password</label>
+                <div className="flex items-center justify-between">
+                  <label htmlFor="company-switch-password" className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                    <Lock className="size-3.5 text-primary" /> Confirm Account Password
+                  </label>
+                  <span className="text-[11px] text-muted-foreground">Required for authorization</span>
+                </div>
+
+                {/* Hidden username to prevent browser autofill credential selector from blocking UI */}
                 <input
-                  type="password"
-                  required
-                  autoFocus
-                  placeholder="Enter your login password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                  type="text"
+                  name="username"
+                  autoComplete="username"
+                  value={session?.user?.email || ""}
+                  readOnly
+                  tabIndex={-1}
+                  className="sr-only"
+                  aria-hidden="true"
                 />
-                <p className="text-[11px] text-muted-foreground">
-                  Confirm your password to switch your active company environment safely.
+
+                <div className="relative">
+                  <KeyRound className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground/70" />
+                  <input
+                    id="company-switch-password"
+                    name="password"
+                    type={showPassword ? "text" : "password"}
+                    required
+                    autoComplete="current-password"
+                    placeholder="Enter your account password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="w-full rounded-xl border border-border/80 bg-background/60 pl-9.5 pr-10 py-2.5 text-xs font-mono placeholder:font-sans placeholder:text-muted-foreground/70 focus:outline-none focus:ring-2 focus:ring-primary focus:bg-background transition-all"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    tabIndex={-1}
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-0.5 rounded transition-colors"
+                  >
+                    {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                  </button>
+                </div>
+                <p className="text-[11px] text-muted-foreground leading-relaxed">
+                  Password re-verification confirms your authorization before switching tenant environments and accessing sensitive company financial data.
                 </p>
               </div>
 
-              <div className="flex items-center justify-end gap-2 pt-2">
+              {/* Action Buttons */}
+              <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-border/60">
                 <button
                   type="button"
                   onClick={() => setPendingCompany(null)}
                   disabled={verifying}
-                  className="rounded-lg border border-border px-4 py-2 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                  className="rounded-xl border border-border px-4 py-2 text-xs font-semibold text-muted-foreground hover:bg-muted hover:text-foreground transition-colors disabled:opacity-50"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={verifying || !password.trim()}
-                  className="flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors"
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-5 py-2 text-xs font-bold text-primary-foreground shadow-md shadow-primary/20 hover:bg-primary/90 disabled:opacity-50 transition-all hover:scale-[1.01]"
                 >
                   {verifying ? (
                     <>
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      Verifying...
+                      <Loader2 className="size-3.5 animate-spin" />
+                      <span>Verifying Access…</span>
                     </>
                   ) : (
                     <>
-                      <ShieldCheck className="h-3.5 w-3.5" />
-                      Authorize Context Switch
+                      <ShieldCheck className="size-4" />
+                      <span>Authorize Context Switch</span>
                     </>
                   )}
                 </button>
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   );

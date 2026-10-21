@@ -4,19 +4,33 @@ import {
   ProjectModel, 
   PaymentModel, 
   ExpenseModel, 
-  InvoiceModel 
+  InvoiceModel,
+  CompanyModel
 } from "@/lib/db/models";
 import { requireRole } from "@/lib/auth/require-role";
 import { authErrorResponse } from "@/lib/api/route-auth";
+import { resolveAuthCompanyContext } from "@/lib/auth/company-context";
 import { startOfMonth, subMonths, subDays, startOfYear, format } from "date-fns";
 
 export async function GET(req: Request) {
   try {
-    await requireRole(["admin"]);
+    const session = await requireRole(["admin"]);
     await connectDB();
 
     const { searchParams } = new URL(req.url);
     const range = searchParams.get("range") || "last_6_months";
+
+    const targetCompanyId = req.headers.get("x-company-id") || searchParams.get("companyId");
+    const scopeMode = (req.headers.get("x-scope-mode") || searchParams.get("scopeMode")) as "single" | "group" || "single";
+    const companyContext = await resolveAuthCompanyContext(session.user, targetCompanyId, scopeMode);
+    const allowedCompanyIds = companyContext.allowedCompanyIds;
+
+    const primaryCompany = await CompanyModel.findOne({ isPrimary: true, isActive: true, deletedAt: null }).select("_id").lean();
+    const isPrimaryActive = primaryCompany && allowedCompanyIds.includes(String(primaryCompany._id));
+
+    const companyCondition = isPrimaryActive
+      ? { $or: [{ companyId: { $in: allowedCompanyIds } }, { companyId: null }, { companyId: { $exists: false } }] }
+      : { companyId: { $in: allowedCompanyIds } };
 
     const now = new Date();
     let startDate: Date | null = null;
@@ -33,13 +47,13 @@ export async function GET(req: Request) {
     // all_time -> startDate remains null
 
     // 1. Fetch Projects (only necessary fields)
-    const projects = await ProjectModel.find({})
+    const projects = await ProjectModel.find({ ...companyCondition, isDeleted: { $ne: true } })
       .select("name status budget currency createdAt")
       .sort({ createdAt: -1 })
       .lean();
 
     // 2. Aggregate Payments per Project via Invoices using MongoDB pipeline
-    const paymentMatch: any = { status: "COMPLETED" };
+    const paymentMatch: any = { status: "COMPLETED", ...companyCondition };
     if (startDate) paymentMatch.createdAt = { $gte: startDate };
 
     const paymentByInvoicePipeline: any[] = [
@@ -57,7 +71,7 @@ export async function GET(req: Request) {
     const invoiceIds = paymentSummary.map(p => p._id).filter(Boolean);
 
     // Map invoice to project
-    const invoices = await InvoiceModel.find({ _id: { $in: invoiceIds } })
+    const invoices = await InvoiceModel.find({ _id: { $in: invoiceIds }, ...companyCondition })
       .select("_id projectId")
       .lean();
 
@@ -78,7 +92,7 @@ export async function GET(req: Request) {
     });
 
     // 3. Aggregate Expenses per Project directly in DB
-    const expenseMatch: any = { isDeleted: { $ne: true } };
+    const expenseMatch: any = { isDeleted: { $ne: true }, ...companyCondition };
     if (startDate) expenseMatch.createdAt = { $gte: startDate };
 
     const expenseSummary = await ExpenseModel.aggregate([

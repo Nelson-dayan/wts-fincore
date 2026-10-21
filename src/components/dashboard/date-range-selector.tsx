@@ -23,12 +23,12 @@ export function DateRangeSelector({
   className?: string;
 }) {
   return (
-    <div className={cn("flex items-center gap-1.5 p-1 rounded-xl bg-muted/40 border border-border/60", className)}>
-      <div className="flex items-center gap-1.5 px-2.5 py-1 text-muted-foreground text-xs font-semibold">
-        <Calendar className="w-3.5 h-3.5 text-primary" />
+    <div className={cn("flex items-center gap-1.5 p-1 rounded-xl bg-muted/40 border border-border/60 max-w-full overflow-x-auto scrollbar-none", className)}>
+      <div className="flex items-center gap-1.5 px-2.5 py-1 text-muted-foreground text-xs font-semibold shrink-0">
+        <Calendar className="w-3.5 h-3.5 text-primary shrink-0" />
         <span className="hidden sm:inline">Time Period:</span>
       </div>
-      <div className="flex items-center gap-1 overflow-x-auto">
+      <div className="flex items-center gap-1 shrink-0">
         {(Object.keys(RANGE_LABELS) as DateRangeOption[]).map((key) => {
           const isActive = value === key;
           return (

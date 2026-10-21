@@ -6,6 +6,7 @@ import { authErrorResponse } from "@/lib/api/route-auth";
 import { parsePagination, parseSearch } from "@/lib/api/pagination";
 import { recordPayment } from "@/lib/services/business/payment.service";
 import { assertEmployeeCanAccessInvoice, assertEmployeeCanAccessProject } from "@/lib/auth/employee-resource-access";
+import { resolveAuthCompanyContext } from "@/lib/auth/company-context";
 
 import { checkOrCreateIdempotency, saveIdempotencySuccess, saveIdempotencyFailed } from "@/lib/services/business/idempotency.service";
 
@@ -20,7 +21,15 @@ export async function GET(req: Request) {
     const projectId = url.searchParams.get("projectId");
     const accountId = url.searchParams.get("accountId");
 
-    const filter: Record<string, any> = { isDeleted: { $ne: true } };
+    const targetCompanyId = req.headers.get("x-company-id") || url.searchParams.get("companyId") || undefined;
+    const requestedScopeMode = (req.headers.get("x-scope-mode") || url.searchParams.get("scopeMode")) as "single" | "group" || "single";
+
+    const companyContext = await resolveAuthCompanyContext(session.user, targetCompanyId, requestedScopeMode);
+
+    const filter: Record<string, any> = {
+      isDeleted: { $ne: true },
+      companyId: { $in: companyContext.allowedCompanyIds },
+    };
 
     if (invoiceId) {
       if (session.user.role === "employee") {
@@ -194,6 +203,13 @@ export async function POST(req: Request) {
     if (!companyId) {
       const primaryCompany = await CompanyModel.findOne({ isPrimary: true }).select("_id").lean();
       companyId = primaryCompany?._id || "69c661683654f65d914b4abc";
+    }
+
+    const targetCompId = String(companyId);
+    const postContext = await resolveAuthCompanyContext(session.user, targetCompId, "single");
+    if (!postContext.allowedCompanyIds.includes(targetCompId)) {
+      if (isIdempotencyEnabled) await saveIdempotencyFailed(idempotencyKey!, userId);
+      return NextResponse.json({ message: "You are not authorized to record payments for this company." }, { status: 403 });
     }
 
     body.clientId = project.clientId;

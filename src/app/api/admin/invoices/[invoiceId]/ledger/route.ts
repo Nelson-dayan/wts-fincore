@@ -3,13 +3,13 @@ import { requireRole } from "@/lib/auth/require-role";
 import { connectDB } from "@/lib/db/connect";
 import { InvoiceModel, PaymentModel } from "@/lib/db/models";
 import { authErrorResponse } from "@/lib/api/route-auth";
+import { authorizeResource } from "@/lib/auth/authorization";
 
 export async function GET(
   req: Request,
   { params }: { params: Promise<{ invoiceId: string }> }
 ) {
   try {
-    await requireRole(["admin", "employee"]);
     await connectDB();
     const { invoiceId } = await params;
     
@@ -19,6 +19,22 @@ export async function GET(
       
     if (!invoice) {
       return NextResponse.json({ message: "Invoice not found" }, { status: 404 });
+    }
+
+    const projectIdStr = (invoice as any).projectId?._id 
+      ? String((invoice as any).projectId._id) 
+      : (invoice as any).projectId 
+      ? String((invoice as any).projectId) 
+      : undefined;
+
+    const auth = await authorizeResource({
+      permission: "invoices.view",
+      companyId: (invoice as any).companyId ? String((invoice as any).companyId) : undefined,
+      projectId: projectIdStr,
+    });
+
+    if (!auth.authorized) {
+      return NextResponse.json({ message: auth.reason || "Forbidden", code: auth.code }, { status: 403 });
     }
 
     const payments = await PaymentModel.find({ 

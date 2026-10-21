@@ -444,16 +444,16 @@ export function AdminAccountsClient({ apiPrefix }: { apiPrefix: string }) {
 
       {/* Setup Modal */}
       {modalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4">
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setModalOpen(false)} />
-          <div className="relative w-full max-w-[450px] bg-card rounded-2xl shadow-2xl border border-border overflow-hidden animate-in fade-in duration-200">
-            <div className="px-6 py-5 border-b bg-muted/10 flex items-center justify-between">
-              <h2 className="text-lg font-semibold tracking-tight">Setup New Account</h2>
-              <button onClick={() => setModalOpen(false)} className="p-2 rounded-full hover:bg-muted text-muted-foreground transition-colors">
+          <div className="relative w-full max-w-[96vw] sm:max-w-[450px] bg-card rounded-2xl shadow-2xl border border-border overflow-hidden animate-in fade-in duration-200">
+            <div className="px-4 py-3.5 sm:px-6 sm:py-5 border-b bg-muted/10 flex items-center justify-between">
+              <h2 className="text-base sm:text-lg font-semibold tracking-tight">Setup New Account</h2>
+              <button onClick={() => setModalOpen(false)} className="p-1.5 sm:p-2 rounded-full hover:bg-muted text-muted-foreground transition-colors" aria-label="Close modal">
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <form onSubmit={handleSubmit} className="p-6 space-y-5">
+            <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4 sm:space-y-5">
               {error && <div className="p-3 rounded-lg bg-destructive/10 text-destructive text-sm font-medium">{error}</div>}
               
               <div className="space-y-2">
@@ -461,7 +461,7 @@ export function AdminAccountsClient({ apiPrefix }: { apiPrefix: string }) {
                 <Input required value={form.name} onChange={e => setForm({...form, name: e.target.value})} placeholder="e.g. Wise USD, Main Bank AED" />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                 <div className="space-y-2">
                   <Label>Currency</Label>
                   <Select 
@@ -519,9 +519,9 @@ export function AdminAccountsClient({ apiPrefix }: { apiPrefix: string }) {
                 )}
               </div>
 
-              <div className="pt-4 flex gap-3">
-                <Button type="button" variant="outline" className="flex-1" onClick={() => setModalOpen(false)}>Cancel</Button>
-                <Button type="submit" className="flex-1 gap-2" disabled={submitting}>
+              <div className="pt-4 flex flex-col-reverse sm:flex-row gap-2 sm:gap-3">
+                <Button type="button" variant="outline" className="w-full sm:flex-1" onClick={() => setModalOpen(false)}>Cancel</Button>
+                <Button type="submit" className="w-full sm:flex-1 gap-2" disabled={submitting}>
                   {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
                   Save Account
                 </Button>

@@ -13,6 +13,15 @@ export const transferSchema = new Schema(
     toCurrency: { type: String, required: true },
     
     exchangeRate: decimalField,
+    rateSource: { 
+      type: String, 
+      enum: ["LIVE_API", "FALLBACK_STATIC", "MANUAL_OVERRIDE"], 
+      default: "MANUAL_OVERRIDE" 
+    },
+    benchmarkRate: { type: Number },
+    rateDeviationPercent: { type: Number, default: 0 },
+    overrideReason: { type: String, default: "" },
+
     fees: { ...decimalField, default: "0" },
     
     reference: { type: String, default: "" },
@@ -20,11 +29,14 @@ export const transferSchema = new Schema(
     
     status: { 
       type: String, 
-      enum: ["PENDING", "COMPLETED", "FAILED"], 
+      enum: ["PENDING", "PENDING_APPROVAL", "COMPLETED", "FAILED", "REJECTED"], 
       default: "COMPLETED",
       index: true 
     },
     
+    approvedBy: { type: Types.ObjectId, ref: "User" },
+    approvedAt: { type: Date },
+
     createdBy: { type: Types.ObjectId, ref: "User", required: true },
   },
   schemaOptions

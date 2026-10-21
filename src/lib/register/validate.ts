@@ -74,11 +74,11 @@ export function parseRegisterPayload(raw: unknown): ParseRegisterResult {
   }
 
   const password = typeof raw.password === "string" ? raw.password : "";
-  const complexityCheck = validatePasswordComplexity(password, emailRaw);
-  if (!complexityCheck.ok) {
+  const passCheck = validatePasswordComplexity(password, emailRaw);
+  if (!passCheck.ok || !passCheck.valid) {
     return {
       ok: false,
-      message: complexityCheck.message || "Password does not meet complexity requirements.",
+      message: passCheck.message || passCheck.error || "Password does not meet complexity requirements.",
     };
   }
 

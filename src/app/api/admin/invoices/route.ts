@@ -10,16 +10,18 @@ import { createInvoiceForPurchaseOrder } from "@/lib/services/business/invoice.s
 import { decimalToNumber } from "@/lib/services/business/money";
 import { checkOrCreateIdempotency, saveIdempotencySuccess, saveIdempotencyFailed } from "@/lib/services/business/idempotency.service";
 import {
-  assertEmployeeCanAccessPurchaseOrder,
   getEmployeeAssignedProjectIdStrings,
 } from "@/lib/auth/employee-resource-access";
 
 import { authorizeResource } from "@/lib/auth/authorization";
-import { CompanyHierarchyService } from "@/lib/services/business/company-hierarchy.service";
 
 export async function GET(req: Request) {
   try {
     const url = new URL(req.url);
+    const { page, limit, skip } = parsePagination(url.searchParams);
+    const q = parseSearch(url.searchParams);
+    const poId = String(url.searchParams.get("poId") ?? "").trim();
+
     const targetCompanyId = req.headers.get("x-company-id") || url.searchParams.get("companyId") || undefined;
     const scopeMode = (req.headers.get("x-scope-mode") || url.searchParams.get("scopeMode")) as "single" | "group" || "single";
     const projectId = String(url.searchParams.get("projectId") ?? "").trim() || undefined;
@@ -38,9 +40,6 @@ export async function GET(req: Request) {
     const session = auth.session;
     const companyContext = auth.context;
     await connectDB();
-    const { page, limit, skip } = parsePagination(url.searchParams);
-    const q = parseSearch(url.searchParams);
-    const poId = String(url.searchParams.get("poId") ?? "").trim();
 
     const filter: Record<string, unknown> = {
       lifecycleStatus: { $ne: "DRAFT_HIDDEN" },
@@ -97,26 +96,30 @@ export async function GET(req: Request) {
       const totals = row.totals as Record<string, unknown> | undefined;
       const extras = row.extras as { poNumberRef?: string } | undefined;
       const dd = row.dueDate;
+      const rowRecord = row as Record<string, unknown>;
+      const projectObj = row.projectId && typeof row.projectId === "object" ? (row.projectId as Record<string, unknown>) : null;
+      const totalsCache = row.totalsCache ? (row.totalsCache as Record<string, unknown>) : undefined;
+
       return {
         _id: String(row._id),
         invoiceNumber: row.invoiceNumber,
         invoiceType: row.invoiceType === "usd" ? "usd" : "aed",
-        currency: String((row as any).currency || "AED").toUpperCase(),
+        currency: String(rowRecord.currency || "AED").toUpperCase(),
         status: row.status,
         dueDate: dd instanceof Date ? dd.toISOString() : dd,
-        projectId: row.projectId && typeof row.projectId === "object" ? {
-          _id: String((row.projectId as any)._id),
-          name: String((row.projectId as any).name || "Unnamed Project"),
+        projectId: projectObj ? {
+          _id: String(projectObj._id),
+          name: String(projectObj.name || "Unnamed Project"),
         } : null,
         poId: row.poId ? String(row.poId) : "",
         companyId: String(row.companyId ?? ""),
         poNumberRef: String(extras?.poNumberRef ?? ""),
         total: decimalToNumber(totals?.total),
-        totalsCache: row.totalsCache ? {
-          totalIntendedBase: decimalToNumber((row.totalsCache as any).totalIntendedBase),
-          totalReceivedBase: decimalToNumber((row.totalsCache as any).totalReceivedBase),
+        totalsCache: totalsCache ? {
+          totalIntendedBase: decimalToNumber(totalsCache.totalIntendedBase),
+          totalReceivedBase: decimalToNumber(totalsCache.totalReceivedBase),
         } : undefined,
-        fixCurrency: (row.projectId as any)?.fixCurrency || false,
+        fixCurrency: Boolean(projectObj?.fixCurrency),
         createdAt:
           row.createdAt instanceof Date ? row.createdAt.toISOString() : row.createdAt,
       };
@@ -158,8 +161,8 @@ export async function POST(req: Request) {
           return NextResponse.json({ message: "Request already in progress" }, { status: 409 });
         }
         isIdempotencyEnabled = true;
-      } catch (e: any) {
-        if (e.message === "IDEMPOTENCY_PAYLOAD_MISMATCH") {
+      } catch (e: unknown) {
+        if (e instanceof Error && e.message === "IDEMPOTENCY_PAYLOAD_MISMATCH") {
           return NextResponse.json(
             { message: "Idempotency key reused with a different body payload" },
             { status: 409 }
@@ -183,7 +186,7 @@ export async function POST(req: Request) {
     const auth = await authorizeResource({
       permission: "invoices.create",
       projectId: String(po.projectId),
-      companyId: (po as any).companyId ? String((po as any).companyId) : undefined,
+      companyId: (po as Record<string, unknown>).companyId ? String((po as Record<string, unknown>).companyId) : undefined,
     });
 
     if (!auth.authorized) {

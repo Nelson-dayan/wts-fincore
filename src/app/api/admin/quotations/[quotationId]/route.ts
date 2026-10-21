@@ -72,16 +72,28 @@ export async function GET(_req: Request, ctx: RouteCtx) {
     const { quotationId } = await ctx.params;
     await connectDB();
     const raw = await QuotationModel.findById(quotationId)
-      .populate("projectId", "name fixCurrency currency")
+      .populate("projectId", "name fixCurrency currency companyId")
       .lean();
     if (!raw) {
       return apiError("Quotation not found", 404);
     }
 
+    const projectIdStr = (raw as any)?.projectId?._id
+      ? String((raw as any).projectId._id)
+      : (raw as any)?.projectId
+      ? String((raw as any).projectId)
+      : undefined;
+
+    const companyIdStr = (raw as any).companyId
+      ? String((raw as any).companyId)
+      : (raw as any).projectId?.companyId
+      ? String((raw as any).projectId.companyId)
+      : undefined;
+
     const auth = await authorizeResource({
       permission: "quotations.view",
-      projectId: String((raw as any).projectId?._id || (raw as any).projectId || ""),
-      companyId: (raw as any).companyId ? String((raw as any).companyId) : undefined,
+      projectId: projectIdStr,
+      companyId: companyIdStr,
     });
 
     if (!auth.authorized) {
@@ -89,10 +101,7 @@ export async function GET(_req: Request, ctx: RouteCtx) {
     }
     const row = raw as Record<string, unknown>;
     const proj = row.projectId as unknown;
-    const projectIdStr =
-      proj && typeof proj === "object" && "_id" in proj
-        ? String((proj as { _id: unknown })._id)
-        : String(row.projectId ?? "");
+
     const projectName =
       proj && typeof proj === "object" && "name" in proj
         ? String((proj as { name?: string }).name ?? "")
@@ -365,7 +374,7 @@ export async function PATCH(req: Request, ctx: RouteCtx) {
           internalNotes: nextInternalNotes,
         },
       },
-      { new: true }
+      { returnDocument: "after" }
     ).lean();
 
     if (!updated) {

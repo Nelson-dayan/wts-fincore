@@ -19,6 +19,10 @@ export async function GET(
       return NextResponse.json({ error: "Quotation not found" }, { status: 404 });
     }
 
+    if (quotation.status === "draft") {
+      return NextResponse.json({ error: "Quotation is not yet published" }, { status: 404 });
+    }
+
     return NextResponse.json({ quotation });
   } catch (error: any) {
     console.error("Public Quotation GET error:", error);
@@ -49,10 +53,17 @@ export async function PATCH(
       return NextResponse.json({ error: "Quotation not found" }, { status: 404 });
     }
 
-    if (quotation.status === status) {
+    if (quotation.status === "draft") {
+      return NextResponse.json(
+        { error: "Quotation is not yet open for client response." },
+        { status: 400 }
+      );
+    }
+
+    if (quotation.status !== "sent") {
       return NextResponse.json({
         success: true,
-        message: `Quotation is already ${status}.`,
+        message: `Quotation is already ${quotation.status}.`,
         quotation,
       });
     }

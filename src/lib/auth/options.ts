@@ -48,7 +48,9 @@ export const authOptions: NextAuthOptions = {
         const persistentStatus = await checkUserLockout(email);
         if (persistentStatus.locked) {
           const minutesLeft = Math.ceil(persistentStatus.retryAfterMs / 60000);
-          throw new Error(`Account temporarily locked due to multiple failed login attempts. Try again in ${minutesLeft} minute(s).`);
+          throw new Error(
+            `AccountLocked: Account is temporarily locked due to multiple failed login attempts. Try again in ${minutesLeft} minute(s).`
+          );
         }
 
         // 2. In-memory check fallback
@@ -56,20 +58,40 @@ export const authOptions: NextAuthOptions = {
         const memStatus = isLoginLocked(lockKey);
         if (memStatus.locked) {
           const minutesLeft = Math.ceil(memStatus.retryAfterMs / 60000);
-          throw new Error(`Account temporarily locked due to multiple failed login attempts. Try again in ${minutesLeft} minute(s).`);
+          throw new Error(
+            `AccountLocked: Account is temporarily locked due to multiple failed login attempts. Try again in ${minutesLeft} minute(s).`
+          );
         }
 
-        const user = await UserModel.findOne({ email }).select("+password");
-        if (!user?.isActive) {
+        const user = await UserModel.findOne({ email }).select("+password +failedLoginAttempts +lockoutUntil");
+        if (!user || !user.isActive) {
           await recordFailedLoginPersistent(email);
           recordFailedLogin(lockKey);
           return null;
         }
 
+        // Check user model lockout field as additional guard
+        if (user.lockoutUntil && new Date(user.lockoutUntil) > new Date()) {
+          const remainingMinutes = Math.max(
+            1,
+            Math.ceil((new Date(user.lockoutUntil).getTime() - Date.now()) / (60 * 1000))
+          );
+          throw new Error(
+            `AccountLocked: Account is temporarily locked due to multiple failed login attempts. Please try again in ${remainingMinutes} minute${
+              remainingMinutes > 1 ? "s" : ""
+            }.`
+          );
+        }
+
         const valid = await verifyPassword(password, user.password);
         if (!valid) {
-          await recordFailedLoginPersistent(email);
+          const result = await recordFailedLoginPersistent(email);
           recordFailedLogin(lockKey);
+          if (result.locked) {
+            throw new Error(
+              "AccountLocked: Account is temporarily locked due to multiple failed login attempts. Please try again in 15 minutes."
+            );
+          }
           return null;
         }
 

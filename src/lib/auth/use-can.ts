@@ -20,7 +20,8 @@ export function useCan() {
   };
 
   const userRole = (session?.user as { role?: string })?.role || "employee";
-  const isAdmin = userRole === "admin";
+  const isSuperAdmin = userRole === "super_admin";
+  const isAdmin = userRole === "admin" || isSuperAdmin;
 
-  return { can, role: userRole, isAdmin, user: session?.user };
+  return { can, role: userRole, isAdmin, isSuperAdmin, user: session?.user };
 }

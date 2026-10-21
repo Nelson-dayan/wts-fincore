@@ -132,7 +132,7 @@ export async function PATCH(
     const updated = await CompanyModel.findByIdAndUpdate(
       companyId,
       { $set: updates },
-      { new: true }
+      { returnDocument: "after" }
     ).lean();
 
     if (body.isPrimary === true) {

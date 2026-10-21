@@ -1,6 +1,6 @@
 import type { ClientSession, Types } from "mongoose";
 import { connectDB } from "@/lib/db/connect";
-import { PurchaseOrderModel, QuotationModel } from "@/lib/db/models";
+import { PurchaseOrderModel, QuotationModel, ProjectModel } from "@/lib/db/models";
 import { applyExchangeRate } from "@/lib/finance/engine";
 import { getNextFiscalSequence } from "@/lib/services/business/counter.service";
 import { generateStandardDocumentRef } from "@/lib/utils/document-reference";
@@ -36,7 +36,7 @@ async function assertQuotationRules(
   session: ClientSession
 ) {
   const quotation = await QuotationModel.findById(input.quotationId)
-    .select("status projectId currency")
+    .select("status projectId currency companyId")
     .session(session)
     .lean();
 
@@ -74,10 +74,19 @@ export async function createPurchaseOrder(
         totalAmountBase = applyExchangeRate(input.totalAmount, defaultExchangeRate);
       }
 
+      let effectiveCompanyId = (quotation as any)?.companyId;
+      if (!effectiveCompanyId && quotation.projectId) {
+        const proj = await ProjectModel.findById(quotation.projectId).select("companyId").session(session).lean();
+        if (proj && proj.companyId) {
+          effectiveCompanyId = proj.companyId;
+        }
+      }
+
       const created = await PurchaseOrderModel.create(
         [
           {
             poNumber: input.poNumber,
+            companyId: effectiveCompanyId,
             projectId: input.projectId,
             quotationId: input.quotationId,
             type: input.type,

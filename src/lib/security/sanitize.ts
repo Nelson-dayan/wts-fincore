@@ -100,3 +100,5 @@ export function sanitizeObject<T>(input: T): T {
 
   return result as T;
 }
+
+export const sanitizeObjectDeep = sanitizeObject;

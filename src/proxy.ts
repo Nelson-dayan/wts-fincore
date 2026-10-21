@@ -1,12 +1,12 @@
 import { withAuth } from "next-auth/middleware";
 import { NextResponse } from "next/server";
 
-export default withAuth(
-  function middleware(req) {
+export const proxy = withAuth(
+  function proxy(req) {
     const path = req.nextUrl.pathname;
     const role = req.nextauth.token?.role as string | undefined;
 
-    if (path.startsWith("/admin") && role !== "admin") {
+    if (path.startsWith("/admin") && role !== "admin" && role !== "super_admin") {
       return NextResponse.redirect(new URL("/employee", req.url));
     }
     return NextResponse.next();
@@ -27,6 +27,8 @@ export default withAuth(
     secret: process.env.NEXTAUTH_SECRET,
   }
 );
+
+export default proxy;
 
 export const config = {
   matcher: ["/admin/:path*", "/employee/:path*"],

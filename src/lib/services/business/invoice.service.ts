@@ -214,7 +214,7 @@ export async function createInvoiceForPurchaseOrder(
     lifecycleStatus: "DRAFT_HIDDEN",
     paymentStatus: "UNPAID",
     currency: quotation.currency ?? DEFAULT_CURRENCY,
-    companyId: (primaryCompany as any)?._id,
+    companyId: (po as any)?.companyId || (quotation as any)?.companyId || (primaryCompany as any)?._id,
     projectId: po.projectId,
     poId: po._id,
     createdBy: new mongoose.Types.ObjectId(input.createdBy),

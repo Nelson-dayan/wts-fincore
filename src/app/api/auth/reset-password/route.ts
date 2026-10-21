@@ -17,10 +17,10 @@ export async function POST(req: Request) {
       );
     }
 
-    const complexity = validatePasswordComplexity(password, email);
-    if (!complexity.ok) {
+    const passCheck = validatePasswordComplexity(password, email);
+    if (!passCheck.ok || !passCheck.valid) {
       return NextResponse.json(
-        { message: complexity.message || "Password does not meet complexity requirements." },
+        { message: passCheck.message || passCheck.error || "Password does not meet complexity requirements." },
         { status: 400 }
       );
     }

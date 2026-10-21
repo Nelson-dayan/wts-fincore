@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
-import { requireRole } from "@/lib/auth/require-role";
 import { connectDB } from "@/lib/db/connect";
-import { InvoiceModel, PurchaseOrderModel, QuotationModel } from "@/lib/db/models";
+import { CompanyModel, InvoiceModel, PurchaseOrderModel, QuotationModel } from "@/lib/db/models";
 import { authErrorResponse } from "@/lib/api/route-auth";
 import { parsePagination, parseSearch, escapeRegex } from "@/lib/api/pagination";
 import { logActivity } from "@/lib/services/activity/log-activity.service";
@@ -18,7 +17,6 @@ import {
   validatePoDataUrlString,
 } from "@/lib/api/po-upload";
 import {
-  assertEmployeeCanAccessProject,
   getEmployeeAssignedProjectIdStrings,
 } from "@/lib/auth/employee-resource-access";
 
@@ -33,11 +31,13 @@ function jsonBodyError() {
 }
 
 import { authorizeResource } from "@/lib/auth/authorization";
-import { CompanyHierarchyService } from "@/lib/services/business/company-hierarchy.service";
 
 export async function GET(req: Request) {
   try {
     const url = new URL(req.url);
+    const { page, limit, skip } = parsePagination(url.searchParams);
+    const q = parseSearch(url.searchParams);
+
     const targetCompanyId = req.headers.get("x-company-id") || url.searchParams.get("companyId") || undefined;
     const scopeMode = (req.headers.get("x-scope-mode") || url.searchParams.get("scopeMode")) as "single" | "group" || "single";
     const projectId = String(url.searchParams.get("projectId") ?? "").trim() || undefined;
@@ -56,18 +56,20 @@ export async function GET(req: Request) {
     const session = auth.session;
     const companyContext = auth.context;
     await connectDB();
-    const { page, limit, skip } = parsePagination(url.searchParams);
-    const q = parseSearch(url.searchParams);
     const quotationId = String(url.searchParams.get("quotationId") ?? "").trim();
 
-    const filter: Record<string, unknown> = {
-      $or: [
-        { companyId: { $in: companyContext.allowedCompanyIds } },
-        { companyId: { $exists: false } },
-        { companyId: null },
-      ],
-    };
+    const primaryCompany = await CompanyModel.findOne({ isPrimary: true, isActive: true, deletedAt: null }).select("_id").lean();
+    const isPrimaryActive = primaryCompany && companyContext.allowedCompanyIds.includes(String(primaryCompany._id));
 
+    const filter: Record<string, unknown> = isPrimaryActive
+      ? {
+          $or: [
+            { companyId: { $in: companyContext.allowedCompanyIds } },
+            { companyId: { $exists: false } },
+            { companyId: null },
+          ],
+        }
+      : { companyId: { $in: companyContext.allowedCompanyIds } };
     if (q) filter.poNumber = { $regex: escapeRegex(q), $options: "i" };
 
     if (session.user.role === "employee") {
@@ -241,7 +243,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ message: "Quotation not found" }, { status: 404 });
     }
     const projectId = String(quotation.projectId);
-    const targetCompanyId = (quotation as any).companyId ? String((quotation as any).companyId) : undefined;
+    const targetCompanyId = (quotation as Record<string, unknown>).companyId ? String((quotation as Record<string, unknown>).companyId) : undefined;
 
     const auth = await authorizeResource({
       permission: "purchaseOrders.create",

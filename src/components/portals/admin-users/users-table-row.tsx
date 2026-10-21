@@ -1,10 +1,11 @@
 "use client";
 
-import { KeyRound, Loader2, Pencil, Trash2, X } from "lucide-react";
+import { Building2, Crown, KeyRound, Layers, Loader2, Pencil, Shield, ShieldAlert, ShieldCheck, Trash2, UserCheck, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import type { AdminUser } from "./types";
+import type { CompanyOption } from "@/components/companies/company-switcher";
 
 function initials(name: string) {
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -14,16 +15,27 @@ function initials(name: string) {
 }
 
 function RoleBadge({ role }: { role: string }) {
-  const isAdmin = role === "admin";
+  if (role === "super_admin") {
+    return (
+      <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-500/35 bg-gradient-to-r from-amber-500/15 via-amber-400/10 to-yellow-500/20 px-2.5 py-0.5 text-[11px] font-extrabold uppercase tracking-wider text-amber-600 dark:text-amber-400 shadow-xs">
+        <Crown className="size-3 text-amber-500" />
+        Super Admin
+      </span>
+    );
+  }
+
+  if (role === "admin") {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full border border-primary/25 bg-primary/10 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-primary">
+        <Shield className="size-3 text-primary" />
+        Admin
+      </span>
+    );
+  }
+
   return (
-    <span
-      className={
-        isAdmin
-          ? "inline-flex items-center rounded-full border border-primary/25 bg-primary/10 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-primary"
-          : "inline-flex items-center rounded-full border border-border bg-muted/60 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground"
-      }
-    >
-      {role}
+    <span className="inline-flex items-center gap-1 rounded-full border border-border bg-muted/60 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+      Employee
     </span>
   );
 }
@@ -48,6 +60,9 @@ function StatusBadge({ active }: { active: boolean }) {
 
 type UsersTableRowProps = {
   user: AdminUser;
+  companies?: CompanyOption[];
+  isCallerSuperAdmin?: boolean;
+  currentUserId?: string;
   editingId: string | null;
   savingId: string;
   draft?: Partial<AdminUser>;
@@ -55,12 +70,16 @@ type UsersTableRowProps = {
   onSave: (userId: string) => void;
   onCancelEdit: () => void;
   onStartEdit: (user: AdminUser) => void;
+  onOpenAccessModal?: (user: AdminUser) => void;
   onDelete: (userId: string) => void;
   onResetPassword?: (user: AdminUser) => void;
 };
 
 export function UsersTableRow({
   user,
+  companies = [],
+  isCallerSuperAdmin = false,
+  currentUserId,
   editingId,
   savingId,
   draft,
@@ -68,13 +87,21 @@ export function UsersTableRow({
   onSave,
   onCancelEdit,
   onStartEdit,
+  onOpenAccessModal,
   onDelete,
   onResetPassword,
 }: UsersTableRowProps) {
-  const isEditing = editingId === user._id;
+  const isProtectedAccount =
+    (user.role === "super_admin" || (user.role === "admin" && user._id !== currentUserId)) &&
+    !isCallerSuperAdmin;
+  const isEditing = !isProtectedAccount && editingId === user._id;
+
+  // Resolve assigned company badges
+  const assignedCompanies = companies.filter((c) => (user.companyIds || []).includes(c._id));
 
   return (
-    <tr className="bg-card transition-colors hover:bg-muted/35 dark:hover:bg-muted/20">
+    <tr className="bg-card transition-colors hover:bg-muted/35 dark:hover:bg-muted/20 border-b border-border/40">
+      {/* User Identity */}
       <td className="px-5 py-3.5 pr-3">
         <div className="flex items-center gap-3">
           <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-linear-to-br from-primary/20 to-primary/5 text-xs font-bold text-primary ring-1 ring-primary/15">
@@ -94,22 +121,49 @@ export function UsersTableRow({
           </div>
         </div>
       </td>
+
+      {/* Email */}
       <td className="max-w-50 truncate px-0 py-3.5 pr-3 text-muted-foreground">{user.email}</td>
+
+      {/* Role */}
       <td className="px-0 py-3.5 pr-3 align-middle">
-        {isEditing ? (
-          <Select
-            value={draft?.role ?? user.role}
-            className="h-9 max-w-40 text-sm"
-            onChange={(e) => onDraftChange(user._id, { role: e.target.value as "admin" | "employee" })}
-            options={[
-              { value: "admin", label: "Admin" },
-              { value: "employee", label: "Employee" },
-            ]}
-          />
-        ) : (
-          <RoleBadge role={user.role} />
-        )}
+        <RoleBadge role={user.role} />
       </td>
+
+      {/* Operating Companies & Group Access */}
+      <td className="px-0 py-3.5 pr-3 align-middle">
+        <div className="flex flex-wrap items-center gap-1.5 max-w-60">
+          {user.role === "super_admin" ? (
+            <span className="inline-flex items-center gap-1 rounded-md border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[10px] font-bold text-amber-600 dark:text-amber-400">
+              <Crown className="size-3" /> ALL (Global Access)
+            </span>
+          ) : assignedCompanies.length > 0 ? (
+            assignedCompanies.map((c) => (
+              <span
+                key={c._id}
+                title={c.name}
+                className="inline-flex items-center gap-1 rounded-md border border-border/70 bg-muted/60 px-2 py-0.5 text-[10px] font-mono font-semibold text-foreground"
+              >
+                <Building2 className="size-3 text-primary" />
+                {c.code}
+              </span>
+            ))
+          ) : (
+            <span className="text-[11px] text-muted-foreground italic">No companies assigned</span>
+          )}
+
+          {user.groupViewAccess && (
+            <span
+              title="Group View Active — Consolidates descendant sub-entities"
+              className="inline-flex items-center gap-1 rounded-md border border-indigo-500/30 bg-indigo-500/10 px-2 py-0.5 text-[10px] font-semibold text-indigo-600 dark:text-indigo-300"
+            >
+              <Layers className="size-3" /> Group View
+            </span>
+          )}
+        </div>
+      </td>
+
+      {/* Status */}
       <td className="px-0 py-3.5 pr-3 align-middle">
         {isEditing ? (
           <Select
@@ -125,6 +179,8 @@ export function UsersTableRow({
           <StatusBadge active={user.isActive} />
         )}
       </td>
+
+      {/* Phone */}
       <td className="px-0 py-3.5 pr-3 text-muted-foreground">
         {isEditing ? (
           <Input
@@ -136,16 +192,19 @@ export function UsersTableRow({
           <span className="tabular-nums">{user.phone || "—"}</span>
         )}
       </td>
-      <td className="whitespace-nowrap px-0 py-3.5 pr-3 text-muted-foreground tabular-nums">
-        {new Date(user.createdAt).toLocaleDateString(undefined, {
-          year: "numeric",
-          month: "short",
-          day: "numeric",
-        })}
-      </td>
+
+      {/* Actions */}
       <td className="px-0 py-3.5 pr-5 text-right">
         <div className="flex justify-end gap-1.5">
-          {isEditing ? (
+          {isProtectedAccount ? (
+            <span
+              className="inline-flex items-center gap-1.5 rounded-lg border border-amber-500/35 bg-amber-500/10 px-2.5 py-1 text-xs font-semibold text-amber-600 dark:text-amber-400 select-none shadow-2xs"
+              title={`Protected Account: ${user.role === "super_admin" ? "Super Admin" : "Admin"} accounts can only be managed by a Super Admin.`}
+            >
+              <ShieldAlert className="size-3.5 text-amber-500" />
+              Protected
+            </span>
+          ) : isEditing ? (
             <>
               <Button size="sm" className="rounded-lg px-3" onClick={() => onSave(user._id)} disabled={savingId === user._id}>
                 {savingId === user._id ? (
@@ -163,7 +222,19 @@ export function UsersTableRow({
             </>
           ) : (
             <>
-              <Button size="sm" variant="outline" className="h-8 w-8 rounded-lg p-0" onClick={() => onStartEdit(user)} title="Edit user" aria-label="Edit user">
+              {onOpenAccessModal && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-8 px-2.5 rounded-lg text-xs font-semibold gap-1 text-primary border-primary/30 hover:bg-primary/10"
+                  onClick={() => onOpenAccessModal(user)}
+                  title="Edit permissions and company assignments"
+                >
+                  <UserCheck className="size-3.5" />
+                  Access
+                </Button>
+              )}
+              <Button size="sm" variant="outline" className="h-8 w-8 rounded-lg p-0" onClick={() => onStartEdit(user)} title="Edit user profile" aria-label="Edit user profile">
                 <Pencil className="size-3.5" aria-hidden />
               </Button>
               {onResetPassword && (

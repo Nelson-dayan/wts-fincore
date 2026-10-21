@@ -469,7 +469,7 @@ export async function renderQuotationPdf(input: QuotationRenderDraft): Promise<B
   leftBlockBottom = y + headerCardH + 8;
 
   /* Right: quotation meta card (same height as left) */
-  let ry = headerStartY;
+  const ry = headerStartY;
   drawRoundedPanel(doc, metaX, ry, metaW, headerCardH, 8, T.accentMuted, T.border);
 
   doc.fillColor(T.accent).font("Helvetica-Bold").fontSize(9);

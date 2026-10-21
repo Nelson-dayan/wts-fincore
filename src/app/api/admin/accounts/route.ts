@@ -3,13 +3,23 @@ import { requireRole } from "@/lib/auth/require-role";
 import { connectDB } from "@/lib/db/connect";
 import { AccountModel, CompanyModel } from "@/lib/db/models";
 import { authErrorResponse } from "@/lib/api/route-auth";
+import { resolveAuthCompanyContext } from "@/lib/auth/company-context";
 
 export async function GET(req: Request) {
   try {
-    await requireRole(["admin", "employee"]);
+    const session = await requireRole(["admin", "employee"]);
     await connectDB();
     
-    const items = await AccountModel.find({ isActive: true })
+    const url = new URL(req.url);
+    const targetCompanyId = req.headers.get("x-company-id") || url.searchParams.get("companyId") || undefined;
+    const requestedScopeMode = (req.headers.get("x-scope-mode") || url.searchParams.get("scopeMode")) as "single" | "group" || "single";
+
+    const companyContext = await resolveAuthCompanyContext(session.user, targetCompanyId, requestedScopeMode);
+
+    const items = await AccountModel.find({
+      isActive: true,
+      companyId: { $in: companyContext.allowedCompanyIds },
+    })
       .sort({ isPrimary: -1, name: 1 })
       .lean();
     
@@ -33,20 +43,25 @@ export async function POST(req: Request) {
     await connectDB();
     const body = await req.json();
     
-    // Ensure companyId
-    if (!body.companyId) {
-      const primary = await CompanyModel.findOne({ isPrimary: true }).select("_id").lean();
-      if (primary) body.companyId = primary._id;
+    const targetCompanyId = body.companyId || req.headers.get("x-company-id") || undefined;
+    const companyContext = await resolveAuthCompanyContext(session.user, targetCompanyId, "single");
+
+    const effectiveCompanyId = body.companyId || companyContext.activeCompanyId;
+    if (!companyContext.allowedCompanyIds.includes(String(effectiveCompanyId))) {
+      return NextResponse.json(
+        { message: "Target company is outside your authorized operating scope." },
+        { status: 403 }
+      );
     }
     
-    if (!body.companyId) {
-      return NextResponse.json({ message: "companyId is required" }, { status: 400 });
-    }
-
+    body.companyId = effectiveCompanyId;
     body.createdBy = session.user.id;
     
     if (body.isPrimary) {
-      await AccountModel.updateMany({ isPrimary: true }, { isPrimary: false });
+      await AccountModel.updateMany(
+        { companyId: effectiveCompanyId, isPrimary: true },
+        { isPrimary: false }
+      );
     }
     
     const item = await AccountModel.create(body);

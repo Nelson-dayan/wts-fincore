@@ -4,17 +4,26 @@ import { authErrorResponse } from "@/lib/api/route-auth";
 import { parseSearch } from "@/lib/api/pagination";
 import { createContact, listContacts } from "@/lib/services/business/contact.service";
 import { sanitizeText } from "@/lib/security/sanitize";
+import { resolveAuthCompanyContext } from "@/lib/auth/company-context";
 
 export async function GET(req: Request) {
   try {
-    await requireRole(["admin", "employee"]);
+    const session = await requireRole(["admin", "employee"]);
     const url = new URL(req.url);
-    const companyId = url.searchParams.get("companyId") || undefined;
+    const targetCompanyId = req.headers.get("x-company-id") || url.searchParams.get("companyId") || undefined;
+    const scopeMode = (req.headers.get("x-scope-mode") || url.searchParams.get("scopeMode")) as "single" | "group" || "single";
+    const companyContext = await resolveAuthCompanyContext(session.user, targetCompanyId, scopeMode);
+
     const clientId = url.searchParams.get("clientId") || undefined;
     const q = parseSearch(url.searchParams) || undefined;
     const status = (url.searchParams.get("status") as "ACTIVE" | "INACTIVE") || undefined;
 
-    const items = await listContacts({ companyId, clientId, q, status });
+    const items = await listContacts({
+      companyIds: companyContext.allowedCompanyIds,
+      clientId,
+      q,
+      status,
+    });
     return NextResponse.json({ items });
   } catch (error) {
     return authErrorResponse(error, "Failed to list contacts");
@@ -33,10 +42,16 @@ export async function POST(req: Request) {
       return NextResponse.json({ message: "First name and last name are required." }, { status: 400 });
     }
 
-    const companyId = body.companyId || (session.user as any).companyId || session.user.id;
+    const targetCompanyId = body.companyId || req.headers.get("x-company-id");
+    const companyContext = await resolveAuthCompanyContext(session.user, targetCompanyId, "single");
+    const effectiveCompanyId = companyContext.activeCompanyId;
+
+    if (!companyContext.allowedCompanyIds.includes(effectiveCompanyId)) {
+      return NextResponse.json({ message: "Unauthorized company selection" }, { status: 403 });
+    }
 
     const contact = await createContact({
-      companyId: String(companyId),
+      companyId: effectiveCompanyId,
       clientId: body.clientId ? String(body.clientId) : null,
       firstName,
       lastName,

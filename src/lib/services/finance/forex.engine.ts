@@ -5,20 +5,15 @@
  * Layer 2 (Treasury account display), and Layer 3 (Original documents).
  */
 
+import { STATIC_FX_RATES as BASE_STATIC_FX_RATES } from "@/lib/constants/finance";
+
 export const BASE_ACCOUNTING_CURRENCY = "INR";
 
 export interface FXRates {
   [currency: string]: number;
 }
 
-export const STATIC_FX_RATES: FXRates = {
-  INR: 1.0,
-  USD: 83.0,
-  AED: 22.6,
-  RM: 18.2,
-  SGD: 62.5,
-  AUD: 54.5,
-};
+export const STATIC_FX_RATES: FXRates = BASE_STATIC_FX_RATES;
 
 export type RateSource = "LIVE_API" | "FALLBACK_STATIC" | "MANUAL_OVERRIDE";
 
