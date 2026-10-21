@@ -111,7 +111,7 @@ export function AdminResetPasswordModal({
       <div
         role="dialog"
         aria-modal="true"
-        className="relative z-10 w-full max-w-md overflow-hidden rounded-2xl border border-border/80 bg-card p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-200"
+        className="relative z-10 w-full max-w-md max-h-[90vh] overflow-y-auto rounded-2xl border border-border/80 bg-card p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-200"
       >
         <div className="flex items-center justify-between border-b border-border/60 pb-4">
           <div className="flex items-center gap-2.5">

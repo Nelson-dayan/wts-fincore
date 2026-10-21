@@ -444,84 +444,98 @@ export function AdminAccountsClient({ apiPrefix }: { apiPrefix: string }) {
 
       {/* Setup Modal */}
       {modalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4">
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setModalOpen(false)} />
-          <div className="relative w-full max-w-[96vw] sm:max-w-[450px] bg-card rounded-2xl shadow-2xl border border-border overflow-hidden animate-in fade-in duration-200">
-            <div className="px-4 py-3.5 sm:px-6 sm:py-5 border-b bg-muted/10 flex items-center justify-between">
-              <h2 className="text-base sm:text-lg font-semibold tracking-tight">Setup New Account</h2>
-              <button onClick={() => setModalOpen(false)} className="p-1.5 sm:p-2 rounded-full hover:bg-muted text-muted-foreground transition-colors" aria-label="Close modal">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setModalOpen(false)} />
+          <div className="relative w-full max-w-[96vw] sm:max-w-[480px] bg-card rounded-2xl shadow-2xl border border-border overflow-hidden flex flex-col max-h-[calc(100vh-2rem)] sm:max-h-[calc(100vh-4rem)] animate-in fade-in duration-200 my-auto">
+            {/* Header (Always Visible) */}
+            <div className="px-5 py-4 sm:px-6 sm:py-4.5 border-b bg-muted/20 flex items-center justify-between flex-shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center text-primary ring-1 ring-primary/20 shrink-0">
+                  <Plus className="w-4 h-4" />
+                </div>
+                <div>
+                  <h2 className="text-base sm:text-lg font-bold tracking-tight text-foreground">Setup New Account</h2>
+                  <p className="text-xs text-muted-foreground">Add a bank account, gateway, or cash wallet</p>
+                </div>
+              </div>
+              <button onClick={() => setModalOpen(false)} className="p-1.5 sm:p-2 rounded-xl hover:bg-muted text-muted-foreground hover:text-foreground transition-colors" aria-label="Close modal">
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4 sm:space-y-5">
-              {error && <div className="p-3 rounded-lg bg-destructive/10 text-destructive text-sm font-medium">{error}</div>}
-              
-              <div className="space-y-2">
-                <Label>Account Name</Label>
-                <Input required value={form.name} onChange={e => setForm({...form, name: e.target.value})} placeholder="e.g. Wise USD, Main Bank AED" />
-              </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+            <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
+              {/* Scrollable Body */}
+              <div className="p-4 sm:p-6 overflow-y-auto flex-1 space-y-4">
+                {error && <div className="p-3 rounded-lg bg-destructive/10 text-destructive text-sm font-medium">{error}</div>}
+                
                 <div className="space-y-2">
-                  <Label>Currency</Label>
-                  <Select 
-                    value={form.currency} 
-                    onChange={e => setForm({...form, currency: e.target.value})}
-                    options={[...SUPPORTED_CURRENCIES]}
-                  />
+                  <Label>Account Name</Label>
+                  <Input required value={form.name} onChange={e => setForm({...form, name: e.target.value})} placeholder="e.g. Wise USD, Main Bank AED" />
                 </div>
-                <div className="space-y-2">
-                  <Label>Type</Label>
-                  <Select 
-                    value={form.type} 
-                    onChange={e => setForm({...form, type: e.target.value})}
-                    options={[
-                      { value: "BANK", label: "Bank Account" },
-                      { value: "GATEWAY", label: "Digital Gateway" },
-                      { value: "CASH", label: "Cash Reserve" },
-                    ]}
-                  />
-                </div>
-              </div>
 
-              <div className="space-y-2">
-                <Label>Provider / Bank Name</Label>
-                <Input value={form.provider} onChange={e => setForm({...form, provider: e.target.value})} placeholder="e.g. HSBC, Stripe, PayPal" />
-              </div>
-
-              <div className="space-y-2">
-                <Label>Opening Balance</Label>
-                <Input type="number" step="0.01" value={form.openingBalance} onChange={e => setForm({...form, openingBalance: e.target.value})} />
-              </div>
-
-              <div className="space-y-2 pt-2">
-                <div className="flex items-center gap-2">
-                  <input 
-                    type="checkbox" 
-                    id="isPrimary" 
-                    checked={form.isPrimary} 
-                    onChange={e => setForm({...form, isPrimary: e.target.checked})} 
-                    className="rounded border-border cursor-pointer size-4 text-primary focus:ring-primary" 
-                  />
-                  <Label htmlFor="isPrimary" className="cursor-pointer font-medium select-none text-sm">Set as Primary Account</Label>
-                </div>
-                {primaryAccount && (
-                  <div className="text-[11px] text-amber-600 bg-amber-500/5 p-2.5 border border-amber-500/20 rounded-xl space-y-1">
-                    <p className="font-semibold flex items-center gap-1">
-                      ⚠️ "{primaryAccount.name}" ({primaryAccount.currency}) is already the primary account.
-                    </p>
-                    {form.isPrimary && (
-                      <p className="font-normal text-amber-700 leading-normal">
-                        Saving this account as primary will automatically unset "{primaryAccount.name}" as the primary account.
-                      </p>
-                    )}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                  <div className="space-y-2">
+                    <Label>Currency</Label>
+                    <Select 
+                      value={form.currency} 
+                      onChange={e => setForm({...form, currency: e.target.value})}
+                      options={[...SUPPORTED_CURRENCIES]}
+                    />
                   </div>
-                )}
+                  <div className="space-y-2">
+                    <Label>Type</Label>
+                    <Select 
+                      value={form.type} 
+                      onChange={e => setForm({...form, type: e.target.value})}
+                      options={[
+                        { value: "BANK", label: "Bank Account" },
+                        { value: "GATEWAY", label: "Digital Gateway" },
+                        { value: "CASH", label: "Cash Reserve" },
+                      ]}
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Provider / Bank Name</Label>
+                  <Input value={form.provider} onChange={e => setForm({...form, provider: e.target.value})} placeholder="e.g. HSBC, Stripe, PayPal" />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Opening Balance</Label>
+                  <Input type="number" step="0.01" value={form.openingBalance} onChange={e => setForm({...form, openingBalance: e.target.value})} />
+                </div>
+
+                <div className="space-y-2 pt-2">
+                  <div className="flex items-center gap-2">
+                    <input 
+                      type="checkbox" 
+                      id="isPrimary" 
+                      checked={form.isPrimary} 
+                      onChange={e => setForm({...form, isPrimary: e.target.checked})} 
+                      className="rounded border-border cursor-pointer size-4 text-primary focus:ring-primary" 
+                    />
+                    <Label htmlFor="isPrimary" className="cursor-pointer font-medium select-none text-sm">Set as Primary Account</Label>
+                  </div>
+                  {primaryAccount && (
+                    <div className="text-[11px] text-amber-600 bg-amber-500/5 p-2.5 border border-amber-500/20 rounded-xl space-y-1">
+                      <p className="font-semibold flex items-center gap-1">
+                        ⚠️ "{primaryAccount.name}" ({primaryAccount.currency}) is already the primary account.
+                      </p>
+                      {form.isPrimary && (
+                        <p className="font-normal text-amber-700 leading-normal">
+                          Saving this account as primary will automatically unset "{primaryAccount.name}" as the primary account.
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
 
-              <div className="pt-4 flex flex-col-reverse sm:flex-row gap-2 sm:gap-3">
-                <Button type="button" variant="outline" className="w-full sm:flex-1" onClick={() => setModalOpen(false)}>Cancel</Button>
-                <Button type="submit" className="w-full sm:flex-1 gap-2" disabled={submitting}>
+              {/* Sticky Footer */}
+              <div className="px-5 py-3.5 sm:px-6 sm:py-4 border-t bg-muted/20 flex items-center justify-end gap-3 flex-shrink-0">
+                <Button type="button" variant="outline" onClick={() => setModalOpen(false)}>Cancel</Button>
+                <Button type="submit" className="gap-2 px-5" disabled={submitting}>
                   {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
                   Save Account
                 </Button>

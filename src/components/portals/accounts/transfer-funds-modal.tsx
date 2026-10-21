@@ -233,36 +233,48 @@ export function TransferFundsModal({ isOpen, onClose, onSuccess, apiPrefix }: Tr
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4">
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full max-w-[96vw] sm:max-w-[480px] bg-card rounded-2xl shadow-2xl border border-border overflow-hidden animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative w-full max-w-[96vw] sm:max-w-[540px] bg-card rounded-2xl shadow-2xl border border-border overflow-hidden flex flex-col max-h-[calc(100vh-2rem)] sm:max-h-[calc(100vh-4rem)] animate-in fade-in duration-200 my-auto">
         
-        {/* Header */}
-        <div className="px-4 py-3.5 sm:px-6 sm:py-5 border-b bg-muted/10 flex items-center justify-between">
-          <div>
-            <h2 className="text-base sm:text-lg font-semibold tracking-tight">Transfer Funds</h2>
-            <p className="text-xs text-muted-foreground mt-0.5">Move money between internal accounts</p>
+        {/* Header (Always Visible) */}
+        <div className="px-5 py-4 sm:px-6 sm:py-4.5 border-b bg-muted/20 flex items-center justify-between flex-shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center text-primary ring-1 ring-primary/20 shrink-0">
+              <RefreshCw className="w-4 h-4" />
+            </div>
+            <div>
+              <h2 className="text-base sm:text-lg font-bold tracking-tight text-foreground">Transfer Funds</h2>
+              <p className="text-xs text-muted-foreground">Move money between internal company accounts</p>
+            </div>
           </div>
-          <button onClick={onClose} className="p-1.5 sm:p-2 rounded-full hover:bg-muted text-muted-foreground transition-colors" aria-label="Close modal">
+          <button 
+            type="button" 
+            onClick={onClose} 
+            className="p-1.5 sm:p-2 rounded-xl hover:bg-muted text-muted-foreground hover:text-foreground transition-colors" 
+            aria-label="Close modal"
+          >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {loading ? (
-          <div className="flex items-center justify-center py-20">
+          <div className="flex items-center justify-center py-20 flex-1">
             <Loader2 className="w-8 h-8 animate-spin text-primary/40" />
           </div>
         ) : (
-          <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4 sm:space-y-5">
-            {error && (
-              <div className="p-3 rounded-lg bg-destructive/10 text-destructive text-xs font-medium">
-                {error}
-              </div>
-            )}
+          <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
+            {/* Scrollable Form Body */}
+            <div className="p-4 sm:p-6 overflow-y-auto flex-1 space-y-4">
+              {error && (
+                <div className="p-3 rounded-lg bg-destructive/10 text-destructive text-xs font-medium">
+                  {error}
+                </div>
+              )}
 
-            {/* From & To Dropdowns */}
-            <div className="space-y-1.5">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+              {/* From & To Dropdowns */}
+              <div className="space-y-1.5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                 <div className="space-y-1.5">
                   <Label className="text-xs">From Account</Label>
                   <Select
@@ -465,12 +477,14 @@ export function TransferFundsModal({ isOpen, onClose, onSuccess, apiPrefix }: Tr
               />
             </div>
 
-            {/* Footer Buttons */}
-            <div className="pt-4 flex flex-col-reverse sm:flex-row gap-2 sm:gap-3">
-              <Button type="button" variant="outline" className="w-full sm:flex-1" onClick={onClose} disabled={submitting}>
+            </div>
+
+            {/* Sticky Footer (Always Visible at bottom) */}
+            <div className="px-5 py-3.5 sm:px-6 sm:py-4 border-t bg-muted/20 flex items-center justify-end gap-3 flex-shrink-0">
+              <Button type="button" variant="outline" onClick={onClose} disabled={submitting}>
                 Cancel
               </Button>
-              <Button type="submit" className="w-full sm:flex-1 gap-2" disabled={!isFormValid || submitting}>
+              <Button type="submit" className="gap-2 px-5" disabled={!isFormValid || submitting}>
                 {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
                 Execute Transfer
               </Button>
