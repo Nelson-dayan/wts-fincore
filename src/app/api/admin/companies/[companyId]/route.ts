@@ -5,8 +5,8 @@ import { connectDB } from "@/lib/db/connect";
 import { CompanyModel } from "@/lib/db/models";
 import { logActivity } from "@/lib/services/activity/log-activity.service";
 import { isImageSrc } from "@/lib/utils/is-image-src";
-
 import { authorizeResource } from "@/lib/auth/authorization";
+import { sanitizeText } from "@/lib/security/sanitize";
 
 export async function GET(
   req: Request,
@@ -63,12 +63,12 @@ export async function PATCH(
 
     const updates: Record<string, any> = {};
 
-    if (body.name !== undefined) updates.name = String(body.name).trim();
+    if (body.name !== undefined) updates.name = sanitizeText(String(body.name).trim());
     if (body.code !== undefined) updates.code = String(body.code).trim().toUpperCase();
     if (body.kind !== undefined) updates.kind = body.kind;
     if (body.parentCompanyId !== undefined) updates.parentCompanyId = body.parentCompanyId || null;
-    if (body.address !== undefined) updates.address = String(body.address);
-    if (body.contactName !== undefined) updates.contactName = String(body.contactName);
+    if (body.address !== undefined) updates.address = sanitizeText(String(body.address));
+    if (body.contactName !== undefined) updates.contactName = sanitizeText(String(body.contactName));
     if (body.email !== undefined) updates.email = String(body.email).toLowerCase();
     if (body.phone !== undefined) updates.phone = String(body.phone);
     if (body.website !== undefined) updates.website = String(body.website);
@@ -82,6 +82,9 @@ export async function PATCH(
       updates.branding = {
         ...(current.branding || {}),
         ...body.branding,
+        // Sanitize free-text branding fields after spread to override any injected values
+        invoiceFooter: sanitizeText(String(body.branding.invoiceFooter ?? current.branding?.invoiceFooter ?? "")),
+        bankDetailsText: sanitizeText(String(body.branding.bankDetailsText ?? current.branding?.bankDetailsText ?? "")),
       };
 
       // Resolve logo image: prioritize valid image sources

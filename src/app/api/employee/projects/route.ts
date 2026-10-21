@@ -3,7 +3,7 @@ import { requireRole } from "@/lib/auth/require-role";
 import { connectDB } from "@/lib/db/connect";
 import { ProjectModel } from "@/lib/db/models";
 import { authErrorResponse } from "@/lib/api/route-auth";
-import { parsePagination, parseSearch } from "@/lib/api/pagination";
+import { parsePagination, parseSearch, escapeRegex } from "@/lib/api/pagination";
 
 export async function GET(req: Request) {
   try {
@@ -14,7 +14,7 @@ export async function GET(req: Request) {
     const q = parseSearch(url.searchParams);
     const filter = {
       assignedTo: session.user.id,
-      ...(q ? { name: { $regex: q, $options: "i" } } : {}),
+      ...(q ? { name: { $regex: escapeRegex(q), $options: "i" } } : {}),
     };
     const [items, total] = await Promise.all([
       ProjectModel.find(filter)

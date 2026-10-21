@@ -12,6 +12,7 @@ export function PurchaseOrderFilePreview({ fileUrl }: { fileUrl: string }) {
       <iframe
         title="PO document"
         src={u}
+        sandbox=""
         className="mt-2 h-[min(72vh,820px)] w-full rounded-lg border border-border/60 bg-white"
       />
     );

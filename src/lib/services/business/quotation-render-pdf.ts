@@ -1,5 +1,9 @@
 import PDFDocument from "pdfkit";
 import { PassThrough } from "node:stream";
+import dns from "dns";
+import http from "http";
+import https from "https";
+import net from "net";
 import type { QuotationRenderDraft } from "@/lib/services/business/quotation-render.types";
 import { quotationCodeFromDocumentInfo } from "@/lib/services/business/quotation-render.types";
 import {
@@ -10,6 +14,11 @@ import {
   type QuotationBrandingState,
 } from "@/lib/portals/quotation-preview-utils";
 import { normalizeQuotationRenderDraft } from "@/lib/services/business/quotation-render-normalize";
+import {
+  isBlockedHostnameForSsrf,
+  isBlockedIpAddress,
+  hasEmbeddedCredentials,
+} from "@/lib/api/po-upload";
 
 const PAGE_W = 595.28;
 const PAGE_H = 841.89;
@@ -64,35 +73,70 @@ function bufferLooksLikePdfKitRaster(buf: Buffer): boolean {
   return false;
 }
 
-function isBlockedHostnameForSsrf(hostname: string): boolean {
-  const h = hostname.toLowerCase().replace(/^\[|\]$/g, "");
-  if (h === "localhost" || h === "0.0.0.0") return true;
-  if (h.endsWith(".localhost") || h === "local") return true;
-  const ipv4 = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(h);
-  if (ipv4) {
-    const a = +ipv4[1];
-    const b = +ipv4[2];
-    const c = +ipv4[3];
-    const d = +ipv4[4];
-    if ([a, b, c, d].some((x) => x > 255)) return true;
-    if (a === 0 || a === 127) return true;
-    if (a === 10) return true;
-    if (a === 169 && b === 254) return true;
-    if (a === 172 && b >= 16 && b <= 31) return true;
-    if (a === 192 && b === 168) return true;
-    if (a === 100 && b >= 64 && b <= 127) return true;
+export type DnsLookupCallback = (err: NodeJS.ErrnoException | null, address: string, family: number) => void;
+
+/**
+ * Custom DNS lookup for HTTP/HTTPS requests that prevents SSRF, DNS rebinding,
+ * and TOCTOU race conditions by validating all resolved IP addresses before
+ * allowing the TCP socket to connect.
+ *
+ * Rules:
+ * 1. If hostname is directly an IP, validates it immediately.
+ * 2. Pre-checks hostname string (localhost, local, alternate IP forms).
+ * 3. Resolves all addresses (IPv4 & IPv6).
+ * 4. Fails closed (rejects) if ANY resolved address is private, loopback, link-local, cloud-metadata, or reserved.
+ * 5. Fails closed on resolution errors or empty results.
+ * 6. Pins the socket connection to the first validated public IP address.
+ */
+export function secureDnsLookup(
+  hostname: string,
+  options: any,
+  callback: DnsLookupCallback
+): void {
+  const cleanHost = String(hostname ?? "").trim().toLowerCase().replace(/^\[|\]$/g, "");
+
+  // 1. Direct IP check
+  if (net.isIP(cleanHost)) {
+    if (isBlockedIpAddress(cleanHost)) {
+      return callback(new Error(`Prohibited IP destination (SSRF protection): ${cleanHost}`), "", 0);
+    }
+    return callback(null, cleanHost, net.isIP(cleanHost));
   }
-  if (h.includes(":")) {
-    if (h === "::1") return true;
-    if (h.startsWith("fe80:")) return true;
-    if (h.startsWith("fc") || h.startsWith("fd")) return true;
-    const tail = h.includes("::ffff:") ? h.split("::ffff:")[1] : null;
-    if (tail && isBlockedHostnameForSsrf(tail)) return true;
+
+  // 2. Pre-check hostname string (e.g. localhost, local, alternate IP forms)
+  if (isBlockedHostnameForSsrf(cleanHost)) {
+    return callback(new Error(`Prohibited hostname (SSRF protection): ${cleanHost}`), "", 0);
   }
-  return false;
+
+  // 3. Resolve all addresses via DNS
+  dns.lookup(cleanHost, { all: true }, (err, addresses) => {
+    if (err) {
+      return callback(err, "", 0);
+    }
+    if (!addresses || addresses.length === 0) {
+      return callback(new Error(`DNS resolution returned no addresses for ${cleanHost}`), "", 0);
+    }
+
+    // 4. Fail closed if ANY address is prohibited
+    for (const entry of addresses) {
+      if (!entry.address || isBlockedIpAddress(entry.address)) {
+        return callback(
+          new Error(
+            `Prohibited IP destination (SSRF protection): resolved ${cleanHost} to ${entry.address}`
+          ),
+          "",
+          0
+        );
+      }
+    }
+
+    // 5. Pin connection to first validated public address
+    const chosen = addresses[0];
+    callback(null, chosen.address, chosen.family);
+  });
 }
 
-async function fetchRemoteImageBufferForPdf(url: string): Promise<Buffer | null> {
+export async function fetchRemoteImageBufferForPdf(url: string): Promise<Buffer | null> {
   let parsed: URL;
   try {
     parsed = new URL(url);
@@ -101,37 +145,103 @@ async function fetchRemoteImageBufferForPdf(url: string): Promise<Buffer | null>
   }
   if (parsed.protocol !== "https:" && parsed.protocol !== "http:") return null;
   if (process.env.NODE_ENV === "production" && parsed.protocol === "http:") return null;
+  if (hasEmbeddedCredentials(parsed)) return null;
   if (isBlockedHostnameForSsrf(parsed.hostname)) return null;
 
-  const ac = new AbortController();
-  const timer = setTimeout(() => ac.abort(), REMOTE_IMAGE_FETCH_MS);
-  try {
-    const res = await fetch(url, {
-      redirect: "follow",
-      signal: ac.signal,
-      headers: { Accept: "image/*,*/*;q=0.1" },
+  return new Promise<Buffer | null>((resolve) => {
+    const isHttps = parsed.protocol === "https:";
+    const client = isHttps ? https : http;
+
+    let resolved = false;
+    const safeResolve = (val: Buffer | null) => {
+      if (!resolved) {
+        resolved = true;
+        resolve(val);
+      }
+    };
+
+    const req = client.request(
+      parsed,
+      {
+        method: "GET",
+        lookup: secureDnsLookup,
+        headers: {
+          Accept: "image/*,*/*;q=0.1",
+          Host: parsed.host,
+          "User-Agent": "WTS-FinCore-PdfRenderer/1.0",
+        },
+        servername: parsed.hostname, // Ensure SNI matches hostname for TLS cert verification
+        timeout: REMOTE_IMAGE_FETCH_MS,
+      },
+      (res) => {
+        // Strictly reject all HTTP redirects (3xx) — never follow redirect targets
+        if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400) {
+          req.destroy();
+          return safeResolve(null);
+        }
+
+        // Must be HTTP 2xx
+        if (!res.statusCode || res.statusCode < 200 || res.statusCode >= 300) {
+          req.destroy();
+          return safeResolve(null);
+        }
+
+        // Check declared Content-Length
+        const cl = res.headers["content-length"];
+        if (cl && Number(cl) > MAX_EMBED_IMAGE_BYTES) {
+          req.destroy();
+          return safeResolve(null);
+        }
+
+        // Check Content-Type
+        const ct = (res.headers["content-type"] ?? "").split(";")[0].trim().toLowerCase();
+        if (ct && ct !== "application/octet-stream" && !ct.startsWith("image/")) {
+          req.destroy();
+          return safeResolve(null);
+        }
+
+        const chunks: Buffer[] = [];
+        let totalBytes = 0;
+
+        res.on("data", (chunk: Buffer) => {
+          totalBytes += chunk.length;
+          if (totalBytes > MAX_EMBED_IMAGE_BYTES) {
+            req.destroy();
+            return safeResolve(null);
+          }
+          chunks.push(chunk);
+        });
+
+        res.on("end", () => {
+          const buf = Buffer.concat(chunks);
+          if (buf.length === 0 || buf.length > MAX_EMBED_IMAGE_BYTES) {
+            return safeResolve(null);
+          }
+          if (!bufferLooksLikePdfKitRaster(buf)) {
+            return safeResolve(null);
+          }
+          safeResolve(buf);
+        });
+
+        res.on("error", () => {
+          req.destroy();
+          safeResolve(null);
+        });
+      }
+    );
+
+    req.on("timeout", () => {
+      req.destroy();
+      safeResolve(null);
     });
-    if (!res.ok) return null;
-    const cl = res.headers.get("content-length");
-    if (cl && Number(cl) > MAX_EMBED_IMAGE_BYTES) return null;
-    const ct = (res.headers.get("content-type") ?? "").split(";")[0].trim().toLowerCase();
-    if (
-      ct &&
-      ct !== "application/octet-stream" &&
-      !ct.startsWith("image/")
-    ) {
-      return null;
-    }
-    const ab = await res.arrayBuffer();
-    if (ab.byteLength > MAX_EMBED_IMAGE_BYTES) return null;
-    const buf = Buffer.from(ab);
-    if (!bufferLooksLikePdfKitRaster(buf)) return null;
-    return buf;
-  } catch {
-    return null;
-  } finally {
-    clearTimeout(timer);
-  }
+
+    req.on("error", () => {
+      req.destroy();
+      safeResolve(null);
+    });
+
+    req.end();
+  });
 }
 
 async function resolveImageBufferForPdf(src: string): Promise<Buffer | null> {

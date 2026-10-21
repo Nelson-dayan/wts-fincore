@@ -1,3 +1,5 @@
+import net from "net";
+
 /** Max raw binary size before base64 (~Mongo 16MB doc budget). */
 export const MAX_PO_FILE_BYTES = 9 * 1024 * 1024;
 
@@ -34,32 +36,136 @@ export function isAllowedPoDataUrl(value: string): boolean {
 
 export const MAX_REMOTE_URL_LENGTH = 2048;
 
+/**
+ * Converts an alternate IPv4 representation to dotted-decimal, or returns null
+ * if the input is not a recognized alternate form.
+ * Handles DWORD/decimal integers (2130706433), octal (0177.0.0.1), and hex (0x7f.0.0.1).
+ */
+function normalizeToDottedDecimalIpv4(h: string): string | null {
+  // Pure integer (DWORD): e.g. 2130706433 => 127.0.0.1
+  if (/^\d{7,10}$/.test(h)) {
+    const n = parseInt(h, 10);
+    if (!Number.isFinite(n) || n < 0 || n > 0xffffffff) return null;
+    return `${(n >>> 24) & 0xff}.${(n >>> 16) & 0xff}.${(n >>> 8) & 0xff}.${n & 0xff}`;
+  }
+  // Pure hex: e.g. 0x7f000001
+  if (/^0x[0-9a-f]{1,8}$/i.test(h)) {
+    const n = parseInt(h, 16);
+    if (!Number.isFinite(n) || n < 0 || n > 0xffffffff) return null;
+    return `${(n >>> 24) & 0xff}.${(n >>> 16) & 0xff}.${(n >>> 8) & 0xff}.${n & 0xff}`;
+  }
+  // Octal or hex dotted quads, possibly mixed with plain decimals:
+  // e.g. 0177.0.0.1 (octal first part), 0x7f.0x0.0x0.0x1 (hex parts)
+  // A quad is "alternate" if at least one part is non-standard (octal/hex).
+  const parts = h.split(".");
+  if (parts.length === 4) {
+    let hasAlt = false;
+    const nums = parts.map((p) => {
+      if (/^0x[0-9a-f]+$/i.test(p)) { hasAlt = true; return parseInt(p, 16); }
+      if (/^0[0-7]+$/.test(p)) { hasAlt = true; return parseInt(p, 8); } // octal (e.g. 0177)
+      if (/^\d+$/.test(p)) return parseInt(p, 10); // plain decimal part in mixed quad
+      return NaN;
+    });
+    if (hasAlt && nums.every((n) => Number.isFinite(n) && n >= 0 && n <= 255)) {
+      return nums.join(".");
+    }
+  }
+  return null;
+}
+
+/**
+ * Validates whether an IP address belongs to loopback, private, link-local,
+ * cloud metadata, CGNAT, multicast, benchmark, or reserved ranges.
+ * Handles both IPv4 and IPv6, including IPv4-mapped IPv6.
+ * Fails closed (returns true) for invalid or malformed IP addresses.
+ */
+export function isBlockedIpAddress(ip: string): boolean {
+  const clean = String(ip ?? "").trim().toLowerCase();
+  if (!clean) return true;
+
+  // Handle IPv4-mapped IPv6 (e.g. ::ffff:127.0.0.1 or ::ffff:7f00:1)
+  if (clean.includes("::ffff:")) {
+    const tail = clean.split("::ffff:")[1];
+    if (tail) {
+      if (net.isIP(tail) === 4) {
+        return isBlockedIpAddress(tail);
+      }
+      const hexMatch = tail.match(/^([0-9a-f]{1,4}):([0-9a-f]{1,4})$/i);
+      if (hexMatch) {
+        const high = parseInt(hexMatch[1], 16);
+        const low = parseInt(hexMatch[2], 16);
+        if (Number.isFinite(high) && Number.isFinite(low)) {
+          const dotted = `${(high >> 8) & 0xff}.${high & 0xff}.${(low >> 8) & 0xff}.${low & 0xff}`;
+          return isBlockedIpAddress(dotted);
+        }
+      }
+    }
+    return true; // Malformed mapped address -> fail closed
+  }
+
+  const version = net.isIP(clean);
+  if (version === 4) {
+    const parts = clean.split(".").map((p) => parseInt(p, 10));
+    if (parts.length !== 4 || parts.some((p) => isNaN(p) || p < 0 || p > 255)) {
+      return true; // Malformed IPv4 -> fail closed
+    }
+    const [a, b, c] = parts;
+    if (a === 0 || a === 127) return true; // 0.0.0.0/8 & 127.0.0.0/8
+    if (a === 10) return true; // 10.0.0.0/8
+    if (a === 169 && b === 254) return true; // 169.254.0.0/16 (link-local & AWS metadata)
+    if (a === 172 && b >= 16 && b <= 31) return true; // 172.16.0.0/12
+    if (a === 192 && b === 168) return true; // 192.168.0.0/16
+    if (a === 100 && b >= 64 && b <= 127) return true; // 100.64.0.0/10 (CGNAT)
+    if (a === 192 && b === 0 && (c === 0 || c === 2)) return true; // 192.0.0.0/24 & 192.0.2.0/24
+    if (a === 198 && b === 51 && c === 100) return true; // 198.51.100.0/24
+    if (a === 203 && b === 0 && c === 113) return true; // 203.0.113.0/24
+    if (a === 198 && (b === 18 || b === 19)) return true; // 198.18.0.0/15
+    if (a >= 224) return true; // 224.0.0.0/4 (multicast) & 240.0.0.0/4 (reserved) & 255.255.255.255
+    return false;
+  }
+
+  if (version === 6) {
+    if (clean === "::1" || clean === "::") return true;
+    if (/^fe[89ab][0-9a-f]/i.test(clean) || clean.startsWith("fe80:")) return true;
+    if (clean.startsWith("fc") || clean.startsWith("fd")) return true;
+    if (clean.startsWith("ff")) return true;
+    if (clean.startsWith("2001:db8:") || clean.startsWith("2001:0db8:")) return true;
+    if (clean.startsWith("100::") || clean.startsWith("0100::")) return true;
+    if (clean.startsWith("2001:10:") || clean.startsWith("2001:20:")) return true;
+    return false;
+  }
+
+  return true;
+}
+
 export function isBlockedHostnameForSsrf(hostname: string): boolean {
   const h = (hostname ?? "").trim().toLowerCase();
   if (!h) return true;
   if (h === "localhost" || h.endsWith(".localhost") || h === "local") return true;
   if (h === "0.0.0.0" || h === "127.0.0.1") return true;
-  const ipv4 = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(h);
-  if (ipv4) {
-    const a = +ipv4[1];
-    const b = +ipv4[2];
-    const c = +ipv4[3];
-    const d = +ipv4[4];
-    if ([a, b, c, d].some((x) => x > 255)) return true;
-    if (a === 0 || a === 127) return true;
-    if (a === 10) return true;
-    if (a === 169 && b === 254) return true; // Link-local / AWS metadata
-    if (a === 172 && b >= 16 && b <= 31) return true;
-    if (a === 192 && b === 168) return true;
-    if (a === 100 && b >= 64 && b <= 127) return true;
+
+  // Normalize alternate IPv4 representations (DWORD, hex, octal) before checking
+  const normalized = normalizeToDottedDecimalIpv4(h);
+  if (normalized !== null) {
+    return isBlockedIpAddress(normalized);
   }
-  if (h.includes(":")) {
-    if (h === "::1" || h === "::") return true;
-    if (h.startsWith("fe80:") || h.startsWith("fc") || h.startsWith("fd")) return true;
-    const tail = h.includes("::ffff:") ? h.split("::ffff:")[1] : null;
-    if (tail && isBlockedHostnameForSsrf(tail)) return true;
+
+  // If hostname is directly an IP address, validate it
+  if (net.isIP(h)) {
+    return isBlockedIpAddress(h);
   }
+
+  // Handle dotless local hostnames without TLD
+  if (!h.includes(".")) {
+    return true;
+  }
+
   return false;
+}
+
+/** Returns true if a parsed URL contains embedded credentials (user:pass@host). */
+export function hasEmbeddedCredentials(parsed: URL): boolean {
+  return Boolean(parsed.username || parsed.password);
 }
 
 export function containsMaliciousMarkup(buf: Buffer): boolean {
@@ -216,6 +322,11 @@ export function validatePoFileUrl(
       return { ok: false, message: "Only HTTPS remote URLs are supported" };
     }
 
+    // Reject URLs embedding credentials (user:pass@host) — CVE-class: credential leakage / confused deputy
+    if (hasEmbeddedCredentials(parsed)) {
+      return { ok: false, message: "Remote URL must not contain embedded credentials" };
+    }
+
     if (isBlockedHostnameForSsrf(parsed.hostname)) {
       return { ok: false, message: "Remote URL host is prohibited (SSRF protection)" };
     }
@@ -230,7 +341,7 @@ export function validatePoFileUrl(
       };
     }
 
-    return { ok: true, url: parsed.toString() };
+    return { ok: true, url: parsed.href };
   }
 
   return {

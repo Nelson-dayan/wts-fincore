@@ -4,6 +4,7 @@ import { authErrorResponse } from "@/lib/api/route-auth";
 import { connectDB } from "@/lib/db/connect";
 import { CompanyModel } from "@/lib/db/models";
 import { logActivity } from "@/lib/services/activity/log-activity.service";
+import { sanitizeText } from "@/lib/security/sanitize";
 
 export async function GET() {
   try {
@@ -28,7 +29,7 @@ export async function POST(req: Request) {
 
     const body = await req.json();
 
-    const name = String(body.name || "").trim();
+    const name = sanitizeText(String(body.name || "").trim());
     let code = String(body.code || "").trim().toUpperCase();
     const kind = String(body.kind || "operating").toLowerCase();
     const parentCompanyId = body.parentCompanyId ? String(body.parentCompanyId) : null;
@@ -57,8 +58,8 @@ export async function POST(req: Request) {
       code,
       kind: ["holding", "operating", "branch", "division"].includes(kind) ? kind : "operating",
       parentCompanyId: parentCompanyId || null,
-      address: String(body.address || ""),
-      contactName: String(body.contactName || ""),
+      address: sanitizeText(String(body.address || "")),
+      contactName: sanitizeText(String(body.contactName || "")),
       email: String(body.email || "").toLowerCase(),
       phone: String(body.phone || ""),
       website: String(body.website || ""),
@@ -76,8 +77,8 @@ export async function POST(req: Request) {
         invoicePrefix: String(body.branding?.invoicePrefix || `${code}-INV`),
         quotationPrefix: String(body.branding?.quotationPrefix || `${code}-QT`),
         poPrefix: String(body.branding?.poPrefix || `${code}-PO`),
-        invoiceFooter: String(body.branding?.invoiceFooter || ""),
-        bankDetailsText: String(body.branding?.bankDetailsText || ""),
+        invoiceFooter: sanitizeText(String(body.branding?.invoiceFooter || "")),
+        bankDetailsText: sanitizeText(String(body.branding?.bankDetailsText || "")),
       },
       logoText: String(body.logoText || body.branding?.logoText || ""),
       signatureText: String(body.signatureText || body.branding?.signatureText || ""),

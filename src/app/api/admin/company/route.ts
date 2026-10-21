@@ -6,6 +6,7 @@ import { authErrorResponse } from "@/lib/api/route-auth";
 import { logActivity } from "@/lib/services/activity/log-activity.service";
 import { isImageSrc } from "@/lib/utils/is-image-src";
 import { CompanyHierarchyService } from "@/lib/services/business/company-hierarchy.service";
+import { sanitizeText } from "@/lib/security/sanitize";
 
 export async function GET(req: Request) {
   try {
@@ -57,11 +58,11 @@ export async function PATCH(req: Request) {
 
     const updates: Record<string, any> = {};
 
-    if (body.name !== undefined) updates.name = String(body.name).trim();
+    if (body.name !== undefined) updates.name = sanitizeText(String(body.name).trim());
     if (body.code !== undefined) updates.code = String(body.code).trim().toUpperCase();
     if (body.kind !== undefined) updates.kind = body.kind;
-    if (body.address !== undefined) updates.address = String(body.address);
-    if (body.contactName !== undefined) updates.contactName = String(body.contactName);
+    if (body.address !== undefined) updates.address = sanitizeText(String(body.address));
+    if (body.contactName !== undefined) updates.contactName = sanitizeText(String(body.contactName));
     if (body.email !== undefined) updates.email = String(body.email).toLowerCase();
     if (body.phone !== undefined) updates.phone = String(body.phone);
     if (body.website !== undefined) updates.website = String(body.website);
@@ -108,8 +109,8 @@ export async function PATCH(req: Request) {
       invoicePrefix: bodyBranding.invoicePrefix ?? body.invoicePrefix ?? currentBranding.invoicePrefix ?? `${updates.code || current?.code || "INV"}-INV`,
       quotationPrefix: bodyBranding.quotationPrefix ?? body.quotationPrefix ?? currentBranding.quotationPrefix ?? `${updates.code || current?.code || "QT"}-QT`,
       poPrefix: bodyBranding.poPrefix ?? body.poPrefix ?? currentBranding.poPrefix ?? `${updates.code || current?.code || "PO"}-PO`,
-      invoiceFooter: bodyBranding.invoiceFooter ?? body.invoiceFooter ?? currentBranding.invoiceFooter ?? "",
-      bankDetailsText: bodyBranding.bankDetailsText ?? body.bankDetailsText ?? currentBranding.bankDetailsText ?? "",
+      invoiceFooter: sanitizeText(bodyBranding.invoiceFooter ?? body.invoiceFooter ?? currentBranding.invoiceFooter ?? ""),
+      bankDetailsText: sanitizeText(bodyBranding.bankDetailsText ?? body.bankDetailsText ?? currentBranding.bankDetailsText ?? ""),
     };
 
     const updated = await CompanyModel.findByIdAndUpdate(
