@@ -39,6 +39,11 @@ export function rateLimit(
 export const REGISTER_LIMIT = 10;
 export const REGISTER_WINDOW_MS = 60 * 60 * 1000;
 
+/** Password Reset: 5 attempts / 15 minutes / IP; 3 attempts / 15 minutes / Email */
+export const FORGOT_PASSWORD_IP_LIMIT = 5;
+export const FORGOT_PASSWORD_EMAIL_LIMIT = 3;
+export const FORGOT_PASSWORD_WINDOW_MS = 15 * 60 * 1000;
+
 /** Login Lockout: 5 failed attempts per 15 minutes per account */
 export const LOGIN_MAX_FAILED_ATTEMPTS = 5;
 export const LOGIN_LOCKOUT_WINDOW_MS = 15 * 60 * 1000;
@@ -75,6 +80,10 @@ export function isLoginLocked(
 }
 
 export function clearFailedLogin(key: string): void {
+  buckets.delete(key);
+}
+
+export function clearRateLimit(key: string): void {
   buckets.delete(key);
 }
 
