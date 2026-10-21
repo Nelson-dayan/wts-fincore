@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { X, Loader2, RefreshCw, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,6 +25,7 @@ interface TransferFundsModalProps {
 import { getBenchmarkRate, getCurrencyDecimals } from "@/lib/constants/finance";
 
 export function TransferFundsModal({ isOpen, onClose, onSuccess, apiPrefix }: TransferFundsModalProps) {
+  const [mounted, setMounted] = useState(false);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -38,6 +40,26 @@ export function TransferFundsModal({ isOpen, onClose, onSuccess, apiPrefix }: Tr
   const [reference, setReference] = useState("");
   const [note, setNote] = useState("");
   const [overrideReason, setOverrideReason] = useState("");
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape" && !submitting) {
+        onClose();
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.body.style.overflow = originalOverflow;
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isOpen, submitting, onClose]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -230,12 +252,19 @@ export function TransferFundsModal({ isOpen, onClose, onSuccess, apiPrefix }: Tr
     }
   };
 
-  if (!isOpen) return null;
+  if (!isOpen || !mounted) return null;
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
-      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full max-w-[96vw] sm:max-w-[540px] bg-card rounded-2xl shadow-2xl border border-border overflow-hidden flex flex-col max-h-[calc(100vh-2rem)] sm:max-h-[calc(100vh-4rem)] animate-in fade-in duration-200 my-auto">
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[9999] flex items-center justify-center p-3 sm:p-4 md:p-6 overflow-y-auto"
+      role="dialog"
+      aria-modal="true"
+    >
+      <div
+        className="fixed inset-0 bg-black/75 backdrop-blur-sm transition-opacity"
+        onClick={() => !submitting && onClose()}
+      />
+      <div className="relative z-10 w-full max-w-[96vw] sm:max-w-[560px] bg-card rounded-2xl shadow-2xl border border-border/80 overflow-hidden flex flex-col max-h-[88vh] animate-in fade-in zoom-in-95 duration-200 my-auto">
         
         {/* Header (Always Visible) */}
         <div className="px-5 py-4 sm:px-6 sm:py-4.5 border-b bg-muted/20 flex items-center justify-between flex-shrink-0">
@@ -492,6 +521,7 @@ export function TransferFundsModal({ isOpen, onClose, onSuccess, apiPrefix }: Tr
           </form>
         )}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

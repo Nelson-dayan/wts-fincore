@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { 
   Plus, 
   Wallet, 
@@ -63,6 +64,27 @@ export function AdminAccountsClient({ apiPrefix }: { apiPrefix: string }) {
     openingBalance: "0",
     isPrimary: false
   });
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!modalOpen) return;
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape" && !submitting) {
+        setModalOpen(false);
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.body.style.overflow = originalOverflow;
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [modalOpen, submitting]);
 
   const loadProjection = useCallback(async () => {
     try {
@@ -443,10 +465,17 @@ export function AdminAccountsClient({ apiPrefix }: { apiPrefix: string }) {
       )}
 
       {/* Setup Modal */}
-      {modalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setModalOpen(false)} />
-          <div className="relative w-full max-w-[96vw] sm:max-w-[480px] bg-card rounded-2xl shadow-2xl border border-border overflow-hidden flex flex-col max-h-[calc(100vh-2rem)] sm:max-h-[calc(100vh-4rem)] animate-in fade-in duration-200 my-auto">
+      {modalOpen && mounted && createPortal(
+        <div
+          className="fixed inset-0 z-[9999] flex items-center justify-center p-3 sm:p-4 md:p-6 overflow-y-auto"
+          role="dialog"
+          aria-modal="true"
+        >
+          <div
+            className="fixed inset-0 bg-black/75 backdrop-blur-sm transition-opacity"
+            onClick={() => !submitting && setModalOpen(false)}
+          />
+          <div className="relative z-10 w-full max-w-[96vw] sm:max-w-[480px] bg-card rounded-2xl shadow-2xl border border-border/80 overflow-hidden flex flex-col max-h-[88vh] animate-in fade-in zoom-in-95 duration-200 my-auto">
             {/* Header (Always Visible) */}
             <div className="px-5 py-4 sm:px-6 sm:py-4.5 border-b bg-muted/20 flex items-center justify-between flex-shrink-0">
               <div className="flex items-center gap-3">
@@ -542,7 +571,8 @@ export function AdminAccountsClient({ apiPrefix }: { apiPrefix: string }) {
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Transfer Modal */}
