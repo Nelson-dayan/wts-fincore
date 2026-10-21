@@ -40,7 +40,7 @@ export function AdminUsersClient() {
     primaryCompanyId: "",
   });
   const [saveTargetId, setSaveTargetId] = useState<string | null>(null);
-  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
+  const [deleteTargetUser, setDeleteTargetUser] = useState<AdminUser | null>(null);
   const [resetTargetUser, setResetTargetUser] = useState<AdminUser | null>(null);
   const [accessTargetUser, setAccessTargetUser] = useState<AdminUser | null>(null);
 
@@ -167,17 +167,37 @@ export function AdminUsersClient() {
     }
   }
 
-  async function deleteUser(userId: string): Promise<boolean> {
-    setSavingId(userId);
+  async function reactivateUser(user: AdminUser): Promise<boolean> {
+    setSavingId(user._id);
     setError("");
     try {
-      await apiFetch<{ message?: string }>(`/api/admin/users/${userId}`, {
+      await apiFetch<{ message?: string }>(`/api/admin/users/${user._id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isActive: true }),
+      });
+      await loadUsers(page, query);
+      return true;
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to reactivate user");
+      return false;
+    } finally {
+      setSavingId("");
+    }
+  }
+
+  async function deleteUser(user: AdminUser): Promise<boolean> {
+    setSavingId(user._id);
+    setError("");
+    try {
+      const mode = user.isActive ? "deactivate" : "permanent";
+      await apiFetch<{ message?: string }>(`/api/admin/users/${user._id}?mode=${mode}`, {
         method: "DELETE",
       });
       await loadUsers(page, query);
       return true;
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to delete user");
+      setError(e instanceof Error ? e.message : "Failed to process user removal");
       return false;
     } finally {
       setSavingId("");
@@ -202,19 +222,27 @@ export function AdminUsersClient() {
         }}
       />
       <ConfirmDialog
-        open={deleteTargetId !== null}
+        open={deleteTargetUser !== null}
         onOpenChange={(o) => {
-          if (!o) setDeleteTargetId(null);
+          if (!o) setDeleteTargetUser(null);
         }}
-        title="Delete this user?"
-        description="This removes the account from the workspace. This cannot be undone."
-        confirmLabel="Delete"
-        variant="destructive"
-        loading={Boolean(deleteTargetId && savingId === deleteTargetId)}
+        title={
+          deleteTargetUser?.isActive
+            ? `Deactivate account for ${deleteTargetUser.name}?`
+            : `Permanently delete ${deleteTargetUser?.name}?`
+        }
+        description={
+          deleteTargetUser?.isActive
+            ? "Safe Deactivation (Recommended): This revokes active login access immediately and marks the user as Inactive. All historical vouchers, invoices, and ledger records will preserve their author reference for financial audit compliance."
+            : "Permanent Deletion: This permanently removes the user record from the database. Note: If this user is referenced by historical financial records (transfers, payments, invoices, or ledger vouchers), permanent deletion will be prevented to maintain audit integrity."
+        }
+        confirmLabel={deleteTargetUser?.isActive ? "Deactivate User" : "Permanently Delete"}
+        variant={deleteTargetUser?.isActive ? "default" : "destructive"}
+        loading={Boolean(deleteTargetUser && savingId === deleteTargetUser._id)}
         onConfirm={async () => {
-          if (!deleteTargetId) return;
-          const ok = await deleteUser(deleteTargetId);
-          if (ok) setDeleteTargetId(null);
+          if (!deleteTargetUser) return;
+          const ok = await deleteUser(deleteTargetUser);
+          if (ok) setDeleteTargetUser(null);
         }}
       />
       <DashboardPageHeader
@@ -274,8 +302,12 @@ export function AdminUsersClient() {
           }
           onSave={(id) => setSaveTargetId(id)}
           onOpenAccessModal={(user) => setAccessTargetUser(user)}
-          onDelete={(id) => setDeleteTargetId(id)}
+          onDelete={(id) => {
+            const u = users.find((x) => x._id === id);
+            if (u) setDeleteTargetUser(u);
+          }}
           onResetPassword={(user) => setResetTargetUser(user)}
+          onReactivate={(user) => reactivateUser(user)}
         />
       </div>
 

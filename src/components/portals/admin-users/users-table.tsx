@@ -39,6 +39,7 @@ export function UsersTable({
   onOpenAccessModal,
   onDelete,
   onResetPassword,
+  onReactivate,
 }: {
   users: AdminUser[];
   companies?: CompanyOption[];
@@ -64,6 +65,7 @@ export function UsersTable({
   onOpenAccessModal?: (user: AdminUser) => void;
   onDelete: (userId: string) => void;
   onResetPassword?: (user: AdminUser) => void;
+  onReactivate?: (user: AdminUser) => void;
 }) {
   const totalPages = Math.max(1, Math.ceil(total / limit));
   const end = Math.min(page * limit, total);
@@ -220,6 +222,7 @@ export function UsersTable({
                     onOpenAccessModal={onOpenAccessModal}
                     onDelete={onDelete}
                     onResetPassword={onResetPassword}
+                    onReactivate={onReactivate}
                   />
                 ))}
               </tbody>

@@ -1,6 +1,15 @@
 import { NextResponse } from "next/server";
 import { connectDB } from "@/lib/db/connect";
-import { UserModel } from "@/lib/db/models";
+import { 
+  UserModel, 
+  TransferModel, 
+  PaymentModel, 
+  InvoiceModel, 
+  PurchaseOrderModel, 
+  QuotationModel, 
+  ExpenseModel, 
+  AccountTransactionModel 
+} from "@/lib/db/models";
 import { requireRole } from "@/lib/auth/require-role";
 import { authErrorResponse } from "@/lib/api/route-auth";
 import { logActivity } from "@/lib/services/activity/log-activity.service";
@@ -193,7 +202,7 @@ export async function PATCH(req: Request, ctx: RouteCtx) {
   }
 }
 
-export async function DELETE(_req: Request, ctx: RouteCtx) {
+export async function DELETE(req: Request, ctx: RouteCtx) {
   try {
     const session = await requireRole(["admin"]);
     const isSuperAdmin = session.user.role === "super_admin";
@@ -201,34 +210,38 @@ export async function DELETE(_req: Request, ctx: RouteCtx) {
     const { userId } = await ctx.params;
     const callerAccess = await getUserAccessInfo(session.user.id, session.user.role);
 
+    const url = new URL(req.url);
+    const mode = url.searchParams.get("mode") || "deactivate"; // "deactivate" (soft) | "permanent" (hard)
+
     if (session.user.id === userId) {
       return NextResponse.json(
-        { message: "You cannot delete your own account" },
+        { message: "You cannot deactivate or delete your own account." },
         { status: 400 }
       );
     }
 
-    const targetUser = await UserModel.findById(userId).select("_id role email companyIds primaryCompanyId").lean();
+    const targetUser = await UserModel.findById(userId).select("_id role email companyIds primaryCompanyId isActive").lean();
     if (!targetUser) {
       return NextResponse.json({ message: "User not found" }, { status: 404 });
     }
 
-    // Role Hierarchy Guards for Account Deletion:
+    // Role Hierarchy Guards for Account Deletion / Deactivation:
     if (targetUser.role === "super_admin") {
       if (!isSuperAdmin) {
         return NextResponse.json(
-          { message: "Only a Super Admin can delete a Super Admin account." },
+          { message: "Only a Super Admin can modify or delete a Super Admin account." },
           { status: 403 }
         );
       }
 
-      const otherSuperAdmins = await UserModel.countDocuments({
+      const otherActiveSuperAdmins = await UserModel.countDocuments({
         _id: { $ne: targetUser._id },
         role: "super_admin",
+        isActive: { $ne: false },
       });
-      if (otherSuperAdmins === 0) {
+      if (otherActiveSuperAdmins === 0) {
         return NextResponse.json(
-          { message: "Cannot delete the only Super Admin account." },
+          { message: "Cannot deactivate or delete the only active Super Admin account. At least one Super Admin must remain active." },
           { status: 400 }
         );
       }
@@ -236,12 +249,12 @@ export async function DELETE(_req: Request, ctx: RouteCtx) {
 
     if (targetUser.role === "admin" && !isSuperAdmin) {
       return NextResponse.json(
-        { message: "Only a Super Admin can delete Admin accounts." },
+        { message: "Only a Super Admin can deactivate or delete Admin accounts." },
         { status: 403 }
       );
     }
 
-    // Standard Admin can only delete users within their assigned companies
+    // Standard Admin can only manage users within their assigned companies
     if (!isSuperAdmin) {
       const targetCompanies = [
         ...(targetUser.companyIds || []).map(String),
@@ -250,24 +263,76 @@ export async function DELETE(_req: Request, ctx: RouteCtx) {
       const hasSharedCompany = targetCompanies.length > 0 && targetCompanies.some((cId) => callerAccess.assignedCompanyIds.includes(cId));
       if (!hasSharedCompany) {
         return NextResponse.json(
-          { message: "You can only delete users within your authorized company scope." },
+          { message: "You can only manage users within your authorized company scope." },
           { status: 403 }
         );
       }
     }
 
-    await UserModel.findByIdAndDelete(userId);
+    // Mode: Permanent Deletion (Hard Delete)
+    if (mode === "permanent") {
+      // Check for historical financial transactions linked to this user
+      const [
+        hasTransfers,
+        hasPayments,
+        hasInvoices,
+        hasPOs,
+        hasQuotations,
+        hasExpenses,
+        hasAccountTx,
+      ] = await Promise.all([
+        TransferModel.exists({ $or: [{ createdBy: userId }, { approvedBy: userId }] }),
+        PaymentModel.exists({ createdBy: userId }),
+        InvoiceModel.exists({ createdBy: userId }),
+        PurchaseOrderModel.exists({ createdBy: userId }),
+        QuotationModel.exists({ createdBy: userId }),
+        ExpenseModel.exists({ createdBy: userId }),
+        AccountTransactionModel.exists({ $or: [{ createdBy: userId }, { userId }] }),
+      ]);
+
+      const isLinkedToFinancialRecords = Boolean(
+        hasTransfers || hasPayments || hasInvoices || hasPOs || hasQuotations || hasExpenses || hasAccountTx
+      );
+
+      if (isLinkedToFinancialRecords) {
+        return NextResponse.json(
+          {
+            message: "Cannot permanently delete this user because they are linked to historical financial records (transfers, payments, invoices, or ledger transactions). Deactivate the account instead to maintain financial audit integrity.",
+            canDeactivate: true,
+            isLinkedToFinancialRecords: true,
+          },
+          { status: 409 }
+        );
+      }
+
+      await UserModel.findByIdAndDelete(userId);
+
+      await logActivity({
+        userId: session.user.id,
+        action: "deleted_user",
+        entityType: "user",
+        entityId: String(targetUser._id),
+        message: `Permanently deleted user ${targetUser.email}`,
+      });
+
+      return NextResponse.json({ ok: true, action: "deleted" });
+    }
+
+    // Mode: Safe Deactivation (Soft Delete - Default)
+    await UserModel.findByIdAndUpdate(userId, {
+      isActive: false,
+    });
 
     await logActivity({
       userId: session.user.id,
-      action: "deleted_user",
+      action: "updated_user",
       entityType: "user",
       entityId: String(targetUser._id),
-      message: `Deleted user ${targetUser.email}`,
+      message: `Deactivated user ${targetUser.email} (Safe Deactivation)`,
     });
 
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true, action: "deactivated" });
   } catch (error) {
-    return authErrorResponse(error, "Failed to delete user");
+    return authErrorResponse(error, "Failed to deactivate or delete user");
   }
 }

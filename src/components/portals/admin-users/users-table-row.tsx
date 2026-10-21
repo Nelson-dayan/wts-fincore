@@ -73,6 +73,7 @@ type UsersTableRowProps = {
   onOpenAccessModal?: (user: AdminUser) => void;
   onDelete: (userId: string) => void;
   onResetPassword?: (user: AdminUser) => void;
+  onReactivate?: (user: AdminUser) => void;
 };
 
 export function UsersTableRow({
@@ -90,6 +91,7 @@ export function UsersTableRow({
   onOpenAccessModal,
   onDelete,
   onResetPassword,
+  onReactivate,
 }: UsersTableRowProps) {
   const isProtectedAccount =
     (user.role === "super_admin" || (user.role === "admin" && user._id !== currentUserId)) &&
@@ -249,14 +251,33 @@ export function UsersTableRow({
                   <KeyRound className="size-3.5" aria-hidden />
                 </Button>
               )}
+              {!user.isActive && onReactivate && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-8 px-2 rounded-lg text-xs font-semibold gap-1 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/10"
+                  onClick={() => onReactivate(user)}
+                  title="Reactivate user account"
+                  aria-label="Reactivate user account"
+                >
+                  <UserCheck className="size-3.5" />
+                  Reactivate
+                </Button>
+              )}
               <Button
                 size="sm"
-                variant="destructive"
-                className="h-8 w-8 rounded-lg p-0"
+                variant={user.isActive ? "destructive" : "outline"}
+                className={`h-8 w-8 rounded-lg p-0 ${!user.isActive ? "text-destructive border-destructive/30 hover:bg-destructive/10" : ""}`}
                 onClick={() => onDelete(user._id)}
-                disabled={savingId === user._id}
-                title="Delete user"
-                aria-label="Delete user"
+                disabled={savingId === user._id || user._id === currentUserId}
+                title={
+                  user._id === currentUserId
+                    ? "You cannot deactivate or delete your own account"
+                    : user.isActive
+                    ? "Deactivate account (Safe Soft Delete)"
+                    : "Permanently delete user record"
+                }
+                aria-label={user.isActive ? "Deactivate user" : "Permanently delete user"}
               >
                 <Trash2 className="size-3.5" aria-hidden />
               </Button>
