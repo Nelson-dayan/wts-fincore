@@ -4,11 +4,21 @@ import { getPrimaryCompanyLogoForPortal } from "@/lib/company/get-primary-compan
 import { PortalMobileDrawer } from "@/components/layout/portal-mobile-drawer";
 import { PortalNavLink } from "@/components/layout/portal-nav-link";
 import { PortalShell } from "@/components/layout/portal-shell";
-import { SignOutButton } from "@/components/portals/sign-out-button";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { EmployeePortalProviders } from "@/components/portals/employee-portal-providers";
 import { PortalUserBadge } from "@/components/layout/portal-user-badge";
 import { PortalUserMenu } from "@/components/layout/portal-user-menu";
+import {
+  LayoutDashboard,
+  FolderKanban,
+  FileText,
+  ShoppingBag,
+  Receipt,
+  CreditCard,
+  Wallet,
+  Bell,
+  UserCircle,
+} from "lucide-react";
 
 import { connection } from "next/server";
 
@@ -24,7 +34,8 @@ export default async function EmployeePortalLayout({
 }) {
   await connection();
   return (
-    <div className="flex min-h-dvh flex-col bg-background md:flex-row">
+    <div className="flex min-h-dvh flex-col bg-background md:flex-row font-sans text-foreground antialiased">
+      {/* Mobile Navigation Drawer */}
       <PortalMobileDrawer
         brand={
           <Suspense fallback={<PortalBrand variant="employee" brandLogoSrc={null} />}>
@@ -38,97 +49,149 @@ export default async function EmployeePortalLayout({
           </>
         }
       >
-        <nav className="space-y-2" aria-label="Employee">
-          <p className="px-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-primary/85">Core</p>
-          <div className="grid gap-1.5">
-            <PortalNavLink href="/employee" match="exact" className="w-full justify-start">
-              Overview
-            </PortalNavLink>
-            <PortalNavLink href="/employee/projects" match="prefix" className="w-full justify-start">
-              Projects
-            </PortalNavLink>
-            <PortalNavLink href="/employee/quotations" match="prefix" className="w-full justify-start">
-              Quotations
-            </PortalNavLink>
-            <PortalNavLink href="/employee/purchase-orders" match="prefix" className="w-full justify-start">
-              POs
-            </PortalNavLink>
-            <PortalNavLink href="/employee/invoices" match="prefix" className="w-full justify-start">
-              Invoices
-            </PortalNavLink>
-            <PortalNavLink href="/employee/payments" match="prefix" className="w-full justify-start">
-              Payments
-            </PortalNavLink>
-            <PortalNavLink href="/employee/expenses" match="prefix" className="w-full justify-start">
-              Expenses
-            </PortalNavLink>
-            <PortalNavLink href="/employee/notifications" match="prefix" className="w-full justify-start">
-              Notifications
-            </PortalNavLink>
-            <PortalNavLink href="/employee/profile" match="prefix" className="w-full justify-start text-primary font-medium">
-              My Profile
-            </PortalNavLink>
+        <nav className="space-y-6" aria-label="Employee Mobile">
+          <div className="space-y-1.5">
+            <p className="px-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/80">
+              Core Workspace
+            </p>
+            <div className="grid gap-1">
+              <PortalNavLink href="/employee" match="exact" className="w-full justify-start gap-2.5">
+                <LayoutDashboard className="size-4 shrink-0" />
+                <span>Overview</span>
+              </PortalNavLink>
+              <PortalNavLink href="/employee/projects" match="prefix" className="w-full justify-start gap-2.5">
+                <FolderKanban className="size-4 shrink-0" />
+                <span>Projects</span>
+              </PortalNavLink>
+              <PortalNavLink href="/employee/profile" match="prefix" className="w-full justify-start gap-2.5">
+                <UserCircle className="size-4 shrink-0 text-primary" />
+                <span>My Profile</span>
+              </PortalNavLink>
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <p className="px-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/80">
+              Financial Operations
+            </p>
+            <div className="grid gap-1">
+              <PortalNavLink href="/employee/quotations" match="prefix" className="w-full justify-start gap-2.5">
+                <FileText className="size-4 shrink-0" />
+                <span>Quotations</span>
+              </PortalNavLink>
+              <PortalNavLink href="/employee/purchase-orders" match="prefix" className="w-full justify-start gap-2.5">
+                <ShoppingBag className="size-4 shrink-0" />
+                <span>Purchase Orders</span>
+              </PortalNavLink>
+              <PortalNavLink href="/employee/invoices" match="prefix" className="w-full justify-start gap-2.5">
+                <Receipt className="size-4 shrink-0" />
+                <span>Invoices</span>
+              </PortalNavLink>
+              <PortalNavLink href="/employee/payments" match="prefix" className="w-full justify-start gap-2.5">
+                <CreditCard className="size-4 shrink-0" />
+                <span>Payments</span>
+              </PortalNavLink>
+              <PortalNavLink href="/employee/expenses" match="prefix" className="w-full justify-start gap-2.5">
+                <Wallet className="size-4 shrink-0" />
+                <span>Expenses</span>
+              </PortalNavLink>
+              <PortalNavLink href="/employee/notifications" match="prefix" className="w-full justify-start gap-2.5">
+                <Bell className="size-4 shrink-0" />
+                <span>Notifications</span>
+              </PortalNavLink>
+            </div>
           </div>
         </nav>
 
-        <PortalUserBadge />
+        <div className="pt-4">
+          <PortalUserBadge portal="employee" />
+        </div>
       </PortalMobileDrawer>
 
-      <aside className="hidden border-b border-border/60 bg-card/70 backdrop-blur md:sticky md:top-0 md:block md:h-dvh md:w-72 md:shrink-0 md:border-b-0">
-        <div className="flex h-full flex-col gap-5 p-4 sm:p-5">
-          <div className="flex items-center justify-between gap-3 md:justify-start">
-            <Suspense fallback={<PortalBrand variant="employee" brandLogoSrc={null} />}>
-              <EmployeePortalBrand />
-            </Suspense>
+      {/* Desktop Sidebar Navigation */}
+      <aside className="hidden border-r border-border/80 bg-card text-card-foreground md:sticky md:top-0 md:block md:h-dvh md:w-64 md:shrink-0">
+        <div className="flex h-full flex-col justify-between p-4">
+          <div className="space-y-6">
+            <div className="px-2 py-1">
+              <Suspense fallback={<PortalBrand variant="employee" brandLogoSrc={null} />}>
+                <EmployeePortalBrand />
+              </Suspense>
+            </div>
+
+            <nav className="space-y-5" aria-label="Employee Desktop">
+              <div className="space-y-1">
+                <p className="px-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">
+                  Core Workspace
+                </p>
+                <div className="space-y-0.5">
+                  <PortalNavLink href="/employee" match="exact" className="w-full justify-start gap-2.5">
+                    <LayoutDashboard className="size-4 shrink-0" />
+                    <span>Overview</span>
+                  </PortalNavLink>
+                  <PortalNavLink href="/employee/projects" match="prefix" className="w-full justify-start gap-2.5">
+                    <FolderKanban className="size-4 shrink-0" />
+                    <span>Projects</span>
+                  </PortalNavLink>
+                  <PortalNavLink href="/employee/profile" match="prefix" className="w-full justify-start gap-2.5">
+                    <UserCircle className="size-4 shrink-0 text-primary" />
+                    <span>My Profile</span>
+                  </PortalNavLink>
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <p className="px-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">
+                  Finance Operations
+                </p>
+                <div className="space-y-0.5">
+                  <PortalNavLink href="/employee/quotations" match="prefix" className="w-full justify-start gap-2.5">
+                    <FileText className="size-4 shrink-0" />
+                    <span>Quotations</span>
+                  </PortalNavLink>
+                  <PortalNavLink href="/employee/purchase-orders" match="prefix" className="w-full justify-start gap-2.5">
+                    <ShoppingBag className="size-4 shrink-0" />
+                    <span>Purchase Orders</span>
+                  </PortalNavLink>
+                  <PortalNavLink href="/employee/invoices" match="prefix" className="w-full justify-start gap-2.5">
+                    <Receipt className="size-4 shrink-0" />
+                    <span>Invoices</span>
+                  </PortalNavLink>
+                  <PortalNavLink href="/employee/payments" match="prefix" className="w-full justify-start gap-2.5">
+                    <CreditCard className="size-4 shrink-0" />
+                    <span>Payments</span>
+                  </PortalNavLink>
+                  <PortalNavLink href="/employee/expenses" match="prefix" className="w-full justify-start gap-2.5">
+                    <Wallet className="size-4 shrink-0" />
+                    <span>Expenses</span>
+                  </PortalNavLink>
+                  <PortalNavLink href="/employee/notifications" match="prefix" className="w-full justify-start gap-2.5">
+                    <Bell className="size-4 shrink-0" />
+                    <span>Notifications</span>
+                  </PortalNavLink>
+                </div>
+              </div>
+            </nav>
           </div>
 
-          <nav className="space-y-2" aria-label="Employee">
-            <p className="px-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-primary/85">
-              Core
-            </p>
-            <div className="grid gap-1.5">
-              <PortalNavLink href="/employee" match="exact" className="w-full justify-start">
-                Overview
-              </PortalNavLink>
-              <PortalNavLink href="/employee/projects" match="prefix" className="w-full justify-start">
-                Projects
-              </PortalNavLink>
-              <PortalNavLink href="/employee/quotations" match="prefix" className="w-full justify-start">
-                Quotations
-              </PortalNavLink>
-              <PortalNavLink href="/employee/purchase-orders" match="prefix" className="w-full justify-start">
-                POs
-              </PortalNavLink>
-              <PortalNavLink href="/employee/invoices" match="prefix" className="w-full justify-start">
-                Invoices
-              </PortalNavLink>
-              <PortalNavLink href="/employee/payments" match="prefix" className="w-full justify-start">
-                Payments
-              </PortalNavLink>
-              <PortalNavLink href="/employee/expenses" match="prefix" className="w-full justify-start">
-                Expenses
-              </PortalNavLink>
-              <PortalNavLink href="/employee/notifications" match="prefix" className="w-full justify-start">
-                Notifications
-              </PortalNavLink>
-              <PortalNavLink href="/employee/profile" match="prefix" className="w-full justify-start text-primary font-medium">
-                My Profile
-              </PortalNavLink>
+          <div className="border-t border-border/80 pt-3 space-y-2">
+            <PortalUserBadge portal="employee" />
+            <div className="px-2 py-1 flex items-center justify-between text-[11px] text-muted-foreground font-mono">
+              <span>Sec-DocuTrade v2.5</span>
+              <span className="text-emerald-500 font-semibold">• Live</span>
             </div>
-          </nav>
-
-          <PortalUserBadge />
+          </div>
         </div>
       </aside>
 
+      {/* Main Content Area Shell */}
       <PortalShell>
-        <header className="sticky top-0 z-30 hidden border-b border-border/60 bg-card/70 backdrop-blur md:block">
-          <div className="mx-auto flex w-full max-w-6xl items-center justify-end gap-2.5 px-4 py-3 sm:px-6">
+        <header className="sticky top-0 z-30 hidden border-b border-border/80 bg-card/90 backdrop-blur-md md:block">
+          <div className="mx-auto flex w-full max-w-7xl items-center justify-end gap-2.5 px-6 py-3">
             <ThemeToggle />
             <PortalUserMenu portal="employee" />
           </div>
         </header>
-        <div className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
+        <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-8 sm:py-8">
           <Suspense fallback={<div className="h-64 flex items-center justify-center text-sm text-muted-foreground">Loading...</div>}>
             <EmployeePortalProviders>{children}</EmployeePortalProviders>
           </Suspense>
