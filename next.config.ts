@@ -1,3 +1,4 @@
+import path from "path";
 import type { NextConfig } from "next";
 
 const securityHeaders = [
@@ -18,8 +19,12 @@ const nextConfig: NextConfig = {
   reactCompiler: true,
   poweredByHeader: false,
   cacheComponents: true,
+  turbopack: {
+    root: path.resolve(__dirname),
+  },
   experimental: {
     instantNavigationDevToolsToggle: true,
+    turbopackFileSystemCacheForDev: false,
   },
   /** PDFKit loads .afm metrics from its package dir; bundling breaks those paths (e.g. C:\\ROOT\\node_modules). */
   serverExternalPackages: ["pdfkit"],

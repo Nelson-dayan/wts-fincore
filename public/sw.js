@@ -1,6 +1,5 @@
-const CACHE_NAME = "wts-fincore-v1";
+const CACHE_NAME = "wts-fincore-v2";
 const ASSETS_TO_CACHE = [
-  "/",
   "/manifest.webmanifest",
   "/favicon.ico",
 ];
@@ -29,12 +28,18 @@ self.addEventListener("activate", (event) => {
 });
 
 self.addEventListener("fetch", (event) => {
-  // Only handle GET requests for web pages / static assets
   if (event.request.method !== "GET") return;
   const url = new URL(event.request.url);
 
-  // Exclude API routes and next-auth routes from cache interception
-  if (url.pathname.startsWith("/api/")) return;
+  // Never intercept API routes, Next.js build/HMR chunks, or RSC requests
+  if (
+    url.pathname.startsWith("/api/") ||
+    url.pathname.startsWith("/_next/") ||
+    url.searchParams.has("_rsc") ||
+    event.request.headers.get("RSC") === "1"
+  ) {
+    return;
+  }
 
   event.respondWith(
     fetch(event.request)
