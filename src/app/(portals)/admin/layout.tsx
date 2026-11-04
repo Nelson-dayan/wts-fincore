@@ -160,105 +160,106 @@ export default async function AdminPortalLayout({
       </PortalMobileDrawer>
 
       {/* Desktop Sidebar Navigation */}
-      <aside className="hidden border-r border-border/80 bg-card text-card-foreground md:sticky md:top-0 md:block md:h-dvh md:w-64 md:shrink-0">
-        <div className="flex h-full flex-col justify-between p-4">
-          <div className="space-y-6">
-            <div className="px-2 py-1">
-              <Suspense fallback={<PortalBrand variant="admin" brandLogoSrc={null} />}>
-                <AdminPortalBrand />
-              </Suspense>
-            </div>
-
-            <nav className="space-y-5" aria-label="Admin Desktop">
-              <div className="space-y-1">
-                <p className="px-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">
-                  Core Workspace
-                </p>
-                <div className="space-y-0.5">
-                  <PortalNavLink href="/admin" match="exact" className="w-full justify-start gap-2.5">
-                    <LayoutDashboard className="size-4 shrink-0" />
-                    <span>Overview</span>
-                  </PortalNavLink>
-                  <PortalNavLink href="/admin/users" match="prefix" className="w-full justify-start gap-2.5">
-                    <Users className="size-4 shrink-0" />
-                    <span>Users</span>
-                  </PortalNavLink>
-                  <PortalNavLink href="/admin/clients" match="prefix" className="w-full justify-start gap-2.5">
-                    <UserCheck className="size-4 shrink-0" />
-                    <span>Clients</span>
-                  </PortalNavLink>
-                  <PortalNavLink href="/admin/projects" match="prefix" className="w-full justify-start gap-2.5">
-                    <FolderKanban className="size-4 shrink-0" />
-                    <span>Projects</span>
-                  </PortalNavLink>
-                  <PortalNavLink href="/admin/settings/companies" match="prefix" className="w-full justify-start gap-2.5">
-                    <Network className="size-4 shrink-0 text-primary" />
-                    <span>Corporate Hierarchy</span>
-                  </PortalNavLink>
-                  <PortalNavLink href="/admin/settings/company" match="exact" className="w-full justify-start gap-2.5">
-                    <Building2 className="size-4 shrink-0" />
-                    <span>Company Profile</span>
-                  </PortalNavLink>
-                  <PortalNavLink href="/admin/profile" match="prefix" className="w-full justify-start gap-2.5">
-                    <UserCircle className="size-4 shrink-0 text-primary" />
-                    <span>My Profile</span>
-                  </PortalNavLink>
-                </div>
-              </div>
-
-              <div className="space-y-1">
-                <p className="px-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">
-                  Finance Operations
-                </p>
-                <div className="space-y-0.5">
-                  <PortalNavLink href="/admin/quotations" match="prefix" className="w-full justify-start gap-2.5">
-                    <FileText className="size-4 shrink-0" />
-                    <span>Quotations</span>
-                  </PortalNavLink>
-                  <PortalNavLink href="/admin/purchase-orders" match="prefix" className="w-full justify-start gap-2.5">
-                    <ShoppingBag className="size-4 shrink-0" />
-                    <span>Purchase Orders</span>
-                  </PortalNavLink>
-                  <PortalNavLink href="/admin/invoices" match="prefix" className="w-full justify-start gap-2.5">
-                    <Receipt className="size-4 shrink-0" />
-                    <span>Invoices</span>
-                  </PortalNavLink>
-                  <PortalNavLink href="/admin/payments" match="prefix" className="w-full justify-start gap-2.5">
-                    <CreditCard className="size-4 shrink-0" />
-                    <span>Payments</span>
-                  </PortalNavLink>
-                  <PortalNavLink href="/admin/accounts" match="prefix" className="w-full justify-start gap-2.5">
-                    <Wallet className="size-4 shrink-0" />
-                    <span>Accounts</span>
-                  </PortalNavLink>
-                  <PortalNavLink href="/admin/expenses" match="prefix" className="w-full justify-start gap-2.5">
-                    <DollarSign className="size-4 shrink-0" />
-                    <span>Expenses</span>
-                  </PortalNavLink>
-                  <PortalNavLink href="/admin/activity" match="prefix" className="w-full justify-start gap-2.5">
-                    <History className="size-4 shrink-0" />
-                    <span>Audit Logs</span>
-                  </PortalNavLink>
-                </div>
-              </div>
-
-              {process.env.NODE_ENV === "development" && (
-                <div className="space-y-1">
-                  <p className="px-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">
-                    Developer
-                  </p>
-                  <div className="space-y-0.5">
-                    <PortalNavLink href="/admin/style-guide" match="prefix" className="w-full justify-start gap-2.5">
-                      <Palette className="size-4 shrink-0" />
-                      <span>Style Guide</span>
-                    </PortalNavLink>
-                  </div>
-                </div>
-              )}
-            </nav>
+      <aside className="hidden border-r border-border/80 bg-card text-card-foreground md:sticky md:top-0 md:block md:h-dvh md:w-64 md:shrink-0 overflow-hidden">
+        <div className="flex h-full flex-col p-4">
+          <div className="shrink-0 px-2 py-1 pb-4">
+            <Suspense fallback={<PortalBrand variant="admin" brandLogoSrc={null} />}>
+              <AdminPortalBrand />
+            </Suspense>
           </div>
 
-          <div className="border-t border-border/80 pt-3 space-y-2">
+          <nav
+            className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain pr-1 space-y-5"
+            aria-label="Admin Desktop"
+          >
+            <div className="space-y-1">
+              <p className="px-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">
+                Core Workspace
+              </p>
+              <div className="space-y-0.5">
+                <PortalNavLink href="/admin" match="exact" className="w-full justify-start gap-2.5">
+                  <LayoutDashboard className="size-4 shrink-0" />
+                  <span>Overview</span>
+                </PortalNavLink>
+                <PortalNavLink href="/admin/users" match="prefix" className="w-full justify-start gap-2.5">
+                  <Users className="size-4 shrink-0" />
+                  <span>Users</span>
+                </PortalNavLink>
+                <PortalNavLink href="/admin/clients" match="prefix" className="w-full justify-start gap-2.5">
+                  <UserCheck className="size-4 shrink-0" />
+                  <span>Clients</span>
+                </PortalNavLink>
+                <PortalNavLink href="/admin/projects" match="prefix" className="w-full justify-start gap-2.5">
+                  <FolderKanban className="size-4 shrink-0" />
+                  <span>Projects</span>
+                </PortalNavLink>
+                <PortalNavLink href="/admin/settings/companies" match="prefix" className="w-full justify-start gap-2.5">
+                  <Network className="size-4 shrink-0 text-primary" />
+                  <span>Corporate Hierarchy</span>
+                </PortalNavLink>
+                <PortalNavLink href="/admin/settings/company" match="exact" className="w-full justify-start gap-2.5">
+                  <Building2 className="size-4 shrink-0" />
+                  <span>Company Profile</span>
+                </PortalNavLink>
+                <PortalNavLink href="/admin/profile" match="prefix" className="w-full justify-start gap-2.5">
+                  <UserCircle className="size-4 shrink-0 text-primary" />
+                  <span>My Profile</span>
+                </PortalNavLink>
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <p className="px-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">
+                Finance Operations
+              </p>
+              <div className="space-y-0.5">
+                <PortalNavLink href="/admin/quotations" match="prefix" className="w-full justify-start gap-2.5">
+                  <FileText className="size-4 shrink-0" />
+                  <span>Quotations</span>
+                </PortalNavLink>
+                <PortalNavLink href="/admin/purchase-orders" match="prefix" className="w-full justify-start gap-2.5">
+                  <ShoppingBag className="size-4 shrink-0" />
+                  <span>Purchase Orders</span>
+                </PortalNavLink>
+                <PortalNavLink href="/admin/invoices" match="prefix" className="w-full justify-start gap-2.5">
+                  <Receipt className="size-4 shrink-0" />
+                  <span>Invoices</span>
+                </PortalNavLink>
+                <PortalNavLink href="/admin/payments" match="prefix" className="w-full justify-start gap-2.5">
+                  <CreditCard className="size-4 shrink-0" />
+                  <span>Payments</span>
+                </PortalNavLink>
+                <PortalNavLink href="/admin/accounts" match="prefix" className="w-full justify-start gap-2.5">
+                  <Wallet className="size-4 shrink-0" />
+                  <span>Accounts</span>
+                </PortalNavLink>
+                <PortalNavLink href="/admin/expenses" match="prefix" className="w-full justify-start gap-2.5">
+                  <DollarSign className="size-4 shrink-0" />
+                  <span>Expenses</span>
+                </PortalNavLink>
+                <PortalNavLink href="/admin/activity" match="prefix" className="w-full justify-start gap-2.5">
+                  <History className="size-4 shrink-0" />
+                  <span>Audit Logs</span>
+                </PortalNavLink>
+              </div>
+            </div>
+
+            {process.env.NODE_ENV === "development" && (
+              <div className="space-y-1">
+                <p className="px-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">
+                  Developer
+                </p>
+                <div className="space-y-0.5">
+                  <PortalNavLink href="/admin/style-guide" match="prefix" className="w-full justify-start gap-2.5">
+                    <Palette className="size-4 shrink-0" />
+                    <span>Style Guide</span>
+                  </PortalNavLink>
+                </div>
+              </div>
+            )}
+          </nav>
+
+          <div className="shrink-0 pt-3 space-y-2">
             <PortalUserBadge portal="admin" />
             <div className="px-2 py-1 flex items-center justify-between text-[11px] text-muted-foreground font-mono">
               <span>Sec-DocuTrade v2.5</span>

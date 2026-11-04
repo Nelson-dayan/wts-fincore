@@ -2,10 +2,22 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowUpRight, ClipboardList, FileText, FolderKanban, Receipt } from "lucide-react";
-import { DashboardPageHeader } from "@/components/dashboard/page-header";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  ArrowUpRight,
+  ChevronRight,
+  ClipboardList,
+  FileText,
+  FolderKanban,
+  Receipt,
+  Sparkles,
+} from "lucide-react";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { readResponseJson } from "@/lib/http/read-response-json";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -38,11 +50,14 @@ type EmployeeOverview = {
   }>;
 };
 
-function OverviewListSkeleton({ rows = 5 }: { rows?: number }) {
+function OverviewListSkeleton({ rows = 4 }: { rows?: number }) {
   return (
     <div className="space-y-2.5">
       {Array.from({ length: rows }).map((_, i) => (
-        <div key={i} className="dashboard-list-row space-y-2 py-2">
+        <div
+          key={i}
+          className="rounded-xl border border-border/60 bg-muted/20 px-3.5 py-2.5 space-y-2"
+        >
           <Skeleton className="h-4 w-3/5 max-w-[14rem]" />
           <Skeleton className="h-3 w-2/5 max-w-[10rem]" />
         </div>
@@ -85,212 +100,336 @@ export function EmployeeOverviewClient() {
   }, []);
 
   return (
-    <div className="animate-fade-in">
-      <DashboardPageHeader
-        eyebrow="Workspace"
-        title="Your dashboard"
-        description="Projects assigned to you, plus recent quotations, purchase orders, and invoices."
-      />
+    <div className="space-y-8 animate-in fade-in-50 duration-300">
+      {/* Top Title Header — matching Admin Overview style */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-border/60 pb-5">
+        <div>
+          <div className="flex items-center gap-2 text-xs font-mono font-semibold uppercase tracking-wider text-muted-foreground">
+            <span>Workspace</span>
+            <span>•</span>
+            <span className="text-emerald-500 font-bold">Live Synced</span>
+          </div>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl mt-1">
+            Your dashboard
+          </h1>
+          <p className="text-xs text-muted-foreground mt-1">
+            Projects assigned to you, plus recent quotations, purchase orders, and invoices.
+          </p>
+        </div>
+      </div>
+
       {error ? (
-        <div className="mb-6 rounded-xl border border-destructive/40 bg-destructive/5 p-4 text-sm text-destructive">
+        <div className="rounded-xl border border-destructive/40 bg-destructive/10 p-4 text-sm font-medium text-destructive">
           {error}
         </div>
       ) : null}
 
-      <section className="mb-7 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Card className="dashboard-stat-card">
+      {/* Top KPI Metric Summary Cards — matching Admin Overview style */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <Card className="bg-card border-border/80 shadow-xs relative overflow-hidden">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Projects</CardTitle>
-            <FolderKanban className="size-4 text-primary/85" aria-hidden />
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <Skeleton className="h-9 w-16" />
-            ) : (
-              <p className="text-3xl font-semibold tabular-nums">
-                {(data?.myProjects.length ?? 0).toLocaleString()}
-              </p>
-            )}
-          </CardContent>
-        </Card>
-        <Card className="dashboard-stat-card">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Quotations</CardTitle>
-            <FileText className="size-4 text-primary/85" aria-hidden />
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <Skeleton className="h-9 w-16" />
-            ) : (
-              <p className="text-3xl font-semibold tabular-nums">
-                {(data?.myQuotations.length ?? 0).toLocaleString()}
-              </p>
-            )}
-          </CardContent>
-        </Card>
-        <Card className="dashboard-stat-card">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Invoices</CardTitle>
-            <Receipt className="size-4 text-primary/85" aria-hidden />
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <Skeleton className="h-9 w-16" />
-            ) : (
-              <p className="text-3xl font-semibold tabular-nums">
-                {(data?.myInvoices.length ?? 0).toLocaleString()}
-              </p>
-            )}
-          </CardContent>
-        </Card>
-        <Card className="dashboard-stat-card">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">POs</CardTitle>
-            <ClipboardList className="size-4 text-primary/85" aria-hidden />
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <Skeleton className="h-9 w-16" />
-            ) : (
-              <p className="text-3xl font-semibold tabular-nums">
-                {(data?.myPurchaseOrders.length ?? 0).toLocaleString()}
-              </p>
-            )}
-          </CardContent>
-        </Card>
-      </section>
-
-      <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
-        <Card className="dashboard-panel-card">
-          <CardHeader className="flex flex-row items-start justify-between gap-2 space-y-0 pb-3">
-            <div className="flex items-center gap-2">
-              <span className="inline-flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary ring-1 ring-primary/15">
-                <FolderKanban className="size-4" aria-hidden />
-              </span>
-              <CardTitle className="text-base font-semibold">My projects</CardTitle>
+            <CardTitle className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Projects
+            </CardTitle>
+            <div className="flex size-8 items-center justify-center rounded-lg bg-indigo-500/10 text-indigo-500">
+              <FolderKanban className="size-4" aria-hidden />
             </div>
-            <Button variant="ghost" size="sm" className="shrink-0 gap-1 px-2.5" asChild>
-              <Link href="/employee/projects">
-                View all
-                <ArrowUpRight className="size-3.5 opacity-70" aria-hidden />
-              </Link>
-            </Button>
           </CardHeader>
-          <CardContent className="space-y-2 text-sm">
+          <CardContent>
+            <div className="text-2xl font-bold font-mono tabular-nums text-foreground">
+              {loading ? "..." : (data?.myProjects.length ?? 0).toLocaleString()}
+            </div>
+            <div className="mt-1 flex items-center gap-1.5 text-[11px] text-indigo-500 font-medium">
+              <Sparkles className="size-3" />
+              <span>Assigned Deliverables</span>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-card border-border/80 shadow-xs relative overflow-hidden">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Quotations
+            </CardTitle>
+            <div className="flex size-8 items-center justify-center rounded-lg bg-blue-500/10 text-blue-500">
+              <FileText className="size-4" aria-hidden />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold font-mono tabular-nums text-foreground">
+              {loading ? "..." : (data?.myQuotations.length ?? 0).toLocaleString()}
+            </div>
+            <div className="mt-1 flex items-center gap-1.5 text-[11px] text-blue-500 font-medium">
+              <span>Commercial Proposals</span>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-card border-border/80 shadow-xs relative overflow-hidden">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Invoices
+            </CardTitle>
+            <div className="flex size-8 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-500">
+              <Receipt className="size-4" aria-hidden />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold font-mono tabular-nums text-foreground">
+              {loading ? "..." : (data?.myInvoices.length ?? 0).toLocaleString()}
+            </div>
+            <div className="mt-1 flex items-center gap-1.5 text-[11px] text-emerald-500 font-medium">
+              <span>Client Invoices</span>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-card border-border/80 shadow-xs relative overflow-hidden">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              POs
+            </CardTitle>
+            <div className="flex size-8 items-center justify-center rounded-lg bg-amber-500/10 text-amber-500">
+              <ClipboardList className="size-4" aria-hidden />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold font-mono tabular-nums text-foreground">
+              {loading ? "..." : (data?.myPurchaseOrders.length ?? 0).toLocaleString()}
+            </div>
+            <div className="mt-1 flex items-center gap-1.5 text-[11px] text-muted-foreground font-medium">
+              <span>Purchase Orders</span>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Resource Panels — matching Admin Card UI */}
+      <div className="grid gap-6 lg:grid-cols-2">
+        {/* My projects */}
+        <Card className="border-border/80 shadow-xs bg-card overflow-hidden">
+          <CardHeader className="flex flex-row items-center justify-between gap-3 pb-3 border-b border-border/60">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-indigo-500/10 text-indigo-500">
+                <FolderKanban className="size-4" aria-hidden />
+              </div>
+              <div className="min-w-0">
+                <CardTitle className="text-sm font-bold truncate">My projects</CardTitle>
+                <CardDescription className="text-xs truncate">
+                  Projects currently assigned to you
+                </CardDescription>
+              </div>
+            </div>
+            <Link
+              href="/employee/projects"
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-border/60 bg-muted/20 px-3 py-1.5 text-xs font-medium text-foreground transition-all hover:bg-primary/10 hover:border-primary/40 hover:text-primary group"
+            >
+              <span>View all</span>
+              <ArrowUpRight
+                className="size-3.5 text-muted-foreground group-hover:text-primary transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5"
+                aria-hidden
+              />
+            </Link>
+          </CardHeader>
+          <CardContent className="pt-4 space-y-2 text-sm">
             {loading ? (
               <OverviewListSkeleton />
             ) : data?.myProjects.length ? (
               data.myProjects.map((project) => (
-                <div key={project._id} className="dashboard-list-row">
-                  <p className="font-medium leading-snug text-foreground">{project.name}</p>
-                  <p className="mt-0.5 text-xs text-muted-foreground">
-                    <span className="capitalize">{project.status}</span>
-                    <span aria-hidden> · </span>
-                    <span className="capitalize">{project.priority}</span>
-                  </p>
-                </div>
+                <Link
+                  key={project._id}
+                  href={`/employee/projects/${project._id}`}
+                  className="group flex items-center justify-between gap-3 rounded-xl border border-border/60 bg-muted/20 px-3.5 py-2.5 transition-all hover:border-primary/40 hover:bg-primary/5"
+                >
+                  <div className="min-w-0">
+                    <p className="font-semibold text-xs text-foreground truncate group-hover:text-primary transition-colors">
+                      {project.name}
+                    </p>
+                    <p className="mt-0.5 text-[11px] text-muted-foreground">
+                      <span className="capitalize">{project.status}</span>
+                      <span aria-hidden> · </span>
+                      <span className="capitalize">{project.priority}</span>
+                    </p>
+                  </div>
+                  <ChevronRight className="size-4 shrink-0 text-muted-foreground group-hover:translate-x-0.5 group-hover:text-primary transition-transform" />
+                </Link>
               ))
             ) : (
-              <p className="py-2 text-muted-foreground">No assigned projects yet.</p>
+              <div className="rounded-xl border border-border/60 bg-muted/20 px-4 py-6 text-center">
+                <p className="text-xs font-medium text-muted-foreground">
+                  No assigned projects yet.
+                </p>
+              </div>
             )}
           </CardContent>
         </Card>
 
-        <Card className="dashboard-panel-card">
-          <CardHeader className="flex flex-row items-start justify-between gap-2 space-y-0 pb-3">
-            <div className="flex items-center gap-2">
-              <span className="inline-flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary ring-1 ring-primary/15">
+        {/* My quotations */}
+        <Card className="border-border/80 shadow-xs bg-card overflow-hidden">
+          <CardHeader className="flex flex-row items-center justify-between gap-3 pb-3 border-b border-border/60">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-blue-500/10 text-blue-500">
                 <FileText className="size-4" aria-hidden />
-              </span>
-              <CardTitle className="text-base font-semibold">My quotations</CardTitle>
+              </div>
+              <div className="min-w-0">
+                <CardTitle className="text-sm font-bold truncate">My quotations</CardTitle>
+                <CardDescription className="text-xs truncate">
+                  Commercial proposals on your projects
+                </CardDescription>
+              </div>
             </div>
-            <Button variant="ghost" size="sm" className="shrink-0 gap-1 px-2.5" asChild>
-              <Link href="/employee/quotations">
-                View all
-                <ArrowUpRight className="size-3.5 opacity-70" aria-hidden />
-              </Link>
-            </Button>
+            <Link
+              href="/employee/quotations"
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-border/60 bg-muted/20 px-3 py-1.5 text-xs font-medium text-foreground transition-all hover:bg-primary/10 hover:border-primary/40 hover:text-primary group"
+            >
+              <span>View all</span>
+              <ArrowUpRight
+                className="size-3.5 text-muted-foreground group-hover:text-primary transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5"
+                aria-hidden
+              />
+            </Link>
           </CardHeader>
-          <CardContent className="space-y-2 text-sm">
+          <CardContent className="pt-4 space-y-2 text-sm">
             {loading ? (
               <OverviewListSkeleton />
             ) : data?.myQuotations.length ? (
               data.myQuotations.map((quotation) => (
-                <div key={quotation._id} className="dashboard-list-row">
-                  <p className="font-medium text-foreground">{quotation.quotationNumber}</p>
-                  <p className="mt-0.5 text-xs capitalize text-muted-foreground">
-                    {quotation.status}
-                  </p>
-                </div>
+                <Link
+                  key={quotation._id}
+                  href={`/employee/quotations/${quotation._id}`}
+                  className="group flex items-center justify-between gap-3 rounded-xl border border-border/60 bg-muted/20 px-3.5 py-2.5 transition-all hover:border-primary/40 hover:bg-primary/5"
+                >
+                  <div className="min-w-0">
+                    <p className="font-semibold font-mono text-xs text-foreground truncate group-hover:text-primary transition-colors">
+                      {quotation.quotationNumber}
+                    </p>
+                    <p className="mt-0.5 text-[11px] capitalize text-muted-foreground">
+                      {quotation.status}
+                    </p>
+                  </div>
+                  <ChevronRight className="size-4 shrink-0 text-muted-foreground group-hover:translate-x-0.5 group-hover:text-primary transition-transform" />
+                </Link>
               ))
             ) : (
-              <p className="py-2 text-muted-foreground">No quotations on your projects yet.</p>
+              <div className="rounded-xl border border-border/60 bg-muted/20 px-4 py-6 text-center">
+                <p className="text-xs font-medium text-muted-foreground">
+                  No quotations on your projects yet.
+                </p>
+              </div>
             )}
           </CardContent>
         </Card>
 
-        <Card className="dashboard-panel-card">
-          <CardHeader className="flex flex-row items-start justify-between gap-2 space-y-0 pb-3">
-            <div className="flex items-center gap-2">
-              <span className="inline-flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary ring-1 ring-primary/15">
+        {/* My invoices */}
+        <Card className="border-border/80 shadow-xs bg-card overflow-hidden">
+          <CardHeader className="flex flex-row items-center justify-between gap-3 pb-3 border-b border-border/60">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-500">
                 <Receipt className="size-4" aria-hidden />
-              </span>
-              <CardTitle className="text-base font-semibold">My invoices</CardTitle>
+              </div>
+              <div className="min-w-0">
+                <CardTitle className="text-sm font-bold truncate">My invoices</CardTitle>
+                <CardDescription className="text-xs truncate">
+                  Billing & due dates on your projects
+                </CardDescription>
+              </div>
             </div>
-            <Button variant="ghost" size="sm" className="shrink-0 gap-1 px-2.5" asChild>
-              <Link href="/employee/invoices">
-                View all
-                <ArrowUpRight className="size-3.5 opacity-70" aria-hidden />
-              </Link>
-            </Button>
+            <Link
+              href="/employee/invoices"
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-border/60 bg-muted/20 px-3 py-1.5 text-xs font-medium text-foreground transition-all hover:bg-primary/10 hover:border-primary/40 hover:text-primary group"
+            >
+              <span>View all</span>
+              <ArrowUpRight
+                className="size-3.5 text-muted-foreground group-hover:text-primary transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5"
+                aria-hidden
+              />
+            </Link>
           </CardHeader>
-          <CardContent className="space-y-2 text-sm">
+          <CardContent className="pt-4 space-y-2 text-sm">
             {loading ? (
               <OverviewListSkeleton />
             ) : data?.myInvoices.length ? (
               data.myInvoices.map((invoice) => (
-                <div key={invoice._id} className="dashboard-list-row">
-                  <p className="font-medium text-foreground">{invoice.invoiceNumber}</p>
-                  <p className="mt-0.5 text-xs text-muted-foreground">
-                    <span className="capitalize">{invoice.status}</span>
-                    <span aria-hidden> · </span>
-                    Due {new Date(invoice.dueDate).toLocaleDateString()}
-                  </p>
-                </div>
+                <Link
+                  key={invoice._id}
+                  href={`/employee/invoices/${invoice._id}`}
+                  className="group flex items-center justify-between gap-3 rounded-xl border border-border/60 bg-muted/20 px-3.5 py-2.5 transition-all hover:border-primary/40 hover:bg-primary/5"
+                >
+                  <div className="min-w-0">
+                    <p className="font-semibold font-mono text-xs text-foreground truncate group-hover:text-primary transition-colors">
+                      {invoice.invoiceNumber}
+                    </p>
+                    <p className="mt-0.5 text-[11px] text-muted-foreground">
+                      <span className="capitalize">{invoice.status}</span>
+                      <span aria-hidden> · </span>
+                      Due {new Date(invoice.dueDate).toLocaleDateString()}
+                    </p>
+                  </div>
+                  <ChevronRight className="size-4 shrink-0 text-muted-foreground group-hover:translate-x-0.5 group-hover:text-primary transition-transform" />
+                </Link>
               ))
             ) : (
-              <p className="py-2 text-muted-foreground">No invoices on your projects yet.</p>
+              <div className="rounded-xl border border-border/60 bg-muted/20 px-4 py-6 text-center">
+                <p className="text-xs font-medium text-muted-foreground">
+                  No invoices on your projects yet.
+                </p>
+              </div>
             )}
           </CardContent>
         </Card>
 
-        <Card className="dashboard-panel-card">
-          <CardHeader className="flex flex-row items-start justify-between gap-2 space-y-0 pb-3">
-            <div className="flex items-center gap-2">
-              <span className="inline-flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary ring-1 ring-primary/15">
+        {/* My POs */}
+        <Card className="border-border/80 shadow-xs bg-card overflow-hidden">
+          <CardHeader className="flex flex-row items-center justify-between gap-3 pb-3 border-b border-border/60">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-amber-500/10 text-amber-500">
                 <ClipboardList className="size-4" aria-hidden />
-              </span>
-              <CardTitle className="text-base font-semibold">My POs</CardTitle>
+              </div>
+              <div className="min-w-0">
+                <CardTitle className="text-sm font-bold truncate">My POs</CardTitle>
+                <CardDescription className="text-xs truncate">
+                  Purchase orders on your projects
+                </CardDescription>
+              </div>
             </div>
-            <Button variant="ghost" size="sm" className="shrink-0 gap-1 px-2.5" asChild>
-              <Link href="/employee/purchase-orders">
-                View all
-                <ArrowUpRight className="size-3.5 opacity-70" aria-hidden />
-              </Link>
-            </Button>
+            <Link
+              href="/employee/purchase-orders"
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-border/60 bg-muted/20 px-3 py-1.5 text-xs font-medium text-foreground transition-all hover:bg-primary/10 hover:border-primary/40 hover:text-primary group"
+            >
+              <span>View all</span>
+              <ArrowUpRight
+                className="size-3.5 text-muted-foreground group-hover:text-primary transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5"
+                aria-hidden
+              />
+            </Link>
           </CardHeader>
-          <CardContent className="space-y-2 text-sm">
+          <CardContent className="pt-4 space-y-2 text-sm">
             {loading ? (
               <OverviewListSkeleton />
             ) : data?.myPurchaseOrders.length ? (
               data.myPurchaseOrders.map((po) => (
-                <div key={po._id} className="dashboard-list-row">
-                  <p className="font-medium text-foreground">{po.poNumber}</p>
-                  <p className="mt-0.5 text-xs capitalize text-muted-foreground">{po.status}</p>
-                </div>
+                <Link
+                  key={po._id}
+                  href={`/employee/purchase-orders/${po._id}`}
+                  className="group flex items-center justify-between gap-3 rounded-xl border border-border/60 bg-muted/20 px-3.5 py-2.5 transition-all hover:border-primary/40 hover:bg-primary/5"
+                >
+                  <div className="min-w-0">
+                    <p className="font-semibold font-mono text-xs text-foreground truncate group-hover:text-primary transition-colors">
+                      {po.poNumber}
+                    </p>
+                    <p className="mt-0.5 text-[11px] capitalize text-muted-foreground">
+                      {po.status}
+                    </p>
+                  </div>
+                  <ChevronRight className="size-4 shrink-0 text-muted-foreground group-hover:translate-x-0.5 group-hover:text-primary transition-transform" />
+                </Link>
               ))
             ) : (
-              <p className="py-2 text-muted-foreground">No POs on your projects yet.</p>
+              <div className="rounded-xl border border-border/60 bg-muted/20 px-4 py-6 text-center">
+                <p className="text-xs font-medium text-muted-foreground">
+                  No POs on your projects yet.
+                </p>
+              </div>
             )}
           </CardContent>
         </Card>
